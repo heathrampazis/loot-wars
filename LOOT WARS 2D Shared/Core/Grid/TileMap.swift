@@ -45,7 +45,7 @@ struct TileMap {
         switch self[point] {
         case .floor:
             return false
-        case .stone, .tree:
+        case .stone:
             return true
         case .block(let owner):
             return owner != team

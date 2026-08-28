@@ -74,9 +74,9 @@ final class TileMapRenderer {
         switch tile {
         case .stone:
             return RenderPalette.terrain
-        case .floor, .tree, .block:
-            // Trees and blocks get plain ground baked underneath them; they are
-            // drawn as sprites on top, because they change or overflow their tile.
+        case .floor, .block:
+            // Blocks get plain ground baked underneath them; they are drawn as
+            // sprites on top, because they come and go during a match.
             // A checkerboard makes it obvious you are actually moving.
             return (col + row) % 2 == 0 ? RenderPalette.floorLight : RenderPalette.floorDark
         }

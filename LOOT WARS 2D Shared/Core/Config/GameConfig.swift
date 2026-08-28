@@ -43,6 +43,19 @@ enum GameConfig {
         static let halfSize: Double = 0.4
     }
 
+    enum Trees {
+        /// Collision radius as a fraction of half a clump's width, per clump size.
+        /// Chosen to sit between the star art's inner and outer radius.
+        static let collisionRadiusFactor: [Int: Double] = [2: 0.82, 3: 0.89]
+
+        /// Idle spin, radians per second. A full turn takes roughly 35 to 105 seconds.
+        static let minSpin: Double = 0.06
+        static let maxSpin: Double = 0.18
+
+        /// Clear space kept between two clumps, in tiles.
+        static let spacing: Double = 0.75
+    }
+
     enum Blaster {
         /// Tiles per second.
         static let projectileSpeed: Double = 14

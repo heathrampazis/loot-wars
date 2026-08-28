@@ -21,6 +21,9 @@ final class World {
 
     let claims: [TeamID: BaseClaim]
 
+    /// Round obstacles. Not tiles - see TreePatch for why.
+    let trees: [TreePatch]
+
     var actors: [ActorID: Actor] = [:]
     var projectiles: [Projectile] = []
 
@@ -33,6 +36,7 @@ final class World {
     init(generated: GeneratedMap, localTeam: TeamID) {
         self.map = generated.map
         self.claims = generated.claims
+        self.trees = generated.trees
 
         let playerID = ActorID(0)
         self.localPlayerID = playerID

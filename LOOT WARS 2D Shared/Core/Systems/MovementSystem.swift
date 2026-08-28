@@ -23,7 +23,44 @@ enum MovementSystem {
             actor.position.y += step.y
             resolve(&actor, in: world.map, along: .vertical, delta: step.y)
 
+            // Trees are circles, so they are resolved after the grid, by pushing
+            // straight back out along the surface normal. That is what gives you
+            // the smooth slide around a clump instead of catching on a corner.
+            resolveTrees(&actor, in: world.trees)
+
             world.actors[id] = actor
+        }
+    }
+
+    private static func resolveTrees(_ actor: inout Actor, in trees: [TreePatch]) {
+        let half = GameConfig.Player.halfSize
+
+        for tree in trees {
+            // Nearest point on the actor's box to the centre of the clump.
+            let closest = Vec2(
+                x: min(max(tree.centre.x, actor.position.x - half), actor.position.x + half),
+                y: min(max(tree.centre.y, actor.position.y - half), actor.position.y + half)
+            )
+
+            var normal = closest - tree.centre
+            var distance = normal.length
+
+            guard distance < tree.radius else { continue }
+
+            if distance < 0.0001 {
+                // The clump's centre is inside the actor's box, so there is no
+                // surface normal to use. Push away from the centre instead; it
+                // untangles over the next tick or two.
+                normal = actor.position - tree.centre
+                distance = normal.length
+                if distance < 0.0001 {
+                    normal = Vec2(x: 0, y: 1)
+                    distance = 0.0001
+                }
+            }
+
+            let push = (tree.radius - distance) / distance
+            actor.position = actor.position + normal * push
         }
     }
 

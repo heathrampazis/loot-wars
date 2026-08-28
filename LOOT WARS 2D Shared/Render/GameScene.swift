@@ -83,7 +83,7 @@ final class GameScene: SKScene {
 
         tileRenderer.build(from: generated.map)
         claimRenderer.build(claims: generated.claims)
-        treeRenderer.build(patches: generated.treePatches)
+        treeRenderer.build(patches: generated.trees)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(claimRenderer.node)
         worldLayer.addChild(treeRenderer.node)

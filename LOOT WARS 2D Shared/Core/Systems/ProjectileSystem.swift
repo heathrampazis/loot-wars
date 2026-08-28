@@ -28,6 +28,8 @@ enum ProjectileSystem {
             // base, but you cannot shoot through it.
             if world.map.isOccupied(GridPoint(containing: projectile.position)) { continue }
 
+            if world.trees.contains(where: { $0.contains(projectile.position) }) { continue }
+
             survivors.append(projectile)
         }
 

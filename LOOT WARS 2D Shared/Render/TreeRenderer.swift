@@ -4,11 +4,13 @@
 //
 //  One sprite per tree clump, not one per tile.
 //
-//  That is the whole reason MapFactory hands back TreePatch rectangles instead of
-//  just marking tiles: a clump is one thing, so it gets one sprite and one image.
+//  That is the whole reason MapFactory hands back TreePatch objects instead of just
+//  marking tiles: a clump is one thing, so it gets one sprite and one image.
 //
-//  Textures are looked up once per clump size and cached, so the whole forest costs
-//  a couple of draw calls.
+//  The idle spin is a pure SKAction. It never touches the simulation, which is
+//  exactly right: the hitbox is a circle, so no amount of rotation changes what the
+//  clump collides with. The drawing can be as lively as it likes and the physics
+//  stays identical.
 //
 
 import SpriteKit
@@ -33,15 +35,27 @@ final class TreeRenderer {
 
             let sprite = SKSpriteNode(texture: texture(forSize: patch.size),
                                       size: CGSize(width: side, height: side))
-            // Anchored bottom-left so the sprite sits exactly on the tiles the clump
-            // occupies - the art's own padding is what insets it from the edges.
-            sprite.anchorPoint = CGPoint(x: 0, y: 0)
-            sprite.position = GridGeometry.point(for: Vec2(x: Double(patch.origin.col),
-                                                           y: Double(patch.origin.row)))
+            // Centred, so it turns about its own middle - which is also where the
+            // collision circle sits.
+            sprite.position = GridGeometry.point(for: patch.centre)
+            sprite.zRotation = CGFloat(patch.initialRotation)
             sprite.zPosition = 2    // above the ground and claim tints, below walls
+
+            sprite.run(spinAction(radiansPerSecond: patch.spin))
 
             node.addChild(sprite)
         }
+    }
+
+    /// A full turn, repeated forever. Direction comes from the sign of the speed.
+    private func spinAction(radiansPerSecond: Double) -> SKAction {
+        let fullTurn = 2 * Double.pi
+        let duration = fullTurn / abs(radiansPerSecond)
+        let angle = radiansPerSecond < 0 ? -fullTurn : fullTurn
+
+        return SKAction.repeatForever(
+            SKAction.rotate(byAngle: CGFloat(angle), duration: duration)
+        )
     }
 
     private func texture(forSize size: Int) -> SKTexture {

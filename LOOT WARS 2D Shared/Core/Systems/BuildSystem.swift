@@ -22,8 +22,13 @@ enum BuildSystem {
         // You may only build on your own claim.
         guard world.claim(for: owner)?.contains(point) == true else { return false }
 
-        // Only on open ground: not on terrain, trees, or an existing block.
+        // Only on open ground: not on terrain or an existing block.
         guard !world.map.isOccupied(point) else { return false }
+
+        // Trees are not tiles, so they need asking about separately. Today they can
+        // never land on a claim anyway, but that is a generation rule, not a
+        // guarantee worth relying on here.
+        guard !world.trees.contains(where: { $0.overlaps(point) }) else { return false }
 
         // You may block yourself in - you can walk back out through your own wall.
         // Sealing an enemy inside one is not allowed.
