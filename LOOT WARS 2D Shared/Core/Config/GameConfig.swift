@@ -19,10 +19,12 @@ enum GameConfig {
         static let width = 64
         static let height = 64
 
-        /// Fraction of open tiles that grow a tree.
-        /// Zero for now - the empty field is easier to work against. Everything
-        /// needed for trees is still in place; raise this to bring them back.
-        static let treeDensity: Double = 0.0
+        /// How many tree clumps to try to place. Placement can fail when a spot is
+        /// already taken, so treat this as a target rather than a guarantee.
+        static let treePatchCount = 45
+
+        /// Clumps are square, and either of these sizes.
+        static let treePatchSizes = [2, 3]
 
         /// Width and height of a team's base claim, in tiles. Odd, so it has a
         /// true centre tile to spawn on.
@@ -53,12 +55,5 @@ enum GameConfig {
         /// Half the width of a projectile, in tiles. Only used for drawing today;
         /// hit detection arrives with health at M5.
         static let projectileRadius: Double = 0.18
-    }
-
-    enum Trees {
-        /// A tree blocks exactly one tile, but is drawn slightly larger so it
-        /// overlaps the tile above and the map does not read as flat.
-        static let visualWidth: Double = 1.15
-        static let visualHeight: Double = 1.35
     }
 }

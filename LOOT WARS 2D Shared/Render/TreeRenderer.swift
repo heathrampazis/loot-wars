@@ -2,15 +2,14 @@
 //  TreeRenderer.swift
 //  Loot Wars
 //
-//  Draws every tree tile as a sprite sharing ONE texture, so a few hundred trees
-//  still cost a single draw call.
+//  One sprite per tree clump, not one per tile.
 //
-//  Trees are not baked into the terrain texture like the ground is, because they
-//  are drawn taller than the tile they occupy - they need to overlap whatever is
-//  above them.
+//  That is the whole reason MapFactory hands back TreePatch rectangles instead of
+//  just marking tiles: when real art turns up, a 2x2 clump is one image and a 3x3
+//  clump is another, and only makeTexture below has to change.
 //
-//  The texture is generated in code for now. Swapping in real art later means
-//  deleting makeTexture() and loading an image instead; nothing else changes.
+//  Textures are generated per clump size and cached, so the whole forest is a couple
+//  of draw calls.
 //
 
 import SpriteKit
@@ -20,84 +19,63 @@ final class TreeRenderer {
 
     let node = SKNode()
 
-    private lazy var texture: SKTexture = TreeRenderer.makeTexture()
+    /// Pixels drawn per tile. Only affects placeholder crispness, not game scale.
+    private static let pixelsPerTile: CGFloat = 64
+    private static let outline: CGFloat = 14
 
-    func build(from map: TileMap) {
+    private var textureCache: [Int: SKTexture] = [:]
+
+    func build(patches: [TreePatch]) {
         node.removeAllChildren()
 
-        let size = CGSize(width: GridGeometry.length(ofTiles: GameConfig.Trees.visualWidth),
-                          height: GridGeometry.length(ofTiles: GameConfig.Trees.visualHeight))
+        for patch in patches {
+            let side = GridGeometry.length(ofTiles: Double(patch.size))
 
-        for row in 0..<map.height {
-            for col in 0..<map.width where map[GridPoint(col: col, row: row)] == .tree {
-                let sprite = SKSpriteNode(texture: texture, size: size)
+            let sprite = SKSpriteNode(texture: texture(forSize: patch.size),
+                                      size: CGSize(width: side, height: side))
+            // Anchored bottom-left so the sprite covers exactly the tiles the clump
+            // occupies - what you see is precisely what you collide with.
+            sprite.anchorPoint = CGPoint(x: 0, y: 0)
+            sprite.position = GridGeometry.point(for: Vec2(x: Double(patch.origin.col),
+                                                           y: Double(patch.origin.row)))
+            sprite.zPosition = 2    // above the ground and claim tints, below walls
 
-                // Anchored at the foot of the tree so it stands on its own tile and
-                // grows upward into the one above.
-                sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
-                sprite.position = GridGeometry.point(for: Vec2(x: Double(col) + 0.5,
-                                                               y: Double(row)))
-
-                // Trees further down the screen overlap the ones behind them.
-                // The range is tiny on purpose, so every tree still sits below the
-                // actors, which live at zPosition 10.
-                sprite.zPosition = 1.0 + Double(map.height - row) * 0.001
-
-                node.addChild(sprite)
-            }
+            node.addChild(sprite)
         }
     }
 
-    // MARK: - Texture
+    private func texture(forSize size: Int) -> SKTexture {
+        if let cached = textureCache[size] { return cached }
+        let made = TreeRenderer.makeTexture(size: size)
+        textureCache[size] = made
+        return made
+    }
 
-    private static func makeTexture() -> SKTexture {
-        let canvas = CGSize(width: 96, height: 120)
-        let outline: CGFloat = 7
-
-        // Three overlapping circles make a canopy that reads as a tree rather than
-        // a lollipop.
-        let canopy: [(centre: CGPoint, radius: CGFloat)] = [
-            (CGPoint(x: 48, y: 42), 34),
-            (CGPoint(x: 24, y: 60), 24),
-            (CGPoint(x: 72, y: 60), 24)
-        ]
-        let trunk = CGRect(x: 39, y: 74, width: 18, height: 36)
+    /// Replace this with a loaded image when the art is ready. Because the canvas
+    /// scales with the clump size, the outline stays the same thickness on screen
+    /// whether the clump is 2x2 or 3x3.
+    private static func makeTexture(size: Int) -> SKTexture {
+        let side = CGFloat(size) * pixelsPerTile
 
         let format = UIGraphicsImageRendererFormat.default()
         format.opaque = false
 
-        let image = UIGraphicsImageRenderer(size: canvas, format: format).image { _ in
-
-            // Pass 1: one black silhouette, slightly larger than everything else.
-            // Outlining each shape separately would leave seams where they overlap.
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side),
+            format: format
+        ).image { _ in
             SKColor.black.setFill()
-            for part in canopy {
-                circle(part.centre, part.radius + outline).fill()
-            }
-            UIBezierPath(roundedRect: trunk.insetBy(dx: -outline, dy: -outline),
-                         cornerRadius: 8).fill()
+            UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: side, height: side),
+                         cornerRadius: 18).fill()
 
-            // Pass 2: the colours, sitting inside the silhouette so it reads as an
-            // outline around the whole tree.
-            RenderPalette.treeTrunk.setFill()
-            UIBezierPath(roundedRect: trunk, cornerRadius: 4).fill()
-
-            RenderPalette.treeCanopy.setFill()
-            for part in canopy {
-                circle(part.centre, part.radius).fill()
-            }
-
-            RenderPalette.treeHighlight.setFill()
-            circle(CGPoint(x: 39, y: 35), 11).fill()
+            RenderPalette.tree.setFill()
+            UIBezierPath(roundedRect: CGRect(x: outline,
+                                             y: outline,
+                                             width: side - outline * 2,
+                                             height: side - outline * 2),
+                         cornerRadius: 10).fill()
         }
 
         return SKTexture(image: image)
-    }
-
-    private static func circle(_ centre: CGPoint, _ radius: CGFloat) -> UIBezierPath {
-        UIBezierPath(ovalIn: CGRect(x: centre.x - radius,
-                                    y: centre.y - radius,
-                                    width: radius * 2,
-                                    height: radius * 2))
     }
 }
