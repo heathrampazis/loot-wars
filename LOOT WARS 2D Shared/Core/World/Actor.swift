@@ -17,6 +17,14 @@ struct Actor {
     /// Set from Commands at the start of every tick.
     var moveInput: Vec2 = .zero
 
+    /// The last direction the actor actually moved in, and therefore where it
+    /// shoots. Holds its value when the stick is released, so letting go does not
+    /// leave you aiming at nothing.
+    var facing: Vec2 = Vec2(x: 1, y: 0)
+
+    /// Seconds until this actor may fire again.
+    var shootCooldown: Double = 0
+
     /// Does this actor's hitbox overlap the given tile at all?
     /// Lives here so collision, building and rendering all agree on the answer.
     func overlaps(_ point: GridPoint) -> Bool {

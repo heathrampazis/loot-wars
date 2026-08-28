@@ -33,6 +33,7 @@ final class GameScene: SKScene {
     private let claimRenderer = ClaimRenderer()
     private let treeRenderer = TreeRenderer()
     private let blockRenderer = BlockRenderer()
+    private let projectileRenderer = ProjectileRenderer()
     private let actorRenderer = ActorRenderer()
     private let cameraController = CameraController()
 
@@ -43,10 +44,12 @@ final class GameScene: SKScene {
     // MARK: - UI
 
     private let joystick = JoystickNode()
+    private let fireButton = ActionButtonNode(glyph: Glyphs.crosshair)
 
     #if os(iOS) || os(tvOS)
-    /// Which finger owns the stick, and which one might still turn out to be a tap.
+    /// Which finger owns which control, and which one might still turn out to be a tap.
     private var joystickTouch: UITouch?
+    private var fireTouch: UITouch?
     private var tapTouch: UITouch?
     private var tapOrigin: CGPoint = .zero
     /// Slide further than this and it was a drag, not a tap.
@@ -85,6 +88,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(claimRenderer.node)
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
+        worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
         addChild(worldLayer)
 
@@ -92,6 +96,7 @@ final class GameScene: SKScene {
         camera = cameraController.node
         addChild(cameraController.node)
         cameraController.node.addChild(joystick)
+        cameraController.node.addChild(fireButton)
         layOutUI()
 
         syncRenderers()
@@ -106,6 +111,8 @@ final class GameScene: SKScene {
         let margin: CGFloat = 110
         joystick.position = CGPoint(x: -size.width / 2 + margin,
                                     y: -size.height / 2 + margin)
+        fireButton.position = CGPoint(x: size.width / 2 - margin,
+                                      y: -size.height / 2 + margin)
     }
 
     // MARK: - Loop
@@ -137,6 +144,7 @@ final class GameScene: SKScene {
         }
 
         blockRenderer.sync(with: world)
+        projectileRenderer.sync(with: world)
         actorRenderer.sync(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
@@ -147,6 +155,11 @@ final class GameScene: SKScene {
     /// Commands exactly the same way, and the world cannot tell them apart.
     private func gatherCommands() -> [ActorID: [Command]] {
         var commands: [Command] = [.move(joystick.direction)]
+        if fireButton.isPressed {
+            // Asked every tick while held. WeaponSystem owns the fire rate, so this
+            // cannot shoot faster than the blaster allows.
+            commands.append(.shoot)
+        }
         commands.append(contentsOf: queuedCommands)
         queuedCommands.removeAll()
         return [world.localPlayerID: commands]
@@ -158,10 +171,17 @@ extension GameScene {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
-            // The stick gets first refusal on every touch.
+            // The controls get first refusal on every touch; whatever is left over
+            // is a tap on the map.
             if joystickTouch == nil,
                joystick.begin(atLocalPoint: touch.location(in: joystick)) {
                 joystickTouch = touch
+                continue
+            }
+
+            if fireTouch == nil,
+               fireButton.begin(atLocalPoint: touch.location(in: fireButton)) {
+                fireTouch = touch
                 continue
             }
 
@@ -188,6 +208,7 @@ extension GameScene {
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseJoystick(matching: touches)
+        releaseFireButton(matching: touches)
 
         if let tap = tapTouch, touches.contains(tap) {
             requestBlock(at: tap.location(in: worldLayer))
@@ -197,6 +218,7 @@ extension GameScene {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseJoystick(matching: touches)
+        releaseFireButton(matching: touches)
 
         if let tap = tapTouch, touches.contains(tap) {
             tapTouch = nil
@@ -207,6 +229,12 @@ extension GameScene {
         guard let active = joystickTouch, touches.contains(active) else { return }
         joystick.end()
         joystickTouch = nil
+    }
+
+    private func releaseFireButton(matching touches: Set<UITouch>) {
+        guard let active = fireTouch, touches.contains(active) else { return }
+        fireButton.end()
+        fireTouch = nil
     }
 
     /// Asks for a block. Whether one appears is BuildSystem's call, not the scene's.

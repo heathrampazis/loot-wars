@@ -12,4 +12,7 @@
 enum Command {
     case move(Vec2)
     case placeBlock(GridPoint)
+    /// Fire in whatever direction the actor is facing. Rate limiting is the
+    /// simulation's job, so holding the button down is perfectly safe.
+    case shoot
 }

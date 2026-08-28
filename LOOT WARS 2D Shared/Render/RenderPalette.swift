@@ -39,9 +39,14 @@ enum RenderPalette {
         teams[team.raw % teams.count]
     }
 
+    // Projectiles - the pale blue from the mockup, deliberately not team coloured
+    // so shots stay readable against eight different team colours.
+    static let projectile        = rgb(0xB3, 0xF0, 0xFA)
+    static let projectileOutline = SKColor.black
+
     // UI
-    static let joystickBase = SKColor(white: 0.0, alpha: 0.18)
-    static let joystickKnob = SKColor(white: 0.0, alpha: 0.30)
+    static let controlBackground = SKColor(white: 0.0, alpha: 0.18)
+    static let controlForeground = SKColor(white: 0.0, alpha: 0.30)
 
     private static func rgb(_ r: Int, _ g: Int, _ b: Int) -> SKColor {
         SKColor(red: CGFloat(r) / 255.0,

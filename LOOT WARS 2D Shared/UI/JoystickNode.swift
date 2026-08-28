@@ -37,9 +37,9 @@ final class JoystickNode: SKNode {
     override init() {
         super.init()
 
-        base.fillColor = RenderPalette.joystickBase
+        base.fillColor = RenderPalette.controlBackground
         base.strokeColor = .clear
-        knob.fillColor = RenderPalette.joystickKnob
+        knob.fillColor = RenderPalette.controlForeground
         knob.strokeColor = .clear
 
         zPosition = 1000

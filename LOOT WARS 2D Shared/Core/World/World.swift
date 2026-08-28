@@ -22,6 +22,9 @@ final class World {
     let claims: [TeamID: BaseClaim]
 
     var actors: [ActorID: Actor] = [:]
+    var projectiles: [Projectile] = []
+
+    private var nextProjectileID = 0
 
     /// Which actor this device is driving. Today it is the only one; later it is
     /// simply one of eight. Nothing else in the code assumes it is special.
@@ -47,6 +50,17 @@ final class World {
 
     func claim(for team: TeamID) -> BaseClaim? { claims[team] }
 
+    func spawnProjectile(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2) {
+        let projectile = Projectile(id: ProjectileID(nextProjectileID),
+                                    owner: owner,
+                                    team: team,
+                                    position: position,
+                                    velocity: velocity,
+                                    distanceRemaining: GameConfig.Blaster.range)
+        nextProjectileID += 1
+        projectiles.append(projectile)
+    }
+
     func setTile(_ tile: TileType, at point: GridPoint) {
         guard map.contains(point), map[point] != tile else { return }
         map[point] = tile
@@ -57,7 +71,9 @@ final class World {
     func step(commands: [ActorID: [Command]], dt: Double) {
         applyMovementInput(commands)
         BuildSystem.update(self, commands: commands)
+        WeaponSystem.update(self, commands: commands, dt: dt)
         MovementSystem.update(self, dt: dt)
+        ProjectileSystem.update(self, dt: dt)
         tick += 1
     }
 
@@ -67,9 +83,14 @@ final class World {
             for command in list {
                 switch command {
                 case .move(let direction):
-                    actor.moveInput = direction.clampedToUnit()
-                case .placeBlock:
-                    break   // BuildSystem's business, not movement's
+                    let input = direction.clampedToUnit()
+                    actor.moveInput = input
+                    // Remember where we were last heading - that is where we shoot.
+                    if input.length > 0.01 {
+                        actor.facing = input.normalized()
+                    }
+                case .placeBlock, .shoot:
+                    break   // other systems' business, not movement's
                 }
             }
             actors[id] = actor

@@ -41,6 +41,20 @@ enum GameConfig {
         static let halfSize: Double = 0.4
     }
 
+    enum Blaster {
+        /// Tiles per second.
+        static let projectileSpeed: Double = 14
+        /// Shots per second while the button is held.
+        static let fireRate: Double = 3.0
+        /// Tiles a shot travels before fizzling out.
+        static let range: Double = 12
+        /// How far in front of the actor a shot appears, so you never shoot yourself.
+        static let muzzleOffset: Double = 0.5
+        /// Half the width of a projectile, in tiles. Only used for drawing today;
+        /// hit detection arrives with health at M5.
+        static let projectileRadius: Double = 0.18
+    }
+
     enum Trees {
         /// A tree blocks exactly one tile, but is drawn slightly larger so it
         /// overlaps the tile above and the map does not read as flat.
