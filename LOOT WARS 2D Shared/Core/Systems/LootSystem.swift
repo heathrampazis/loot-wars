@@ -20,7 +20,7 @@ enum LootSystem {
 
     private static func openBoxes(_ world: World, commands: [ActorID: [Command]]) {
         for (id, list) in commands {
-            guard let actor = world.actors[id] else { continue }
+            guard let actor = world.actors[id], actor.isAlive else { continue }
 
             for command in list {
                 guard case .openLootbox = command else { continue }
@@ -42,7 +42,7 @@ enum LootSystem {
         var collected: [GroundItemID] = []
 
         for actorID in Array(world.actors.keys) {
-            guard var actor = world.actors[actorID] else { continue }
+            guard var actor = world.actors[actorID], actor.isAlive else { continue }
 
             let reach = actor.hitbox
 

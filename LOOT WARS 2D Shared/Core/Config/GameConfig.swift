@@ -48,10 +48,16 @@ enum GameConfig {
         /// Tiles travelled per second at full stick.
         static let moveSpeed: Double = 4.5
 
-        /// Starting and maximum health. Nothing takes it away yet - damage lands
-        /// with the rest of M5 - but the HUD reads the real value, so it will start
-        /// moving the moment it does.
+        /// Starting and maximum health.
         static let maxHealth = 100
+
+        /// Seconds spent dead before respawning at your own claim.
+        static let respawnDelay: Double = 3.0
+
+        /// Seconds of immunity after respawning, so you cannot be spawn-camped.
+        /// Shots pass straight through a protected actor rather than being absorbed,
+        /// so it cannot be used as a shield either.
+        static let spawnProtection: Double = 1.5
         // The hitbox is the whole standing figure: the sprite is drawn at exactly
         // these dimensions, so what you see is what you collide with.
         //
@@ -106,6 +112,11 @@ enum GameConfig {
         /// Half the width of a projectile, in tiles. Only used for drawing today;
         /// hit detection arrives with health at M5.
         static let projectileRadius: Double = 0.18
+
+        /// Damage per hit. This is tier 1 from the design spec: nine hits to kill
+        /// an unarmoured actor, about 2.7 seconds. When helmet and blaster tiers
+        /// arrive, this number becomes a lookup on the actor's blaster.
+        static let damage = 12
 
         /// Shots you can fire before running dry.
         static let magazineSize = 12

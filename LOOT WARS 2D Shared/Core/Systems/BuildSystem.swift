@@ -10,7 +10,7 @@ enum BuildSystem {
 
     static func update(_ world: World, commands: [ActorID: [Command]]) {
         for (id, list) in commands {
-            guard let actor = world.actors[id] else { continue }
+            guard let actor = world.actors[id], actor.isAlive else { continue }
             for command in list {
                 guard case .placeBlock(let point) = command else { continue }
                 place(at: point, owner: actor.team, in: world)

@@ -11,7 +11,7 @@ enum MovementSystem {
         // Snapshot the keys: writing back into the dictionary while iterating its
         // live key view would copy the storage on every single write.
         for id in Array(world.actors.keys) {
-            guard var actor = world.actors[id] else { continue }
+            guard var actor = world.actors[id], actor.isAlive else { continue }
 
             let step = actor.moveInput.clampedToUnit() * (GameConfig.Player.moveSpeed * dt)
 

@@ -145,6 +145,7 @@ final class World {
         ProjectileSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
         LootSystem.update(self, commands: commands)
+        RespawnSystem.update(self, dt: dt)
         tick += 1
     }
 

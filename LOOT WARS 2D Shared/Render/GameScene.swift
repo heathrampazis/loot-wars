@@ -58,6 +58,7 @@ final class GameScene: SKScene {
     private var actionMode: ActionMode = .shoot
     private let hud = HUDNode()
     private let hotbar = HotbarNode()
+    private let respawnBanner = RespawnBanner()
 
     #if os(iOS) || os(tvOS)
     /// Which finger owns which control, and which one might still turn out to be a tap.
@@ -114,6 +115,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(actionButton)
         cameraController.node.addChild(hud)
         cameraController.node.addChild(hotbar)
+        cameraController.node.addChild(respawnBanner)
         layOutUI()
 
         syncRenderers()
@@ -176,6 +178,7 @@ final class GameScene: SKScene {
         actorRenderer.sync(with: world)
         hud.update(with: world)
         hotbar.update(with: world)
+        respawnBanner.update(with: world)
 
         updateActionMode(with: world)
         if let player = world.localPlayer {

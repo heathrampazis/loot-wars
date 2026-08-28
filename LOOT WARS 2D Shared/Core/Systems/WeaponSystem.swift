@@ -53,6 +53,7 @@ enum WeaponSystem {
 
     private static func fire(_ id: ActorID, in world: World) {
         guard var actor = world.actors[id],
+              actor.isAlive,
               actor.shootCooldown <= 0,
               actor.ammo > 0 else { return }
 

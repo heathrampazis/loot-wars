@@ -29,6 +29,14 @@ struct Actor {
 
     var health: Int = GameConfig.Player.maxHealth
 
+    /// nil while alive; counts down to respawn while dead.
+    var respawnTimer: Double?
+
+    /// Seconds of spawn protection left.
+    var invulnerability: Double = 0
+
+    var isAlive: Bool { respawnTimer == nil }
+
     var ammo: Int = GameConfig.Blaster.magazineSize
 
     var inventory = Inventory()

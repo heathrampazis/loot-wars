@@ -31,6 +31,8 @@ final class ActorRenderer {
         let sprite: SKSpriteNode
         let healthFill: SKShapeNode
         var lastHealthFraction: Double = -1
+        /// Used only to notice a drop, which is what triggers the hit flash.
+        var lastHealth: Int = Int.max
 
         init(sprite: SKSpriteNode, healthFill: SKShapeNode) {
             self.sprite = sprite
@@ -55,6 +57,21 @@ final class ActorRenderer {
 
             // Actors lower down the screen draw in front of those behind them.
             nodes.root.zPosition = 10 + (Double(world.map.height) - actor.position.y) * 0.001
+
+            // The dead are simply not drawn. Nothing is removed, because the actor
+            // itself still exists and is counting down to respawn.
+            nodes.root.isHidden = !actor.isAlive
+
+            // Spawn protection reads as a ghost, so it is obvious why shots are
+            // passing straight through someone.
+            nodes.root.alpha = actor.invulnerability > 0 ? 0.55 : 1.0
+
+            // A drop in health is the hit. No event system needed for something the
+            // renderer can simply notice.
+            if actor.health < nodes.lastHealth, actor.isAlive {
+                flash(nodes.sprite)
+            }
+            nodes.lastHealth = actor.health
 
             setHealth(Double(actor.health) / Double(GameConfig.Player.maxHealth), on: nodes)
         }
@@ -104,6 +121,16 @@ final class ActorRenderer {
         node.addChild(nodes.root)
         nodesByActor[actor.id] = nodes
         return nodes
+    }
+
+    /// A quick white blink. Keyed, so rapid hits restart it rather than stacking up
+    /// into a permanently white actor.
+    private func flash(_ sprite: SKSpriteNode) {
+        sprite.removeAction(forKey: "hit")
+        sprite.run(.sequence([
+            .colorize(with: .white, colorBlendFactor: 0.85, duration: 0.04),
+            .colorize(withColorBlendFactor: 0, duration: 0.14)
+        ]), withKey: "hit")
     }
 
     private func setHealth(_ fraction: Double, on nodes: ActorNodes) {
