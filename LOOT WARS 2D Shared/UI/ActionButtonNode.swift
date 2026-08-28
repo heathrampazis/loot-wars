@@ -18,15 +18,17 @@ final class ActionButtonNode: SKNode {
     /// Generous, like the joystick - thumbs are imprecise.
     private static let grabRadius: CGFloat = 105
 
+    /// Longest side a glyph is allowed to be. Art of any shape is fitted inside it.
+    private static let glyphSize: CGFloat = 62
+
     private let base = SKShapeNode(circleOfRadius: ActionButtonNode.radius)
-    private let glyph: SKSpriteNode
+    private let glyph = SKSpriteNode()
 
     private(set) var isPressed = false
 
     init(glyph texture: SKTexture) {
-        self.glyph = SKSpriteNode(texture: texture,
-                                  size: CGSize(width: 62, height: 62))
         super.init()
+        setGlyph(texture)
 
         base.fillColor = RenderPalette.controlBackground
         base.strokeColor = .clear
@@ -40,6 +42,20 @@ final class ActionButtonNode: SKNode {
 
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    /// Swaps what the button does the job of. The caller decides when that is safe -
+    /// changing it under a thumb that is already pressing would be the worst
+    /// possible moment.
+    func setGlyph(_ texture: SKTexture) {
+        glyph.texture = texture
+
+        // Fit the art inside the glyph box rather than squashing it to a square.
+        let art = texture.size()
+        let scale = art.width > 0 && art.height > 0
+            ? min(ActionButtonNode.glyphSize / art.width, ActionButtonNode.glyphSize / art.height)
+            : 1
+        glyph.size = CGSize(width: art.width * scale, height: art.height * scale)
     }
 
     /// - Parameter localPoint: the touch, in this node's own coordinate space.

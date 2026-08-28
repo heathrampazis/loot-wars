@@ -13,6 +13,9 @@ enum Glyphs {
 
     static let crosshair: SKTexture = makeCrosshair()
 
+    /// The action button borrows the lootbox art when there is one in reach.
+    static let lootbox: SKTexture = SKTexture(imageNamed: "LootboxRed")
+
     private static func makeCrosshair() -> SKTexture {
         let side: CGFloat = 128
         let centre = CGPoint(x: side / 2, y: side / 2)

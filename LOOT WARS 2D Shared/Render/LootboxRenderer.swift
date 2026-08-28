@@ -29,11 +29,7 @@ final class LootboxRenderer {
 
         for (id, sprite) in Array(nodesByBox) where world.lootboxes[id] == nil {
             nodesByBox[id] = nil
-            // Pop rather than blink out, so opening a box reads as an event.
-            sprite.run(.sequence([
-                .group([.scale(to: 1.35, duration: 0.14), .fadeOut(withDuration: 0.14)]),
-                .removeFromParent()
-            ]))
+            sprite.removeFromParent()
         }
     }
 

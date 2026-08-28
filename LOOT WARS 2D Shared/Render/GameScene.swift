@@ -17,6 +17,12 @@
 
 import SpriteKit
 
+/// What the one action button currently does.
+private enum ActionMode {
+    case shoot
+    case open
+}
+
 final class GameScene: SKScene {
 
     // MARK: - Simulation
@@ -46,17 +52,17 @@ final class GameScene: SKScene {
     // MARK: - UI
 
     private let joystick = JoystickNode()
-    private let fireButton = ActionButtonNode(glyph: Glyphs.crosshair)
-    /// Only shown when there is actually a lootbox in reach.
-    private let openButton = ActionButtonNode(glyph: SKTexture(imageNamed: "LootboxRed"))
+    /// One button, two jobs. It shoots, unless you are standing next to a lootbox
+    /// with your finger off the trigger - then it opens.
+    private let actionButton = ActionButtonNode(glyph: Glyphs.crosshair)
+    private var actionMode: ActionMode = .shoot
     private let hud = HUDNode()
     private let hotbar = HotbarNode()
 
     #if os(iOS) || os(tvOS)
     /// Which finger owns which control, and which one might still turn out to be a tap.
     private var joystickTouch: UITouch?
-    private var fireTouch: UITouch?
-    private var openTouch: UITouch?
+    private var actionTouch: UITouch?
     private var tapTouch: UITouch?
     private var tapOrigin: CGPoint = .zero
     /// Slide further than this and it was a drag, not a tap.
@@ -105,8 +111,7 @@ final class GameScene: SKScene {
         camera = cameraController.node
         addChild(cameraController.node)
         cameraController.node.addChild(joystick)
-        cameraController.node.addChild(fireButton)
-        cameraController.node.addChild(openButton)
+        cameraController.node.addChild(actionButton)
         cameraController.node.addChild(hud)
         cameraController.node.addChild(hotbar)
         layOutUI()
@@ -123,12 +128,8 @@ final class GameScene: SKScene {
         let margin: CGFloat = 110
         joystick.position = CGPoint(x: -size.width / 2 + margin,
                                     y: -size.height / 2 + margin)
-        fireButton.position = CGPoint(x: size.width / 2 - margin,
-                                      y: -size.height / 2 + margin)
-
-        // Sits above the fire button, where a right thumb can reach it.
-        openButton.position = CGPoint(x: size.width / 2 - margin,
-                                      y: -size.height / 2 + margin + 92)
+        actionButton.position = CGPoint(x: size.width / 2 - margin,
+                                        y: -size.height / 2 + margin)
 
         // The HUD's origin is its own top-left corner, so this is just an inset.
         let inset: CGFloat = 16
@@ -176,23 +177,40 @@ final class GameScene: SKScene {
         hud.update(with: world)
         hotbar.update(with: world)
 
-        // The button only appears when there is something to open, and it asks the
-        // world the same question LootSystem will - so it can never light up for a
-        // box the simulation would then refuse to open.
-        let inReach = world.localPlayer.flatMap {
-            world.nearestLootbox(to: $0.feet, within: GameConfig.Loot.openRange)
-        }
-        openButton.isHidden = inReach == nil
+        updateActionMode(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }
+    }
+
+    /// The action button becomes an Open button near a lootbox - but only while the
+    /// player is not mid-fight. Swapping the trigger out from under a thumb during
+    /// PvP would be indefensible, so the mode is frozen while the button is held
+    /// and while a shot is still cooling down.
+    private func updateActionMode(with world: World) {
+        guard let player = world.localPlayer else { return }
+
+        #if os(iOS) || os(tvOS)
+        guard actionTouch == nil else { return }
+        #endif
+        guard player.shootCooldown <= 0 else { return }
+
+        // Asks the world the same question LootSystem will, so the button can never
+        // offer to open a box the simulation would then refuse.
+        let boxInReach = world.nearestLootbox(to: player.feet,
+                                              within: GameConfig.Loot.openRange) != nil
+        let wanted: ActionMode = boxInReach ? .open : .shoot
+
+        guard wanted != actionMode else { return }
+        actionMode = wanted
+        actionButton.setGlyph(wanted == .open ? Glyphs.lootbox : Glyphs.crosshair)
     }
 
     /// Input becomes a Command. Later, AI brains and network packets produce their
     /// Commands exactly the same way, and the world cannot tell them apart.
     private func gatherCommands() -> [ActorID: [Command]] {
         var commands: [Command] = [.move(joystick.direction)]
-        if fireButton.isPressed {
+        if actionMode == .shoot, actionButton.isPressed {
             // Asked every tick while held. WeaponSystem owns the fire rate, so this
             // cannot shoot faster than the blaster allows.
             commands.append(.shoot)
@@ -216,17 +234,14 @@ extension GameScene {
                 continue
             }
 
-            if fireTouch == nil,
-               fireButton.begin(atLocalPoint: touch.location(in: fireButton)) {
-                fireTouch = touch
-                continue
-            }
-
-            if openTouch == nil, !openButton.isHidden,
-               openButton.begin(atLocalPoint: touch.location(in: openButton)) {
-                openTouch = touch
-                // A one-shot action, unlike the fire button - queued on press.
-                queuedCommands.append(.openLootbox)
+            if actionTouch == nil,
+               actionButton.begin(atLocalPoint: touch.location(in: actionButton)) {
+                actionTouch = touch
+                // Opening is a one-shot action, so it fires on press. Shooting is
+                // held, and is read from isPressed in gatherCommands instead.
+                if actionMode == .open {
+                    queuedCommands.append(.openLootbox)
+                }
                 continue
             }
 
@@ -253,8 +268,7 @@ extension GameScene {
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseJoystick(matching: touches)
-        releaseFireButton(matching: touches)
-        releaseOpenButton(matching: touches)
+        releaseActionButton(matching: touches)
 
         if let tap = tapTouch, touches.contains(tap) {
             requestBlock(at: tap.location(in: worldLayer))
@@ -264,8 +278,7 @@ extension GameScene {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseJoystick(matching: touches)
-        releaseFireButton(matching: touches)
-        releaseOpenButton(matching: touches)
+        releaseActionButton(matching: touches)
 
         if let tap = tapTouch, touches.contains(tap) {
             tapTouch = nil
@@ -278,16 +291,10 @@ extension GameScene {
         joystickTouch = nil
     }
 
-    private func releaseFireButton(matching touches: Set<UITouch>) {
-        guard let active = fireTouch, touches.contains(active) else { return }
-        fireButton.end()
-        fireTouch = nil
-    }
-
-    private func releaseOpenButton(matching touches: Set<UITouch>) {
-        guard let active = openTouch, touches.contains(active) else { return }
-        openButton.end()
-        openTouch = nil
+    private func releaseActionButton(matching touches: Set<UITouch>) {
+        guard let active = actionTouch, touches.contains(active) else { return }
+        actionButton.end()
+        actionTouch = nil
     }
 
     /// Asks for a block. Whether one appears is BuildSystem's call, not the scene's.

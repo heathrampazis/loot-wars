@@ -15,9 +15,11 @@ import SpriteKit
 
 final class HotbarNode: SKNode {
 
-    private static let slotSize: CGFloat = 54
+    private static let slotSize: CGFloat = 60
     private static let gap: CGFloat = 8
-    private static let outline: CGFloat = 4.5
+    /// How much smaller the item is drawn than its slot. Small, so items fill the
+    /// slot the way they do in the reference art.
+    private static let iconInset: CGFloat = 6
 
     static var size: CGSize {
         let count = CGFloat(Inventory.slotCount)
@@ -66,18 +68,16 @@ final class HotbarNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// No outline: the slots are quiet panels the items sit on, not framed boxes.
     private func makeSlot(atX centreX: CGFloat) -> SKShapeNode {
-        // Inset by half the stroke so the outline's outer edge lands on slotSize,
-        // the same trick the HUD bars use.
-        let inner = HotbarNode.slotSize - HotbarNode.outline
-        let slot = SKShapeNode(rect: CGRect(x: centreX - inner / 2,
-                                            y: -inner / 2,
-                                            width: inner,
-                                            height: inner),
-                               cornerRadius: 10)
+        let side = HotbarNode.slotSize
+        let slot = SKShapeNode(rect: CGRect(x: centreX - side / 2,
+                                            y: -side / 2,
+                                            width: side,
+                                            height: side),
+                               cornerRadius: 12)
         slot.fillColor = RenderPalette.hudPanel
-        slot.strokeColor = .black
-        slot.lineWidth = HotbarNode.outline
+        slot.strokeColor = .clear
         return slot
     }
 
@@ -98,7 +98,7 @@ final class HotbarNode: SKNode {
 
             let texture = ItemArt.texture(for: stack.type)
             let art = texture.size()
-            let height = HotbarNode.slotSize - 14
+            let height = HotbarNode.slotSize - HotbarNode.iconInset
             let width = art.height > 0 ? height * (art.width / art.height) : height
 
             icon.texture = texture
