@@ -29,6 +29,14 @@ struct Vec2: Equatable {
         length > 1 ? normalized() : self
     }
 
+    /// Direction as an angle in radians.
+    var angle: Double { atan2(y, x) }
+
+    /// A unit vector pointing along the given angle.
+    static func fromAngle(_ radians: Double) -> Vec2 {
+        Vec2(x: cos(radians), y: sin(radians))
+    }
+
     static func + (a: Vec2, b: Vec2) -> Vec2 { Vec2(x: a.x + b.x, y: a.y + b.y) }
     static func - (a: Vec2, b: Vec2) -> Vec2 { Vec2(x: a.x - b.x, y: a.y - b.y) }
     static func * (v: Vec2, scalar: Double) -> Vec2 { Vec2(x: v.x * scalar, y: v.y * scalar) }

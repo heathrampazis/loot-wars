@@ -7,6 +7,8 @@
 //  protecting. It is what would let this same code run on a host or a server.
 //
 
+import Foundation
+
 final class World {
 
     private(set) var tick: Int = 0
@@ -78,12 +80,14 @@ final class World {
                 local = id
             } else if brainsGiven < GameConfig.AI.botCount {
                 brainsGiven += 1
+                let heading = Vec2.fromAngle(Double.random(in: 0..<(2 * .pi), using: &rng))
                 actor.ai = AIState(
-                    destination: spawn,
-                    // Staggered, so all seven do not stop and think on the same tick.
-                    decisionTimer: Double.random(in: 0...GameConfig.AI.decisionInterval,
+                    heading: heading,
+                    desiredHeading: heading,
+                    // Staggered, so all seven do not change their minds in unison.
+                    decisionTimer: Double.random(in: GameConfig.AI.decisionInterval,
                                                  using: &rng),
-                    positionAtLastDecision: spawn
+                    turnPreference: Bool.random(using: &rng) ? 1 : -1
                 )
             }
 

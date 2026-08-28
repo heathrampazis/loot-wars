@@ -44,11 +44,15 @@ enum RespawnSystem {
             actor.position = claim.centreTile.center
         }
 
-        // A bot that died halfway across the map should not set off for its old
-        // destination the moment it comes back. Make it think again immediately.
+        // A bot that died halfway across the map should not come back still
+        // pointed the way it was going. Face it out of its own base and let it
+        // choose again shortly.
         if var ai = actor.ai {
-            ai.destination = actor.position
-            ai.positionAtLastDecision = actor.position
+            let outward = (actor.position - Vec2(x: Double(world.map.width) / 2,
+                                                 y: Double(world.map.height) / 2))
+            let heading = outward.length > 0 ? outward.normalized() : Vec2(x: 1, y: 0)
+            ai.heading = heading
+            ai.desiredHeading = heading
             ai.decisionTimer = 0
             actor.ai = ai
         }

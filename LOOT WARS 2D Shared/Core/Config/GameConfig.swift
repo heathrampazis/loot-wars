@@ -92,26 +92,30 @@ enum GameConfig {
         /// watching a single bot's behaviour.
         static let botCount = 7
 
-        /// Seconds between decisions. Bots keep executing in between - re-deciding
-        /// every tick makes them vibrate between options instead of committing.
-        static let decisionInterval: Double = 0.5
+        /// How long a bot holds a direction before picking a new one. Randomised
+        /// per decision, so seven bots never change their minds in unison.
+        static let decisionInterval: ClosedRange<Double> = 1.2...3.0
 
-        /// Close enough to count as having arrived, in tiles.
-        static let arriveDistance: Double = 0.8
+        /// How fast a bot can turn, in radians per second. This is the single
+        /// number that decides whether movement reads as steering or as snapping.
+        /// Roughly a half-turn per second.
+        static let turnRate: Double = 4.5
 
-        /// Moved less than this since the last decision means something is in the
-        /// way, so pick a different destination rather than grinding into it.
-        static let stuckDistance: Double = 0.4
+        /// How far a change of mind can swing the heading, in radians (about 60°).
+        /// Large enough to be a real change, small enough not to look like a glitch.
+        static let wanderTurn: Double = 1.1
 
-        /// How far away a bot will pick its next spot to walk to, in tiles.
-        static let wanderRange: ClosedRange<Double> = 4...14
+        /// How far ahead to look for obstacles, in tiles. Several distances, so a
+        /// bot starts easing away early rather than turning at the last moment.
+        static let probeDistances: [Double] = [1.0, 2.0, 3.2]
 
-        /// How many spots to try before giving up and standing still.
-        static let destinationAttempts = 12
+        /// Angles to try when the way ahead is blocked, in radians, smallest first,
+        /// so a bot takes the gentlest turn that works.
+        static let avoidanceAngles: [Double] = [0.45, 0.9, 1.5, 2.1, 2.7, 3.14]
 
-        /// Draws each bot's current goal above its head. Worth leaving on while
-        /// tuning behaviour; turn it off when you want to just play.
-        static let showDebugLabels = true
+        /// Draws each bot's current goal above its head. Useful while tuning
+        /// behaviour, noise the rest of the time.
+        static let showDebugLabels = false
     }
 
     enum Loot {

@@ -14,14 +14,22 @@
 struct AIState {
     var goal: AIGoal = .wander
 
-    /// Where the bot is currently heading, in tile space.
-    var destination: Vec2
+    /// The direction the bot is actually travelling, as a unit vector.
+    ///
+    /// This is turned TOWARDS desiredHeading at a limited rate rather than being set
+    /// to it. That one indirection is the whole difference between a bot that steers
+    /// and a bot that snaps.
+    var heading: Vec2
 
-    /// Counts down to the next decision. Bots keep executing in between, which is
-    /// what makes them look deliberate instead of twitchy.
+    /// Where the bot currently wants to go.
+    var desiredHeading: Vec2
+
+    /// Counts down to the next change of mind. The bot keeps walking throughout -
+    /// it never stops to think.
     var decisionTimer: Double
 
-    /// Where the bot was when it last decided, so it can tell whether it is
-    /// actually getting anywhere.
-    var positionAtLastDecision: Vec2
+    /// Which way this bot prefers to turn when something is in the way. Fixed per
+    /// bot, so one in a corner commits to a direction instead of dithering between
+    /// left and right.
+    var turnPreference: Double
 }
