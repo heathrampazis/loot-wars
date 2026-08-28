@@ -25,6 +25,7 @@ final class GameScene: SKScene {
 
     private let worldLayer = SKNode()
     private let tileRenderer = TileMapRenderer()
+    private let treeRenderer = TreeRenderer()
     private let actorRenderer = ActorRenderer()
     private let cameraController = CameraController()
 
@@ -54,12 +55,18 @@ final class GameScene: SKScene {
         backgroundColor = RenderPalette.background
         anchorPoint = CGPoint(x: 0.5, y: 0.5)
 
-        let map = MapFactory.testMap()
-        let spawn = Vec2(x: Double(map.width) / 2, y: Double(map.height) / 2)
-        world = World(map: map, playerSpawn: spawn)
+        // A fresh map every launch. The seed is logged so any map worth keeping -
+        // or worth debugging - can be pinned in GameConfig.Map.fixedSeed.
+        let seed = GameConfig.Map.fixedSeed ?? UInt64.random(in: UInt64.min...UInt64.max)
+        print("Loot Wars map seed: \(seed)")
+
+        let map = MapFactory.makeMap(seed: seed)
+        world = World(map: map, playerSpawn: MapFactory.spawnPoint(in: map).center)
 
         tileRenderer.build(from: map)
+        treeRenderer.build(from: map)
         worldLayer.addChild(tileRenderer.node)
+        worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(actorRenderer.node)
         addChild(worldLayer)
 

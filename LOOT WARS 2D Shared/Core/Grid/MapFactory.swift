@@ -2,16 +2,31 @@
 //  MapFactory.swift
 //  Loot Wars
 //
-//  A hand-built map so there is something to walk around and bump into.
-//  Real seeded generation (terrain, 8 base claims, loot spawns) arrives in M3.
+//  Builds a map from a seed. Same seed in, same map out - always.
+//
+//  Still deliberately simple: an edge, and scattered trees. Real generation
+//  (terrain features, 8 base claims, loot and arcade spawns) arrives at M3.
 //
 
 enum MapFactory {
 
-    static func testMap() -> TileMap {
+    static func makeMap(seed: UInt64) -> TileMap {
+        var rng = SeededRandom(seed: seed)
         var map = TileMap(width: GameConfig.Map.width, height: GameConfig.Map.height)
 
-        // Solid border around the whole map.
+        sealEdges(of: &map)
+        scatterTrees(in: &map, using: &rng)
+
+        return map
+    }
+
+    /// Where the player starts. Kept here so the generator and the scene cannot
+    /// disagree about it.
+    static func spawnPoint(in map: TileMap) -> GridPoint {
+        GridPoint(col: map.width / 2, row: map.height / 2)
+    }
+
+    private static func sealEdges(of map: inout TileMap) {
         for col in 0..<map.width {
             map[GridPoint(col: col, row: 0)] = .stone
             map[GridPoint(col: col, row: map.height - 1)] = .stone
@@ -20,21 +35,22 @@ enum MapFactory {
             map[GridPoint(col: 0, row: row)] = .stone
             map[GridPoint(col: map.width - 1, row: row)] = .stone
         }
+    }
 
-        // A grid of 2x2 pillars so movement and collision are obvious.
-        var col = 6
-        while col < map.width - 6 {
-            var row = 6
-            while row < map.height - 6 {
-                map[GridPoint(col: col,     row: row)]     = .stone
-                map[GridPoint(col: col + 1, row: row)]     = .stone
-                map[GridPoint(col: col,     row: row + 1)] = .stone
-                map[GridPoint(col: col + 1, row: row + 1)] = .stone
-                row += 9
+    private static func scatterTrees(in map: inout TileMap, using rng: inout SeededRandom) {
+        let spawn = spawnPoint(in: map)
+        let clear = GameConfig.Map.spawnClearRadius
+
+        for row in 1..<(map.height - 1) {
+            for col in 1..<(map.width - 1) {
+                // Never box the player in at spawn.
+                let nearSpawn = abs(col - spawn.col) <= clear && abs(row - spawn.row) <= clear
+                if nearSpawn { continue }
+
+                if Double.random(in: 0..<1, using: &rng) < GameConfig.Map.treeDensity {
+                    map[GridPoint(col: col, row: row)] = .tree
+                }
             }
-            col += 9
         }
-
-        return map
     }
 }

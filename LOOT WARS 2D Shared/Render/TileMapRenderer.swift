@@ -74,7 +74,9 @@ final class TileMapRenderer {
         switch tile {
         case .stone:
             return RenderPalette.terrain
-        case .floor:
+        case .floor, .tree:
+            // Trees get plain ground baked underneath them - TreeRenderer draws the
+            // tree itself as a sprite on top, because it is taller than its tile.
             // A checkerboard makes it obvious you are actually moving.
             return (col + row) % 2 == 0 ? RenderPalette.floorLight : RenderPalette.floorDark
         }

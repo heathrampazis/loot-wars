@@ -17,6 +17,11 @@ enum RenderPalette {
     static let terrain    = rgb(0x6F, 0x8F, 0x4B)   // impassable scenery
     static let background = rgb(0x7E, 0x9A, 0x5C)   // only visible past the map edge
 
+    // Trees
+    static let treeCanopy    = rgb(0x4E, 0x9E, 0x4A)
+    static let treeHighlight = rgb(0x6F, 0xC0, 0x61)
+    static let treeTrunk     = rgb(0x7A, 0x54, 0x33)
+
     // Actors
     static let player = rgb(0x3E, 0xA2, 0x7F)
 

@@ -18,6 +18,17 @@ enum GameConfig {
     enum Map {
         static let width = 64
         static let height = 64
+
+        /// Fraction of open tiles that grow a tree.
+        static let treeDensity: Double = 0.05
+
+        /// Tiles either side of the spawn kept clear, so you never start hemmed in.
+        static let spawnClearRadius = 4
+
+        /// Set this to replay one exact map. nil means a fresh map every launch -
+        /// the seed used is printed to the console so you can pin it down here if
+        /// something interesting (or broken) shows up.
+        static let fixedSeed: UInt64? = nil
     }
 
     enum Player {
@@ -25,5 +36,12 @@ enum GameConfig {
         static let moveSpeed: Double = 4.5
         /// Half the width of the player's square hitbox, in tiles.
         static let halfSize: Double = 0.4
+    }
+
+    enum Trees {
+        /// A tree blocks exactly one tile, but is drawn slightly larger so it
+        /// overlaps the tile above and the map does not read as flat.
+        static let visualWidth: Double = 1.15
+        static let visualHeight: Double = 1.35
     }
 }
