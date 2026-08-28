@@ -5,18 +5,25 @@
 //  Builds a map from a seed. Same seed in, same map out - always. That includes
 //  which way each tree spins, so two runs of the same seed are identical.
 //
-//  Still deliberately simple: an edge, one base claim, and scattered tree clumps.
-//  Eight claims on a ring, terrain features and loot spawns arrive at M3.
+//  An edge, eight base claims on a ring, scattered tree clumps and crates.
+//  Terrain features beyond that arrive later.
 //
 
-/// Everything the generator produces. Claims and trees are part of the map's
-/// identity, not something bolted on afterwards, so they come out of the same
-/// seeded pass.
+import Foundation
+
+/// Everything the generator produces.
+///
+/// Claims, trees, crates and even which team you play are all part of the map's
+/// identity rather than things bolted on afterwards, so they all come out of the
+/// same seeded pass. One number rebuilds an identical match.
 struct GeneratedMap {
     let map: TileMap
     let claims: [TeamID: BaseClaim]
     let trees: [TreePatch]
     let lootboxes: [Lootbox]
+    /// Which team this device plays. Random per seed, so your colour and your
+    /// corner of the map change every game.
+    let localTeam: TeamID
 }
 
 enum MapFactory {
@@ -26,19 +33,46 @@ enum MapFactory {
         var map = TileMap(width: GameConfig.Map.width, height: GameConfig.Map.height)
 
         sealEdges(of: &map)
-        let claims = makeClaims(in: map)
+        let (claims, localTeam) = makeClaims(in: map, using: &rng)
         let trees = plantTrees(in: map, avoiding: claims, using: &rng)
         let lootboxes = scatterLootboxes(in: map, avoiding: claims, and: trees, using: &rng)
 
-        return GeneratedMap(map: map, claims: claims, trees: trees, lootboxes: lootboxes)
+        return GeneratedMap(map: map,
+                            claims: claims,
+                            trees: trees,
+                            lootboxes: lootboxes,
+                            localTeam: localTeam)
     }
 
-    /// One claim in the middle for now. M3 spreads eight of them around a ring.
-    private static func makeClaims(in map: TileMap) -> [TeamID: BaseClaim] {
-        let claim = BaseClaim(team: TeamID(0),
-                              centredOn: GridPoint(col: map.width / 2, row: map.height / 2),
-                              size: GameConfig.Map.claimSize)
-        return [claim.team: claim]
+    /// Eight claims evenly spaced around a ring, then shuffled between the teams.
+    ///
+    /// The ring positions are fixed but WHO gets which one is not, so no team ever
+    /// has a structural advantage and your base is somewhere new each game.
+    private static func makeClaims(in map: TileMap,
+                                   using rng: inout SeededRandom) -> ([TeamID: BaseClaim], TeamID) {
+        let centre = GridPoint(col: map.width / 2, row: map.height / 2)
+        let radius = GameConfig.Map.claimRingRadius
+
+        var positions: [GridPoint] = (0..<TeamID.count).map { index in
+            let angle = 2 * Double.pi * Double(index) / Double(TeamID.count)
+            return GridPoint(col: centre.col + Int((cos(angle) * radius).rounded()),
+                             row: centre.row + Int((sin(angle) * radius).rounded()))
+        }
+
+        positions.shuffle(using: &rng)
+
+        var claims: [TeamID: BaseClaim] = [:]
+        for index in 0..<TeamID.count {
+            let team = TeamID(index)
+            claims[team] = BaseClaim(team: team,
+                                     centredOn: positions[index],
+                                     size: GameConfig.Map.claimSize)
+        }
+
+        // Which colour you play is part of the match, so it comes from the seed too.
+        let localTeam = TeamID(Int.random(in: 0..<TeamID.count, using: &rng))
+
+        return (claims, localTeam)
     }
 
     private static func sealEdges(of map: inout TileMap) {

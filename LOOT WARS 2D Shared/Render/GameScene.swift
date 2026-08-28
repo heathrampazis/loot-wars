@@ -92,7 +92,7 @@ final class GameScene: SKScene {
         print("Loot Wars map seed: \(seed)")
 
         let generated = MapFactory.generate(seed: seed)
-        world = World(generated: generated, localTeam: TeamID(0))
+        world = World(generated: generated)
 
         tileRenderer.build(from: generated.map)
         claimRenderer.build(claims: generated.claims)

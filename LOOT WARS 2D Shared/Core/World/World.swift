@@ -37,25 +37,39 @@ final class World {
     /// simply one of eight. Nothing else in the code assumes it is special.
     let localPlayerID: ActorID
 
-    init(generated: GeneratedMap, localTeam: TeamID) {
+    init(generated: GeneratedMap) {
         self.map = generated.map
         self.claims = generated.claims
         self.trees = generated.trees
 
+        var crates: [LootboxID: Lootbox] = [:]
         for box in generated.lootboxes {
-            self.lootboxes[box.id] = box
+            crates[box.id] = box
+        }
+        self.lootboxes = crates
+
+        // One actor per team, standing in the middle of its own claim.
+        //
+        // The local player is simply one of the eight. Nothing else about it is
+        // special, and nothing downstream may assume otherwise - that is what makes
+        // an AI or a remote player a drop-in replacement for the joystick.
+        var spawned: [ActorID: Actor] = [:]
+        var local = ActorID(0)
+
+        for index in 0..<TeamID.count {
+            let team = TeamID(index)
+            guard let claim = generated.claims[team] else { continue }
+
+            let id = ActorID(index)
+            spawned[id] = Actor(id: id, team: team, position: claim.centreTile.center)
+
+            if team == generated.localTeam {
+                local = id
+            }
         }
 
-        let playerID = ActorID(0)
-        self.localPlayerID = playerID
-
-        // You start in the middle of your own claim.
-        let spawn = generated.claims[localTeam]?.centreTile
-            ?? GridPoint(col: generated.map.width / 2, row: generated.map.height / 2)
-
-        self.actors[playerID] = Actor(id: playerID,
-                                      team: localTeam,
-                                      position: spawn.center)
+        self.actors = spawned
+        self.localPlayerID = local
     }
 
     var localPlayer: Actor? { actors[localPlayerID] }

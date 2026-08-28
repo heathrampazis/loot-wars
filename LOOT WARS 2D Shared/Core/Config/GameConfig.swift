@@ -30,6 +30,14 @@ enum GameConfig {
         /// true centre tile to spawn on.
         static let claimSize = 9
 
+        /// How far the ring of base claims sits from the middle of the map.
+        ///
+        /// Sized so every claim keeps a few tiles of breathing room from the map
+        /// edge, and so adjacent bases are about 17 tiles apart centre to centre.
+        /// Nothing goes in the middle: the centre of the map should be contested
+        /// ground, not somebody's living room.
+        static let claimRingRadius: Double = 22
+
         /// Set this to replay one exact map. nil means a fresh map every launch -
         /// the seed used is printed to the console so you can pin it down here if
         /// something interesting (or broken) shows up.
