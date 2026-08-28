@@ -12,9 +12,6 @@ final class LootboxRenderer {
 
     let node = SKNode()
 
-    /// Width on the ground, in tiles. Height follows the art's proportions.
-    private static let widthInTiles: Double = 0.95
-
     private var nodesByBox: [LootboxID: SKSpriteNode] = [:]
     private lazy var texture: SKTexture = {
         let texture = SKTexture(imageNamed: "LootboxRed")
@@ -34,12 +31,12 @@ final class LootboxRenderer {
     }
 
     private func makeNode(for id: LootboxID, at position: Vec2) {
-        let width = GridGeometry.length(ofTiles: LootboxRenderer.widthInTiles)
-        let art = texture.size()
-        let height = art.width > 0 ? width * (art.height / art.width) : width
+        // Drawn at exactly the collision size, so the crate you see is the crate
+        // you bump into. GameConfig.Loot.lootboxSize matches the art's proportions.
+        let size = CGSize(width: GridGeometry.length(ofTiles: GameConfig.Loot.lootboxSize.x),
+                          height: GridGeometry.length(ofTiles: GameConfig.Loot.lootboxSize.y))
 
-        let sprite = SKSpriteNode(texture: texture,
-                                  size: CGSize(width: width, height: height))
+        let sprite = SKSpriteNode(texture: texture, size: size)
         sprite.position = GridGeometry.point(for: position)
         sprite.zPosition = 3    // above trees, below walls and actors
 

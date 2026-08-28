@@ -25,10 +25,7 @@ enum LootSystem {
             for command in list {
                 guard case .openLootbox = command else { continue }
 
-                guard let box = world.nearestLootbox(to: actor.feet,
-                                                     within: GameConfig.Loot.openRange) else {
-                    break
-                }
+                guard let box = world.reachableLootbox(for: actor) else { break }
 
                 world.removeLootbox(box.id)
                 world.spawnGroundItem(.soda, at: box.position)
@@ -47,13 +44,14 @@ enum LootSystem {
         for actorID in Array(world.actors.keys) {
             guard var actor = world.actors[actorID] else { continue }
 
+            let reach = actor.hitbox
+
             for item in world.groundItems.values {
                 guard !collected.contains(item.id) else { continue }
 
-                // Measured from the feet, so you sweep things up by walking over
-                // them rather than by waving your head near them.
-                let reach = (item.position - actor.feet).length
-                guard reach <= GameConfig.Loot.pickupRange else { continue }
+                // The actor's real hitbox, the same one walls and crates are tested
+                // against. No separate pickup radius to drift out of step with it.
+                guard reach.contains(item.position) else { continue }
 
                 // A full inventory leaves the item where it is. Picking something up
                 // and having it disappear is worse than not picking it up.

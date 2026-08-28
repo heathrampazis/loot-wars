@@ -64,15 +64,26 @@ final class World {
 
     // MARK: - Loot
 
-    /// The closest lootbox within reach, or nil. Lives here so the Open button and
-    /// the system that actually opens a box can never disagree about which one.
-    func nearestLootbox(to position: Vec2, within range: Double) -> Lootbox? {
+    /// The nearest lootbox this actor can reach, or nil.
+    ///
+    /// Reach is the actor's own hitbox grown slightly, tested against the crate's
+    /// hitbox - not a distance between two points. Since crates are solid you are
+    /// already touching one when you are next to it, so the margin only has to cover
+    /// the hair of clearance collision leaves behind.
+    ///
+    /// Lives here so the Open button and the system that actually opens a crate can
+    /// never disagree about which one, or about whether you are close enough.
+    func reachableLootbox(for actor: Actor) -> Lootbox? {
+        let reach = actor.hitbox.expanded(by: GameConfig.Loot.openReach)
+
         var closest: Lootbox?
-        var shortest = range
+        var shortest = Double.greatestFiniteMagnitude
 
         for box in lootboxes.values {
-            let distance = (box.position - position).length
-            guard distance <= shortest else { continue }
+            guard reach.intersects(box.hitbox) else { continue }
+
+            let distance = (box.position - actor.position).length
+            guard distance < shortest else { continue }
             shortest = distance
             closest = box
         }

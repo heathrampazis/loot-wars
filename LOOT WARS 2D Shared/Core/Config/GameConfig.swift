@@ -77,11 +77,13 @@ enum GameConfig {
         /// Minimum distance between two lootboxes, in tiles, so they do not cluster.
         static let lootboxSpacing: Double = 4
 
-        /// How close you must stand for the Open button to appear and work.
-        static let openRange: Double = 1.6
+        /// The crate's footprint, in tiles. Matches the art's proportions
+        /// (704 x 474), and LootboxRenderer draws the sprite at exactly this size.
+        static let lootboxSize = Vec2(x: 0.95, y: 0.64)
 
-        /// How close your feet must get to sweep an item off the ground.
-        static let pickupRange: Double = 0.7
+        /// How far past your own hitbox you can reach to open a crate. Small,
+        /// because a solid crate means you are already touching it.
+        static let openReach: Double = 0.3
     }
 
     enum Blaster {

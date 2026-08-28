@@ -197,8 +197,7 @@ final class GameScene: SKScene {
 
         // Asks the world the same question LootSystem will, so the button can never
         // offer to open a box the simulation would then refuse.
-        let boxInReach = world.nearestLootbox(to: player.feet,
-                                              within: GameConfig.Loot.openRange) != nil
+        let boxInReach = world.reachableLootbox(for: player) != nil
         let wanted: ActionMode = boxInReach ? .open : .shoot
 
         guard wanted != actionMode else { return }

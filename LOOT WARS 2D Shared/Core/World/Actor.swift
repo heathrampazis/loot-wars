@@ -40,17 +40,15 @@ struct Actor {
     /// every shot, so firing keeps pushing the refill away.
     var rechargeTimer: Double = 0
 
-    /// Bottom-left and top-right of this actor's collision box, in tile space.
-    /// Everything that asks about the actor's shape goes through these, so collision,
-    /// building and rendering can never disagree about where it is.
-    var hitboxMin: Vec2 {
-        Vec2(x: position.x - GameConfig.Player.halfWidth,
-             y: position.y - GameConfig.Player.halfDepth)
-    }
-
-    var hitboxMax: Vec2 {
-        Vec2(x: position.x + GameConfig.Player.halfWidth,
-             y: position.y + GameConfig.Player.halfDepth)
+    /// This actor's collision box, in tile space.
+    ///
+    /// EVERYTHING that asks about the actor's shape goes through here - walls, trees,
+    /// lootboxes, item pickups, building. One shape, one answer, so no two systems
+    /// can develop their own idea of where the player is.
+    var hitbox: Box {
+        Box(centre: position,
+            size: Vec2(x: GameConfig.Player.halfWidth * 2,
+                       y: GameConfig.Player.halfDepth * 2))
     }
 
     /// The bottom edge of the hitbox, which is where the sprite is anchored.
@@ -60,9 +58,6 @@ struct Actor {
 
     /// Does this actor's hitbox overlap the given tile at all?
     func overlaps(_ point: GridPoint) -> Bool {
-        hitboxMax.x > Double(point.col)
-            && hitboxMin.x < Double(point.col + 1)
-            && hitboxMax.y > Double(point.row)
-            && hitboxMin.y < Double(point.row + 1)
+        hitbox.intersects(Box(tile: point))
     }
 }

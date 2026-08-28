@@ -27,6 +27,7 @@ enum MovementSystem {
             // straight back out along the surface normal. That is what gives you
             // the smooth slide around a clump instead of catching on a corner.
             resolveTrees(&actor, in: world.trees)
+            resolveLootboxes(&actor, in: world.lootboxes)
 
             world.actors[id] = actor
         }
@@ -35,10 +36,7 @@ enum MovementSystem {
     private static func resolveTrees(_ actor: inout Actor, in trees: [TreePatch]) {
         for tree in trees {
             // Nearest point on the actor's box to the centre of the clump.
-            let low = actor.hitboxMin
-            let high = actor.hitboxMax
-            let closest = Vec2(x: min(max(tree.centre.x, low.x), high.x),
-                               y: min(max(tree.centre.y, low.y), high.y))
+            let closest = actor.hitbox.closestPoint(to: tree.centre)
 
             var normal = closest - tree.centre
             var distance = normal.length
@@ -59,6 +57,27 @@ enum MovementSystem {
 
             let push = (tree.radius - distance) / distance
             actor.position = actor.position + normal * push
+        }
+    }
+
+    /// Crates are boxes, so they are resolved box against box: find how deeply the
+    /// two overlap on each axis and push back out along the shallower one, which is
+    /// the side the actor came in from.
+    private static func resolveLootboxes(_ actor: inout Actor, in lootboxes: [LootboxID: Lootbox]) {
+        for lootbox in lootboxes.values {
+            let actorBox = actor.hitbox
+            let crate = lootbox.hitbox
+
+            guard actorBox.intersects(crate) else { continue }
+
+            let overlapX = min(actorBox.upper.x, crate.upper.x) - max(actorBox.lower.x, crate.lower.x)
+            let overlapY = min(actorBox.upper.y, crate.upper.y) - max(actorBox.lower.y, crate.lower.y)
+
+            if overlapX < overlapY {
+                actor.position.x += actor.position.x < crate.centre.x ? -overlapX : overlapX
+            } else {
+                actor.position.y += actor.position.y < crate.centre.y ? -overlapY : overlapY
+            }
         }
     }
 

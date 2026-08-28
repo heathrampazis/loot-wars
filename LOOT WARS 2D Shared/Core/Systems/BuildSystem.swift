@@ -30,6 +30,13 @@ enum BuildSystem {
         // guarantee worth relying on here.
         guard !world.trees.contains(where: { $0.overlaps(point) }) else { return false }
 
+        // Same for crates. They cannot land on a claim today, but that is a
+        // generation rule, not a guarantee worth relying on from here.
+        let tileBox = Box(tile: point)
+        guard !world.lootboxes.values.contains(where: { $0.hitbox.intersects(tileBox) }) else {
+            return false
+        }
+
         // You may block yourself in - you can walk back out through your own wall.
         // Sealing an enemy inside one is not allowed.
         let wouldTrapAnEnemy = world.actors.values.contains {

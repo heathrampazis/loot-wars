@@ -30,6 +30,12 @@ enum ProjectileSystem {
 
             if world.trees.contains(where: { $0.contains(projectile.position) }) { continue }
 
+            // A crate is solid, so it stops a shot too - otherwise bullets sail
+            // through something you demonstrably cannot walk through.
+            if world.lootboxes.values.contains(where: { $0.hitbox.contains(projectile.position) }) {
+                continue
+            }
+
             survivors.append(projectile)
         }
 
