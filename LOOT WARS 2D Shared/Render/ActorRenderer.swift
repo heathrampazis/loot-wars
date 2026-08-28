@@ -10,19 +10,29 @@
 //
 
 import SpriteKit
-import UIKit
 
 final class ActorRenderer {
 
     let node = SKNode()
 
-    private var nodesByActor: [ActorID: SKNode] = [:]
+    /// How wide the figure is drawn, in tiles. Height follows from the art's own
+    /// proportions, so replacing the image with a differently shaped one still
+    /// looks right.
+    private static let spriteWidthInTiles: Double = 0.9
+
+    private var nodesByActor: [ActorID: SKSpriteNode] = [:]
     private var textureCache: [TeamID: SKTexture] = [:]
 
     func sync(with world: World) {
         for (id, actor) in world.actors {
             let sprite = nodesByActor[id] ?? makeNode(for: actor)
-            sprite.position = GridGeometry.point(for: actor.position)
+
+            // The art is a standing figure, so it stands ON the hitbox rather than
+            // being centred in it: the sprite's feet sit at the bottom of the box
+            // and the body rises from there.
+            let feet = Vec2(x: actor.position.x,
+                            y: actor.position.y - GameConfig.Player.halfSize)
+            sprite.position = GridGeometry.point(for: feet)
         }
 
         // Drop nodes for actors that no longer exist.
@@ -32,11 +42,18 @@ final class ActorRenderer {
         }
     }
 
-    private func makeNode(for actor: Actor) -> SKNode {
-        let side = GridGeometry.length(ofTiles: GameConfig.Player.halfSize * 2)
-        let sprite = SKSpriteNode(texture: texture(for: actor.team),
-                                  size: CGSize(width: side, height: side))
-        sprite.zPosition = 10
+    private func makeNode(for actor: Actor) -> SKSpriteNode {
+        let texture = self.texture(for: actor.team)
+
+        let width = GridGeometry.length(ofTiles: ActorRenderer.spriteWidthInTiles)
+        let art = texture.size()
+        let height = art.width > 0 ? width * (art.height / art.width) : width
+
+        let sprite = SKSpriteNode(texture: texture,
+                                  size: CGSize(width: width, height: height))
+        sprite.anchorPoint = CGPoint(x: 0.5, y: 0)   // stands on its position
+        sprite.zPosition = 10                        // over everything in the world
+
         node.addChild(sprite)
         nodesByActor[actor.id] = sprite
         return sprite
@@ -44,36 +61,20 @@ final class ActorRenderer {
 
     private func texture(for team: TeamID) -> SKTexture {
         if let cached = textureCache[team] { return cached }
-        let made = ActorRenderer.makeTexture(colour: RenderPalette.colour(for: team))
-        textureCache[team] = made
-        return made
+
+        let texture = SKTexture(imageNamed: ActorRenderer.assetName(for: team))
+        // The art is far larger than it is ever drawn, so let the GPU pick a
+        // properly downscaled level instead of resampling the full image each frame.
+        texture.usesMipmaps = true
+
+        textureCache[team] = texture
+        return texture
     }
 
-    /// A rounded square in the team colour with a heavy black outline. The outline is
-    /// what keeps an actor readable while standing on a wall of its own colour.
-    private static func makeTexture(colour: SKColor) -> SKTexture {
-        let side: CGFloat = 128
-        let outline: CGFloat = 13
-
-        let format = UIGraphicsImageRendererFormat.default()
-        format.opaque = false
-
-        let image = UIGraphicsImageRenderer(
-            size: CGSize(width: side, height: side),
-            format: format
-        ).image { _ in
-            SKColor.black.setFill()
-            UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: side, height: side),
-                         cornerRadius: 26).fill()
-
-            colour.setFill()
-            UIBezierPath(roundedRect: CGRect(x: outline,
-                                             y: outline,
-                                             width: side - outline * 2,
-                                             height: side - outline * 2),
-                         cornerRadius: 15).fill()
-        }
-
-        return SKTexture(image: image)
+    /// Eventually one image per team - the eight of them differ only in body colour.
+    /// Until those exist every team wears the same one, which is why the lookup is
+    /// here rather than scattered through the renderer.
+    private static func assetName(for team: TeamID) -> String {
+        "Player"
     }
 }
