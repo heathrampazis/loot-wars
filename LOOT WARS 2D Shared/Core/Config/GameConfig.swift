@@ -39,6 +39,11 @@ enum GameConfig {
     enum Player {
         /// Tiles travelled per second at full stick.
         static let moveSpeed: Double = 4.5
+
+        /// Starting and maximum health. Nothing takes it away yet - damage lands
+        /// with the rest of M5 - but the HUD reads the real value, so it will start
+        /// moving the moment it does.
+        static let maxHealth = 100
         // The hitbox is the whole standing figure: the sprite is drawn at exactly
         // these dimensions, so what you see is what you collide with.
         //
@@ -77,5 +82,15 @@ enum GameConfig {
         /// Half the width of a projectile, in tiles. Only used for drawing today;
         /// hit detection arrives with health at M5.
         static let projectileRadius: Double = 0.18
+
+        /// Shots you can fire before running dry.
+        static let magazineSize = 12
+
+        /// Quiet time after your last shot before ammo starts coming back. This is
+        /// what makes bursts better than holding the trigger down.
+        static let rechargeDelay: Double = 1.0
+
+        /// Seconds per bullet once recharging has started.
+        static let rechargeInterval: Double = 0.6
     }
 }

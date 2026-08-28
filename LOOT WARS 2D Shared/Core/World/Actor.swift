@@ -27,8 +27,16 @@ struct Actor {
     /// keeps whichever side it was last heading.
     var facesLeft: Bool = false
 
+    var health: Int = GameConfig.Player.maxHealth
+
+    var ammo: Int = GameConfig.Blaster.magazineSize
+
     /// Seconds until this actor may fire again.
     var shootCooldown: Double = 0
+
+    /// Counts down to the next bullet coming back. Reset to the recharge delay on
+    /// every shot, so firing keeps pushing the refill away.
+    var rechargeTimer: Double = 0
 
     /// Bottom-left and top-right of this actor's collision box, in tile space.
     /// Everything that asks about the actor's shape goes through these, so collision,

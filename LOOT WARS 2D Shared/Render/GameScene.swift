@@ -45,6 +45,7 @@ final class GameScene: SKScene {
 
     private let joystick = JoystickNode()
     private let fireButton = ActionButtonNode(glyph: Glyphs.crosshair)
+    private let hud = HUDNode()
 
     #if os(iOS) || os(tvOS)
     /// Which finger owns which control, and which one might still turn out to be a tap.
@@ -97,6 +98,7 @@ final class GameScene: SKScene {
         addChild(cameraController.node)
         cameraController.node.addChild(joystick)
         cameraController.node.addChild(fireButton)
+        cameraController.node.addChild(hud)
         layOutUI()
 
         syncRenderers()
@@ -113,6 +115,11 @@ final class GameScene: SKScene {
                                     y: -size.height / 2 + margin)
         fireButton.position = CGPoint(x: size.width / 2 - margin,
                                       y: -size.height / 2 + margin)
+
+        // The HUD's origin is its own top-left corner, so this is just an inset.
+        let inset: CGFloat = 16
+        hud.position = CGPoint(x: -size.width / 2 + inset,
+                               y: size.height / 2 - inset)
     }
 
     // MARK: - Loop
@@ -146,6 +153,7 @@ final class GameScene: SKScene {
         blockRenderer.sync(with: world)
         projectileRenderer.sync(with: world)
         actorRenderer.sync(with: world)
+        hud.update(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }

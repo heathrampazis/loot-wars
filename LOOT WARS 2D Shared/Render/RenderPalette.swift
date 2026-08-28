@@ -39,7 +39,15 @@ enum RenderPalette {
     static let projectile        = rgb(0xB3, 0xF0, 0xFA)
     static let projectileOutline = SKColor.black
 
-    // UI
+    // HUD. Panel and track alphas solved from the mockup: the panel is this dark
+    // olive at 70% over the ground, the track a further 35% of black on top.
+    static let hudPanel  = SKColor(red: 0x3B / 255.0, green: 0x46 / 255.0,
+                                   blue: 0x27 / 255.0, alpha: 0.70)
+    static let hudTrack  = SKColor(white: 0.0, alpha: 0.35)
+    static let healthBar = rgb(0xFF, 0x51, 0x7B)
+    static let ammoBar   = rgb(0x3E, 0xA1, 0x80)
+
+    // On-screen controls
     static let controlBackground = SKColor(white: 0.0, alpha: 0.18)
     static let controlForeground = SKColor(white: 0.0, alpha: 0.30)
 
