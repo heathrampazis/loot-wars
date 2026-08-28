@@ -16,6 +16,7 @@ struct GeneratedMap {
     let map: TileMap
     let claims: [TeamID: BaseClaim]
     let trees: [TreePatch]
+    let lootboxes: [Lootbox]
 }
 
 enum MapFactory {
@@ -27,8 +28,9 @@ enum MapFactory {
         sealEdges(of: &map)
         let claims = makeClaims(in: map)
         let trees = plantTrees(in: map, avoiding: claims, using: &rng)
+        let lootboxes = scatterLootboxes(in: map, avoiding: claims, and: trees, using: &rng)
 
-        return GeneratedMap(map: map, claims: claims, trees: trees)
+        return GeneratedMap(map: map, claims: claims, trees: trees, lootboxes: lootboxes)
     }
 
     /// One claim in the middle for now. M3 spreads eight of them around a ring.
@@ -113,5 +115,44 @@ enum MapFactory {
         }
 
         return true
+    }
+}
+
+// MARK: - Lootboxes
+
+extension MapFactory {
+
+    fileprivate static func scatterLootboxes(in map: TileMap,
+                                             avoiding claims: [TeamID: BaseClaim],
+                                             and trees: [TreePatch],
+                                             using rng: inout SeededRandom) -> [Lootbox] {
+        var placed: [Lootbox] = []
+        let attempts = GameConfig.Loot.lootboxCount * 30
+
+        for _ in 0..<attempts {
+            guard placed.count < GameConfig.Loot.lootboxCount else { break }
+
+            let tile = GridPoint(col: Int.random(in: 1...(map.width - 2), using: &rng),
+                                 row: Int.random(in: 1...(map.height - 2), using: &rng))
+
+            guard map[tile] == .floor else { continue }
+
+            // Not inside anyone's base - the whole point is that you go out for loot.
+            if claims.values.contains(where: { $0.contains(tile) }) { continue }
+
+            // Not buried inside a tree clump, where you could never reach it.
+            if trees.contains(where: { $0.overlaps(tile) }) { continue }
+
+            // Spread out, so one corner of the map is not the only place worth going.
+            let centre = tile.center
+            let tooClose = placed.contains {
+                ($0.position - centre).length < GameConfig.Loot.lootboxSpacing
+            }
+            if tooClose { continue }
+
+            placed.append(Lootbox(id: LootboxID(placed.count), tile: tile))
+        }
+
+        return placed
     }
 }

@@ -15,4 +15,8 @@ enum Command {
     /// Fire in whatever direction the actor is facing. Rate limiting is the
     /// simulation's job, so holding the button down is perfectly safe.
     case shoot
+    /// Open the nearest lootbox in reach. Carries no coordinate on purpose: asking
+    /// for a specific box would mean the input code deciding which one is closest,
+    /// and that is the simulation's call.
+    case openLootbox
 }

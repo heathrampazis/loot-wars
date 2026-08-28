@@ -31,6 +31,8 @@ struct Actor {
 
     var ammo: Int = GameConfig.Blaster.magazineSize
 
+    var inventory = Inventory()
+
     /// Seconds until this actor may fire again.
     var shootCooldown: Double = 0
 

@@ -70,6 +70,20 @@ enum GameConfig {
         static let spacing: Double = 0.75
     }
 
+    enum Loot {
+        /// Lootboxes scattered across the map.
+        static let lootboxCount = 30
+
+        /// Minimum distance between two lootboxes, in tiles, so they do not cluster.
+        static let lootboxSpacing: Double = 4
+
+        /// How close you must stand for the Open button to appear and work.
+        static let openRange: Double = 1.6
+
+        /// How close your feet must get to sweep an item off the ground.
+        static let pickupRange: Double = 0.7
+    }
+
     enum Blaster {
         /// Tiles per second.
         static let projectileSpeed: Double = 14
