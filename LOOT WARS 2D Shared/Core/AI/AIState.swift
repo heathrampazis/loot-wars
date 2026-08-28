@@ -41,9 +41,16 @@ struct AIState {
     /// immediately turn it straight back around.
     var lootCooldown: Double = 0
 
+    /// Counts down to the next look around for enemies.
+    var threatScanTimer: Double = 0
+
     /// Counts down after spotting an enemy. Nobody reacts instantly, and a bot that
     /// does feels like a machine.
     var reactionTimer: Double = 0
+
+    /// Whether the bot is currently standing its ground to shoot. Remembered so
+    /// it can hold on a little longer than it would first stop at.
+    var holdingGround: Bool = false
 
     /// A small fixed error added to this bot's aim, re-rolled whenever it changes
     /// its mind. Perfect aim is what makes bots unbeatable and unfun.

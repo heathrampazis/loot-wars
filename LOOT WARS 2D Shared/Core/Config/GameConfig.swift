@@ -125,23 +125,40 @@ enum GameConfig {
         /// How far a bot will notice and go after an enemy, in tiles. Shorter than
         /// the blaster's range, so a fight starts with a bot closing in rather than
         /// sniping from off screen.
-        static let engageRange: Double = 10
+        static let engageRange: Double = 12
 
-        /// It stops closing once this near and holds its ground to trade shots,
-        /// instead of walking through whoever it is fighting.
-        static let standoffRange: Double = 2.2
+        /// The range a bot tries to fight at, in tiles. Inside this it plants its
+        /// feet and shoots; outside it, it closes in.
+        static let preferredRange: Double = 6
 
-        /// The most its aim may drift off target before it takes a step to re-aim,
-        /// in radians. Bots shoot where they walk, exactly like the player, so
-        /// turning and aiming are the same action.
+        /// It keeps chasing a target out to here even with no clear shot, so a tree
+        /// passing between them does not end the fight.
+        static let disengageRange: Double = 16
+
+        /// How often a bot looks around for enemies, in seconds. Threats cannot
+        /// wait for the ordinary decision timer - up to three seconds to notice
+        /// someone shooting at you is most of why fights never started - but line
+        /// of sight is far too expensive to run every tick.
+        static let threatScanInterval: Double = 0.1
+
+        /// How close to lined up a bot needs to be before it plants its feet and
+        /// shoots, in radians.
         ///
-        /// This is only the close-range cap - the real tolerance is how wide the
-        /// target actually looks from where the bot is standing. See aimIsOn.
-        static let aimTolerance: Double = 0.2
+        /// This MUST sit comfortably above aimError. If a bot's own aim wobbles
+        /// further than it is willing to shoot from, it can never satisfy its own
+        /// firing condition: it just keeps walking at whoever it is fighting, which
+        /// is two bots circling each other and never resolving anything.
+        static let fireTolerance: Double = 0.24
 
-        /// Random wobble applied to a bot's aim, in radians (about 5°). Without it
-        /// bots never miss, and a bot that never misses is miserable to play.
-        static let aimError: Double = 0.09
+        /// Random wobble applied to a bot's aim, in radians (about 8°). This is
+        /// what makes bots miss - it is applied to the heading, so a miss looks
+        /// like slightly sloppy movement rather than a bullet bending.
+        static let aimError: Double = 0.14
+
+        /// Once planted, a bot holds its ground this much further out than it would
+        /// first stop at, in tiles. Without the gap it flickers between standing
+        /// and walking every time the range wobbles across the line.
+        static let holdHysteresis: Double = 2
 
         /// How long a bot takes to react to an enemy it has just noticed.
         static let reactionDelay: ClosedRange<Double> = 0.25...0.5
