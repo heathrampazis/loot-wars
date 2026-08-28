@@ -26,11 +26,8 @@ class GameViewController: UIViewController {
     }
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            return .allButUpsideDown
-        } else {
-            return .all
-        }
+        // Loot Wars is landscape only - the map needs the width.
+        return .landscape
     }
 
     override var prefersStatusBarHidden: Bool {
