@@ -22,6 +22,11 @@ struct Actor {
     /// leave you aiming at nothing.
     var facing: Vec2 = Vec2(x: 1, y: 0)
 
+    /// Which way the figure is drawn. Held separately from `facing` because moving
+    /// straight up or down should not turn the character to face the camera - it
+    /// keeps whichever side it was last heading.
+    var facesLeft: Bool = false
+
     /// Seconds until this actor may fire again.
     var shootCooldown: Double = 0
 

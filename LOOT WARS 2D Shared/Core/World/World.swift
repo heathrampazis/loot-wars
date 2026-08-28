@@ -93,6 +93,11 @@ final class World {
                     if input.length > 0.01 {
                         actor.facing = input.normalized()
                     }
+                    // Left/right is tracked on its own, so walking straight up does
+                    // not reset which way the figure is turned.
+                    if abs(input.x) > 0.01 {
+                        actor.facesLeft = input.x < 0
+                    }
                 case .placeBlock, .shoot:
                     break   // other systems' business, not movement's
                 }

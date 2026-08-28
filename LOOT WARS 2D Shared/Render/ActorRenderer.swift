@@ -33,6 +33,9 @@ final class ActorRenderer {
             let feet = Vec2(x: actor.position.x,
                             y: actor.position.y - GameConfig.Player.halfSize)
             sprite.position = GridGeometry.point(for: feet)
+
+            // Mirror rather than swap art: one image serves both directions.
+            sprite.xScale = actor.facesLeft ? -1 : 1
         }
 
         // Drop nodes for actors that no longer exist.
