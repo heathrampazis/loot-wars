@@ -4,22 +4,32 @@
 //
 //  Four slots along the bottom of the screen, mirroring Inventory.slotCount.
 //
-//  Like the HUD it only reads the world. It also only redraws when the inventory
-//  actually changes, which is why Inventory is Equatable.
+//  Like the HUD it only reads the world, and only redraws when the inventory
+//  actually changes - which is why Inventory is Equatable.
 //
 //  Its origin is the centre of the bar, so it sits at the bottom of the screen with
 //  no arithmetic against its own width.
+//
+//  Every measurement below came off the reference art, scaled by its tile size:
+//  a slot is 1.64 tiles, the gap 0.39, an item 0.74 of a slot, and the badge 0.66.
 //
 
 import SpriteKit
 
 final class HotbarNode: SKNode {
 
-    private static let slotSize: CGFloat = 60
-    private static let gap: CGFloat = 8
-    /// How much smaller the item is drawn than its slot. Small, so items fill the
-    /// slot the way they do in the reference art.
-    private static let iconInset: CGFloat = 6
+    private static let slotSize: CGFloat = 66
+    private static let gap: CGFloat = 16
+    /// How much smaller the item is drawn than its slot.
+    private static let iconInset: CGFloat = 10
+
+    /// Badge geometry. The stroke straddles the circle, so the radius plus half the
+    /// outline is the outer edge - 13pt, matching the reference's 26pt across.
+    private static let badgeRadius: CGFloat = 11.5
+    private static let badgeOutline: CGFloat = 3
+    /// How far the badge's centre sits inside the slot's top-left corner, so it
+    /// overhangs slightly rather than floating free.
+    private static let badgeInset: CGFloat = 5
 
     static var size: CGSize {
         let count = CGFloat(Inventory.slotCount)
@@ -27,6 +37,7 @@ final class HotbarNode: SKNode {
     }
 
     private var icons: [SKSpriteNode] = []
+    private var badges: [SKNode] = []
     private var counts: [SKLabelNode] = []
     private var lastInventory: Inventory?
 
@@ -50,17 +61,10 @@ final class HotbarNode: SKNode {
             addChild(icon)
             icons.append(icon)
 
-            let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
-            count.fontSize = 15
-            count.fontColor = .white
-            count.horizontalAlignmentMode = .right
-            count.verticalAlignmentMode = .bottom
-            count.position = CGPoint(x: centreX + HotbarNode.slotSize / 2 - 8,
-                                     y: -HotbarNode.slotSize / 2 + 7)
-            count.zPosition = 2
-            count.isHidden = true
-            addChild(count)
-            counts.append(count)
+            let (badge, label) = makeBadge(atX: centreX)
+            addChild(badge)
+            badges.append(badge)
+            counts.append(label)
         }
     }
 
@@ -76,9 +80,35 @@ final class HotbarNode: SKNode {
                                             width: side,
                                             height: side),
                                cornerRadius: 12)
-        slot.fillColor = RenderPalette.hudPanel
+        slot.fillColor = RenderPalette.hotbarSlot
         slot.strokeColor = .clear
         return slot
+    }
+
+    private func makeBadge(atX centreX: CGFloat) -> (SKNode, SKLabelNode) {
+        let badge = SKNode()
+        badge.position = CGPoint(
+            x: centreX - HotbarNode.slotSize / 2 + HotbarNode.badgeInset,
+            y: HotbarNode.slotSize / 2 - HotbarNode.badgeInset
+        )
+        badge.zPosition = 2
+        badge.isHidden = true
+
+        let circle = SKShapeNode(circleOfRadius: HotbarNode.badgeRadius)
+        circle.fillColor = RenderPalette.countBadge
+        circle.strokeColor = .black
+        circle.lineWidth = HotbarNode.badgeOutline
+        badge.addChild(circle)
+
+        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        label.fontSize = 14
+        label.fontColor = .white
+        label.horizontalAlignmentMode = .center
+        label.verticalAlignmentMode = .center
+        label.zPosition = 1
+        badge.addChild(label)
+
+        return (badge, label)
     }
 
     func update(with world: World) {
@@ -88,11 +118,10 @@ final class HotbarNode: SKNode {
 
         for (index, stack) in player.inventory.slots.enumerated() {
             let icon = icons[index]
-            let count = counts[index]
 
             guard let stack else {
                 icon.isHidden = true
-                count.isHidden = true
+                badges[index].isHidden = true
                 continue
             }
 
@@ -105,8 +134,10 @@ final class HotbarNode: SKNode {
             icon.size = CGSize(width: width, height: height)
             icon.isHidden = false
 
-            count.text = "\(stack.count)"
-            count.isHidden = stack.count <= 1
+            // A badge on a single item is noise - it only earns its place once
+            // there is more than one.
+            badges[index].isHidden = stack.count <= 1
+            counts[index].text = "\(stack.count)"
         }
     }
 }
