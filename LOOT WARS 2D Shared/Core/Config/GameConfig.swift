@@ -20,7 +20,9 @@ enum GameConfig {
         static let height = 64
 
         /// Fraction of open tiles that grow a tree.
-        static let treeDensity: Double = 0.05
+        /// Zero for now - the empty field is easier to work against. Everything
+        /// needed for trees is still in place; raise this to bring them back.
+        static let treeDensity: Double = 0.0
 
         /// Tiles either side of the spawn kept clear, so you never start hemmed in.
         static let spawnClearRadius = 4

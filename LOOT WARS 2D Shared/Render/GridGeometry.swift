@@ -11,7 +11,9 @@ import CoreGraphics
 
 enum GridGeometry {
 
-    static let tileSize: CGFloat = 32
+    /// How many points one tile takes up on screen - in other words, the zoom
+    /// level. This single number scales the entire game.
+    static let tileSize: CGFloat = 40
 
     static func point(for position: Vec2) -> CGPoint {
         CGPoint(x: CGFloat(position.x) * tileSize,
