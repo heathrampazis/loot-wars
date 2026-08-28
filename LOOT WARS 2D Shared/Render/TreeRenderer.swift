@@ -5,11 +5,16 @@
 //  One sprite per tree clump, not one per tile.
 //
 //  That is the whole reason MapFactory hands back TreePatch rectangles instead of
-//  just marking tiles: when real art turns up, a 2x2 clump is one image and a 3x3
-//  clump is another, and only makeTexture below has to change.
+//  just marking tiles: a clump is one thing, so it gets one sprite and, when the art
+//  arrives, one image. Only makeTexture below has to change.
 //
-//  Textures are generated per clump size and cached, so the whole forest is a couple
-//  of draw calls.
+//  The placeholder is a star, matching the reference: a 2x2 clump is a six-pointed
+//  star and a 3x3 clump an eight-pointed one, both with a point straight up. The
+//  point counts and radius ratios were measured off the reference drawing rather
+//  than guessed.
+//
+//  Textures are generated per clump size and cached, so the whole forest costs a
+//  couple of draw calls.
 //
 
 import SpriteKit
@@ -21,7 +26,15 @@ final class TreeRenderer {
 
     /// Pixels drawn per tile. Only affects placeholder crispness, not game scale.
     private static let pixelsPerTile: CGFloat = 64
-    private static let outline: CGFloat = 14
+    /// Outline thickness in pixels at the resolution above - about a tenth of a
+    /// tile, which is the same weight as the outline on walls.
+    private static let strokeWidth: CGFloat = 7
+
+    /// How a clump of each size is drawn. Add a row to support a new clump size.
+    private static let shapes: [Int: (points: Int, innerRatio: CGFloat)] = [
+        2: (points: 6, innerRatio: 0.744),
+        3: (points: 8, innerRatio: 0.827)
+    ]
 
     private var textureCache: [Int: SKTexture] = [:]
 
@@ -33,8 +46,9 @@ final class TreeRenderer {
 
             let sprite = SKSpriteNode(texture: texture(forSize: patch.size),
                                       size: CGSize(width: side, height: side))
-            // Anchored bottom-left so the sprite covers exactly the tiles the clump
-            // occupies - what you see is precisely what you collide with.
+            // Anchored bottom-left so the sprite sits exactly on the tiles the clump
+            // occupies. The star is inscribed in that square, so what you see is
+            // slightly smaller than what you collide with.
             sprite.anchorPoint = CGPoint(x: 0, y: 0)
             sprite.position = GridGeometry.point(for: Vec2(x: Double(patch.origin.col),
                                                            y: Double(patch.origin.row)))
@@ -51,11 +65,18 @@ final class TreeRenderer {
         return made
     }
 
-    /// Replace this with a loaded image when the art is ready. Because the canvas
-    /// scales with the clump size, the outline stays the same thickness on screen
-    /// whether the clump is 2x2 or 3x3.
+    /// Replace this with a loaded image when the art is ready.
     private static func makeTexture(size: Int) -> SKTexture {
         let side = CGFloat(size) * pixelsPerTile
+        let centre = CGPoint(x: side / 2, y: side / 2)
+
+        // Fall back to the small shape rather than crashing if a new clump size
+        // turns up before it has a row in the table above.
+        let shape = shapes[size] ?? (points: 6, innerRatio: 0.744)
+
+        // The stroke straddles the path, so pull the star in by half of it to keep
+        // the whole outline inside the sprite.
+        let outerRadius = side / 2 - strokeWidth / 2
 
         let format = UIGraphicsImageRendererFormat.default()
         format.opaque = false
@@ -64,18 +85,46 @@ final class TreeRenderer {
             size: CGSize(width: side, height: side),
             format: format
         ).image { _ in
-            SKColor.black.setFill()
-            UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: side, height: side),
-                         cornerRadius: 18).fill()
+            let star = starPath(centre: centre,
+                                points: shape.points,
+                                outerRadius: outerRadius,
+                                innerRatio: shape.innerRatio)
+            star.lineWidth = strokeWidth
+            star.lineJoin = .round      // blunts the tips, like the reference
 
             RenderPalette.tree.setFill()
-            UIBezierPath(roundedRect: CGRect(x: outline,
-                                             y: outline,
-                                             width: side - outline * 2,
-                                             height: side - outline * 2),
-                         cornerRadius: 10).fill()
+            star.fill()
+
+            SKColor.black.setStroke()
+            star.stroke()
         }
 
         return SKTexture(image: image)
+    }
+
+    /// A star polygon: alternating outer and inner vertices, starting straight up.
+    private static func starPath(centre: CGPoint,
+                                 points: Int,
+                                 outerRadius: CGFloat,
+                                 innerRatio: CGFloat) -> UIBezierPath {
+        let path = UIBezierPath()
+        let step = CGFloat.pi / CGFloat(points)   // half a point's worth of turn
+
+        for vertex in 0..<(points * 2) {
+            let radius = vertex.isMultiple(of: 2) ? outerRadius : outerRadius * innerRatio
+            // -pi/2 puts the first point straight up (image coordinates run downward).
+            let angle = -CGFloat.pi / 2 + CGFloat(vertex) * step
+            let corner = CGPoint(x: centre.x + cos(angle) * radius,
+                                 y: centre.y + sin(angle) * radius)
+
+            if vertex == 0 {
+                path.move(to: corner)
+            } else {
+                path.addLine(to: corner)
+            }
+        }
+
+        path.close()
+        return path
     }
 }
