@@ -6,7 +6,6 @@
 //
 //  Only .wander exists so far. The rest of the plan, in the order they are coming:
 //
-//    .loot(LootboxID)  - walk to a crate, open it, sweep up what falls out
 //    .fight(ActorID)   - close to blaster range and shoot, with reaction delay
 //                        and aim error so it can actually be beaten
 //    .retreat          - low on health: head for your own claim, where your own
@@ -19,10 +18,12 @@
 
 enum AIGoal: Equatable {
     case wander
+    case loot(LootboxID)
 
     var debugName: String {
         switch self {
         case .wander: return "roam"
+        case .loot: return "loot"
         }
     }
 }

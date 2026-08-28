@@ -25,17 +25,25 @@ enum AIBrain {
     static func think(for actor: inout Actor, in world: World, dt: Double) -> [Command] {
         guard var state = actor.ai else { return [] }
 
+        state.goalAge += dt
+        state.lootCooldown = max(0, state.lootCooldown - dt)
         state.decisionTimer -= dt
+
         if state.decisionTimer <= 0 {
             changeOfMind(&state, actor: actor, in: world)
             state.decisionTimer = Double.random(in: GameConfig.AI.decisionInterval,
                                                 using: &world.rng)
         }
 
+        // Chasing goals re-aim every tick. Only committing to a direction twice a
+        // second would let a bot sail straight past what it was walking to.
+        aimAtTarget(&state, actor: actor, in: world)
+
         // Looking where you are going happens every tick, not on the decision timer.
         // Waiting up to three seconds to notice a tree is how a bot ends up grinding
         // into one in full view.
         steerAroundObstacles(&state, actor: actor, in: world)
+        curveAwayFromEdges(&state, actor: actor, in: world)
 
         // Turn towards the desired heading rather than snapping to it.
         state.heading = turn(state.heading,
@@ -43,16 +51,35 @@ enum AIBrain {
                              limit: GameConfig.AI.turnRate * dt)
 
         actor.ai = state
-        return [.move(state.heading)]
+
+        var commands: [Command] = [.move(state.heading)]
+
+        // Open whatever is within reach, whatever the bot was busy doing. Walking
+        // past an open-able crate and ignoring it is the sort of thing that gives
+        // a bot away.
+        if world.reachableLootbox(for: actor) != nil {
+            commands.append(.openLootbox)
+        }
+
+        return commands
     }
 
     // MARK: - Deciding
 
     private static func changeOfMind(_ state: inout AIState, actor: Actor, in world: World) {
-        state.goal = chooseGoal(for: actor, in: world)
+        // Been walking at the same crate for a while and still not there? Something
+        // is in the way that steering cannot solve. Give up and look elsewhere.
+        if case .loot = state.goal, state.goalAge > GameConfig.AI.lootPatience {
+            state.lootCooldown = GameConfig.AI.lootCooldown
+        }
 
-        switch state.goal {
-        case .wander:
+        let wanted = chooseGoal(for: actor, state: state, in: world)
+        if wanted != state.goal {
+            state.goal = wanted
+            state.goalAge = 0
+        }
+
+        if case .wander = state.goal {
             // Swing off the CURRENT heading rather than picking a fresh direction
             // out of the air, so a change of mind is a course correction and not a
             // pirouette.
@@ -62,10 +89,45 @@ enum AIBrain {
         }
     }
 
-    /// Always .wander for now. Fighting, looting and retreating are added here, in
-    /// priority order, as each one lands.
-    private static func chooseGoal(for actor: Actor, in world: World) -> AIGoal {
-        .wander
+    /// Priority order. Fighting and retreating slot in above looting as they land.
+    private static func chooseGoal(for actor: Actor, state: AIState, in world: World) -> AIGoal {
+        if state.lootCooldown <= 0, let crate = nearestCrate(to: actor, in: world) {
+            return .loot(crate.id)
+        }
+        return .wander
+    }
+
+    private static func nearestCrate(to actor: Actor, in world: World) -> Lootbox? {
+        var closest: Lootbox?
+        var shortest = GameConfig.AI.lootSearchRange
+
+        for crate in world.lootboxes.values {
+            let distance = (crate.position - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            closest = crate
+        }
+
+        return closest
+    }
+
+    // MARK: - Aiming at a target
+
+    private static func aimAtTarget(_ state: inout AIState, actor: Actor, in world: World) {
+        guard case .loot(let id) = state.goal else { return }
+
+        // Somebody else got there first. Drop back to roaming rather than walking
+        // to a crate that no longer exists.
+        guard let crate = world.lootboxes[id] else {
+            state.goal = .wander
+            state.goalAge = 0
+            return
+        }
+
+        let towards = crate.position - actor.position
+        if towards.length > 0.01 {
+            state.desiredHeading = towards.normalized()
+        }
     }
 
     // MARK: - Steering
@@ -95,6 +157,35 @@ enum AIBrain {
 
         // Boxed in on every side: turn around and try again next tick.
         state.desiredHeading = Vec2.fromAngle(base + .pi)
+    }
+
+    /// A soft nudge back towards the middle when a bot gets close to the map edge.
+    ///
+    /// Plain obstacle avoidance turns a bot to run PARALLEL to a wall, which is why
+    /// they end up patrolling the border. This blends the heading towards the centre
+    /// the closer they get, so they peel away instead of tracking along it.
+    private static func curveAwayFromEdges(_ state: inout AIState, actor: Actor, in world: World) {
+        let margin = GameConfig.AI.edgeMargin
+        let width = Double(world.map.width)
+        let height = Double(world.map.height)
+
+        // 0 while comfortably inside, rising to 1 at the very edge.
+        let closeness = max(
+            max(margin - actor.position.x, actor.position.x - (width - margin)),
+            max(margin - actor.position.y, actor.position.y - (height - margin))
+        ) / margin
+
+        guard closeness > 0 else { return }
+
+        let inward = Vec2(x: width / 2, y: height / 2) - actor.position
+        guard inward.length > 0.01 else { return }
+
+        let strength = min(1, closeness) * GameConfig.AI.edgeBias
+        let blended = state.desiredHeading * (1 - strength) + inward.normalized() * strength
+
+        if blended.length > 0.01 {
+            state.desiredHeading = blended.normalized()
+        }
     }
 
     private static func isClear(_ direction: Vec2, from actor: Actor, in world: World) -> Bool {

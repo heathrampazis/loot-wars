@@ -11,9 +11,10 @@
 
 enum LootSystem {
 
-    static func update(_ world: World, commands: [ActorID: [Command]]) {
+    static func update(_ world: World, commands: [ActorID: [Command]], dt: Double) {
         openBoxes(world, commands: commands)
         sweepUpItems(world)
+        world.tickLootboxRespawns(dt: dt)
     }
 
     // MARK: - Opening

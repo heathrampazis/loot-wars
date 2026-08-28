@@ -113,6 +113,26 @@ enum GameConfig {
         /// so a bot takes the gentlest turn that works.
         static let avoidanceAngles: [Double] = [0.45, 0.9, 1.5, 2.1, 2.7, 3.14]
 
+        /// How close to the map edge a bot has to get before it starts curving
+        /// back inward, in tiles.
+        static let edgeMargin: Double = 8
+
+        /// How hard it curves inward when right up against the edge. 0 ignores the
+        /// edge entirely, 1 turns straight for the middle. Anything near 1 looks
+        /// like a bot fleeing the wall, so keep it gentle.
+        static let edgeBias: Double = 0.65
+
+        /// How far away a bot will notice a crate worth walking to, in tiles.
+        static let lootSearchRange: Double = 20
+
+        /// Give up on a crate it has not reached in this long, in seconds. Without
+        /// this, a bot cut off from a crate walks at it until the match ends.
+        static let lootPatience: Double = 8
+
+        /// And ignore crates entirely for this long afterwards, so it does not
+        /// immediately turn back to the one it just abandoned.
+        static let lootCooldown: Double = 4
+
         /// Draws each bot's current goal above its head. Useful while tuning
         /// behaviour, noise the rest of the time.
         static let showDebugLabels = false
@@ -132,6 +152,10 @@ enum GameConfig {
         /// How far past your own hitbox you can reach to open a crate. Small,
         /// because a solid crate means you are already touching it.
         static let openReach: Double = 0.3
+
+        /// Seconds before an opened crate comes back, in the same spot. Without
+        /// this the map is stripped bare a minute into a match.
+        static let respawnDelay: Double = 45
     }
 
     enum Blaster {

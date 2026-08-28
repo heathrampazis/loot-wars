@@ -32,4 +32,12 @@ struct AIState {
     /// bot, so one in a corner commits to a direction instead of dithering between
     /// left and right.
     var turnPreference: Double
+
+    /// How long the current goal has been running. Used to give up on a crate the
+    /// bot cannot actually get to.
+    var goalAge: Double = 0
+
+    /// While this is running the bot ignores crates, so giving up on one does not
+    /// immediately turn it straight back around.
+    var lootCooldown: Double = 0
 }

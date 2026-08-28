@@ -32,8 +32,17 @@ final class World {
     private(set) var lootboxes: [LootboxID: Lootbox] = [:]
     private(set) var groundItems: [GroundItemID: GroundItem] = [:]
 
+    /// An opened crate, waiting to come back in the same spot.
+    private struct PendingLootbox {
+        let tile: GridPoint
+        var timer: Double
+    }
+
+    private var pendingLootboxes: [PendingLootbox] = []
+
     private var nextProjectileID = 0
     private var nextGroundItemID = 0
+    private var nextLootboxID = 0
 
     /// The one source of randomness during play. Nothing in Core may call
     /// Int.random - everything goes through here, so a seed reproduces a match
@@ -58,6 +67,7 @@ final class World {
             crates[box.id] = box
         }
         self.lootboxes = crates
+        self.nextLootboxID = generated.lootboxes.count
 
         // One actor per team, standing in the middle of its own claim.
         //
@@ -133,7 +143,42 @@ final class World {
     }
 
     func removeLootbox(_ id: LootboxID) {
+        guard let crate = lootboxes[id] else { return }
         lootboxes[id] = nil
+
+        // Crates come back. Without that, seven bots strip the map bare within a
+        // minute and there is nothing left to play around.
+        pendingLootboxes.append(PendingLootbox(tile: crate.tile,
+                                               timer: GameConfig.Loot.respawnDelay))
+    }
+
+    func tickLootboxRespawns(dt: Double) {
+        guard !pendingLootboxes.isEmpty else { return }
+
+        var stillWaiting: [PendingLootbox] = []
+
+        for var pending in pendingLootboxes {
+            pending.timer -= dt
+
+            if pending.timer > 0 {
+                stillWaiting.append(pending)
+                continue
+            }
+
+            // Crates are solid, so one appearing under somebody would shove them
+            // out of the way. Wait for them to move on instead.
+            let crate = Lootbox(id: LootboxID(nextLootboxID), tile: pending.tile)
+            if actors.values.contains(where: { $0.isAlive && $0.hitbox.intersects(crate.hitbox) }) {
+                pending.timer = 1
+                stillWaiting.append(pending)
+                continue
+            }
+
+            nextLootboxID += 1
+            lootboxes[crate.id] = crate
+        }
+
+        pendingLootboxes = stillWaiting
     }
 
     func spawnGroundItem(_ type: ItemType, at position: Vec2) {
@@ -176,7 +221,7 @@ final class World {
         MovementSystem.update(self, dt: dt)
         ProjectileSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
-        LootSystem.update(self, commands: everyone)
+        LootSystem.update(self, commands: everyone, dt: dt)
         RespawnSystem.update(self, dt: dt)
         tick += 1
     }
