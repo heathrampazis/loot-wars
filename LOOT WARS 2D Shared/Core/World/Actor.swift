@@ -43,7 +43,7 @@ struct Actor {
              y: position.y + GameConfig.Player.halfDepth)
     }
 
-    /// Where the figure's feet meet the ground - the bottom edge of the hitbox.
+    /// The bottom edge of the hitbox, which is where the sprite is anchored.
     var feet: Vec2 {
         Vec2(x: position.x, y: position.y - GameConfig.Player.halfDepth)
     }

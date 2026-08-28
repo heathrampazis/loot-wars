@@ -15,11 +15,6 @@ final class ActorRenderer {
 
     let node = SKNode()
 
-    /// How wide the figure is drawn, in tiles. Height follows from the art's own
-    /// proportions, so replacing the image with a differently shaped one still
-    /// looks right.
-    private static let spriteWidthInTiles: Double = 0.9
-
     private var nodesByActor: [ActorID: SKSpriteNode] = [:]
     private var textureCache: [TeamID: SKTexture] = [:]
 
@@ -44,14 +39,13 @@ final class ActorRenderer {
     }
 
     private func makeNode(for actor: Actor) -> SKSpriteNode {
-        let texture = self.texture(for: actor.team)
+        // The sprite is drawn at exactly the hitbox's dimensions, so "the hitbox
+        // covers the sprite" is true by construction rather than by two numbers
+        // happening to agree.
+        let size = CGSize(width: GridGeometry.length(ofTiles: GameConfig.Player.halfWidth * 2),
+                          height: GridGeometry.length(ofTiles: GameConfig.Player.halfDepth * 2))
 
-        let width = GridGeometry.length(ofTiles: ActorRenderer.spriteWidthInTiles)
-        let art = texture.size()
-        let height = art.width > 0 ? width * (art.height / art.width) : width
-
-        let sprite = SKSpriteNode(texture: texture,
-                                  size: CGSize(width: width, height: height))
+        let sprite = SKSpriteNode(texture: texture(for: actor.team), size: size)
         sprite.anchorPoint = CGPoint(x: 0.5, y: 0)   // stands on its position
         sprite.zPosition = 10                        // over everything in the world
 
