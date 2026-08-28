@@ -4,11 +4,23 @@
 //
 //  The plan a team builds to, and the ORDER it builds in.
 //
-//  The order is the whole point. A base assembled from randomly chosen tiles looks
-//  like scattered rubble no matter how good the final shape is; the same tiles laid
-//  in sequence look like a wall going up. So a layout is a list, not a set, and it
-//  is ordered to grow outwards from the gateway in both directions at once - the way
-//  somebody would actually build a wall around themselves.
+//  Two ideas hold this together.
+//
+//  First, a base is described by the ground it ENCLOSES, not by the wall itself.
+//  Pick a shape - a rectangle, a cross, a diamond, a blob - and the wall is
+//  whatever surrounds it. That is what lets bases be odd shapes and still be
+//  coherent: any enclosed region has exactly one sensible wall, and it is always
+//  sealed. Walls are the tiles touching the region on any of the eight sides, so
+//  there are no diagonal gaps to squeeze through.
+//
+//  Second, the order is a list rather than a set. A base assembled from randomly
+//  chosen tiles looks like rubble however good the final shape is; the same tiles
+//  laid in sequence look like a wall going up. The order is a breadth-first walk
+//  from one starting tile, which on a closed loop means two ends growing away from
+//  each other - a wall extending in both directions, as somebody would build it.
+//
+//  There are no gateways. Owners walk through their own walls, so a base wants to
+//  be shut, not doored.
 //
 
 struct BaseLayout {
@@ -18,135 +30,187 @@ struct BaseLayout {
 
 enum BaseLayoutFactory {
 
-    /// The shapes a base can take. All of them are rings, which is what keeps every
-    /// base coherent - the variety comes from how many, how far in, how wide the way
-    /// in is, and which side it faces.
-    private enum Style: CaseIterable {
-        /// A single outer wall with a proper gateway.
-        case ring
-        /// A tighter wall set one tile in, leaving a walkway around the outside.
-        case keep
-        /// An outer wall and an inner redoubt, with the two gates on different
-        /// sides, so anyone getting in has to go the long way round.
-        case layered
-        /// A wide-mouthed outer wall around a small central block.
-        case courtyard
+    /// The ground a base encloses. The wall follows from it.
+    private enum Shape: CaseIterable {
+        case rectangle
+        case cross
+        case ell
+        case diamond
+        case blob
     }
 
     static func make(for claim: BaseClaim, using rng: inout SeededRandom) -> BaseLayout {
-        let style = Style.allCases.randomElement(using: &rng) ?? .ring
+        let size = claim.size
+        let shape = Shape.allCases.randomElement(using: &rng) ?? .rectangle
 
-        let rings: [(inset: Int, gate: Int)]
-        switch style {
-        case .ring:      rings = [(0, 2)]
-        case .keep:      rings = [(1, 1)]
-        case .layered:   rings = [(0, 2), (3, 1)]
-        case .courtyard: rings = [(0, 4), (3, 1)]
+        var region: Set<GridPoint>
+        switch shape {
+        case .rectangle: region = rectangle(in: size, using: &rng)
+        case .cross:     region = cross(in: size, using: &rng)
+        case .ell:       region = ell(in: size, using: &rng)
+        case .diamond:   region = diamond(in: size, using: &rng)
+        case .blob:      region = blob(in: size, using: &rng)
         }
 
-        var tiles: [GridPoint] = []
-        for ring in rings {
-            tiles += orderedRing(inset: ring.inset,
-                                 gateWidth: ring.gate,
-                                 size: claim.size,
-                                 origin: claim.origin,
-                                 using: &rng)
+        // A shape that came out too thin would make a wall with no inside worth
+        // defending. Fall back to something sensible rather than shipping a scribble.
+        if region.count < 6 {
+            region = rectangle(in: size, using: &rng)
         }
 
-        return BaseLayout(tiles: tiles)
+        let wall = surroundingWall(of: region, in: size)
+        let ordered = buildOrder(of: wall, using: &rng)
+
+        return BaseLayout(tiles: ordered.map {
+            GridPoint(col: claim.origin.col + $0.col, row: claim.origin.row + $0.row)
+        })
     }
 
-    // MARK: - Building one ring
+    // MARK: - The wall around a region
 
-    private static func orderedRing(inset: Int,
-                                    gateWidth: Int,
-                                    size: Int,
-                                    origin: GridPoint,
-                                    using rng: inout SeededRandom) -> [GridPoint] {
-        let path = ringPath(inset: inset, size: size)
-        guard path.count > gateWidth + 2 else { return [] }
+    /// Every tile touching the region on any of its eight sides.
+    ///
+    /// Eight rather than four on purpose: a four-sided wall leaves the diagonals
+    /// open, and a base with corner gaps is not a base.
+    private static func surroundingWall(of region: Set<GridPoint>, in size: Int) -> Set<GridPoint> {
+        var wall: Set<GridPoint> = []
 
-        let gate = gateIndex(in: path, inset: inset, size: size, using: &rng)
+        for tile in region {
+            for dCol in -1...1 {
+                for dRow in -1...1 where !(dCol == 0 && dRow == 0) {
+                    let neighbour = GridPoint(col: tile.col + dCol, row: tile.row + dRow)
 
-        var isGateway = Array(repeating: false, count: path.count)
-        for offset in 0..<gateWidth {
-            isGateway[wrap(gate - gateWidth / 2 + offset, path.count)] = true
+                    guard !region.contains(neighbour) else { continue }
+                    guard neighbour.col >= 0, neighbour.col < size,
+                          neighbour.row >= 0, neighbour.row < size else { continue }
+
+                    wall.insert(neighbour)
+                }
+            }
         }
 
-        // Walk away from the gateway in both directions, taking one tile from each
-        // side in turn. That is what makes a wall appear to extend outwards from the
-        // entrance rather than sprouting at random points along its length.
-        var clockwise: [GridPoint] = []
-        var anticlockwise: [GridPoint] = []
+        return wall
+    }
 
-        for offset in 1...(path.count / 2) {
-            let ahead = wrap(gate + offset, path.count)
-            let behind = wrap(gate - offset, path.count)
-
-            if !isGateway[ahead] { clockwise.append(path[ahead]) }
-            if behind != ahead, !isGateway[behind] { anticlockwise.append(path[behind]) }
-        }
+    /// Breadth-first from one tile, so the wall grows outwards from a single point
+    /// in every available direction at once.
+    private static func buildOrder(of wall: Set<GridPoint>, using rng: inout SeededRandom) -> [GridPoint] {
+        // Sorted before choosing, because Set iteration order is not stable and the
+        // starting tile has to come from the seed like everything else.
+        let sorted = wall.sorted { ($0.row, $0.col) < ($1.row, $1.col) }
+        guard let start = sorted.randomElement(using: &rng) else { return [] }
 
         var ordered: [GridPoint] = []
-        for index in 0..<max(clockwise.count, anticlockwise.count) {
-            if index < clockwise.count { ordered.append(clockwise[index]) }
-            if index < anticlockwise.count { ordered.append(anticlockwise[index]) }
-        }
+        var seen: Set<GridPoint> = [start]
+        var frontier = [start]
 
-        return ordered.map {
-            GridPoint(col: origin.col + $0.col, row: origin.row + $0.row)
-        }
-    }
+        while !frontier.isEmpty {
+            let tile = frontier.removeFirst()
+            ordered.append(tile)
 
-    /// One lap of the ring, in claim-local coordinates, in a continuous loop - so
-    /// consecutive entries are always neighbours.
-    private static func ringPath(inset: Int, size: Int) -> [GridPoint] {
-        let low = inset
-        let high = size - 1 - inset
-        guard high > low else { return [] }
-
-        var path: [GridPoint] = []
-
-        for col in low...high { path.append(GridPoint(col: col, row: high)) }
-        if high - 1 >= low {
-            for row in stride(from: high - 1, through: low, by: -1) {
-                path.append(GridPoint(col: high, row: row))
+            // Fixed neighbour order, so the same seed always lays the same sequence.
+            for dCol in -1...1 {
+                for dRow in -1...1 where !(dCol == 0 && dRow == 0) {
+                    let neighbour = GridPoint(col: tile.col + dCol, row: tile.row + dRow)
+                    guard wall.contains(neighbour), !seen.contains(neighbour) else { continue }
+                    seen.insert(neighbour)
+                    frontier.append(neighbour)
+                }
             }
         }
-        if high - 1 >= low {
-            for col in stride(from: high - 1, through: low, by: -1) {
-                path.append(GridPoint(col: col, row: low))
+
+        // Anything the walk could not reach - a wall in two disconnected pieces -
+        // still gets built, just afterwards.
+        return ordered + sorted.filter { !seen.contains($0) }
+    }
+
+    // MARK: - Shapes
+    //
+    // Every region stays within 1...(size - 2), so its surrounding wall always
+    // lands inside the claim and never spills onto ground the team cannot build on.
+
+    private static func rectangle(in size: Int, using rng: inout SeededRandom) -> Set<GridPoint> {
+        let span = size - 2
+        let width = Int.random(in: 3...span, using: &rng)
+        let height = Int.random(in: 3...span, using: &rng)
+        let col = Int.random(in: 1...(size - 1 - width), using: &rng)
+        let row = Int.random(in: 1...(size - 1 - height), using: &rng)
+
+        return tiles(col..<(col + width), row..<(row + height))
+    }
+
+    private static func cross(in size: Int, using rng: inout SeededRandom) -> Set<GridPoint> {
+        let arm = Int.random(in: 2...3, using: &rng)
+        let middle = size / 2
+        let low = middle - arm / 2
+
+        return tiles(1..<(size - 1), low..<(low + arm))
+            .union(tiles(low..<(low + arm), 1..<(size - 1)))
+    }
+
+    private static func ell(in size: Int, using rng: inout SeededRandom) -> Set<GridPoint> {
+        let thickness = Int.random(in: 2...3, using: &rng)
+        let long = size - 2
+
+        var shape = tiles(1..<(1 + thickness), 1..<(1 + long))
+            .union(tiles(1..<(1 + long), 1..<(1 + thickness)))
+
+        // Spin it, so the corner is not always in the same place.
+        for _ in 0..<Int.random(in: 0...3, using: &rng) {
+            shape = Set(shape.map { GridPoint(col: size - 1 - $0.row, row: $0.col) })
+        }
+
+        return shape.filter {
+            $0.col >= 1 && $0.col <= size - 2 && $0.row >= 1 && $0.row <= size - 2
+        }
+    }
+
+    private static func diamond(in size: Int, using rng: inout SeededRandom) -> Set<GridPoint> {
+        let middle = size / 2
+        let radius = Int.random(in: 2...3, using: &rng)
+
+        var shape: Set<GridPoint> = []
+        for col in 1...(size - 2) {
+            for row in 1...(size - 2) where abs(col - middle) + abs(row - middle) <= radius {
+                shape.insert(GridPoint(col: col, row: row))
             }
         }
-        if low + 1 <= high - 1 {
-            for row in (low + 1)...(high - 1) { path.append(GridPoint(col: low, row: row)) }
+
+        return shape
+    }
+
+    /// Grown one tile at a time from the middle. Organic, lopsided, and no two the
+    /// same - this is the one that makes bases look hand-made.
+    private static func blob(in size: Int, using rng: inout SeededRandom) -> Set<GridPoint> {
+        let middle = size / 2
+        var shape: Set<GridPoint> = [GridPoint(col: middle, row: middle)]
+        let target = Int.random(in: 10...22, using: &rng)
+
+        var attempts = 0
+        while shape.count < target && attempts < target * 20 {
+            attempts += 1
+
+            let sorted = shape.sorted { ($0.row, $0.col) < ($1.row, $1.col) }
+            guard let from = sorted.randomElement(using: &rng) else { break }
+
+            let steps = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            guard let step = steps.randomElement(using: &rng) else { break }
+
+            let candidate = GridPoint(col: from.col + step.0, row: from.row + step.1)
+            guard candidate.col >= 1, candidate.col <= size - 2,
+                  candidate.row >= 1, candidate.row <= size - 2 else { continue }
+
+            shape.insert(candidate)
         }
 
-        return path
+        return shape
     }
 
-    /// Puts the gateway in the middle of one of the four sides rather than at a
-    /// corner, where it would read as damage instead of a door.
-    private static func gateIndex(in path: [GridPoint],
-                                  inset: Int,
-                                  size: Int,
-                                  using rng: inout SeededRandom) -> Int {
-        let low = inset
-        let high = size - 1 - inset
-        let middle = (low + high) / 2
-
-        let midpoints = [
-            GridPoint(col: middle, row: high),
-            GridPoint(col: high, row: middle),
-            GridPoint(col: middle, row: low),
-            GridPoint(col: low, row: middle)
-        ]
-
-        let chosen = midpoints.randomElement(using: &rng) ?? midpoints[0]
-        return path.firstIndex(of: chosen) ?? 0
-    }
-
-    private static func wrap(_ index: Int, _ count: Int) -> Int {
-        ((index % count) + count) % count
+    private static func tiles(_ cols: Range<Int>, _ rows: Range<Int>) -> Set<GridPoint> {
+        var out: Set<GridPoint> = []
+        for col in cols {
+            for row in rows { out.insert(GridPoint(col: col, row: row)) }
+        }
+        return out
     }
 }
