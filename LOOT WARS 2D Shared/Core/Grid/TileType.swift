@@ -3,22 +3,19 @@
 //  Loot Wars
 //
 
-enum TileType {
+enum TileType: Equatable {
     case floor
     /// The map edge. Never destroyed, never placed.
     case stone
     /// Scenery you cannot walk through. Occupies exactly one tile of collision,
     /// even though it is drawn a bit larger than that.
     case tree
-    /// A wall placed by a player. Unlike terrain, these come and go during a match.
-    case block
+    /// A wall placed by a team. Unlike terrain, these come and go during a match,
+    /// and whether they block you depends on whose they are.
+    case block(owner: TeamID)
 
-    var isSolid: Bool {
-        switch self {
-        case .floor: return false
-        case .stone: return true
-        case .tree:  return true
-        case .block: return true
-        }
+    var blockOwner: TeamID? {
+        guard case .block(let owner) = self else { return nil }
+        return owner
     }
 }

@@ -2,20 +2,19 @@
 //  BlockRenderer.swift
 //  Loot Wars
 //
-//  Draws player-placed blocks with an outline that follows the SHAPE of a group
+//  Draws player-placed walls with an outline that follows the SHAPE of a group
 //  rather than each individual block.
 //
 //  How it works: every block looks at its eight neighbours and builds an 8-bit mask
-//  of which ones are also blocks. The outline is then only drawn on the sides facing
-//  open ground. Two blocks side by side have no line between them, so the group reads
-//  as one solid piece - which is exactly what you get in the mockup.
+//  of which ones are walls OF THE SAME TEAM. The outline is only drawn on the sides
+//  facing something else, so your own walls merge into one solid piece while an
+//  enemy's wall built alongside stays visibly separate.
 //
-//  The subtle case is an inner corner. If the block above and the block to the right
+//  The subtle case is an inner corner. If the wall above and the wall to the right
 //  are both filled but the diagonal between them is empty, neither edge gets a bar,
 //  and the outline would have a notch missing. A small square in that corner closes it.
 //
-//  There are only a few dozen distinct arrangements, so textures are generated once
-//  on demand and cached by mask.
+//  Walls also fade out while their owner is walking through them - see sync(with:).
 //
 
 import SpriteKit
@@ -25,7 +24,24 @@ final class BlockRenderer {
 
     let node = SKNode()
 
-    private var textureCache: [UInt8: SKTexture] = [:]
+    /// How see-through a wall goes while its owner is inside it.
+    private static let passThroughAlpha: CGFloat = 0.4
+    /// How quickly it fades, per frame. Purely cosmetic, so frame-rate dependence
+    /// here is harmless - nothing in the simulation reads it.
+    private static let fadeRate: CGFloat = 0.25
+
+    private struct Wall {
+        let sprite: SKSpriteNode
+        let owner: TeamID
+    }
+
+    private struct TextureKey: Hashable {
+        let mask: UInt8
+        let team: TeamID
+    }
+
+    private var walls: [GridPoint: Wall] = [:]
+    private var textureCache: [TextureKey: SKTexture] = [:]
 
     private enum Side {
         static let north: UInt8     = 1 << 0
@@ -42,52 +58,72 @@ final class BlockRenderer {
 
     func build(from map: TileMap) {
         node.removeAllChildren()
+        walls.removeAll()
 
         let size = CGSize(width: GridGeometry.tileSize, height: GridGeometry.tileSize)
 
         for row in 0..<map.height {
             for col in 0..<map.width {
                 let point = GridPoint(col: col, row: row)
-                guard map[point] == .block else { continue }
+                guard let owner = map[point].blockOwner else { continue }
 
-                let sprite = SKSpriteNode(texture: texture(for: mask(at: point, in: map)),
-                                          size: size)
+                let key = TextureKey(mask: mask(at: point, owner: owner, in: map),
+                                     team: owner)
+                let sprite = SKSpriteNode(texture: texture(for: key), size: size)
                 sprite.position = GridGeometry.pointAtCentre(of: point)
                 sprite.zPosition = 5     // above terrain and trees, below actors
+
                 node.addChild(sprite)
+                walls[point] = Wall(sprite: sprite, owner: owner)
             }
         }
     }
 
-    private func mask(at point: GridPoint, in map: TileMap) -> UInt8 {
+    /// Fades a wall out while the team that owns it is standing in it, so you can
+    /// see yourself passing through instead of vanishing behind your own base.
+    func sync(with world: World) {
+        for (point, wall) in walls {
+            let ownerIsInside = world.actors.values.contains {
+                $0.team == wall.owner && $0.overlaps(point)
+            }
+
+            let target: CGFloat = ownerIsInside ? BlockRenderer.passThroughAlpha : 1.0
+            wall.sprite.alpha += (target - wall.sprite.alpha) * BlockRenderer.fadeRate
+        }
+    }
+
+    /// Only walls belonging to the same team count as neighbours - an enemy wall
+    /// butted up against yours should read as a separate structure.
+    private func mask(at point: GridPoint, owner: TeamID, in map: TileMap) -> UInt8 {
         var mask: UInt8 = 0
 
-        func isBlock(_ dCol: Int, _ dRow: Int) -> Bool {
-            map[GridPoint(col: point.col + dCol, row: point.row + dRow)] == .block
+        func isFriendlyWall(_ dCol: Int, _ dRow: Int) -> Bool {
+            map[GridPoint(col: point.col + dCol, row: point.row + dRow)].blockOwner == owner
         }
 
-        if isBlock( 0,  1) { mask |= Side.north }
-        if isBlock( 1,  1) { mask |= Side.northEast }
-        if isBlock( 1,  0) { mask |= Side.east }
-        if isBlock( 1, -1) { mask |= Side.southEast }
-        if isBlock( 0, -1) { mask |= Side.south }
-        if isBlock(-1, -1) { mask |= Side.southWest }
-        if isBlock(-1,  0) { mask |= Side.west }
-        if isBlock(-1,  1) { mask |= Side.northWest }
+        if isFriendlyWall( 0,  1) { mask |= Side.north }
+        if isFriendlyWall( 1,  1) { mask |= Side.northEast }
+        if isFriendlyWall( 1,  0) { mask |= Side.east }
+        if isFriendlyWall( 1, -1) { mask |= Side.southEast }
+        if isFriendlyWall( 0, -1) { mask |= Side.south }
+        if isFriendlyWall(-1, -1) { mask |= Side.southWest }
+        if isFriendlyWall(-1,  0) { mask |= Side.west }
+        if isFriendlyWall(-1,  1) { mask |= Side.northWest }
 
         return mask
     }
 
     // MARK: - Textures
 
-    private func texture(for mask: UInt8) -> SKTexture {
-        if let cached = textureCache[mask] { return cached }
-        let made = BlockRenderer.makeTexture(mask: mask)
-        textureCache[mask] = made
+    private func texture(for key: TextureKey) -> SKTexture {
+        if let cached = textureCache[key] { return cached }
+        let made = BlockRenderer.makeTexture(mask: key.mask,
+                                             colour: RenderPalette.colour(for: key.team))
+        textureCache[key] = made
         return made
     }
 
-    private static func makeTexture(mask: UInt8) -> SKTexture {
+    private static func makeTexture(mask: UInt8, colour: SKColor) -> SKTexture {
         let side: CGFloat = 128
         let edge: CGFloat = 14
 
@@ -101,7 +137,7 @@ final class BlockRenderer {
             format: format
         ).image { _ in
 
-            RenderPalette.block.setFill()
+            colour.setFill()
             UIBezierPath(rect: CGRect(x: 0, y: 0, width: side, height: side)).fill()
 
             SKColor.black.setFill()

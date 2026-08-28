@@ -32,7 +32,8 @@ enum MovementSystem {
         case vertical
     }
 
-    /// Pushes the actor back out of any solid tile it just moved into.
+    /// Pushes the actor back out of anything solid it just moved into.
+    /// What counts as solid depends on the actor's team - your own walls do not.
     private static func resolve(_ actor: inout Actor, in map: TileMap, along axis: Axis, delta: Double) {
         guard delta != 0 else { return }
 
@@ -48,7 +49,8 @@ enum MovementSystem {
 
         for col in minCol...maxCol {
             for row in minRow...maxRow {
-                guard map.isSolid(GridPoint(col: col, row: row)) else { continue }
+                let point = GridPoint(col: col, row: row)
+                guard map.blocksMovement(at: point, for: actor.team) else { continue }
 
                 switch axis {
                 case .horizontal:

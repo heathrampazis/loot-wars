@@ -22,13 +22,22 @@ enum RenderPalette {
     static let treeHighlight = rgb(0x6F, 0xC0, 0x61)
     static let treeTrunk     = rgb(0x7A, 0x54, 0x33)
 
-    // Player-placed blocks
-    static let block = rgb(0x3E, 0xA2, 0x7F)
+    // Teams. An actor and the walls it builds are the same colour on purpose -
+    // at a glance you should be able to tell whose base you are standing in.
+    private static let teams: [SKColor] = [
+        rgb(0x3E, 0xA2, 0x7F),   // 0 teal
+        rgb(0xE0, 0x4B, 0x5C),   // 1 red
+        rgb(0x4F, 0x92, 0xDC),   // 2 blue
+        rgb(0x7B, 0x5B, 0xD6),   // 3 purple
+        rgb(0xF2, 0x91, 0x3D),   // 4 orange
+        rgb(0xE8, 0x6B, 0xB0),   // 5 pink
+        rgb(0xF0, 0xC9, 0x4A),   // 6 yellow
+        rgb(0x4C, 0x6A, 0x8A)    // 7 slate
+    ]
 
-    // Actors
-    // Deliberately warm: blocks are the mockup's teal, so the player needs to be
-    // something you can never mistake for a wall.
-    static let player = rgb(0xF2, 0xA0, 0x3D)
+    static func colour(for team: TeamID) -> SKColor {
+        teams[team.raw % teams.count]
+    }
 
     // UI
     static let joystickBase = SKColor(white: 0.0, alpha: 0.18)

@@ -29,7 +29,9 @@ final class World {
         self.map = map
         let playerID = ActorID(0)
         self.localPlayerID = playerID
-        self.actors[playerID] = Actor(id: playerID, position: playerSpawn)
+        self.actors[playerID] = Actor(id: playerID,
+                                      team: TeamID(0),
+                                      position: playerSpawn)
     }
 
     var localPlayer: Actor? { actors[localPlayerID] }

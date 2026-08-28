@@ -133,6 +133,7 @@ final class GameScene: SKScene {
             drawnMapRevision = world.mapRevision
         }
 
+        blockRenderer.sync(with: world)
         actorRenderer.sync(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)

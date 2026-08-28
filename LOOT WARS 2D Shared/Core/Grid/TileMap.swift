@@ -36,7 +36,24 @@ struct TileMap {
         }
     }
 
-    func isSolid(_ point: GridPoint) -> Bool {
-        self[point].isSolid
+    /// Whether a tile stops a particular team from moving through it.
+    ///
+    /// Note this is a question, not a property: a wall is solid to everyone EXCEPT
+    /// the team that built it. That is what lets a base wall keep enemies out
+    /// without sealing its owner in.
+    func blocksMovement(at point: GridPoint, for team: TeamID) -> Bool {
+        switch self[point] {
+        case .floor:
+            return false
+        case .stone, .tree:
+            return true
+        case .block(let owner):
+            return owner != team
+        }
+    }
+
+    /// Is there anything here at all? Used when deciding if a tile is free to build on.
+    func isOccupied(_ point: GridPoint) -> Bool {
+        self[point] != .floor
     }
 }

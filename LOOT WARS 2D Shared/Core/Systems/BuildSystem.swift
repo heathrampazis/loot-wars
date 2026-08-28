@@ -9,41 +9,31 @@
 enum BuildSystem {
 
     static func update(_ world: World, commands: [ActorID: [Command]]) {
-        for (_, list) in commands {
+        for (id, list) in commands {
+            guard let actor = world.actors[id] else { continue }
             for command in list {
                 guard case .placeBlock(let point) = command else { continue }
-                place(at: point, in: world)
+                place(at: point, owner: actor.team, in: world)
             }
         }
     }
 
-    static func canPlace(at point: GridPoint, in world: World) -> Bool {
+    static func canPlace(at point: GridPoint, owner: TeamID, in world: World) -> Bool {
         // Only on open ground: not on terrain, trees, or an existing block.
-        guard world.map[point] == .floor else { return false }
+        guard !world.map.isOccupied(point) else { return false }
 
-        // Never seal someone inside a wall.
-        let wouldTrapSomeone = world.actors.values.contains { overlaps($0, point) }
-        return !wouldTrapSomeone
+        // You may block yourself in - you can walk back out through your own wall.
+        // Sealing an enemy inside one is not allowed.
+        let wouldTrapAnEnemy = world.actors.values.contains {
+            $0.team != owner && $0.overlaps(point)
+        }
+        return !wouldTrapAnEnemy
     }
 
     @discardableResult
-    static func place(at point: GridPoint, in world: World) -> Bool {
-        guard canPlace(at: point, in: world) else { return false }
-        world.setTile(.block, at: point)
+    static func place(at point: GridPoint, owner: TeamID, in world: World) -> Bool {
+        guard canPlace(at: point, owner: owner, in: world) else { return false }
+        world.setTile(.block(owner: owner), at: point)
         return true
-    }
-
-    /// Does an actor's hitbox overlap this tile at all?
-    private static func overlaps(_ actor: Actor, _ point: GridPoint) -> Bool {
-        let half = GameConfig.Player.halfSize
-        let left = Double(point.col)
-        let right = Double(point.col + 1)
-        let bottom = Double(point.row)
-        let top = Double(point.row + 1)
-
-        return actor.position.x + half > left
-            && actor.position.x - half < right
-            && actor.position.y + half > bottom
-            && actor.position.y - half < top
     }
 }
