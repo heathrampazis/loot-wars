@@ -33,6 +33,11 @@ final class World {
     private var nextProjectileID = 0
     private var nextGroundItemID = 0
 
+    /// The one source of randomness during play. Nothing in Core may call
+    /// Int.random - everything goes through here, so a seed reproduces a match
+    /// exactly, bots included.
+    var rng: SeededRandom
+
     /// Which actor this device is driving. Today it is the only one; later it is
     /// simply one of eight. Nothing else in the code assumes it is special.
     let localPlayerID: ActorID
@@ -41,6 +46,10 @@ final class World {
         self.map = generated.map
         self.claims = generated.claims
         self.trees = generated.trees
+
+        // Offset from the map's seed, so play does not replay the same number
+        // sequence that built the terrain.
+        var rng = SeededRandom(seed: generated.seed &+ 0x9E37)
 
         var crates: [LootboxID: Lootbox] = [:]
         for box in generated.lootboxes {
@@ -55,21 +64,35 @@ final class World {
         // an AI or a remote player a drop-in replacement for the joystick.
         var spawned: [ActorID: Actor] = [:]
         var local = ActorID(0)
+        var brainsGiven = 0
 
         for index in 0..<TeamID.count {
             let team = TeamID(index)
             guard let claim = generated.claims[team] else { continue }
 
             let id = ActorID(index)
-            spawned[id] = Actor(id: id, team: team, position: claim.centreTile.center)
+            let spawn = claim.centreTile.center
+            var actor = Actor(id: id, team: team, position: spawn)
 
             if team == generated.localTeam {
                 local = id
+            } else if brainsGiven < GameConfig.AI.botCount {
+                brainsGiven += 1
+                actor.ai = AIState(
+                    destination: spawn,
+                    // Staggered, so all seven do not stop and think on the same tick.
+                    decisionTimer: Double.random(in: 0...GameConfig.AI.decisionInterval,
+                                                 using: &rng),
+                    positionAtLastDecision: spawn
+                )
             }
+
+            spawned[id] = actor
         }
 
         self.actors = spawned
         self.localPlayerID = local
+        self.rng = rng
     }
 
     var localPlayer: Actor? { actors[localPlayerID] }
@@ -138,13 +161,18 @@ final class World {
 
     /// Advances the whole game by exactly one fixed step.
     func step(commands: [ActorID: [Command]], dt: Double) {
-        applyMovementInput(commands)
-        BuildSystem.update(self, commands: commands)
-        WeaponSystem.update(self, commands: commands, dt: dt)
+        // Whatever is driving actors from outside comes in; the brains fill in the
+        // rest. From here down, nothing can tell which is which.
+        var everyone = commands
+        AISystem.contribute(to: &everyone, in: self, dt: dt)
+
+        applyMovementInput(everyone)
+        BuildSystem.update(self, commands: everyone)
+        WeaponSystem.update(self, commands: everyone, dt: dt)
         MovementSystem.update(self, dt: dt)
         ProjectileSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
-        LootSystem.update(self, commands: commands)
+        LootSystem.update(self, commands: everyone)
         RespawnSystem.update(self, dt: dt)
         tick += 1
     }

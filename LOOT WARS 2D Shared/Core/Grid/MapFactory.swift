@@ -24,6 +24,8 @@ struct GeneratedMap {
     /// Which team this device plays. Random per seed, so your colour and your
     /// corner of the map change every game.
     let localTeam: TeamID
+    /// Kept so the world can start its own generator from the same number.
+    let seed: UInt64
 }
 
 enum MapFactory {
@@ -41,7 +43,8 @@ enum MapFactory {
                             claims: claims,
                             trees: trees,
                             lootboxes: lootboxes,
-                            localTeam: localTeam)
+                            localTeam: localTeam,
+                            seed: seed)
     }
 
     /// Eight claims evenly spaced around a ring, then shuffled between the teams.

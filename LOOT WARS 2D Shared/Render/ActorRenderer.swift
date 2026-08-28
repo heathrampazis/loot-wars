@@ -30,13 +30,15 @@ final class ActorRenderer {
         let root = SKNode()
         let sprite: SKSpriteNode
         let healthFill: SKShapeNode
+        let goalLabel: SKLabelNode?
         var lastHealthFraction: Double = -1
         /// Used only to notice a drop, which is what triggers the hit flash.
         var lastHealth: Int = Int.max
 
-        init(sprite: SKSpriteNode, healthFill: SKShapeNode) {
+        init(sprite: SKSpriteNode, healthFill: SKShapeNode, goalLabel: SKLabelNode?) {
             self.sprite = sprite
             self.healthFill = healthFill
+            self.goalLabel = goalLabel
         }
     }
 
@@ -72,6 +74,8 @@ final class ActorRenderer {
                 flash(nodes.sprite)
             }
             nodes.lastHealth = actor.health
+
+            nodes.goalLabel?.text = actor.ai?.goal.debugName
 
             setHealth(Double(actor.health) / Double(GameConfig.Player.maxHealth), on: nodes)
         }
@@ -114,9 +118,24 @@ final class ActorRenderer {
         bar.addChild(track)
         bar.addChild(fill)
 
-        let nodes = ActorNodes(sprite: sprite, healthFill: fill)
+        // A bot's current goal, drawn above its head. Eight actors all doing
+        // something is genuinely hard to read otherwise.
+        var goalLabel: SKLabelNode?
+        if GameConfig.AI.showDebugLabels, actor.ai != nil {
+            let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            label.fontSize = 10
+            label.fontColor = .white
+            label.alpha = 0.8
+            label.verticalAlignmentMode = .bottom
+            label.position = CGPoint(x: 0, y: bar.position.y
+                                     + GridGeometry.length(ofTiles: ActorRenderer.barHeightInTiles))
+            goalLabel = label
+        }
+
+        let nodes = ActorNodes(sprite: sprite, healthFill: fill, goalLabel: goalLabel)
         nodes.root.addChild(sprite)
         nodes.root.addChild(bar)
+        if let goalLabel { nodes.root.addChild(goalLabel) }
 
         node.addChild(nodes.root)
         nodesByActor[actor.id] = nodes

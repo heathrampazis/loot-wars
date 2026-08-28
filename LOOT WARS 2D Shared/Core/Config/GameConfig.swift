@@ -84,6 +84,36 @@ enum GameConfig {
         static let spacing: Double = 0.75
     }
 
+    enum AI {
+        /// Master switch. Off gives you the quiet map back for testing anything else.
+        static let enabled = true
+
+        /// How many of the seven other actors get a brain. Drop it to 1 while
+        /// watching a single bot's behaviour.
+        static let botCount = 7
+
+        /// Seconds between decisions. Bots keep executing in between - re-deciding
+        /// every tick makes them vibrate between options instead of committing.
+        static let decisionInterval: Double = 0.5
+
+        /// Close enough to count as having arrived, in tiles.
+        static let arriveDistance: Double = 0.8
+
+        /// Moved less than this since the last decision means something is in the
+        /// way, so pick a different destination rather than grinding into it.
+        static let stuckDistance: Double = 0.4
+
+        /// How far away a bot will pick its next spot to walk to, in tiles.
+        static let wanderRange: ClosedRange<Double> = 4...14
+
+        /// How many spots to try before giving up and standing still.
+        static let destinationAttempts = 12
+
+        /// Draws each bot's current goal above its head. Worth leaving on while
+        /// tuning behaviour; turn it off when you want to just play.
+        static let showDebugLabels = true
+    }
+
     enum Loot {
         /// Lootboxes scattered across the map.
         static let lootboxCount = 30

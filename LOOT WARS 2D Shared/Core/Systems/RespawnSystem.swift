@@ -43,5 +43,14 @@ enum RespawnSystem {
         if let claim = world.claim(for: actor.team) {
             actor.position = claim.centreTile.center
         }
+
+        // A bot that died halfway across the map should not set off for its old
+        // destination the moment it comes back. Make it think again immediately.
+        if var ai = actor.ai {
+            ai.destination = actor.position
+            ai.positionAtLastDecision = actor.position
+            ai.decisionTimer = 0
+            actor.ai = ai
+        }
     }
 }

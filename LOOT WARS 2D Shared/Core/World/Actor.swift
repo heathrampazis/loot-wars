@@ -41,6 +41,10 @@ struct Actor {
 
     var inventory = Inventory()
 
+    /// A bot's memory. nil for anything driven from outside - the local player
+    /// today, a remote player later.
+    var ai: AIState?
+
     /// Seconds until this actor may fire again.
     var shootCooldown: Double = 0
 
