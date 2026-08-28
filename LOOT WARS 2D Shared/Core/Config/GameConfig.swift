@@ -125,6 +125,11 @@ enum GameConfig {
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 20
 
+        /// How far a bot will detour for an item lying on the ground, in tiles.
+        /// Shorter than the crate range - a dropped item is worth a few steps, not
+        /// a march across the map.
+        static let itemSearchRange: Double = 8
+
         /// Give up on a crate it has not reached in this long, in seconds. Without
         /// this, a bot cut off from a crate walks at it until the match ends.
         static let lootPatience: Double = 8

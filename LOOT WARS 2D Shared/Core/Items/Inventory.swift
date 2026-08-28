@@ -13,6 +13,16 @@ struct Inventory: Equatable {
 
     var isFull: Bool { slots.allSatisfy { $0 != nil } }
 
+    /// Whether this item would actually fit. Not the same as "not full": a full
+    /// inventory can still take more of something it already has room to stack.
+    func canAccept(_ type: ItemType) -> Bool {
+        for slot in slots {
+            guard let stack = slot else { return true }
+            if stack.type == type, stack.count < type.maxStack { return true }
+        }
+        return false
+    }
+
     /// Tops up a matching stack first, then takes the first empty slot.
     ///
     /// Returns false when there is nowhere for it to go. The caller is expected to

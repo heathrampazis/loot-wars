@@ -59,6 +59,12 @@ enum AIBrain {
         // a bot away.
         if world.reachableLootbox(for: actor) != nil {
             commands.append(.openLootbox)
+
+            // Whatever falls out is right there. Re-decide on the next tick so the
+            // bot turns for it immediately, instead of wandering off and only
+            // noticing seconds later when the timer happens to come round.
+            state.decisionTimer = 0
+            actor.ai = state
         }
 
         return commands
@@ -69,8 +75,13 @@ enum AIBrain {
     private static func changeOfMind(_ state: inout AIState, actor: Actor, in world: World) {
         // Been walking at the same crate for a while and still not there? Something
         // is in the way that steering cannot solve. Give up and look elsewhere.
-        if case .loot = state.goal, state.goalAge > GameConfig.AI.lootPatience {
-            state.lootCooldown = GameConfig.AI.lootCooldown
+        switch state.goal {
+        case .loot, .collect:
+            if state.goalAge > GameConfig.AI.lootPatience {
+                state.lootCooldown = GameConfig.AI.lootCooldown
+            }
+        case .wander:
+            break
         }
 
         let wanted = chooseGoal(for: actor, state: state, in: world)
@@ -89,12 +100,38 @@ enum AIBrain {
         }
     }
 
-    /// Priority order. Fighting and retreating slot in above looting as they land.
+    /// Priority order. Fighting and retreating slot in above these as they land.
     private static func chooseGoal(for actor: Actor, state: AIState, in world: World) -> AIGoal {
-        if state.lootCooldown <= 0, let crate = nearestCrate(to: actor, in: world) {
+        guard state.lootCooldown <= 0 else { return .wander }
+
+        // Something already on the ground beats walking to a crate: it is closer,
+        // and it is usually the thing this bot just opened.
+        if let item = nearestItem(to: actor, in: world) {
+            return .collect(item.id)
+        }
+
+        if let crate = nearestCrate(to: actor, in: world) {
             return .loot(crate.id)
         }
+
         return .wander
+    }
+
+    private static func nearestItem(to actor: Actor, in world: World) -> GroundItem? {
+        var closest: GroundItem?
+        var shortest = GameConfig.AI.itemSearchRange
+
+        for item in world.groundItems.values {
+            // No point walking to something there is no room for.
+            guard actor.inventory.canAccept(item.type) else { continue }
+
+            let distance = (item.position - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            closest = item
+        }
+
+        return closest
     }
 
     private static func nearestCrate(to actor: Actor, in world: World) -> Lootbox? {
@@ -114,17 +151,29 @@ enum AIBrain {
     // MARK: - Aiming at a target
 
     private static func aimAtTarget(_ state: inout AIState, actor: Actor, in world: World) {
-        guard case .loot(let id) = state.goal else { return }
+        let target: Vec2?
+
+        switch state.goal {
+        case .wander:
+            return
+        case .loot(let id):
+            target = world.lootboxes[id]?.position
+        case .collect(let id):
+            target = world.groundItems[id]?.position
+        }
 
         // Somebody else got there first. Drop back to roaming rather than walking
-        // to a crate that no longer exists.
-        guard let crate = world.lootboxes[id] else {
+        // towards something that no longer exists.
+        guard let target else {
             state.goal = .wander
             state.goalAge = 0
             return
         }
 
-        let towards = crate.position - actor.position
+        // Steering aims the actor's centre at the item, which puts the item well
+        // inside the hitbox by the time it arrives - so walking to it is enough to
+        // pick it up.
+        let towards = target - actor.position
         if towards.length > 0.01 {
             state.desiredHeading = towards.normalized()
         }

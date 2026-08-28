@@ -19,11 +19,13 @@
 enum AIGoal: Equatable {
     case wander
     case loot(LootboxID)
+    case collect(GroundItemID)
 
     var debugName: String {
         switch self {
         case .wander: return "roam"
         case .loot: return "loot"
+        case .collect: return "grab"
         }
     }
 }
