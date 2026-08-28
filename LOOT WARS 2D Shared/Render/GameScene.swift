@@ -11,6 +11,8 @@
 //    4. lay out the UI
 //
 //  If this file starts growing game rules, they belong in a system in Core instead.
+//  Notice that tapping a tile does not place a block here - it asks for one.
+//  BuildSystem decides whether it happens.
 //
 
 import SpriteKit
@@ -21,21 +23,33 @@ final class GameScene: SKScene {
 
     private var world: World!
 
+    /// Commands raised by one-off input (taps), waiting for the next tick.
+    private var queuedCommands: [Command] = []
+
     // MARK: - Rendering
 
     private let worldLayer = SKNode()
     private let tileRenderer = TileMapRenderer()
     private let treeRenderer = TreeRenderer()
+    private let blockRenderer = BlockRenderer()
     private let actorRenderer = ActorRenderer()
     private let cameraController = CameraController()
+
+    /// The map revision the block layer was last drawn from, so it is only rebuilt
+    /// when a tile actually changed.
+    private var drawnMapRevision = -1
 
     // MARK: - UI
 
     private let joystick = JoystickNode()
 
     #if os(iOS) || os(tvOS)
-    /// Which finger owns the stick right now.
+    /// Which finger owns the stick, and which one might still turn out to be a tap.
     private var joystickTouch: UITouch?
+    private var tapTouch: UITouch?
+    private var tapOrigin: CGPoint = .zero
+    /// Slide further than this and it was a drag, not a tap.
+    private let tapSlop: CGFloat = 24
     #endif
 
     // MARK: - Fixed timestep
@@ -67,6 +81,7 @@ final class GameScene: SKScene {
         treeRenderer.build(from: map)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(treeRenderer.node)
+        worldLayer.addChild(blockRenderer.node)
         worldLayer.addChild(actorRenderer.node)
         addChild(worldLayer)
 
@@ -76,10 +91,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(joystick)
         layOutUI()
 
-        actorRenderer.sync(with: world)
-        if let player = world.localPlayer {
-            cameraController.follow(player.position)
-        }
+        syncRenderers()
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -111,6 +123,16 @@ final class GameScene: SKScene {
             accumulator -= GameConfig.fixedTimeStep
         }
 
+        syncRenderers()
+    }
+
+    private func syncRenderers() {
+        // Blocks only get rebuilt when a tile actually changed.
+        if world.mapRevision != drawnMapRevision {
+            blockRenderer.build(from: world.map)
+            drawnMapRevision = world.mapRevision
+        }
+
         actorRenderer.sync(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
@@ -120,7 +142,10 @@ final class GameScene: SKScene {
     /// Input becomes a Command. Later, AI brains and network packets produce their
     /// Commands exactly the same way, and the world cannot tell them apart.
     private func gatherCommands() -> [ActorID: [Command]] {
-        [world.localPlayerID: [.move(joystick.direction)]]
+        var commands: [Command] = [.move(joystick.direction)]
+        commands.append(contentsOf: queuedCommands)
+        queuedCommands.removeAll()
+        return [world.localPlayerID: commands]
     }
 }
 
@@ -128,26 +153,50 @@ final class GameScene: SKScene {
 extension GameScene {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard joystickTouch == nil else { return }
         for touch in touches {
-            if joystick.begin(atLocalPoint: touch.location(in: joystick)) {
+            // The stick gets first refusal on every touch.
+            if joystickTouch == nil,
+               joystick.begin(atLocalPoint: touch.location(in: joystick)) {
                 joystickTouch = touch
-                return
+                continue
+            }
+
+            if tapTouch == nil {
+                tapTouch = touch
+                tapOrigin = touch.location(in: self)
             }
         }
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let active = joystickTouch, touches.contains(active) else { return }
-        joystick.update(toLocalPoint: active.location(in: joystick))
+        if let active = joystickTouch, touches.contains(active) {
+            joystick.update(toLocalPoint: active.location(in: joystick))
+        }
+
+        // A finger that wanders was never a tap.
+        if let tap = tapTouch, touches.contains(tap) {
+            let moved = tap.location(in: self) - tapOrigin
+            if hypot(moved.x, moved.y) > tapSlop {
+                tapTouch = nil
+            }
+        }
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseJoystick(matching: touches)
+
+        if let tap = tapTouch, touches.contains(tap) {
+            requestBlock(at: tap.location(in: worldLayer))
+            tapTouch = nil
+        }
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseJoystick(matching: touches)
+
+        if let tap = tapTouch, touches.contains(tap) {
+            tapTouch = nil
+        }
     }
 
     private func releaseJoystick(matching touches: Set<UITouch>) {
@@ -155,5 +204,14 @@ extension GameScene {
         joystick.end()
         joystickTouch = nil
     }
+
+    /// Asks for a block. Whether one appears is BuildSystem's call, not the scene's.
+    private func requestBlock(at pointInWorld: CGPoint) {
+        queuedCommands.append(.placeBlock(GridGeometry.gridPoint(for: pointInWorld)))
+    }
+}
+
+private func - (a: CGPoint, b: CGPoint) -> CGPoint {
+    CGPoint(x: a.x - b.x, y: a.y - b.y)
 }
 #endif

@@ -8,6 +8,7 @@
 //
 
 import CoreGraphics
+import Foundation
 
 enum GridGeometry {
 
@@ -26,5 +27,12 @@ enum GridGeometry {
 
     static func length(ofTiles tiles: Double) -> CGFloat {
         CGFloat(tiles) * tileSize
+    }
+
+    /// The tile a point on screen falls in. The inverse of the functions above, and
+    /// the only way a touch is allowed to become a coordinate.
+    static func gridPoint(for point: CGPoint) -> GridPoint {
+        GridPoint(col: Int(floor(point.x / tileSize)),
+                  row: Int(floor(point.y / tileSize)))
     }
 }

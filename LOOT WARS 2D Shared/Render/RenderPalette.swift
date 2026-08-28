@@ -22,8 +22,13 @@ enum RenderPalette {
     static let treeHighlight = rgb(0x6F, 0xC0, 0x61)
     static let treeTrunk     = rgb(0x7A, 0x54, 0x33)
 
+    // Player-placed blocks
+    static let block = rgb(0x3E, 0xA2, 0x7F)
+
     // Actors
-    static let player = rgb(0x3E, 0xA2, 0x7F)
+    // Deliberately warm: blocks are the mockup's teal, so the player needs to be
+    // something you can never mistake for a wall.
+    static let player = rgb(0xF2, 0xA0, 0x3D)
 
     // UI
     static let joystickBase = SKColor(white: 0.0, alpha: 0.18)

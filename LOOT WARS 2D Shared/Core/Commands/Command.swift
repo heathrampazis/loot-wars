@@ -11,4 +11,5 @@
 
 enum Command {
     case move(Vec2)
+    case placeBlock(GridPoint)
 }
