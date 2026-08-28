@@ -6,26 +6,33 @@
 //
 //  Only .wander exists so far. The rest of the plan, in the order they are coming:
 //
-//    .fight(ActorID)   - close to blaster range and shoot, with reaction delay
-//                        and aim error so it can actually be beaten
-//    .retreat          - low on health: head for your own claim, where your own
-//                        walls let you through and the enemy's shots do not
+//  Priority runs top down: retreat beats fighting, fighting beats loot, loot
+//  beats roaming. Still to come is .raid, once bombs exist.
 //
-//  Each one is a new case here, a branch in AIBrain.chooseGoal, and a branch in
-//  AIBrain.execute. Nothing else in the game changes - a bot produces the same
-//  Commands a thumb does.
+//  Nothing about a bot is privileged. It shoots in the direction it is walking,
+//  exactly like the player, so turning to aim and moving are the same action - and
+//  it cannot strafe while firing any more than you can.
 //
 
 enum AIGoal: Equatable {
     case wander
     case loot(LootboxID)
     case collect(GroundItemID)
+    case fight(ActorID)
+    case retreat
+
+    var isFight: Bool {
+        if case .fight = self { return true }
+        return false
+    }
 
     var debugName: String {
         switch self {
         case .wander: return "roam"
         case .loot: return "loot"
         case .collect: return "grab"
+        case .fight: return "fight"
+        case .retreat: return "flee"
         }
     }
 }

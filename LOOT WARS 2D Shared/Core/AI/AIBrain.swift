@@ -27,6 +27,7 @@ enum AIBrain {
 
         state.goalAge += dt
         state.lootCooldown = max(0, state.lootCooldown - dt)
+        state.reactionTimer = max(0, state.reactionTimer - dt)
         state.decisionTimer -= dt
 
         if state.decisionTimer <= 0 {
@@ -52,7 +53,11 @@ enum AIBrain {
 
         actor.ai = state
 
-        var commands: [Command] = [.move(state.heading)]
+        var commands: [Command] = [.move(movement(for: state, actor: actor, in: world))]
+
+        if shouldShoot(state: state, actor: actor, in: world) {
+            commands.append(.shoot)
+        }
 
         // Open whatever is within reach, whatever the bot was busy doing. Walking
         // past an open-able crate and ignoring it is the sort of thing that gives
@@ -80,15 +85,24 @@ enum AIBrain {
             if state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
             }
-        case .wander:
+        case .wander, .fight, .retreat:
             break
         }
 
         let wanted = chooseGoal(for: actor, state: state, in: world)
         if wanted != state.goal {
+            // Only a NEW fight costs a reaction - a bot already shooting at someone
+            // does not freeze up again every time it re-picks the same target.
+            if case .fight = wanted, !state.goal.isFight {
+                state.reactionTimer = Double.random(in: GameConfig.AI.reactionDelay,
+                                                    using: &world.rng)
+            }
             state.goal = wanted
             state.goalAge = 0
         }
+
+        state.aimNoise = Double.random(in: -GameConfig.AI.aimError...GameConfig.AI.aimError,
+                                       using: &world.rng)
 
         if case .wander = state.goal {
             // Swing off the CURRENT heading rather than picking a fresh direction
@@ -100,8 +114,21 @@ enum AIBrain {
         }
     }
 
-    /// Priority order. Fighting and retreating slot in above these as they land.
+    /// Priority order: staying alive, then fighting, then loot, then roaming.
     private static func chooseGoal(for actor: Actor, state: AIState, in world: World) -> AIGoal {
+        if let enemy = nearestVisibleEnemy(to: actor, in: world) {
+            let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
+
+            // Hurt and in danger: get out. Note this only holds while an enemy is
+            // actually near - once it is safe the bot goes back to work rather than
+            // hiding at home for the rest of the match.
+            if healthLeft < GameConfig.AI.retreatHealthFraction {
+                return .retreat
+            }
+
+            return .fight(enemy.id)
+        }
+
         guard state.lootCooldown <= 0 else { return .wander }
 
         // Something already on the ground beats walking to a crate: it is closer,
@@ -160,6 +187,10 @@ enum AIBrain {
             target = world.lootboxes[id]?.position
         case .collect(let id):
             target = world.groundItems[id]?.position
+        case .fight(let id):
+            target = world.actors[id].flatMap { $0.isAlive ? $0.position : nil }
+        case .retreat:
+            target = world.claim(for: actor.team)?.centreTile.center
         }
 
         // Somebody else got there first. Drop back to roaming rather than walking
@@ -174,9 +205,114 @@ enum AIBrain {
         // inside the hitbox by the time it arrives - so walking to it is enough to
         // pick it up.
         let towards = target - actor.position
-        if towards.length > 0.01 {
+        guard towards.length > 0.01 else { return }
+
+        // Aim wobble is applied to the heading, not to the bullet, because a bot
+        // shoots where it walks. Missing therefore looks like slightly sloppy
+        // movement, which is exactly how a person misses.
+        if case .fight = state.goal {
+            state.desiredHeading = Vec2.fromAngle(towards.angle + state.aimNoise)
+        } else {
             state.desiredHeading = towards.normalized()
         }
+    }
+
+    // MARK: - Fighting
+
+    private static func nearestVisibleEnemy(to actor: Actor, in world: World) -> Actor? {
+        var closest: Actor?
+        var shortest = GameConfig.AI.engageRange
+
+        // Fixed order, so two equally distant enemies are always resolved the same
+        // way and a seed replays identically.
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let candidate = world.actors[id],
+                  candidate.team != actor.team,
+                  candidate.isAlive,
+                  candidate.invulnerability <= 0 else { continue }
+
+            let distance = (candidate.position - actor.position).length
+            guard distance < shortest else { continue }
+            guard hasLineOfSight(from: actor.position, to: candidate.position, in: world) else { continue }
+
+            shortest = distance
+            closest = candidate
+        }
+
+        return closest
+    }
+
+    /// Whether to keep walking, or hold still and trade shots.
+    ///
+    /// Standing still keeps the last facing, which is what lets a bot hold its
+    /// ground without losing its aim. It starts moving again the moment the target
+    /// drifts off that aim - so it turns by taking a step, exactly as you do.
+    private static func movement(for state: AIState, actor: Actor, in world: World) -> Vec2 {
+        guard case .fight(let id) = state.goal,
+              let enemy = world.actors[id], enemy.isAlive else { return state.heading }
+
+        let towards = enemy.position - actor.position
+        guard towards.length <= GameConfig.AI.standoffRange else { return state.heading }
+        guard aimIsOn(actor: actor, towards: towards) else { return state.heading }
+
+        return .zero
+    }
+
+    private static func shouldShoot(state: AIState, actor: Actor, in world: World) -> Bool {
+        guard case .fight(let id) = state.goal else { return false }
+        guard state.reactionTimer <= 0 else { return false }
+
+        guard let enemy = world.actors[id],
+              enemy.isAlive,
+              enemy.invulnerability <= 0 else { return false }
+
+        let towards = enemy.position - actor.position
+        guard towards.length <= GameConfig.Blaster.range else { return false }
+        guard aimIsOn(actor: actor, towards: towards) else { return false }
+
+        // Do not fire into the back of a tree.
+        return hasLineOfSight(from: actor.position, to: enemy.position, in: world)
+    }
+
+    /// Is the bot lined up well enough to be worth pulling the trigger?
+    ///
+    /// The tolerance is how wide the target LOOKS from here, not a fixed angle. A
+    /// fixed 0.2 radians is about half a tile at two tiles away but two and a half
+    /// tiles at twelve, so a bot using it would blaze away at long range and hit
+    /// nothing. This way its aim error naturally pushes it to close the distance
+    /// before shooting, which is what a person does.
+    private static func aimIsOn(actor: Actor, towards: Vec2) -> Bool {
+        let distance = max(towards.length, 0.5)
+        let apparentWidth = atan(GameConfig.Player.halfWidth / distance)
+        let tolerance = min(GameConfig.AI.aimTolerance, apparentWidth)
+
+        return abs(shortestAngle(from: actor.facing.angle, to: towards.angle)) <= tolerance
+    }
+
+    /// Samples along the line. Uses the same rules a bullet does - including that
+    /// walls stop shots even when they are your own - so a bot never takes a shot
+    /// the simulation would swallow.
+    private static func hasLineOfSight(from start: Vec2, to end: Vec2, in world: World) -> Bool {
+        let delta = end - start
+        let distance = delta.length
+        guard distance > 0.01 else { return true }
+
+        let direction = delta * (1 / distance)
+        var travelled = GameConfig.Blaster.muzzleOffset
+
+        while travelled < distance {
+            if blocksShot(start + direction * travelled, in: world) { return false }
+            travelled += 0.4
+        }
+
+        return true
+    }
+
+    private static func blocksShot(_ point: Vec2, in world: World) -> Bool {
+        if world.map.isOccupied(GridPoint(containing: point)) { return true }
+        if world.trees.contains(where: { $0.contains(point) }) { return true }
+        if world.lootboxes.values.contains(where: { $0.hitbox.contains(point) }) { return true }
+        return false
     }
 
     // MARK: - Steering
@@ -259,14 +395,16 @@ enum AIBrain {
 
     /// Rotates one heading towards another by at most `limit` radians.
     private static func turn(_ heading: Vec2, towards desired: Vec2, limit: Double) -> Vec2 {
-        var delta = desired.angle - heading.angle
-
-        // Take the short way round, so turning from 170° to -170° is a 20° nudge
-        // rather than a 340° spin.
-        while delta > .pi { delta -= 2 * .pi }
-        while delta < -.pi { delta += 2 * .pi }
-
+        let delta = shortestAngle(from: heading.angle, to: desired.angle)
         let step = max(-limit, min(limit, delta))
         return Vec2.fromAngle(heading.angle + step)
+    }
+
+    /// The short way round, so 170° to -170° is a 20° nudge rather than a 340° spin.
+    private static func shortestAngle(from: Double, to: Double) -> Double {
+        var delta = to - from
+        while delta > .pi { delta -= 2 * .pi }
+        while delta < -.pi { delta += 2 * .pi }
+        return delta
     }
 }

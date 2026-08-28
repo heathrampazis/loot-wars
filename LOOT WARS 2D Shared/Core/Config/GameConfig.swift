@@ -122,6 +122,35 @@ enum GameConfig {
         /// like a bot fleeing the wall, so keep it gentle.
         static let edgeBias: Double = 0.65
 
+        /// How far a bot will notice and go after an enemy, in tiles. Shorter than
+        /// the blaster's range, so a fight starts with a bot closing in rather than
+        /// sniping from off screen.
+        static let engageRange: Double = 10
+
+        /// It stops closing once this near and holds its ground to trade shots,
+        /// instead of walking through whoever it is fighting.
+        static let standoffRange: Double = 2.2
+
+        /// The most its aim may drift off target before it takes a step to re-aim,
+        /// in radians. Bots shoot where they walk, exactly like the player, so
+        /// turning and aiming are the same action.
+        ///
+        /// This is only the close-range cap - the real tolerance is how wide the
+        /// target actually looks from where the bot is standing. See aimIsOn.
+        static let aimTolerance: Double = 0.2
+
+        /// Random wobble applied to a bot's aim, in radians (about 5°). Without it
+        /// bots never miss, and a bot that never misses is miserable to play.
+        static let aimError: Double = 0.09
+
+        /// How long a bot takes to react to an enemy it has just noticed.
+        static let reactionDelay: ClosedRange<Double> = 0.25...0.5
+
+        /// Below this share of its health, a bot breaks off and runs for home -
+        /// but only while an enemy is actually near. Once it is safe it gets back
+        /// to work rather than cowering in its base for the rest of the match.
+        static let retreatHealthFraction: Double = 0.3
+
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 20
 

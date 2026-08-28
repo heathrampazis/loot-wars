@@ -40,4 +40,12 @@ struct AIState {
     /// While this is running the bot ignores crates, so giving up on one does not
     /// immediately turn it straight back around.
     var lootCooldown: Double = 0
+
+    /// Counts down after spotting an enemy. Nobody reacts instantly, and a bot that
+    /// does feels like a machine.
+    var reactionTimer: Double = 0
+
+    /// A small fixed error added to this bot's aim, re-rolled whenever it changes
+    /// its mind. Perfect aim is what makes bots unbeatable and unfun.
+    var aimNoise: Double = 0
 }
