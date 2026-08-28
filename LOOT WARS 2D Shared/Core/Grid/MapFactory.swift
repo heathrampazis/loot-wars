@@ -21,6 +21,8 @@ struct GeneratedMap {
     let claims: [TeamID: BaseClaim]
     let trees: [TreePatch]
     let lootboxes: [Lootbox]
+    /// The wall plan each team builds to, in the order it lays them.
+    let baseLayouts: [TeamID: BaseLayout]
     /// Which team this device plays. Random per seed, so your colour and your
     /// corner of the map change every game.
     let localTeam: TeamID
@@ -39,10 +41,18 @@ enum MapFactory {
         let trees = plantTrees(in: map, avoiding: claims, using: &rng)
         let lootboxes = scatterLootboxes(in: map, avoiding: claims, and: trees, using: &rng)
 
+        var baseLayouts: [TeamID: BaseLayout] = [:]
+        for index in 0..<TeamID.count {
+            let team = TeamID(index)
+            guard let claim = claims[team] else { continue }
+            baseLayouts[team] = BaseLayoutFactory.make(for: claim, using: &rng)
+        }
+
         return GeneratedMap(map: map,
                             claims: claims,
                             trees: trees,
                             lootboxes: lootboxes,
+                            baseLayouts: baseLayouts,
                             localTeam: localTeam,
                             seed: seed)
     }

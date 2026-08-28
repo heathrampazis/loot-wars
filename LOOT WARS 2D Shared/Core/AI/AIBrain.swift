@@ -27,6 +27,8 @@ enum AIBrain {
 
         state.goalAge += dt
         state.lootCooldown = max(0, state.lootCooldown - dt)
+        state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
+        state.placeTimer = max(0, state.placeTimer - dt)
         state.reactionTimer = max(0, state.reactionTimer - dt)
         state.decisionTimer -= dt
 
@@ -70,6 +72,11 @@ enum AIBrain {
 
         var commands: [Command] = [.move(step)]
 
+        if let wall = wallToLay(&state, actor: actor, in: world) {
+            commands.append(.placeBlock(wall))
+            actor.ai = state
+        }
+
         if state.holdingGround, state.reactionTimer <= 0 {
             // Firing and standing still are the same decision, so they cannot
             // disagree: a bot shoots exactly when it has planted itself to shoot.
@@ -102,11 +109,28 @@ enum AIBrain {
             if state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
             }
+        case .build:
+            if state.goalAge > GameConfig.Build.patience {
+                state.buildUrgeTimer = Double.random(in: GameConfig.Build.urgeInterval,
+                                                     using: &world.rng)
+            }
         case .wander, .fight, .retreat:
             break
         }
 
-        let wanted = chooseGoal(for: actor, state: state, in: world)
+        var wanted = chooseGoal(for: actor, state: state, in: world)
+
+        // Re-point at the current next wall rather than the one chosen minutes ago,
+        // which may well have been laid by now.
+        if case .build = wanted, case .build = state.goal,
+           let current = world.nextBuildTile(for: actor.team) {
+            wanted = .build(current)
+        }
+
+        if case .build = wanted, !state.goal.isBuild {
+            state.blocksLeftToLay = Int.random(in: GameConfig.Build.blocksPerVisit, using: &world.rng)
+        }
+
         if wanted != state.goal {
             // Only a NEW fight costs a reaction - a bot already shooting at someone
             // does not freeze up again every time it re-picks the same target.
@@ -139,7 +163,9 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect:
+        case .wander, .loot, .collect, .build:
+            // Building is interruptible. A bot laying bricks while somebody shoots
+            // at it is not a bot anyone believes in.
             break
         }
 
@@ -167,6 +193,12 @@ enum AIBrain {
             }
 
             return .fight(enemy.id)
+        }
+
+        // Home comes before loot when the urge is up. Crates are always closer
+        // than your base, so a bot that checks loot first never builds anything.
+        if state.buildUrgeTimer <= 0, let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
         }
 
         guard state.lootCooldown <= 0 else { return .wander }
@@ -239,6 +271,8 @@ enum AIBrain {
             }
         case .retreat:
             target = world.claim(for: actor.team)?.centreTile.center
+        case .build(let tile):
+            target = standingSpot(for: tile, team: actor.team, in: world)
         }
 
         // Somebody else got there first. Drop back to roaming rather than walking
@@ -266,6 +300,56 @@ enum AIBrain {
         } else {
             state.desiredHeading = towards.normalized()
         }
+    }
+
+    // MARK: - Building
+
+    /// Where to stand to lay a given wall tile.
+    ///
+    /// Pulled a little towards the middle of the claim rather than aiming at the
+    /// tile itself: a bot standing exactly on a bottom-edge wall line has its FEET
+    /// outside the claim, and BuildSystem quite rightly refuses the placement.
+    private static func standingSpot(for tile: GridPoint, team: TeamID, in world: World) -> Vec2 {
+        guard let claim = world.claim(for: team) else { return tile.center }
+
+        let inward = claim.centreTile.center - tile.center
+        guard inward.length > 0.01 else { return tile.center }
+
+        return tile.center + inward.normalized() * GameConfig.Build.standIn
+    }
+
+    /// The wall to lay this tick, if any.
+    ///
+    /// Spaced out by a timer so walls go up one after another, and capped per trip
+    /// so a bot lays a couple and gets back to the match rather than camping its
+    /// claim until the base is finished.
+    private static func wallToLay(_ state: inout AIState, actor: Actor, in world: World) -> GridPoint? {
+        guard case .build = state.goal else { return nil }
+        guard state.placeTimer <= 0, state.blocksLeftToLay > 0 else { return nil }
+
+        // Take whatever is next NOW - the tile picked when the trip started may
+        // already have been laid, by this bot or by a teammate later on.
+        guard let tile = world.nextBuildTile(for: actor.team) else {
+            state.goal = .wander
+            state.goalAge = 0
+            return nil
+        }
+
+        guard (tile.center - actor.position).length <= GameConfig.Build.reach else { return nil }
+        guard BuildSystem.canPlace(at: tile, by: actor, in: world) else { return nil }
+
+        state.placeTimer = GameConfig.Build.placeInterval
+        state.blocksLeftToLay -= 1
+
+        if state.blocksLeftToLay <= 0 {
+            // Done for now. Back to the match.
+            state.buildUrgeTimer = Double.random(in: GameConfig.Build.urgeInterval,
+                                                 using: &world.rng)
+            state.goal = .wander
+            state.goalAge = 0
+        }
+
+        return tile
     }
 
     // MARK: - Fighting

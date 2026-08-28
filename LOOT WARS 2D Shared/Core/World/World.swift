@@ -26,6 +26,8 @@ final class World {
     /// Round obstacles. Not tiles - see TreePatch for why.
     let trees: [TreePatch]
 
+    let baseLayouts: [TeamID: BaseLayout]
+
     var actors: [ActorID: Actor] = [:]
     var projectiles: [Projectile] = []
 
@@ -57,6 +59,7 @@ final class World {
         self.map = generated.map
         self.claims = generated.claims
         self.trees = generated.trees
+        self.baseLayouts = generated.baseLayouts
 
         // Offset from the map's seed, so play does not replay the same number
         // sequence that built the terrain.
@@ -112,6 +115,17 @@ final class World {
     var localPlayer: Actor? { actors[localPlayerID] }
 
     func claim(for team: TeamID) -> BaseClaim? { claims[team] }
+
+    /// The next wall this team should lay, or nil once the base is finished.
+    ///
+    /// Walks the plan in order and takes the first tile that is still free, so a
+    /// spot temporarily blocked by a crate is skipped rather than stalling the
+    /// whole build.
+    func nextBuildTile(for team: TeamID) -> GridPoint? {
+        baseLayouts[team]?.tiles.first {
+            BuildSystem.isBuildableTile($0, for: team, in: self)
+        }
+    }
 
     // MARK: - Loot
 

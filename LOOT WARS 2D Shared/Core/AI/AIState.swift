@@ -52,6 +52,15 @@ struct AIState {
     /// it can hold on a little longer than it would first stop at.
     var holdingGround: Bool = false
 
+    /// Counts down to the next urge to go home and add to the base.
+    var buildUrgeTimer: Double = 0
+
+    /// Walls left to lay on this trip home.
+    var blocksLeftToLay: Int = 0
+
+    /// Spaces out the individual walls within a trip.
+    var placeTimer: Double = 0
+
     /// A small fixed error added to this bot's aim, re-rolled whenever it changes
     /// its mind. Perfect aim is what makes bots unbeatable and unfun.
     var aimNoise: Double = 0

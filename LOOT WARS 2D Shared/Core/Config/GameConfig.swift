@@ -189,6 +189,33 @@ enum GameConfig {
         static let showDebugLabels = false
     }
 
+    enum Build {
+        /// How long a bot goes without thinking about its base after a trip home.
+        /// Short trips, often - a bot that camps its claim laying thirty walls is
+        /// a bot that never plays the game.
+        static let urgeInterval: ClosedRange<Double> = 3...5
+
+        /// Walls laid per trip. A couple at a time, so the base visibly grows over
+        /// a match rather than appearing at once.
+        static let blocksPerVisit: ClosedRange<Int> = 2...4
+
+        /// Seconds between individual walls, so they go up one after another
+        /// instead of all in the same instant.
+        static let placeInterval: Double = 0.8
+
+        /// How close a bot must be to the tile it is laying, in tiles.
+        static let reach: Double = 2.2
+
+        /// How far inside the claim the bot stands to lay an edge tile. Without
+        /// this it would stand on the wall line itself, which for the bottom edge
+        /// puts its feet outside the claim and the placement is refused.
+        static let standIn: Double = 1.2
+
+        /// Abandon a building trip that has taken this long - something is in the
+        /// way and the bot has a match to be playing.
+        static let patience: Double = 25
+    }
+
     enum Loot {
         /// Lootboxes scattered across the map.
         static let lootboxCount = 30
