@@ -30,13 +30,29 @@ struct Actor {
     /// Seconds until this actor may fire again.
     var shootCooldown: Double = 0
 
+    /// Bottom-left and top-right of this actor's collision box, in tile space.
+    /// Everything that asks about the actor's shape goes through these, so collision,
+    /// building and rendering can never disagree about where it is.
+    var hitboxMin: Vec2 {
+        Vec2(x: position.x - GameConfig.Player.halfWidth,
+             y: position.y - GameConfig.Player.halfDepth)
+    }
+
+    var hitboxMax: Vec2 {
+        Vec2(x: position.x + GameConfig.Player.halfWidth,
+             y: position.y + GameConfig.Player.halfDepth)
+    }
+
+    /// Where the figure's feet meet the ground - the bottom edge of the hitbox.
+    var feet: Vec2 {
+        Vec2(x: position.x, y: position.y - GameConfig.Player.halfDepth)
+    }
+
     /// Does this actor's hitbox overlap the given tile at all?
-    /// Lives here so collision, building and rendering all agree on the answer.
     func overlaps(_ point: GridPoint) -> Bool {
-        let half = GameConfig.Player.halfSize
-        return position.x + half > Double(point.col)
-            && position.x - half < Double(point.col + 1)
-            && position.y + half > Double(point.row)
-            && position.y - half < Double(point.row + 1)
+        hitboxMax.x > Double(point.col)
+            && hitboxMin.x < Double(point.col + 1)
+            && hitboxMax.y > Double(point.row)
+            && hitboxMin.y < Double(point.row + 1)
     }
 }

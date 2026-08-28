@@ -30,9 +30,7 @@ final class ActorRenderer {
             // The art is a standing figure, so it stands ON the hitbox rather than
             // being centred in it: the sprite's feet sit at the bottom of the box
             // and the body rises from there.
-            let feet = Vec2(x: actor.position.x,
-                            y: actor.position.y - GameConfig.Player.halfSize)
-            sprite.position = GridGeometry.point(for: feet)
+            sprite.position = GridGeometry.point(for: actor.feet)
 
             // Mirror rather than swap art: one image serves both directions.
             sprite.xScale = actor.facesLeft ? -1 : 1

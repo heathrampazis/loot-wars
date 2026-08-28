@@ -39,8 +39,17 @@ enum GameConfig {
     enum Player {
         /// Tiles travelled per second at full stick.
         static let moveSpeed: Double = 4.5
-        /// Half the width of the player's square hitbox, in tiles.
-        static let halfSize: Double = 0.4
+        // The hitbox is a wide, shallow box at the character's feet - NOT the whole
+        // standing figure. In a top-down view you collide with where you stand, so
+        // your head and shoulders pass in front of walls instead of bumping into
+        // them from a tile away.
+
+        /// Half the footprint's width, in tiles. A shade narrower than the sprite,
+        /// which reads as forgiving rather than as clipping.
+        static let halfWidth: Double = 0.42
+
+        /// Half the footprint's depth, in tiles - how much ground the figure stands on.
+        static let halfDepth: Double = 0.25
     }
 
     enum Trees {

@@ -33,14 +33,12 @@ enum MovementSystem {
     }
 
     private static func resolveTrees(_ actor: inout Actor, in trees: [TreePatch]) {
-        let half = GameConfig.Player.halfSize
-
         for tree in trees {
             // Nearest point on the actor's box to the centre of the clump.
-            let closest = Vec2(
-                x: min(max(tree.centre.x, actor.position.x - half), actor.position.x + half),
-                y: min(max(tree.centre.y, actor.position.y - half), actor.position.y + half)
-            )
+            let low = actor.hitboxMin
+            let high = actor.hitboxMax
+            let closest = Vec2(x: min(max(tree.centre.x, low.x), high.x),
+                               y: min(max(tree.centre.y, low.y), high.y))
 
             var normal = closest - tree.centre
             var distance = normal.length
@@ -74,15 +72,19 @@ enum MovementSystem {
     private static func resolve(_ actor: inout Actor, in map: TileMap, along axis: Axis, delta: Double) {
         guard delta != 0 else { return }
 
-        let half = GameConfig.Player.halfSize
+        // The footprint is wider than it is deep, so each axis has its own half
+        // extent - one square value would be wrong on both counts.
+        let halfWidth = GameConfig.Player.halfWidth
+        let halfDepth = GameConfig.Player.halfDepth
+
         // A hair of margin so the actor rests just outside the tile rather than
         // exactly on its edge, where floating point would flip-flop.
         let margin = 0.0001
 
-        let minCol = Int(floor(actor.position.x - half))
-        let maxCol = Int(floor(actor.position.x + half))
-        let minRow = Int(floor(actor.position.y - half))
-        let maxRow = Int(floor(actor.position.y + half))
+        let minCol = Int(floor(actor.position.x - halfWidth))
+        let maxCol = Int(floor(actor.position.x + halfWidth))
+        let minRow = Int(floor(actor.position.y - halfDepth))
+        let maxRow = Int(floor(actor.position.y + halfDepth))
 
         for col in minCol...maxCol {
             for row in minRow...maxRow {
@@ -92,12 +94,12 @@ enum MovementSystem {
                 switch axis {
                 case .horizontal:
                     actor.position.x = delta > 0
-                        ? Double(col) - half - margin
-                        : Double(col + 1) + half + margin
+                        ? Double(col) - halfWidth - margin
+                        : Double(col + 1) + halfWidth + margin
                 case .vertical:
                     actor.position.y = delta > 0
-                        ? Double(row) - half - margin
-                        : Double(row + 1) + half + margin
+                        ? Double(row) - halfDepth - margin
+                        : Double(row + 1) + halfDepth + margin
                 }
             }
         }
