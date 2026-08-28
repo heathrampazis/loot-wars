@@ -5,14 +5,20 @@
 //  An icon and a bar. Knows nothing about health or ammo - it is handed a fraction
 //  between 0 and 1 and draws it, which is why the same node serves both rows.
 //
+//  Both the track and the fill are outlined, so a part-full bar shows a black cap
+//  where the colour stops. The outline weight is the same 0.11 tiles used on walls
+//  and trees, which is what keeps the HUD looking like part of the same game.
+//
 
 import SpriteKit
 
 final class StatBarNode: SKNode {
 
     static let iconSize: CGFloat = 30
+    /// Outer dimensions, outline included.
     static let barWidth: CGFloat = 150
-    static let barHeight: CGFloat = 20
+    static let barHeight: CGFloat = 22
+    static let outline: CGFloat = 4.5
     static let gap: CGFloat = 10
 
     /// Total width of icon plus bar, so the panel can size itself around it.
@@ -30,13 +36,16 @@ final class StatBarNode: SKNode {
         icon.position = CGPoint(x: StatBarNode.iconSize / 2, y: 0)
         addChild(icon)
 
-        let track = SKShapeNode(path: StatBarNode.barPath(width: StatBarNode.barWidth))
+        let track = SKShapeNode(path: StatBarNode.barPath(outerWidth: StatBarNode.barWidth))
         track.fillColor = RenderPalette.hudTrack
-        track.strokeColor = .clear
+        track.strokeColor = .black
+        track.lineWidth = StatBarNode.outline
         addChild(track)
 
         fill.fillColor = fillColour
-        fill.strokeColor = .clear
+        fill.strokeColor = .black
+        fill.lineWidth = StatBarNode.outline
+        fill.zPosition = 1
         addChild(fill)
 
         setFraction(1)
@@ -57,17 +66,23 @@ final class StatBarNode: SKNode {
 
         // Never narrower than it is tall, or the rounded ends collapse into a sliver.
         let width = max(StatBarNode.barHeight, StatBarNode.barWidth * CGFloat(clamped))
-        fill.path = StatBarNode.barPath(width: width)
+        fill.path = StatBarNode.barPath(outerWidth: width)
     }
 
-    private static func barPath(width: CGFloat) -> CGPath {
-        let rect = CGRect(x: iconSize + gap,
-                          y: -barHeight / 2,
-                          width: width,
-                          height: barHeight)
+    /// - Parameter outerWidth: width including the outline.
+    private static func barPath(outerWidth: CGFloat) -> CGPath {
+        // A stroke straddles its path, so inset by half of it - that puts the
+        // outline's OUTER edge exactly on the dimensions asked for, rather than
+        // letting every bar grow by half an outline in each direction.
+        let height = barHeight - outline
+        let rect = CGRect(x: iconSize + gap + outline / 2,
+                          y: -height / 2,
+                          width: outerWidth - outline,
+                          height: height)
+
         return CGPath(roundedRect: rect,
-                      cornerWidth: barHeight / 2,
-                      cornerHeight: barHeight / 2,
+                      cornerWidth: height / 2,
+                      cornerHeight: height / 2,
                       transform: nil)
     }
 }
