@@ -19,22 +19,33 @@ final class World {
     /// last drew, which is far cheaper than diffing four thousand tiles a frame.
     private(set) var mapRevision: Int = 0
 
+    let claims: [TeamID: BaseClaim]
+
     var actors: [ActorID: Actor] = [:]
 
     /// Which actor this device is driving. Today it is the only one; later it is
     /// simply one of eight. Nothing else in the code assumes it is special.
     let localPlayerID: ActorID
 
-    init(map: TileMap, playerSpawn: Vec2) {
-        self.map = map
+    init(generated: GeneratedMap, localTeam: TeamID) {
+        self.map = generated.map
+        self.claims = generated.claims
+
         let playerID = ActorID(0)
         self.localPlayerID = playerID
+
+        // You start in the middle of your own claim.
+        let spawn = generated.claims[localTeam]?.centreTile
+            ?? GridPoint(col: generated.map.width / 2, row: generated.map.height / 2)
+
         self.actors[playerID] = Actor(id: playerID,
-                                      team: TeamID(0),
-                                      position: playerSpawn)
+                                      team: localTeam,
+                                      position: spawn.center)
     }
 
     var localPlayer: Actor? { actors[localPlayerID] }
+
+    func claim(for team: TeamID) -> BaseClaim? { claims[team] }
 
     func setTile(_ tile: TileType, at point: GridPoint) {
         guard map.contains(point), map[point] != tile else { return }

@@ -4,26 +4,36 @@
 //
 //  Builds a map from a seed. Same seed in, same map out - always.
 //
-//  Still deliberately simple: an edge, and scattered trees. Real generation
-//  (terrain features, 8 base claims, loot and arcade spawns) arrives at M3.
+//  Still deliberately simple: an edge, one base claim, and scattered trees. Eight
+//  claims on a ring, terrain features and loot spawns arrive at M3.
 //
+
+/// Everything the generator produces. Claims are part of the map's identity, not
+/// something bolted on afterwards, so they come out of the same seeded pass.
+struct GeneratedMap {
+    let map: TileMap
+    let claims: [TeamID: BaseClaim]
+}
 
 enum MapFactory {
 
-    static func makeMap(seed: UInt64) -> TileMap {
+    static func generate(seed: UInt64) -> GeneratedMap {
         var rng = SeededRandom(seed: seed)
         var map = TileMap(width: GameConfig.Map.width, height: GameConfig.Map.height)
 
         sealEdges(of: &map)
-        scatterTrees(in: &map, using: &rng)
+        let claims = makeClaims(in: map)
+        scatterTrees(in: &map, avoiding: claims, using: &rng)
 
-        return map
+        return GeneratedMap(map: map, claims: claims)
     }
 
-    /// Where the player starts. Kept here so the generator and the scene cannot
-    /// disagree about it.
-    static func spawnPoint(in map: TileMap) -> GridPoint {
-        GridPoint(col: map.width / 2, row: map.height / 2)
+    /// One claim in the middle for now. M3 spreads eight of them around a ring.
+    private static func makeClaims(in map: TileMap) -> [TeamID: BaseClaim] {
+        let claim = BaseClaim(team: TeamID(0),
+                              centredOn: GridPoint(col: map.width / 2, row: map.height / 2),
+                              size: GameConfig.Map.claimSize)
+        return [claim.team: claim]
     }
 
     private static func sealEdges(of map: inout TileMap) {
@@ -37,18 +47,18 @@ enum MapFactory {
         }
     }
 
-    private static func scatterTrees(in map: inout TileMap, using rng: inout SeededRandom) {
-        let spawn = spawnPoint(in: map)
-        let clear = GameConfig.Map.spawnClearRadius
-
+    private static func scatterTrees(in map: inout TileMap,
+                                     avoiding claims: [TeamID: BaseClaim],
+                                     using rng: inout SeededRandom) {
         for row in 1..<(map.height - 1) {
             for col in 1..<(map.width - 1) {
-                // Never box the player in at spawn.
-                let nearSpawn = abs(col - spawn.col) <= clear && abs(row - spawn.row) <= clear
-                if nearSpawn { continue }
+                let point = GridPoint(col: col, row: row)
+
+                // A claim is buildable ground - never grow anything on it.
+                if claims.values.contains(where: { $0.contains(point) }) { continue }
 
                 if Double.random(in: 0..<1, using: &rng) < GameConfig.Map.treeDensity {
-                    map[GridPoint(col: col, row: row)] = .tree
+                    map[point] = .tree
                 }
             }
         }

@@ -19,6 +19,9 @@ enum BuildSystem {
     }
 
     static func canPlace(at point: GridPoint, owner: TeamID, in world: World) -> Bool {
+        // You may only build on your own claim.
+        guard world.claim(for: owner)?.contains(point) == true else { return false }
+
         // Only on open ground: not on terrain, trees, or an existing block.
         guard !world.map.isOccupied(point) else { return false }
 

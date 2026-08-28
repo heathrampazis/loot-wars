@@ -24,8 +24,9 @@ enum GameConfig {
         /// needed for trees is still in place; raise this to bring them back.
         static let treeDensity: Double = 0.0
 
-        /// Tiles either side of the spawn kept clear, so you never start hemmed in.
-        static let spawnClearRadius = 4
+        /// Width and height of a team's base claim, in tiles. Odd, so it has a
+        /// true centre tile to spawn on.
+        static let claimSize = 9
 
         /// Set this to replay one exact map. nil means a fresh map every launch -
         /// the seed used is printed to the console so you can pin it down here if

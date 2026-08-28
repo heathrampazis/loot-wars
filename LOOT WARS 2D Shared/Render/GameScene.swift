@@ -30,6 +30,7 @@ final class GameScene: SKScene {
 
     private let worldLayer = SKNode()
     private let tileRenderer = TileMapRenderer()
+    private let claimRenderer = ClaimRenderer()
     private let treeRenderer = TreeRenderer()
     private let blockRenderer = BlockRenderer()
     private let actorRenderer = ActorRenderer()
@@ -74,12 +75,14 @@ final class GameScene: SKScene {
         let seed = GameConfig.Map.fixedSeed ?? UInt64.random(in: UInt64.min...UInt64.max)
         print("Loot Wars map seed: \(seed)")
 
-        let map = MapFactory.makeMap(seed: seed)
-        world = World(map: map, playerSpawn: MapFactory.spawnPoint(in: map).center)
+        let generated = MapFactory.generate(seed: seed)
+        world = World(generated: generated, localTeam: TeamID(0))
 
-        tileRenderer.build(from: map)
-        treeRenderer.build(from: map)
+        tileRenderer.build(from: generated.map)
+        claimRenderer.build(claims: generated.claims)
+        treeRenderer.build(from: generated.map)
         worldLayer.addChild(tileRenderer.node)
+        worldLayer.addChild(claimRenderer.node)
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
         worldLayer.addChild(actorRenderer.node)
