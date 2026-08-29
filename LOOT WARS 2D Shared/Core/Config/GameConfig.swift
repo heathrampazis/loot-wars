@@ -242,13 +242,16 @@ enum GameConfig {
         /// out on the map.
         static let urgeInterval: ClosedRange<Double> = 10...16
 
-        /// Walls laid per trip. Still a handful at a time, so the base visibly
-        /// grows over a match rather than appearing at once.
-        static let blocksPerVisit: ClosedRange<Int> = 3...5
+        /// Walls laid per trip.
+        ///
+        /// More walls per trip rather than more trips: the walk home is what a trip
+        /// actually costs, so a bigger armful finishes the base faster without
+        /// eating into the time a bot spends out on the map looting.
+        static let blocksPerVisit: ClosedRange<Int> = 4...7
 
-        /// Seconds between individual walls, so they go up one after another
-        /// instead of all in the same instant.
-        static let placeInterval: Double = 0.8
+        /// Seconds between individual walls. Quick enough to read as somebody
+        /// laying a run of them, slow enough that you can still see it happen.
+        static let placeInterval: Double = 0.5
 
         /// How close a bot must be to the tile it is laying, in tiles.
         static let reach: Double = 2.2
