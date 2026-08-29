@@ -35,12 +35,6 @@ final class JoystickNode: SKNode {
     /// Current direction, length 0...1. Zero when nobody is touching it.
     private(set) var direction: Vec2 = .zero
 
-    /// Whether the current touch has actually moved the stick, as opposed to just
-    /// resting on it. This is what separates a tap from a drag, and so lets the
-    /// same control both aim and act.
-    private(set) var wasDeflected = false
-
-    private var glyph: SKSpriteNode?
 
     /// - Parameter glyph: optional mark on the knob, so two sticks on the same
     ///   screen are told apart at a glance rather than by which side they are on.
@@ -58,7 +52,6 @@ final class JoystickNode: SKNode {
             mark.size = CGSize(width: side, height: side)
             mark.alpha = 0.9
             knob.addChild(mark)
-            self.glyph = mark
         }
 
         zPosition = 1000
@@ -74,15 +67,8 @@ final class JoystickNode: SKNode {
     /// - Returns: true if the stick is taking ownership of this touch.
     func begin(atLocalPoint localPoint: CGPoint) -> Bool {
         guard hypot(localPoint.x, localPoint.y) <= Self.grabRadius else { return false }
-        wasDeflected = false
         update(toLocalPoint: localPoint)
         return true
-    }
-
-    /// Swaps the mark on the knob, so one control can show which of its two jobs
-    /// it is currently offering.
-    func setGlyph(_ texture: SKTexture) {
-        glyph?.texture = texture
     }
 
     func update(toLocalPoint localPoint: CGPoint) {
@@ -93,8 +79,6 @@ final class JoystickNode: SKNode {
             direction = .zero
             return
         }
-
-        wasDeflected = true
 
         let clamped: CGPoint
         if distance > Self.baseRadius {

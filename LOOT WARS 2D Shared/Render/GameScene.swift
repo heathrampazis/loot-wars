@@ -52,14 +52,14 @@ final class GameScene: SKScene {
     /// Every fight collapsed into two actors marching into each other.
     private let moveStick = JoystickNode()
     ///
-    /// The aim stick doubles as the Open control: drag it to aim and fire, tap it
-    /// to open a crate you are standing next to. Separating those by drag-versus-tap
-    /// means the two never compete - you cannot accidentally open a crate while
-    /// fighting, because fighting means the stick is deflected.
+    /// The bottom-right corner holds two controls that swap places: the aim stick
+    /// while there is shooting to be done, and a plain Open button while there is a
+    /// crate in reach. Only one is ever on screen.
     private let aimStick = JoystickNode(glyph: Glyphs.crosshair)
+    private let openButton = ActionButtonNode(glyph: Glyphs.lootbox)
 
-    /// Whether the aim stick is currently offering Open rather than fire.
-    private var aimStickOffersOpen = false
+    /// Whether that corner is currently offering Open rather than fire.
+    private var rightControlOffersOpen = false
     private let hud = HUDNode()
     private let hotbar = HotbarNode()
     private let respawnBanner = RespawnBanner()
@@ -68,6 +68,7 @@ final class GameScene: SKScene {
     /// Which finger owns which control, and which one might still turn out to be a tap.
     private var moveTouch: UITouch?
     private var aimTouch: UITouch?
+    private var openTouch: UITouch?
     private var tapTouch: UITouch?
     private var tapOrigin: CGPoint = .zero
     /// Slide further than this and it was a drag, not a tap.
@@ -117,6 +118,8 @@ final class GameScene: SKScene {
         addChild(cameraController.node)
         cameraController.node.addChild(moveStick)
         cameraController.node.addChild(aimStick)
+        cameraController.node.addChild(openButton)
+        openButton.isHidden = true
         cameraController.node.addChild(hud)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(respawnBanner)
@@ -134,8 +137,10 @@ final class GameScene: SKScene {
         let margin: CGFloat = 110
         moveStick.position = CGPoint(x: -size.width / 2 + margin,
                                      y: -size.height / 2 + margin)
+        // Same corner: they take it in turns rather than sharing it.
         aimStick.position = CGPoint(x: size.width / 2 - margin,
                                     y: -size.height / 2 + margin)
+        openButton.position = aimStick.position
 
 
         // The HUD's origin is its own top-left corner, so this is just an inset.
@@ -185,20 +190,38 @@ final class GameScene: SKScene {
         hotbar.update(with: world)
         respawnBanner.update(with: world)
 
-        // The stick shows a crate when there is one in reach, and asks the world
-        // the same question LootSystem will - so it can never offer to open a crate
-        // the simulation would then refuse.
-        let crateInReach = world.localPlayer.flatMap {
-            world.reachableLootbox(for: $0)
-        } != nil
-
-        if crateInReach != aimStickOffersOpen {
-            aimStickOffersOpen = crateInReach
-            aimStick.setGlyph(crateInReach ? Glyphs.lootbox : Glyphs.crosshair)
-        }
+        updateRightControl(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }
+    }
+
+    /// Swaps the bottom-right corner between the aim stick and the Open button.
+    ///
+    /// The swap waits for a lull: never while a thumb is on the stick, and never
+    /// while a shot is still cooling down. Pulling the aim stick out from under
+    /// somebody mid-fight because they happened to walk past a crate would be
+    /// indefensible, and walking past crates during a fight is exactly what happens.
+    private func updateRightControl(with world: World) {
+        guard let player = world.localPlayer else { return }
+
+        #if os(iOS) || os(tvOS)
+        guard aimTouch == nil, openTouch == nil else { return }
+        #endif
+        guard player.shootCooldown <= 0 else { return }
+
+        // Asks the world the same question LootSystem will, so the button can never
+        // offer to open a crate the simulation would then refuse.
+        let crateInReach = world.reachableLootbox(for: player) != nil
+        guard crateInReach != rightControlOffersOpen else { return }
+
+        rightControlOffersOpen = crateInReach
+        aimStick.isHidden = crateInReach
+        openButton.isHidden = !crateInReach
+
+        // Make sure the stick is not left holding a direction it can no longer be
+        // asked to give up.
+        if crateInReach { aimStick.end() }
     }
 
     /// Input becomes a Command. Later, AI brains and network packets produce their
@@ -232,9 +255,17 @@ extension GameScene {
                 continue
             }
 
-            if aimTouch == nil,
+            if aimTouch == nil, !aimStick.isHidden,
                aimStick.begin(atLocalPoint: touch.location(in: aimStick)) {
                 aimTouch = touch
+                continue
+            }
+
+            if openTouch == nil, !openButton.isHidden,
+               openButton.begin(atLocalPoint: touch.location(in: openButton)) {
+                openTouch = touch
+                // A one-shot action, so it fires on press.
+                queuedCommands.append(.openLootbox)
                 continue
             }
 
@@ -292,17 +323,15 @@ extension GameScene {
         }
 
         if let active = aimTouch, touches.contains(active) {
-            // A touch that never moved the stick was a tap, not an aim - so it means
-            // "open that crate". Anything that deflected it was a shot, and opening
-            // is not on offer.
-            if !aimStick.wasDeflected, aimStickOffersOpen {
-                queuedCommands.append(.openLootbox)
-            }
-
             // Letting go stops the firing, but Actor.aim keeps its last value, so
             // the character stays pointed where it was rather than snapping round.
             aimStick.end()
             aimTouch = nil
+        }
+
+        if let active = openTouch, touches.contains(active) {
+            openButton.end()
+            openTouch = nil
         }
     }
 
