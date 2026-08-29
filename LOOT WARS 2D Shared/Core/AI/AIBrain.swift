@@ -1,3 +1,39 @@
+    private static func movement(for state: inout AIState, actor: Actor, in world: World) -> Vec2 {
+        guard case .fight(let id) = state.goal,
+              let enemy = world.actors[id], enemy.isAlive else {
+            state.holdingGround = false
+            return state.heading
+        }
+
+        let gap = (enemy.position - actor.position).length
+
+        // Empty, or standing too close for the weapon: keep moving. aimAtTarget has
+        // already pointed the heading away, so this walks the bot back out to a
+        // range worth shooting from.
+        guard actor.ammo > 0, gap >= GameConfig.AI.minimumRange else {
+            state.holdingGround = false
+            return state.heading
+        }
+
+        // Once planted, hold on a little further out than the range that first
+        // stopped it, so the range wobbling across the line does not make it
+        // flicker between standing and walking.
+        let limit = state.holdingGround
+            ? GameConfig.AI.preferredRange + GameConfig.AI.holdHysteresis
+            : GameConfig.AI.preferredRange
+
+        let readyToShoot = gap <= limit
+            && isPointedAt(enemy.position, actor: actor)
+            && hasLineOfSight(from: actor.position, to: enemy.position, in: world)
+
+        state.holdingGround = readyToShoot
+
+        // Standing still holds the last facing, so a planted bot keeps its aim. It
+        // takes a step to re-aim the moment the target drifts off - stepping IS
+        // turning, for a bot exactly as for the player.
+        return readyToShoot ? .zero : state.heading
+    }
+
 //
 //  AIBrain.swift
 //  Loot Wars
@@ -170,6 +206,22 @@ enum AIBrain {
     /// Only picking a NEW fight - a bot already fighting or already running is left
     /// alone, so this cannot re-trigger the reaction delay every tenth of a second.
     private static func reactToThreats(_ state: inout AIState, actor: Actor, in world: World) {
+        // Already running - nothing to reconsider.
+        if state.goal.isRetreat { return }
+
+        // Mid-fight and hurt: break off NOW. Waiting for the ordinary decision
+        // timer means up to three more seconds of standing there being shot, which
+        // is most of why a bot on its last legs looks like it is loitering.
+        if case .fight(let id) = state.goal {
+            let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
+            if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
+                state.goal = .retreat(from: id)
+                state.goalAge = 0
+                state.holdingGround = false
+            }
+            return
+        }
+
         switch state.goal {
         case .fight, .retreat:
             return
@@ -200,7 +252,7 @@ enum AIBrain {
             // health, the bot turns round and fights rather than hiding at home for
             // the rest of the match.
             if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
-                return .retreat
+                return .retreat(from: enemy.id)
             }
 
             return .fight(enemy.id)
@@ -300,8 +352,8 @@ enum AIBrain {
             } else {
                 target = nil
             }
-        case .retreat:
-            target = world.claim(for: actor.team)?.centreTile.center
+        case .retreat(let id):
+            target = breakOffPoint(for: actor, awayFrom: world.actors[id], in: world)
         case .build(let tile):
             target = standingSpot(for: tile, team: actor.team, in: world)
         }
@@ -323,7 +375,19 @@ enum AIBrain {
         // Aim wobble is applied to the heading, not to the bullet, because a bot
         // shoots where it walks. Missing therefore looks like slightly sloppy
         // movement, which is exactly how a person misses.
-        if case .fight = state.goal {
+        if case .fight(let id) = state.goal, let enemy = world.actors[id] {
+            let gap = (enemy.position - actor.position).length
+
+            // Too close, or nothing loaded: give ground instead of pressing in.
+            // This is the only thing in a fight that ever points a bot backwards.
+            if gap < GameConfig.AI.minimumRange || actor.ammo <= 0 {
+                let escape = breakOffPoint(for: actor, awayFrom: enemy, in: world) - actor.position
+                if escape.length > 0.01 {
+                    state.desiredHeading = escape.normalized()
+                    return
+                }
+            }
+
             // The wobble goes on the heading, not the bullet, because a bot shoots
             // where it walks. A miss therefore looks like slightly sloppy movement,
             // which is how a person misses.
@@ -463,6 +527,28 @@ enum AIBrain {
 
         state.drinkTimer = GameConfig.AI.drinkInterval
         return chosen
+    }
+
+    /// Where to go when breaking off - whether that is backing out of somebody's
+    /// face mid-fight or running for your life.
+    ///
+    /// Blended: right on top of them, getting away is all that matters; with
+    /// daylight between you, home is what matters, because that is where your own
+    /// walls let you through and theirs do not.
+    private static func breakOffPoint(for actor: Actor,
+                                      awayFrom threat: Actor?,
+                                      in world: World) -> Vec2 {
+        let home = world.claim(for: actor.team)?.centreTile.center ?? actor.position
+
+        guard let threat else { return home }
+
+        let away = actor.position - threat.position
+        guard away.length > 0.01 else { return home }
+
+        let escape = actor.position + away.normalized() * GameConfig.AI.breakOffDistance
+        let urgency = max(0, min(1, 1 - away.length / GameConfig.AI.engageRange))
+
+        return escape * urgency + home * (1 - urgency)
     }
 
     // MARK: - Fighting

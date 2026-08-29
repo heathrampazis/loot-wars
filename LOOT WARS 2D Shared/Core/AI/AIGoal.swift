@@ -19,11 +19,16 @@ enum AIGoal: Equatable {
     case loot(LootboxID)
     case collect(GroundItemID)
     case fight(ActorID)
-    case retreat
+    case retreat(from: ActorID)
     case build(GridPoint)
 
     var isBuild: Bool {
         if case .build = self { return true }
+        return false
+    }
+
+    var isRetreat: Bool {
+        if case .retreat = self { return true }
         return false
     }
 

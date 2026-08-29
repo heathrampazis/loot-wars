@@ -127,9 +127,15 @@ enum GameConfig {
         /// sniping from off screen.
         static let engageRange: Double = 12
 
-        /// The range a bot tries to fight at, in tiles. Inside this it plants its
-        /// feet and shoots; outside it, it closes in.
-        static let preferredRange: Double = 6
+        /// The range a bot tries to fight at, in tiles. Outside it, it closes in.
+        static let preferredRange: Double = 8
+
+        /// And inside THIS, it gives ground. Without a floor on the range, nothing
+        /// in a fight ever moves a bot backwards: every reason to move - closing,
+        /// re-aiming, chasing - points at the enemy, so two bots grind together
+        /// until they are standing on each other. A blaster that reaches twelve
+        /// tiles should not be fought with at two.
+        static let minimumRange: Double = 5
 
         /// It keeps chasing a target out to here even with no clear shot, so a tree
         /// passing between them does not end the fight.
@@ -153,7 +159,7 @@ enum GameConfig {
         /// Random wobble applied to a bot's aim, in radians (about 8°). This is
         /// what makes bots miss - it is applied to the heading, so a miss looks
         /// like slightly sloppy movement rather than a bullet bending.
-        static let aimError: Double = 0.14
+        static let aimError: Double = 0.12
 
         /// Once planted, a bot holds its ground this much further out than it would
         /// first stop at, in tiles. Without the gap it flickers between standing
@@ -166,7 +172,7 @@ enum GameConfig {
         /// Below this share of its health, a bot breaks off and runs for home -
         /// but only while an enemy is actually near. Once it is safe it gets back
         /// to work rather than cowering in its base for the rest of the match.
-        static let retreatHealthFraction: Double = 0.3
+        static let retreatHealthFraction: Double = 0.45
 
         // Drinking. These read as one set of habits: finish the fight, catch your
         // breath, top up, and never tip a big drink down a small wound - unless you
@@ -179,6 +185,10 @@ enum GameConfig {
         /// When calm, a bot tops up once it has lost this much. Above it, the heal
         /// would mostly be thrown away.
         static let topUpHealthFraction: Double = 0.85
+
+        /// How much of a break-off is "get away from them" versus "get home". Close
+        /// up, distance is all that matters; with daylight between you, home does.
+        static let breakOffDistance: Double = 8
 
         /// Having been shot this recently counts as still being in the fight.
         static let combatRecency: Double = 3.0
