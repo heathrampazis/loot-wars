@@ -1,39 +1,3 @@
-    private static func movement(for state: inout AIState, actor: Actor, in world: World) -> Vec2 {
-        guard case .fight(let id) = state.goal,
-              let enemy = world.actors[id], enemy.isAlive else {
-            state.holdingGround = false
-            return state.heading
-        }
-
-        let gap = (enemy.position - actor.position).length
-
-        // Empty, or standing too close for the weapon: keep moving. aimAtTarget has
-        // already pointed the heading away, so this walks the bot back out to a
-        // range worth shooting from.
-        guard actor.ammo > 0, gap >= GameConfig.AI.minimumRange else {
-            state.holdingGround = false
-            return state.heading
-        }
-
-        // Once planted, hold on a little further out than the range that first
-        // stopped it, so the range wobbling across the line does not make it
-        // flicker between standing and walking.
-        let limit = state.holdingGround
-            ? GameConfig.AI.preferredRange + GameConfig.AI.holdHysteresis
-            : GameConfig.AI.preferredRange
-
-        let readyToShoot = gap <= limit
-            && isPointedAt(enemy.position, actor: actor)
-            && hasLineOfSight(from: actor.position, to: enemy.position, in: world)
-
-        state.holdingGround = readyToShoot
-
-        // Standing still holds the last facing, so a planted bot keeps its aim. It
-        // takes a step to re-aim the moment the target drifts off - stepping IS
-        // turning, for a bot exactly as for the player.
-        return readyToShoot ? .zero : state.heading
-    }
-
 //
 //  AIBrain.swift
 //  Loot Wars
@@ -235,8 +199,8 @@ enum AIBrain {
 
         let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
 
-        state.goal = healthLeft < GameConfig.AI.retreatHealthFraction
-            ? .retreat
+        state.goal = healthLeft < GameConfig.AI.retreatHealthFraction * state.caution
+            ? .retreat(from: enemy.id)
             : .fight(enemy.id)
         state.goalAge = 0
         state.reactionTimer = Double.random(in: GameConfig.AI.reactionDelay, using: &world.rng)
@@ -599,6 +563,16 @@ enum AIBrain {
             return state.heading
         }
 
+        let gap = (enemy.position - actor.position).length
+
+        // Empty, or standing too close for the weapon: keep moving. aimAtTarget has
+        // already pointed the heading away, so this walks the bot back out to a
+        // range worth shooting from.
+        guard actor.ammo > 0, gap >= GameConfig.AI.minimumRange else {
+            state.holdingGround = false
+            return state.heading
+        }
+
         // Once planted, hold on a little further out than the range that first
         // stopped it, so the range wobbling across the line does not make it
         // flicker between standing and walking.
@@ -606,8 +580,7 @@ enum AIBrain {
             ? GameConfig.AI.preferredRange + GameConfig.AI.holdHysteresis
             : GameConfig.AI.preferredRange
 
-        let readyToShoot = (enemy.position - actor.position).length <= limit
-            && actor.ammo > 0
+        let readyToShoot = gap <= limit
             && isPointedAt(enemy.position, actor: actor)
             && hasLineOfSight(from: actor.position, to: enemy.position, in: world)
 
