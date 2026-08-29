@@ -247,6 +247,13 @@ extension GameScene {
                 continue
             }
 
+            // The hotbar sits over the world, so it has to take the touch before
+            // the map does - otherwise drinking would also try to lay a block.
+            if let slot = hotbar.slotIndex(atLocalPoint: touch.location(in: hotbar)) {
+                queuedCommands.append(.useItem(slot: slot))
+                continue
+            }
+
             if tapTouch == nil {
                 tapTouch = touch
                 tapOrigin = touch.location(in: self)

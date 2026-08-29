@@ -28,6 +28,7 @@ enum AIBrain {
         state.goalAge += dt
         state.lootCooldown = max(0, state.lootCooldown - dt)
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
+        state.drinkTimer = max(0, state.drinkTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
         state.reactionTimer = max(0, state.reactionTimer - dt)
         state.decisionTimer -= dt
@@ -74,6 +75,11 @@ enum AIBrain {
 
         if let wall = wallToLay(&state, actor: actor, in: world) {
             commands.append(.placeBlock(wall))
+            actor.ai = state
+        }
+
+        if let slot = drinkToTake(&state, actor: actor) {
+            commands.append(.useItem(slot: slot))
             actor.ai = state
         }
 
@@ -350,6 +356,47 @@ enum AIBrain {
         }
 
         return tile
+    }
+
+    // MARK: - Drinking
+
+    /// Which drink to reach for, if any.
+    ///
+    /// Prefers the SMALLEST one that would fill the bar, and only falls back to the
+    /// biggest when nothing would. Tipping a slushy down a scratch is how a bot
+    /// arrives at its next fight with nothing left.
+    private static func drinkToTake(_ state: inout AIState, actor: Actor) -> Int? {
+        guard state.drinkTimer <= 0 else { return nil }
+
+        let missing = GameConfig.Player.maxHealth - actor.health
+        let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
+        guard healthLeft <= GameConfig.AI.drinkBelowFraction else { return nil }
+
+        var smallestThatFills: Int?
+        var smallestAmount = Int.max
+        var biggest: Int?
+        var biggestAmount = 0
+
+        for (index, slot) in actor.inventory.slots.enumerated() {
+            guard let stack = slot,
+                  ConsumableSystem.canUse(slot: index, actor: actor) else { continue }
+
+            let amount = stack.type.healAmount
+
+            if amount >= missing, amount < smallestAmount {
+                smallestAmount = amount
+                smallestThatFills = index
+            }
+            if amount > biggestAmount {
+                biggestAmount = amount
+                biggest = index
+            }
+        }
+
+        guard let chosen = smallestThatFills ?? biggest else { return nil }
+
+        state.drinkTimer = GameConfig.AI.drinkInterval
+        return chosen
     }
 
     // MARK: - Fighting

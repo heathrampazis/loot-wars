@@ -29,7 +29,7 @@ enum LootSystem {
                 guard let box = world.reachableLootbox(for: actor) else { break }
 
                 world.removeLootbox(box.id)
-                world.spawnGroundItem(.soda, at: box.position)
+                world.spawnGroundItem(LootTable.roll(using: &world.rng), at: box.position)
                 break   // one box per tick, however many times it was asked
             }
         }

@@ -232,6 +232,7 @@ final class World {
         applyMovementInput(everyone)
         BuildSystem.update(self, commands: everyone)
         WeaponSystem.update(self, commands: everyone, dt: dt)
+        ConsumableSystem.update(self, commands: everyone)
         MovementSystem.update(self, dt: dt)
         ProjectileSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
@@ -257,7 +258,7 @@ final class World {
                     if abs(input.x) > 0.01 {
                         actor.facesLeft = input.x < 0
                     }
-                case .placeBlock, .shoot, .openLootbox:
+                case .placeBlock, .shoot, .openLootbox, .useItem:
                     break   // other systems' business, not movement's
                 }
             }

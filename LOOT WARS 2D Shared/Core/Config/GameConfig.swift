@@ -168,6 +168,15 @@ enum GameConfig {
         /// to work rather than cowering in its base for the rest of the match.
         static let retreatHealthFraction: Double = 0.3
 
+        /// A bot drinks once it has lost this much of its health. Higher than the
+        /// retreat threshold on purpose: drink early, run only if that was not
+        /// enough.
+        static let drinkBelowFraction: Double = 0.7
+
+        /// Seconds between sips, so a hurt bot does not empty its whole inventory
+        /// in a single tick.
+        static let drinkInterval: Double = 1.2
+
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 20
 

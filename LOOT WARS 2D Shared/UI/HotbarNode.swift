@@ -40,6 +40,7 @@ final class HotbarNode: SKNode {
     private var badges: [SKNode] = []
     private var counts: [SKLabelNode] = []
     private var lastInventory: Inventory?
+    private var lastUsable: Bool?
 
     override init() {
         super.init()
@@ -111,10 +112,37 @@ final class HotbarNode: SKNode {
         return (badge, label)
     }
 
+    /// Which slot a touch landed on, or nil if it missed the bar entirely.
+    ///
+    /// The slots are treated as touching each other rather than separated by their
+    /// gap: a thumb landing in the crack between two slots meant to hit one of them.
+    func slotIndex(atLocalPoint point: CGPoint) -> Int? {
+        let half = HotbarNode.slotSize / 2
+        guard abs(point.y) <= half + 12 else { return nil }
+
+        let total = HotbarNode.size.width
+
+        for index in 0..<Inventory.slotCount {
+            let centreX = -total / 2
+                + HotbarNode.slotSize / 2
+                + CGFloat(index) * (HotbarNode.slotSize + HotbarNode.gap)
+
+            if abs(point.x - centreX) <= half + HotbarNode.gap / 2 { return index }
+        }
+
+        return nil
+    }
+
     func update(with world: World) {
         guard let player = world.localPlayer else { return }
-        guard player.inventory != lastInventory else { return }
+
+        // Greyed out at full health, because that is when drinking is refused. The
+        // rule itself lives in ConsumableSystem - this only shows it.
+        let usable = player.isAlive && player.health < GameConfig.Player.maxHealth
+
+        guard player.inventory != lastInventory || usable != lastUsable else { return }
         lastInventory = player.inventory
+        lastUsable = usable
 
         for (index, stack) in player.inventory.slots.enumerated() {
             let icon = icons[index]
@@ -133,6 +161,7 @@ final class HotbarNode: SKNode {
             icon.texture = texture
             icon.size = CGSize(width: width, height: height)
             icon.isHidden = false
+            icon.alpha = usable ? 1.0 : 0.35
 
             // A badge on a single item is noise - it only earns its place once
             // there is more than one.

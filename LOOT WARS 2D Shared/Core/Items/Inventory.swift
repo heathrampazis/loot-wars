@@ -46,4 +46,16 @@ struct Inventory: Equatable {
 
         return false
     }
+
+    /// Takes one item out of a slot, emptying the slot if that was the last of them.
+    /// Returns what was taken, or nil if the slot was empty.
+    mutating func consume(at index: Int) -> ItemType? {
+        guard slots.indices.contains(index), var stack = slots[index] else { return nil }
+
+        let taken = stack.type
+        stack.count -= 1
+        slots[index] = stack.count > 0 ? stack : nil
+
+        return taken
+    }
 }

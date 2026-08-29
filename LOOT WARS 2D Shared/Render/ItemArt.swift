@@ -26,7 +26,9 @@ enum ItemArt {
 
     private static func assetName(for type: ItemType) -> String {
         switch type {
-        case .soda: return "Soda"
+        case .juice:  return "Juice"
+        case .soda:   return "Soda"
+        case .slushy: return "Slushy"
         }
     }
 }

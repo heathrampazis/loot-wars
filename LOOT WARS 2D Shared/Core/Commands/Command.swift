@@ -19,4 +19,6 @@ enum Command {
     /// for a specific box would mean the input code deciding which one is closest,
     /// and that is the simulation's call.
     case openLootbox
+    /// Drink whatever is in this hotbar slot.
+    case useItem(slot: Int)
 }

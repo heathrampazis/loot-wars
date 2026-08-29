@@ -23,6 +23,15 @@ enum CombatSystem {
         world.actors[id] = actor
     }
 
+    /// The counterpart to damage, and here for the same reason: health has exactly
+    /// one door in and one door out, so nothing can quietly overheal or revive.
+    static func heal(_ id: ActorID, amount: Int, in world: World) {
+        guard var actor = world.actors[id], actor.isAlive, amount > 0 else { return }
+
+        actor.health = min(GameConfig.Player.maxHealth, actor.health + amount)
+        world.actors[id] = actor
+    }
+
     private static func kill(_ actor: inout Actor) {
         actor.health = 0
         actor.respawnTimer = GameConfig.Player.respawnDelay

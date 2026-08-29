@@ -52,6 +52,9 @@ struct AIState {
     /// it can hold on a little longer than it would first stop at.
     var holdingGround: Bool = false
 
+    /// Spaces out sips, so a hurt bot does not drink everything at once.
+    var drinkTimer: Double = 0
+
     /// Counts down to the next urge to go home and add to the base.
     var buildUrgeTimer: Double = 0
 
