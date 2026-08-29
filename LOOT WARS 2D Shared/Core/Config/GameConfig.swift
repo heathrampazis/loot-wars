@@ -203,7 +203,12 @@ enum GameConfig {
         static let cautionRange: ClosedRange<Double> = 0.85...1.15
 
         /// How far away a bot will notice a crate worth walking to, in tiles.
-        static let lootSearchRange: Double = 20
+        static let lootSearchRange: Double = 26
+
+        /// How much healing a bot wants to be carrying, in health points. Below
+        /// this it puts stocking up ahead of building - turning up to a fight with
+        /// an empty bag is a worse problem than an unfinished wall.
+        static let desiredHealingStock = 150
 
         /// How far a bot will detour for an item lying on the ground, in tiles.
         /// Shorter than the crate range - a dropped item is worth a few steps, not
@@ -225,13 +230,17 @@ enum GameConfig {
 
     enum Build {
         /// How long a bot goes without thinking about its base after a trip home.
-        /// Short trips, often - a bot that camps its claim laying thirty walls is
-        /// a bot that never plays the game.
-        static let urgeInterval: ClosedRange<Double> = 3...5
+        ///
+        /// Long gaps, and more walls per trip. Short frequent trips finish a base
+        /// just as fast but leave a bot commuting for most of the first two
+        /// minutes - it barely loots, so it turns up to fights with nothing to
+        /// drink. Same build time either way; this version spends the difference
+        /// out on the map.
+        static let urgeInterval: ClosedRange<Double> = 10...16
 
-        /// Walls laid per trip. A couple at a time, so the base visibly grows over
-        /// a match rather than appearing at once.
-        static let blocksPerVisit: ClosedRange<Int> = 2...4
+        /// Walls laid per trip. Still a handful at a time, so the base visibly
+        /// grows over a match rather than appearing at once.
+        static let blocksPerVisit: ClosedRange<Int> = 3...5
 
         /// Seconds between individual walls, so they go up one after another
         /// instead of all in the same instant.
@@ -252,7 +261,7 @@ enum GameConfig {
 
     enum Loot {
         /// Lootboxes scattered across the map.
-        static let lootboxCount = 30
+        static let lootboxCount = 42
 
         /// Minimum distance between two lootboxes, in tiles, so they do not cluster.
         static let lootboxSpacing: Double = 4

@@ -202,22 +202,32 @@ enum AIBrain {
             return .fight(enemy.id)
         }
 
-        // Home comes before loot when the urge is up. Crates are always closer
-        // than your base, so a bot that checks loot first never builds anything.
-        if state.buildUrgeTimer <= 0, let wall = world.nextBuildTile(for: actor.team) {
+        // Running low on drinks outranks building. An unfinished wall costs you
+        // nothing until somebody bombs it; turning up to a fight with an empty bag
+        // costs you the fight.
+        let poorlyStocked = actor.inventory.totalHealing < GameConfig.AI.desiredHealingStock
+
+        if !poorlyStocked,
+           state.buildUrgeTimer <= 0,
+           let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
         }
 
-        guard state.lootCooldown <= 0 else { return .wander }
+        if state.lootCooldown <= 0 {
+            // Something already on the ground beats walking to a crate: it is
+            // closer, and it is usually the thing this bot just opened.
+            if let item = nearestItem(to: actor, in: world) {
+                return .collect(item.id)
+            }
 
-        // Something already on the ground beats walking to a crate: it is closer,
-        // and it is usually the thing this bot just opened.
-        if let item = nearestItem(to: actor, in: world) {
-            return .collect(item.id)
+            if let crate = nearestCrate(to: actor, in: world) {
+                return .loot(crate.id)
+            }
         }
 
-        if let crate = nearestCrate(to: actor, in: world) {
-            return .loot(crate.id)
+        // Nothing worth looting within reach, so get on with the base after all.
+        if state.buildUrgeTimer <= 0, let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
         }
 
         return .wander

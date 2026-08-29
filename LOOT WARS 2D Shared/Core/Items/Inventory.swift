@@ -13,6 +13,12 @@ struct Inventory: Equatable {
 
     var isFull: Bool { slots.allSatisfy { $0 != nil } }
 
+    /// Total healing carried, in health points. What a bot uses to decide whether
+    /// it is stocked well enough to go looking for a fight.
+    var totalHealing: Int {
+        slots.compactMap { $0 }.reduce(0) { $0 + $1.type.healAmount * $1.count }
+    }
+
     /// Whether this item would actually fit. Not the same as "not full": a full
     /// inventory can still take more of something it already has room to stack.
     func canAccept(_ type: ItemType) -> Bool {
