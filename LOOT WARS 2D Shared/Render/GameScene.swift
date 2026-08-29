@@ -51,10 +51,15 @@ final class GameScene: SKScene {
     /// shoot at anything you were not walking towards - and neither could a bot.
     /// Every fight collapsed into two actors marching into each other.
     private let moveStick = JoystickNode()
+    ///
+    /// The aim stick doubles as the Open control: drag it to aim and fire, tap it
+    /// to open a crate you are standing next to. Separating those by drag-versus-tap
+    /// means the two never compete - you cannot accidentally open a crate while
+    /// fighting, because fighting means the stick is deflected.
     private let aimStick = JoystickNode(glyph: Glyphs.crosshair)
 
-    /// Only shown when there is actually a crate in reach.
-    private let openButton = ActionButtonNode(glyph: Glyphs.lootbox)
+    /// Whether the aim stick is currently offering Open rather than fire.
+    private var aimStickOffersOpen = false
     private let hud = HUDNode()
     private let hotbar = HotbarNode()
     private let respawnBanner = RespawnBanner()
@@ -63,7 +68,6 @@ final class GameScene: SKScene {
     /// Which finger owns which control, and which one might still turn out to be a tap.
     private var moveTouch: UITouch?
     private var aimTouch: UITouch?
-    private var openTouch: UITouch?
     private var tapTouch: UITouch?
     private var tapOrigin: CGPoint = .zero
     /// Slide further than this and it was a drag, not a tap.
@@ -113,7 +117,6 @@ final class GameScene: SKScene {
         addChild(cameraController.node)
         cameraController.node.addChild(moveStick)
         cameraController.node.addChild(aimStick)
-        cameraController.node.addChild(openButton)
         cameraController.node.addChild(hud)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(respawnBanner)
@@ -134,9 +137,6 @@ final class GameScene: SKScene {
         aimStick.position = CGPoint(x: size.width / 2 - margin,
                                     y: -size.height / 2 + margin)
 
-        // Above the hotbar rather than beside a stick: both thumbs are busy, and a
-        // contextual button overlapping a stick would steal touches meant for it.
-        openButton.position = CGPoint(x: 0, y: -size.height / 2 + 132)
 
         // The HUD's origin is its own top-left corner, so this is just an inset.
         let inset: CGFloat = 16
@@ -185,12 +185,17 @@ final class GameScene: SKScene {
         hotbar.update(with: world)
         respawnBanner.update(with: world)
 
-        // The button only appears when there is something to open, and it asks the
-        // world the same question LootSystem will, so it can never offer to open a
-        // crate the simulation would then refuse.
-        openButton.isHidden = world.localPlayer.flatMap {
+        // The stick shows a crate when there is one in reach, and asks the world
+        // the same question LootSystem will - so it can never offer to open a crate
+        // the simulation would then refuse.
+        let crateInReach = world.localPlayer.flatMap {
             world.reachableLootbox(for: $0)
-        } == nil
+        } != nil
+
+        if crateInReach != aimStickOffersOpen {
+            aimStickOffersOpen = crateInReach
+            aimStick.setGlyph(crateInReach ? Glyphs.lootbox : Glyphs.crosshair)
+        }
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }
@@ -235,14 +240,6 @@ extension GameScene {
 
             if let slot = hotbar.slotIndex(atLocalPoint: touch.location(in: hotbar)) {
                 queuedCommands.append(.useItem(slot: slot))
-                continue
-            }
-
-            if openTouch == nil, !openButton.isHidden,
-               openButton.begin(atLocalPoint: touch.location(in: openButton)) {
-                openTouch = touch
-                // A one-shot action, so it fires on press.
-                queuedCommands.append(.openLootbox)
                 continue
             }
 
@@ -295,15 +292,17 @@ extension GameScene {
         }
 
         if let active = aimTouch, touches.contains(active) {
+            // A touch that never moved the stick was a tap, not an aim - so it means
+            // "open that crate". Anything that deflected it was a shot, and opening
+            // is not on offer.
+            if !aimStick.wasDeflected, aimStickOffersOpen {
+                queuedCommands.append(.openLootbox)
+            }
+
             // Letting go stops the firing, but Actor.aim keeps its last value, so
             // the character stays pointed where it was rather than snapping round.
             aimStick.end()
             aimTouch = nil
-        }
-
-        if let active = openTouch, touches.contains(active) {
-            openButton.end()
-            openTouch = nil
         }
     }
 
