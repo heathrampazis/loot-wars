@@ -192,9 +192,10 @@ enum AIBrain {
             let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
 
             // Hurt and in danger: get out. Note this only holds while an enemy is
-            // actually near - once it is safe the bot goes back to work rather than
-            // hiding at home for the rest of the match.
-            if healthLeft < GameConfig.AI.retreatHealthFraction {
+            // actually near - once it is safe, or once it has drunk its way back to
+            // health, the bot turns round and fights rather than hiding at home for
+            // the rest of the match.
+            if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
                 return .retreat
             }
 
@@ -362,15 +363,44 @@ enum AIBrain {
 
     /// Which drink to reach for, if any.
     ///
-    /// Prefers the SMALLEST one that would fill the bar, and only falls back to the
-    /// biggest when nothing would. Tipping a slushy down a scratch is how a bot
-    /// arrives at its next fight with nothing left.
+    /// The whole point of this function is WHEN, not what. A bot that drinks the
+    /// instant its health dips is a bot that swigs mid-burst, in the open, while
+    /// somebody empties a magazine into it - and reads as a machine reacting to a
+    /// number. So the habits are:
+    ///
+    ///   - about to die: drink now, under fire, whatever is to hand
+    ///   - otherwise, finish the fight first
+    ///   - then wait a beat after the shooting stops
+    ///   - top up only if enough is missing to be worth it
+    ///   - and never tip a big drink down a small wound
+    ///
+    /// Each bot's thresholds are scaled by its own nerve, so seven of them do not
+    /// all reach for a drink on the same frame.
     private static func drinkToTake(_ state: inout AIState, actor: Actor) -> Int? {
         guard state.drinkTimer <= 0 else { return nil }
+        guard actor.health < GameConfig.Player.maxHealth else { return nil }
 
+        let maxHealth = Double(GameConfig.Player.maxHealth)
+        let healthLeft = Double(actor.health) / maxHealth
         let missing = GameConfig.Player.maxHealth - actor.health
-        let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
-        guard healthLeft <= GameConfig.AI.drinkBelowFraction else { return nil }
+
+        let desperate = healthLeft < GameConfig.AI.criticalHealthFraction * state.caution
+
+        if !desperate {
+            // Still in it: keep shooting. A drink taken mid-fight is usually a
+            // drink taken instead of the shot that would have won it.
+            let stillFighting = state.goal.isFight
+                || actor.secondsSinceHit < GameConfig.AI.combatRecency
+            if stillFighting { return nil }
+
+            // And a moment to breathe once it is over.
+            guard actor.secondsSinceHit >= GameConfig.AI.settleDelay else { return nil }
+
+            // Barely scratched - not worth an item.
+            guard healthLeft <= GameConfig.AI.topUpHealthFraction * state.caution else {
+                return nil
+            }
+        }
 
         var smallestThatFills: Int?
         var smallestAmount = Int.max
@@ -394,6 +424,18 @@ enum AIBrain {
         }
 
         guard let chosen = smallestThatFills ?? biggest else { return nil }
+
+        // Check what that actually pours away. "Smallest that fills" is not enough
+        // on its own: with only slushies in the bag, a forty point wound still
+        // takes the whole hundred. Spending it on a graze is how a bot arrives at
+        // its next fight with an empty bar and nothing left, so hold out for
+        // something smaller unless properly hurt.
+        let poured = actor.inventory.slots[chosen]?.type.healAmount ?? 0
+        if !desperate,
+           Double(poured) > Double(missing) * GameConfig.AI.maximumOverdrink,
+           healthLeft > GameConfig.AI.overdrinkBelowFraction {
+            return nil
+        }
 
         state.drinkTimer = GameConfig.AI.drinkInterval
         return chosen

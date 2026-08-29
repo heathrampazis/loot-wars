@@ -102,6 +102,7 @@ final class World {
                                                  using: &rng),
                     turnPreference: Bool.random(using: &rng) ? 1 : -1
                 )
+                actor.ai?.caution = Double.random(in: GameConfig.AI.cautionRange, using: &rng)
             }
 
             spawned[id] = actor
@@ -237,6 +238,7 @@ final class World {
         ProjectileSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
         LootSystem.update(self, commands: everyone, dt: dt)
+        CombatSystem.update(self, dt: dt)
         RespawnSystem.update(self, dt: dt)
         tick += 1
     }

@@ -37,6 +37,7 @@ enum RespawnSystem {
         actor.moveInput = .zero
         actor.shootCooldown = 0
         actor.rechargeTimer = 0
+        actor.secondsSinceHit = 999
 
         // Back to the middle of your own claim - the one place on the map that is
         // always yours.

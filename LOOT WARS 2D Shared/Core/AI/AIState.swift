@@ -52,6 +52,10 @@ struct AIState {
     /// it can hold on a little longer than it would first stop at.
     var holdingGround: Bool = false
 
+    /// This bot's personal nerve. Scales its drinking thresholds, so no two bots
+    /// panic at exactly the same moment.
+    var caution: Double = 1
+
     /// Spaces out sips, so a hurt bot does not drink everything at once.
     var drinkTimer: Double = 0
 

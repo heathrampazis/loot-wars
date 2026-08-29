@@ -9,12 +9,25 @@
 
 enum CombatSystem {
 
+    /// Ages the "how long since I was hurt" clock every actor carries.
+    ///
+    /// Lives here because CombatSystem is the only thing that ever resets it, and
+    /// keeping the two together means they cannot drift apart.
+    static func update(_ world: World, dt: Double) {
+        for id in Array(world.actors.keys) {
+            guard var actor = world.actors[id] else { continue }
+            actor.secondsSinceHit += dt
+            world.actors[id] = actor
+        }
+    }
+
     static func damage(_ id: ActorID, amount: Int, in world: World) {
         guard var actor = world.actors[id],
               actor.isAlive,
               actor.invulnerability <= 0 else { return }
 
         actor.health -= max(1, amount)
+        actor.secondsSinceHit = 0
 
         if actor.health <= 0 {
             kill(&actor)

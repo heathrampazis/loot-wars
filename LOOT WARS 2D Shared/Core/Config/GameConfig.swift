@@ -168,14 +168,39 @@ enum GameConfig {
         /// to work rather than cowering in its base for the rest of the match.
         static let retreatHealthFraction: Double = 0.3
 
-        /// A bot drinks once it has lost this much of its health. Higher than the
-        /// retreat threshold on purpose: drink early, run only if that was not
-        /// enough.
-        static let drinkBelowFraction: Double = 0.7
+        // Drinking. These read as one set of habits: finish the fight, catch your
+        // breath, top up, and never tip a big drink down a small wound - unless you
+        // are about to die, when none of that matters.
+
+        /// Below this, a bot drinks immediately, mid-fight, under fire, whatever is
+        /// to hand. Dying with a full inventory is the worst outcome there is.
+        static let criticalHealthFraction: Double = 0.35
+
+        /// When calm, a bot tops up once it has lost this much. Above it, the heal
+        /// would mostly be thrown away.
+        static let topUpHealthFraction: Double = 0.85
+
+        /// Having been shot this recently counts as still being in the fight.
+        static let combatRecency: Double = 3.0
+
+        /// And even once the shooting stops, a beat before drinking. Swigging on
+        /// the same frame the last bullet lands is a tell that nobody is home.
+        static let settleDelay: Double = 1.5
+
+        /// A bot will pour at most this many times the wound it is fixing. A
+        /// slushy into a scratch technically works and is a terrible idea.
+        static let maximumOverdrink: Double = 2.0
+
+        /// Unless it is at least this hurt, in which case topping up beats hoarding.
+        static let overdrinkBelowFraction: Double = 0.5
 
         /// Seconds between sips, so a hurt bot does not empty its whole inventory
         /// in a single tick.
         static let drinkInterval: Double = 1.2
+
+        /// Each bot's thresholds are nudged by its own factor, so seven of them do
+        /// not all reach for a drink at the same instant.
+        static let cautionRange: ClosedRange<Double> = 0.85...1.15
 
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 20

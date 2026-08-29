@@ -32,6 +32,10 @@ struct Actor {
     /// nil while alive; counts down to respawn while dead.
     var respawnTimer: Double?
 
+    /// How long since anything last hurt this actor. Starts high, so a fresh
+    /// spawn does not count as having just been in a fight.
+    var secondsSinceHit: Double = 999
+
     /// Seconds of spawn protection left.
     var invulnerability: Double = 0
 
