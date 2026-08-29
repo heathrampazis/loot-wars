@@ -48,17 +48,17 @@ enum AIBrain {
             state.threatScanTimer = GameConfig.AI.threatScanInterval
         }
 
-        // Chasing goals re-aim every tick. Only committing to a direction twice a
-        // second would let a bot sail straight past what it was walking to.
-        aimAtTarget(&state, actor: actor, in: world)
+        // Steering runs every tick. Only committing to a direction twice a second
+        // would let a bot sail straight past what it was walking to.
+        steerTowardsGoal(&state, actor: actor, in: world)
 
         // Looking where you are going happens every tick, not on the decision timer.
         // Waiting up to three seconds to notice a tree is how a bot ends up grinding
         // into one in full view.
         steerAroundObstacles(&state, actor: actor, in: world)
 
-        // The edge nudge is for roaming. Applying it in a fight drags a bot's aim
-        // off whoever it is shooting at whenever the fight happens near a border.
+        // The edge nudge is for roaming. Applying it in a fight fights the bot's
+        // own attempt to hold its range near a border.
         if !state.goal.isFight {
             curveAwayFromEdges(&state, actor: actor, in: world)
         }
@@ -68,10 +68,7 @@ enum AIBrain {
                              towards: state.desiredHeading,
                              limit: GameConfig.AI.turnRate * dt)
 
-        let step = movement(for: &state, actor: actor, in: world)
-        actor.ai = state
-
-        var commands: [Command] = [.move(step)]
+        var commands: [Command] = [.move(state.heading)]
 
         if let wall = wallToLay(&state, actor: actor, in: world) {
             commands.append(.placeBlock(wall))
@@ -83,11 +80,15 @@ enum AIBrain {
             actor.ai = state
         }
 
-        if state.holdingGround, state.reactionTimer <= 0 {
-            // Firing and standing still are the same decision, so they cannot
-            // disagree: a bot shoots exactly when it has planted itself to shoot.
-            commands.append(.shoot)
+        // Worked out entirely separately from where the bot is walking, so it can
+        // back off, circle or run for home without ever taking the blaster off its
+        // target. That one separation is what stops fights collapsing into two bots
+        // walking into each other.
+        if let aim = shotToTake(state: state, actor: actor, in: world) {
+            commands.append(.shoot(aim))
         }
+
+        actor.ai = state
 
         // Open whatever is within reach, whatever the bot was busy doing. Walking
         // past an open-able crate and ignoring it is the sort of thing that gives
@@ -155,6 +156,10 @@ enum AIBrain {
         state.aimNoise = Double.random(in: -GameConfig.AI.aimError...GameConfig.AI.aimError,
                                        using: &world.rng)
 
+        if Double.random(in: 0..<1, using: &world.rng) < GameConfig.AI.strafeFlipChance {
+            state.strafeDirection *= -1
+        }
+
         if case .wander = state.goal {
             // Swing off the CURRENT heading rather than picking a fresh direction
             // out of the air, so a change of mind is a course correction and not a
@@ -181,7 +186,6 @@ enum AIBrain {
             if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
                 state.goal = .retreat(from: id)
                 state.goalAge = 0
-                state.holdingGround = false
             }
             return
         }
@@ -296,69 +300,90 @@ enum AIBrain {
 
     // MARK: - Aiming at a target
 
-    private static func aimAtTarget(_ state: inout AIState, actor: Actor, in world: World) {
-        let target: Vec2?
-
+    private static func steerTowardsGoal(_ state: inout AIState, actor: Actor, in world: World) {
         switch state.goal {
         case .wander:
             return
-        case .loot(let id):
-            target = world.lootboxes[id]?.position
-        case .collect(let id):
-            target = world.groundItems[id]?.position
-        case .fight(let id):
-            // Deliberately no line-of-sight test here. Acquiring a target needs a
-            // clear view; STAYING on one does not, or a tree passing between two
-            // bots would end the fight and they would both wander off.
-            if let enemy = world.actors[id], enemy.isAlive,
-               (enemy.position - actor.position).length <= GameConfig.AI.disengageRange {
-                target = enemy.position
-            } else {
-                target = nil
-            }
-        case .retreat(let id):
-            target = breakOffPoint(for: actor, awayFrom: world.actors[id], in: world)
-        case .build(let tile):
-            target = standingSpot(for: tile, team: actor.team, in: world)
-        }
 
-        // Somebody else got there first. Drop back to roaming rather than walking
-        // towards something that no longer exists.
+        case .loot(let id):
+            steer(&state, actor: actor, to: world.lootboxes[id]?.position)
+
+        case .collect(let id):
+            steer(&state, actor: actor, to: world.groundItems[id]?.position)
+
+        case .build(let tile):
+            steer(&state, actor: actor,
+                  to: standingSpot(for: tile, team: actor.team, in: world))
+
+        case .retreat(let id):
+            steer(&state, actor: actor,
+                  to: breakOffPoint(for: actor, awayFrom: world.actors[id], in: world))
+
+        case .fight(let id):
+            steerForFight(&state, actor: actor, enemy: id, in: world)
+        }
+    }
+
+    private static func steer(_ state: inout AIState, actor: Actor, to target: Vec2?) {
+        // Whatever it was walking to is gone - somebody else got there first, or it
+        // died. Drop back to roaming rather than walking to a place with nothing in it.
         guard let target else {
             state.goal = .wander
             state.goalAge = 0
             return
         }
 
-        // Steering aims the actor's centre at the item, which puts the item well
-        // inside the hitbox by the time it arrives - so walking to it is enough to
-        // pick it up.
         let towards = target - actor.position
-        guard towards.length > 0.01 else { return }
-
-        // Aim wobble is applied to the heading, not to the bullet, because a bot
-        // shoots where it walks. Missing therefore looks like slightly sloppy
-        // movement, which is exactly how a person misses.
-        if case .fight(let id) = state.goal, let enemy = world.actors[id] {
-            let gap = (enemy.position - actor.position).length
-
-            // Too close, or nothing loaded: give ground instead of pressing in.
-            // This is the only thing in a fight that ever points a bot backwards.
-            if gap < GameConfig.AI.minimumRange || actor.ammo <= 0 {
-                let escape = breakOffPoint(for: actor, awayFrom: enemy, in: world) - actor.position
-                if escape.length > 0.01 {
-                    state.desiredHeading = escape.normalized()
-                    return
-                }
-            }
-
-            // The wobble goes on the heading, not the bullet, because a bot shoots
-            // where it walks. A miss therefore looks like slightly sloppy movement,
-            // which is how a person misses.
-            state.desiredHeading = Vec2.fromAngle(towards.angle + state.aimNoise)
-        } else {
+        if towards.length > 0.01 {
             state.desiredHeading = towards.normalized()
         }
+    }
+
+    /// Where to put your FEET in a fight. Where to point the blaster is a separate
+    /// question, answered in shotToTake, and keeping the two apart is what lets a
+    /// bot fight like somebody who has done this before.
+    private static func steerForFight(_ state: inout AIState,
+                                      actor: Actor,
+                                      enemy id: ActorID,
+                                      in world: World) {
+        // Deliberately no line-of-sight test. Acquiring a target needs a clear view;
+        // STAYING on one does not, or a tree passing between two bots would end the
+        // fight and they would both wander off.
+        guard let enemy = world.actors[id], enemy.isAlive,
+              (enemy.position - actor.position).length <= GameConfig.AI.disengageRange else {
+            state.goal = .wander
+            state.goalAge = 0
+            return
+        }
+
+        let towards = enemy.position - actor.position
+        let gap = towards.length
+        guard gap > 0.01 else { return }
+
+        let direct = towards.normalized()
+
+        // Too close, or nothing loaded: give ground. Backing off no longer costs a
+        // bot its shot, so this is a reposition rather than a surrender.
+        if gap < GameConfig.AI.minimumRange || actor.ammo <= 0 {
+            let escape = breakOffPoint(for: actor, awayFrom: enemy, in: world) - actor.position
+            state.desiredHeading = escape.length > 0.01
+                ? escape.normalized()
+                : direct * -1
+            return
+        }
+
+        // Too far to be shooting from: close the distance.
+        if gap > GameConfig.AI.preferredRange {
+            state.desiredHeading = direct
+            return
+        }
+
+        // At a range worth fighting at: circle, rather than stand still or walk in.
+        // A bot that holds its ground is a stationary target, and one that keeps
+        // closing ends up in the enemy's face - which is every circling, nose-to-
+        // nose fight we have been chasing. Strafing keeps the blaster on target
+        // while making the bot hard to hit, which is simply what good players do.
+        state.desiredHeading = Vec2(x: -direct.y, y: direct.x) * state.strafeDirection
     }
 
     // MARK: - Building
@@ -517,13 +542,6 @@ enum AIBrain {
 
     // MARK: - Fighting
 
-    // A note on leading the target, since it is the obvious next idea: aiming at
-    // where an enemy is GOING rather than where it is makes fights markedly worse.
-    // Simulated over 48 duels it dropped hit rate from 84% to 67%, halved the time
-    // bots spent standing and shooting, and pulled them into nose-to-nose brawls a
-    // quarter of the time. The lead point swings about as the target reacts, so a
-    // bot can never settle on it long enough to plant its feet. Aim where they are.
-
     private static func nearestVisibleEnemy(to actor: Actor, in world: World) -> Actor? {
         // Cheap tests first. Line of sight is a raycast against every tree and
         // crate on the map, and this runs ten times a second per bot - so it is
@@ -556,48 +574,54 @@ enum AIBrain {
     /// circling enemies you end up watching. Two actors at identical speed can
     /// never catch one another, so a fight has to be settled by shooting, not by
     /// closing the distance.
-    private static func movement(for state: inout AIState, actor: Actor, in world: World) -> Vec2 {
-        guard case .fight(let id) = state.goal,
-              let enemy = world.actors[id], enemy.isAlive else {
-            state.holdingGround = false
-            return state.heading
+    /// Where to point the blaster, or nil for "hold your fire".
+    ///
+    /// Note this fires while RETREATING as well as while fighting. Running away
+    /// with the blaster holstered is exactly what made bots look terrified; now a
+    /// withdrawal is a fighting withdrawal.
+    private static func shotToTake(state: AIState, actor: Actor, in world: World) -> Vec2? {
+        guard state.reactionTimer <= 0, actor.ammo > 0 else { return nil }
+
+        let targetID: ActorID?
+        switch state.goal {
+        case .fight(let id):   targetID = id
+        case .retreat(let id): targetID = id
+        case .wander, .loot, .collect, .build: targetID = nil
         }
 
-        let gap = (enemy.position - actor.position).length
+        guard let id = targetID,
+              let enemy = world.actors[id],
+              enemy.isAlive,
+              enemy.invulnerability <= 0 else { return nil }
 
-        // Empty, or standing too close for the weapon: keep moving. aimAtTarget has
-        // already pointed the heading away, so this walks the bot back out to a
-        // range worth shooting from.
-        guard actor.ammo > 0, gap >= GameConfig.AI.minimumRange else {
-            state.holdingGround = false
-            return state.heading
+        let towards = enemy.position - actor.position
+        guard towards.length <= GameConfig.Blaster.range else { return nil }
+
+        // Do not fire into the back of a tree. Same rules a bullet obeys, so a bot
+        // never takes a shot the simulation would swallow.
+        guard hasLineOfSight(from: actor.position, to: enemy.position, in: world) else {
+            return nil
         }
 
-        // Once planted, hold on a little further out than the range that first
-        // stopped it, so the range wobbling across the line does not make it
-        // flicker between standing and walking.
-        let limit = state.holdingGround
-            ? GameConfig.AI.preferredRange + GameConfig.AI.holdHysteresis
-            : GameConfig.AI.preferredRange
+        // Aim where they will BE, not where they are. A shot takes over half a
+        // second to cross eight tiles and an actor covers two and a half in that
+        // time, so against anything that is moving, aiming at its current position
+        // misses almost every shot.
+        //
+        // This was tried once before and made fights markedly worse - but that was
+        // when aiming and walking were the same thing, and the lead point wandering
+        // about stopped a bot ever settling long enough to plant and shoot. Nothing
+        // plants any more, so the objection died with the button. Simulated over 48
+        // duels the difference is 28% of shots landing versus 51%, and a fight
+        // resolving in five seconds rather than sixty.
+        let flightTime = towards.length / GameConfig.Blaster.projectileSpeed
+        let drift = enemy.moveInput.clampedToUnit()
+            * (GameConfig.Player.moveSpeed * flightTime)
+        let leadPoint = enemy.position + drift
 
-        let readyToShoot = gap <= limit
-            && isPointedAt(enemy.position, actor: actor)
-            && hasLineOfSight(from: actor.position, to: enemy.position, in: world)
-
-        state.holdingGround = readyToShoot
-
-        // Standing still holds the last facing, so a planted bot keeps its aim. It
-        // takes a step to re-aim the moment the target drifts off - stepping IS
-        // turning, for a bot exactly as for the player.
-        return readyToShoot ? .zero : state.heading
-    }
-
-    private static func isPointedAt(_ point: Vec2, actor: Actor) -> Bool {
-        let towards = point - actor.position
-        guard towards.length > 0.01 else { return true }
-
-        return abs(shortestAngle(from: actor.facing.angle, to: towards.angle))
-            <= GameConfig.AI.fireTolerance
+        // The wobble is the only reason a bot misses now that aiming is its own
+        // input rather than a side effect of which way it happens to be walking.
+        return Vec2.fromAngle((leadPoint - actor.position).angle + state.aimNoise)
     }
 
     /// Samples along the line. Uses the same rules a bullet does - including that

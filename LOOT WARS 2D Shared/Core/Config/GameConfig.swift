@@ -147,24 +147,15 @@ enum GameConfig {
         /// of sight is far too expensive to run every tick.
         static let threatScanInterval: Double = 0.1
 
-        /// How close to lined up a bot needs to be before it plants its feet and
-        /// shoots, in radians.
-        ///
-        /// This MUST sit comfortably above aimError. If a bot's own aim wobbles
-        /// further than it is willing to shoot from, it can never satisfy its own
-        /// firing condition: it just keeps walking at whoever it is fighting, which
-        /// is two bots circling each other and never resolving anything.
-        static let fireTolerance: Double = 0.24
-
-        /// Random wobble applied to a bot's aim, in radians (about 8°). This is
-        /// what makes bots miss - it is applied to the heading, so a miss looks
-        /// like slightly sloppy movement rather than a bullet bending.
+        /// Random wobble applied to a bot's aim, in radians (about 7°). This is
+        /// the only reason bots miss, now that aiming is no longer tangled up with
+        /// which way they happen to be walking.
         static let aimError: Double = 0.12
 
-        /// Once planted, a bot holds its ground this much further out than it would
-        /// first stop at, in tiles. Without the gap it flickers between standing
-        /// and walking every time the range wobbles across the line.
-        static let holdHysteresis: Double = 2
+        /// Chance, at each change of mind, that a bot reverses the way it is
+        /// circling. Never reversing reads as a machine on rails; reversing every
+        /// tick reads as a machine having a fit.
+        static let strafeFlipChance: Double = 0.35
 
         /// How long a bot takes to react to an enemy it has just noticed.
         static let reactionDelay: ClosedRange<Double> = 0.25...0.5
@@ -172,7 +163,7 @@ enum GameConfig {
         /// Below this share of its health, a bot breaks off and runs for home -
         /// but only while an enemy is actually near. Once it is safe it gets back
         /// to work rather than cowering in its base for the rest of the match.
-        static let retreatHealthFraction: Double = 0.45
+        static let retreatHealthFraction: Double = 0.35
 
         // Drinking. These read as one set of habits: finish the fight, catch your
         // breath, top up, and never tip a big drink down a small wound - unless you

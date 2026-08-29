@@ -17,14 +17,14 @@ struct Actor {
     /// Set from Commands at the start of every tick.
     var moveInput: Vec2 = .zero
 
-    /// The last direction the actor actually moved in, and therefore where it
-    /// shoots. Holds its value when the stick is released, so letting go does not
-    /// leave you aiming at nothing.
-    var facing: Vec2 = Vec2(x: 1, y: 0)
+    /// Where the blaster points. Set from aiming, not from walking, and it holds
+    /// its value when the stick is released so letting go does not leave the actor
+    /// aiming at nothing.
+    var aim: Vec2 = Vec2(x: 1, y: 0)
 
-    /// Which way the figure is drawn. Held separately from `facing` because moving
-    /// straight up or down should not turn the character to face the camera - it
-    /// keeps whichever side it was last heading.
+    /// Which way the figure is drawn. Aiming wins over walking - somebody backing
+    /// away while shooting is looking at what they are shooting at - and vertical
+    /// input leaves it alone, so walking straight up does not turn the character.
     var facesLeft: Bool = false
 
     var health: Int = GameConfig.Player.maxHealth

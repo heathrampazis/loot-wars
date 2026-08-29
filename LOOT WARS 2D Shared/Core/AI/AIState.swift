@@ -48,9 +48,9 @@ struct AIState {
     /// does feels like a machine.
     var reactionTimer: Double = 0
 
-    /// Whether the bot is currently standing its ground to shoot. Remembered so
-    /// it can hold on a little longer than it would first stop at.
-    var holdingGround: Bool = false
+    /// Which way round the bot is currently circling an enemy. Flipped now and
+    /// then, so it does not orbit forever in one direction.
+    var strafeDirection: Double = 1
 
     /// This bot's personal nerve. Scales its drinking thresholds, so no two bots
     /// panic at exactly the same moment.

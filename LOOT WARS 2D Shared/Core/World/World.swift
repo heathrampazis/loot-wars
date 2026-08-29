@@ -251,12 +251,9 @@ final class World {
                 case .move(let direction):
                     let input = direction.clampedToUnit()
                     actor.moveInput = input
-                    // Remember where we were last heading - that is where we shoot.
-                    if input.length > 0.01 {
-                        actor.facing = input.normalized()
-                    }
                     // Left/right is tracked on its own, so walking straight up does
-                    // not reset which way the figure is turned.
+                    // not reset which way the figure is turned. Aiming overrides
+                    // this later in the tick, in WeaponSystem.
                     if abs(input.x) > 0.01 {
                         actor.facesLeft = input.x < 0
                     }

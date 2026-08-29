@@ -2,12 +2,18 @@
 //  WeaponSystem.swift
 //  Loot Wars
 //
-//  Decides WHEN a shot happens, and whether there is anything left to fire.
-//  Where the shot goes afterwards is ProjectileSystem's job.
+//  Aiming and firing.
 //
-//  Rate limiting and ammo both live here rather than in the input code, which is why
-//  holding the fire button down is safe, and why an AI hammering .shoot every tick
-//  will fire at exactly the same rate a player does, and run dry just as fast.
+//  Aim is its own input, separate from movement. That separation is the whole
+//  reason fights work: an actor can back away while still shooting at whoever is
+//  chasing it, circle round somebody while keeping the blaster on them, or hold a
+//  line and retreat under fire. When aiming was a side effect of walking, every
+//  one of those was impossible, and the only way to keep a weapon pointed at
+//  somebody was to walk into them.
+//
+//  Rate limiting and ammo both live here rather than in the input code, which is
+//  why holding the stick over is safe, and why an AI asking to fire every tick
+//  fires at exactly the same rate a player does, and runs dry just as fast.
 //
 
 enum WeaponSystem {
@@ -17,8 +23,8 @@ enum WeaponSystem {
 
         for (id, list) in commands {
             for command in list {
-                guard case .shoot = command else { continue }
-                fire(id, in: world)
+                guard case .shoot(let direction) = command else { continue }
+                aimAndFire(id, towards: direction, in: world)
                 break   // one trigger pull per tick, however many times it was asked
             }
         }
@@ -51,14 +57,23 @@ enum WeaponSystem {
         }
     }
 
-    private static func fire(_ id: ActorID, in world: World) {
-        guard var actor = world.actors[id],
-              actor.isAlive,
-              actor.shootCooldown <= 0,
-              actor.ammo > 0 else { return }
+    private static func aimAndFire(_ id: ActorID, towards direction: Vec2, in world: World) {
+        guard var actor = world.actors[id], actor.isAlive else { return }
 
-        let direction = actor.facing.normalized()
-        guard direction.length > 0 else { return }
+        let aim = direction.normalized()
+        guard aim.length > 0 else { return }
+
+        // Aiming happens whether or not the shot goes off. An actor waiting on its
+        // cooldown still has the blaster pointed at what it means to hit.
+        actor.aim = aim
+        if abs(aim.x) > 0.01 {
+            actor.facesLeft = aim.x < 0
+        }
+
+        guard actor.shootCooldown <= 0, actor.ammo > 0 else {
+            world.actors[id] = actor
+            return
+        }
 
         actor.ammo -= 1
         actor.shootCooldown = 1.0 / GameConfig.Blaster.fireRate
@@ -69,8 +84,8 @@ enum WeaponSystem {
         world.spawnProjectile(
             owner: id,
             team: actor.team,
-            position: actor.position + direction * GameConfig.Blaster.muzzleOffset,
-            velocity: direction * GameConfig.Blaster.projectileSpeed
+            position: actor.position + aim * GameConfig.Blaster.muzzleOffset,
+            velocity: aim * GameConfig.Blaster.projectileSpeed
         )
     }
 }

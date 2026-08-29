@@ -21,9 +21,10 @@ final class JoystickNode: SKNode {
     private static let baseRadius: CGFloat = 62
     private static let knobRadius: CGFloat = 26
 
-    /// A touch this far from the centre still grabs the stick. Generous on purpose -
-    /// thumbs are imprecise and nobody looks at the joystick while playing.
-    private static let grabRadius: CGFloat = 150
+    /// A touch this far from the centre still grabs the stick. Generous - thumbs
+    /// are imprecise and nobody looks at a stick while playing - but not so wide
+    /// that the two sticks and the hotbar start fighting over the same touches.
+    private static let grabRadius: CGFloat = 120
 
     /// Ignore tiny movements so resting your thumb does not creep the player along.
     private static let deadZone: CGFloat = 8
@@ -34,13 +35,23 @@ final class JoystickNode: SKNode {
     /// Current direction, length 0...1. Zero when nobody is touching it.
     private(set) var direction: Vec2 = .zero
 
-    override init() {
+    /// - Parameter glyph: optional mark on the knob, so two sticks on the same
+    ///   screen are told apart at a glance rather than by which side they are on.
+    init(glyph: SKTexture? = nil) {
         super.init()
 
         base.fillColor = RenderPalette.controlBackground
         base.strokeColor = .clear
         knob.fillColor = RenderPalette.controlForeground
         knob.strokeColor = .clear
+
+        if let glyph {
+            let mark = SKSpriteNode(texture: glyph)
+            let side = JoystickNode.knobRadius * 1.3
+            mark.size = CGSize(width: side, height: side)
+            mark.alpha = 0.9
+            knob.addChild(mark)
+        }
 
         zPosition = 1000
         addChild(base)

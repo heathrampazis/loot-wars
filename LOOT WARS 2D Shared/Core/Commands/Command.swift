@@ -12,9 +12,13 @@
 enum Command {
     case move(Vec2)
     case placeBlock(GridPoint)
-    /// Fire in whatever direction the actor is facing. Rate limiting is the
-    /// simulation's job, so holding the button down is perfectly safe.
-    case shoot
+    /// Fire in this direction, independently of where the actor is walking.
+    ///
+    /// Aiming used to be a side effect of moving, which meant nobody could shoot
+    /// while backing off, and every fight collapsed into two actors walking at each
+    /// other. Rate limiting is still the simulation's job, so holding the stick
+    /// over is perfectly safe.
+    case shoot(Vec2)
     /// Open the nearest lootbox in reach. Carries no coordinate on purpose: asking
     /// for a specific box would mean the input code deciding which one is closest,
     /// and that is the simulation's call.
