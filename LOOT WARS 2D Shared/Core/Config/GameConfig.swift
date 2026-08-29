@@ -205,10 +205,14 @@ enum GameConfig {
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26
 
-        /// How much healing a bot wants to be carrying, in health points. Below
-        /// this it puts stocking up ahead of building - turning up to a fight with
-        /// an empty bag is a worse problem than an unfinished wall.
-        static let desiredHealingStock = 150
+        /// Carrying less healing than this - under two juices - a bot drops what it
+        /// is doing and goes shopping.
+        ///
+        /// Deliberately a near-empty bag rather than a comfortable one. Set at a
+        /// comfortable level it beats building almost permanently, because with
+        /// crates everywhere there is always one worth a detour, and bases never
+        /// get built.
+        static let emergencyHealingStock = 50
 
         /// How far a bot will detour for an item lying on the ground, in tiles.
         /// Shorter than the crate range - a dropped item is worth a few steps, not

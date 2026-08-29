@@ -117,6 +117,10 @@ enum AIBrain {
             }
         case .build:
             if state.goalAge > GameConfig.Build.patience {
+                // Clearing the allowance is what releases the commitment above -
+                // otherwise a bot that cannot reach its wall would hold onto the
+                // trip forever.
+                state.blocksLeftToLay = 0
                 state.buildUrgeTimer = Double.random(in: GameConfig.Build.urgeInterval,
                                                      using: &world.rng)
             }
@@ -202,14 +206,29 @@ enum AIBrain {
             return .fight(enemy.id)
         }
 
-        // Running low on drinks outranks building. An unfinished wall costs you
-        // nothing until somebody bombs it; turning up to a fight with an empty bag
-        // costs you the fight.
-        let poorlyStocked = actor.inventory.totalHealing < GameConfig.AI.desiredHealingStock
-
-        if !poorlyStocked,
-           state.buildUrgeTimer <= 0,
+        // A trip home is a commitment.
+        //
+        // Without this a bot re-weighs building against every crate it walks past,
+        // and since there is nearly always a crate worth a detour it oscillates
+        // between the two - drifting a little way towards each and arriving at
+        // neither. Fighting still interrupts, because that is checked above.
+        if case .build = state.goal,
+           state.blocksLeftToLay > 0,
            let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
+        }
+
+        // Almost out of drinks: go shopping, base or no base.
+        if actor.inventory.totalHealing < GameConfig.AI.emergencyHealingStock,
+           state.lootCooldown <= 0 {
+            if let item = nearestItem(to: actor, in: world) { return .collect(item.id) }
+            if let crate = nearestCrate(to: actor, in: world) { return .loot(crate.id) }
+        }
+
+        // Otherwise the base gets its turn whenever the urge is up. The urge timer
+        // is what balances building against looting, not a running comparison
+        // against whatever happens to be lying nearby.
+        if state.buildUrgeTimer <= 0, let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
         }
 
@@ -223,11 +242,6 @@ enum AIBrain {
             if let crate = nearestCrate(to: actor, in: world) {
                 return .loot(crate.id)
             }
-        }
-
-        // Nothing worth looting within reach, so get on with the base after all.
-        if state.buildUrgeTimer <= 0, let wall = world.nextBuildTile(for: actor.team) {
-            return .build(wall)
         }
 
         return .wander
