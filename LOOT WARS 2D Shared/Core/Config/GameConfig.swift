@@ -48,8 +48,10 @@ enum GameConfig {
         /// Tiles travelled per second at full stick.
         static let moveSpeed: Double = 4.5
 
-        /// Starting and maximum health.
-        static let maxHealth = 100
+        /// Health with no helmet on. Every tier scales up from here - see
+        /// HelmetTier.maxHealth - so an actor's real maximum is actor.maxHealth,
+        /// never this.
+        static let baseHealth = 100
 
         /// Seconds spent dead before respawning at your own claim.
         static let respawnDelay: Double = 3.0

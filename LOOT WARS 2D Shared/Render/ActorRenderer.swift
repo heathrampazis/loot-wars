@@ -15,6 +15,7 @@
 //
 
 import SpriteKit
+import UIKit
 
 final class ActorRenderer {
 
@@ -32,6 +33,8 @@ final class ActorRenderer {
         let healthFill: SKShapeNode
         let goalLabel: SKLabelNode?
         var lastHealthFraction: Double = -1
+        /// So the figure can be re-dressed the moment its helmet changes.
+        var lastHelmet: HelmetTier?
         /// Used only to notice a drop, which is what triggers the hit flash.
         var lastHealth: Int = Int.max
 
@@ -43,7 +46,7 @@ final class ActorRenderer {
     }
 
     private var nodesByActor: [ActorID: ActorNodes] = [:]
-    private var textureCache: [TeamID: SKTexture] = [:]
+    private var textureCache: [HelmetTier: SKTexture] = [:]
 
     func sync(with world: World) {
         for (id, actor) in world.actors {
@@ -77,7 +80,15 @@ final class ActorRenderer {
 
             nodes.goalLabel?.text = actor.ai?.goal.debugName
 
-            setHealth(Double(actor.health) / Double(GameConfig.Player.maxHealth), on: nodes)
+            // Re-dress when the helmet changes. Picking one up has to be visible
+            // instantly - it is the main way anybody can tell how dangerous the
+            // actor coming at them is.
+            if nodes.lastHelmet != actor.helmet {
+                nodes.lastHelmet = actor.helmet
+                nodes.sprite.texture = texture(for: actor.helmet)
+            }
+
+            setHealth(Double(actor.health) / Double(actor.maxHealth), on: nodes)
         }
 
         for (id, nodes) in Array(nodesByActor) where world.actors[id] == nil {
@@ -95,7 +106,7 @@ final class ActorRenderer {
         let size = CGSize(width: GridGeometry.length(ofTiles: GameConfig.Player.halfWidth * 2),
                           height: GridGeometry.length(ofTiles: GameConfig.Player.halfDepth * 2))
 
-        let sprite = SKSpriteNode(texture: texture(for: actor.team), size: size)
+        let sprite = SKSpriteNode(texture: texture(for: actor.helmet), size: size)
         sprite.anchorPoint = CGPoint(x: 0.5, y: 0)   // stands on its root
 
         let track = SKShapeNode(path: ActorRenderer.barPath(
@@ -186,19 +197,24 @@ final class ActorRenderer {
 
     // MARK: - Textures
 
-    private func texture(for team: TeamID) -> SKTexture {
-        if let cached = textureCache[team] { return cached }
+    private func texture(for helmet: HelmetTier) -> SKTexture {
+        if let cached = textureCache[helmet] { return cached }
 
-        let texture = SKTexture(imageNamed: ActorRenderer.assetName(for: team))
+        let texture = SKTexture(imageNamed: ActorRenderer.assetName(for: helmet))
         texture.usesMipmaps = true
-        textureCache[team] = texture
+        textureCache[helmet] = texture
         return texture
     }
 
-    /// Eventually one image per team - the eight of them differ only in body colour.
-    /// Until those exist every team wears the same one, which is why the overhead
-    /// bar is currently doing the work of telling them apart.
-    private static func assetName(for team: TeamID) -> String {
-        "Player"
+    /// The figure wearing a given helmet.
+    ///
+    /// Falls back to the bare-headed sprite when a tier's artwork is not in the
+    /// catalogue yet - a missing asset otherwise renders as a blank rectangle, and
+    /// an invisible player is a far worse bug than an under-dressed one.
+    private static func assetName(for helmet: HelmetTier) -> String {
+        guard helmet != .none else { return "Player" }
+
+        let name = "Player\(helmet.name)"
+        return UIImage(named: name) != nil ? name : "Player"
     }
 }

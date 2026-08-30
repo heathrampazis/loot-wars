@@ -28,7 +28,7 @@ enum ConsumableSystem {
               actor.inventory.slots[slot] != nil else { return false }
 
         // Drinking on full health would throw the item away for nothing.
-        return actor.health < GameConfig.Player.maxHealth
+        return actor.health < actor.maxHealth
     }
 
     private static func use(slot: Int, by id: ActorID, in world: World) {
@@ -36,6 +36,6 @@ enum ConsumableSystem {
         guard let drink = actor.inventory.consume(at: slot) else { return }
 
         world.actors[id] = actor
-        CombatSystem.heal(id, amount: drink.healAmount, in: world)
+        CombatSystem.heal(id, amount: drink.healAmount(of: actor.maxHealth), in: world)
     }
 }

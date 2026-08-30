@@ -30,7 +30,7 @@ enum RespawnSystem {
 
     private static func respawn(_ actor: inout Actor, in world: World) {
         actor.respawnTimer = nil
-        actor.health = GameConfig.Player.maxHealth
+        actor.health = actor.maxHealth
         actor.ammo = GameConfig.Blaster.magazineSize
         actor.invulnerability = GameConfig.Player.spawnProtection
 

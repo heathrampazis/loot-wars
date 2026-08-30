@@ -13,22 +13,27 @@ import SpriteKit
 
 enum ItemArt {
 
-    private static var cache: [ItemType: SKTexture] = [:]
+    private static var cache: [Pickup: SKTexture] = [:]
 
-    static func texture(for type: ItemType) -> SKTexture {
-        if let cached = cache[type] { return cached }
+    static func texture(for pickup: Pickup) -> SKTexture {
+        if let cached = cache[pickup] { return cached }
 
-        let texture = SKTexture(imageNamed: assetName(for: type))
+        let texture = SKTexture(imageNamed: assetName(for: pickup))
         texture.usesMipmaps = true
-        cache[type] = texture
+        cache[pickup] = texture
         return texture
     }
 
-    private static func assetName(for type: ItemType) -> String {
-        switch type {
-        case .juice:  return "Juice"
-        case .soda:   return "Soda"
-        case .slushy: return "Slushy"
+    static func texture(for type: ItemType) -> SKTexture {
+        texture(for: .item(type))
+    }
+
+    private static func assetName(for pickup: Pickup) -> String {
+        switch pickup {
+        case .item(.juice):  return "Juice"
+        case .item(.soda):   return "Soda"
+        case .item(.slushy): return "Slushy"
+        case .helmet(let tier): return tier.name
         }
     }
 }

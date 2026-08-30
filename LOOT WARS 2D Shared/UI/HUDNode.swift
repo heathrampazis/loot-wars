@@ -58,7 +58,7 @@ final class HUDNode: SKNode {
     func update(with world: World) {
         guard let player = world.localPlayer else { return }
 
-        health.setFraction(Double(player.health) / Double(GameConfig.Player.maxHealth))
+        health.setFraction(Double(player.health) / Double(player.maxHealth))
         ammo.setFraction(Double(player.ammo) / Double(GameConfig.Blaster.magazineSize))
     }
 }

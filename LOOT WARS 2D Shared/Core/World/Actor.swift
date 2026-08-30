@@ -27,7 +27,13 @@ struct Actor {
     /// input leaves it alone, so walking straight up does not turn the character.
     var facesLeft: Bool = false
 
-    var health: Int = GameConfig.Player.maxHealth
+    /// What the actor is wearing. Everyone starts with nothing.
+    var helmet: HelmetTier = .none
+
+    /// Full health for THIS actor, which depends on its helmet.
+    var maxHealth: Int { helmet.maxHealth }
+
+    var health: Int = GameConfig.Player.baseHealth
 
     /// nil while alive; counts down to respawn while dead.
     var respawnTimer: Double?
@@ -70,6 +76,22 @@ struct Actor {
     /// The bottom edge of the hitbox, which is where the sprite is anchored.
     var feet: Vec2 {
         Vec2(x: position.x, y: position.y - GameConfig.Player.halfDepth)
+    }
+
+    /// Whether this actor has any use for something lying on the ground.
+    ///
+    /// One answer, asked by both the pickup code and the bots deciding whether a
+    /// drop is worth walking to - so a bot can never set off for something it
+    /// would then decline to pick up.
+    func wants(_ pickup: Pickup) -> Bool {
+        switch pickup {
+        case .item(let type):
+            return inventory.canAccept(type)
+        case .helmet(let tier):
+            // Only an upgrade is worth having. A worse helmet stays on the ground
+            // for somebody who has nothing.
+            return tier > helmet
+        }
     }
 
     /// Does this actor's hitbox overlap the given tile at all?

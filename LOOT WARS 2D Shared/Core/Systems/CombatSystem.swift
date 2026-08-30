@@ -30,7 +30,7 @@ enum CombatSystem {
         actor.secondsSinceHit = 0
 
         if actor.health <= 0 {
-            kill(&actor)
+            kill(&actor, in: world)
         }
 
         world.actors[id] = actor
@@ -41,18 +41,25 @@ enum CombatSystem {
     static func heal(_ id: ActorID, amount: Int, in world: World) {
         guard var actor = world.actors[id], actor.isAlive, amount > 0 else { return }
 
-        actor.health = min(GameConfig.Player.maxHealth, actor.health + amount)
+        actor.health = min(actor.maxHealth, actor.health + amount)
         world.actors[id] = actor
     }
 
-    private static func kill(_ actor: inout Actor) {
+    private static func kill(_ actor: inout Actor, in world: World) {
         actor.health = 0
         actor.respawnTimer = GameConfig.Player.respawnDelay
 
         // Stop dead rather than sliding on with whatever was last pressed.
         actor.moveInput = .zero
 
-        // Upgrades are deliberately kept: the design calls for aggressive play in a
-        // short match, and losing your gear on death punishes exactly that.
+        // The helmet falls where you did, and you come back bare-headed.
+        //
+        // This is what makes a well-equipped actor worth hunting rather than just
+        // worth avoiding: killing someone in a Legendary is how you get one. It
+        // also keeps an early lead from compounding across a whole match.
+        if actor.helmet > .none {
+            world.spawnGroundItem(.helmet(actor.helmet), at: actor.position)
+            actor.helmet = .none
+        }
     }
 }

@@ -33,7 +33,7 @@ final class GroundItemRenderer {
     }
 
     private func makeNode(for item: GroundItem) {
-        let texture = ItemArt.texture(for: item.type)
+        let texture = ItemArt.texture(for: item.pickup)
 
         let width = GridGeometry.length(ofTiles: GroundItemRenderer.widthInTiles)
         let art = texture.size()

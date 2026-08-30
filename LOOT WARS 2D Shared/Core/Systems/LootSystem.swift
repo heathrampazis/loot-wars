@@ -37,6 +37,26 @@ enum LootSystem {
 
     // MARK: - Picking up
 
+    /// Returns false when the actor has no use for it, and the pickup stays put.
+    /// Walking over something and having it vanish is worse than leaving it.
+    private static func take(_ pickup: Pickup, by actor: inout Actor) -> Bool {
+        switch pickup {
+        case .item(let type):
+            return actor.inventory.add(type)
+
+        case .helmet(let tier):
+            guard tier > actor.helmet else { return false }
+
+            // A better helmet is worn on the spot, and the extra capacity arrives
+            // as actual health - so finding one mid-fight is a real reprieve
+            // rather than just a longer bar to refill.
+            let gained = tier.maxHealth - actor.maxHealth
+            actor.helmet = tier
+            actor.health = min(actor.maxHealth, actor.health + gained)
+            return true
+        }
+    }
+
     private static func sweepUpItems(_ world: World) {
         guard !world.groundItems.isEmpty else { return }
 
@@ -54,9 +74,7 @@ enum LootSystem {
                 // against. No separate pickup radius to drift out of step with it.
                 guard reach.contains(item.position) else { continue }
 
-                // A full inventory leaves the item where it is. Picking something up
-                // and having it disappear is worse than not picking it up.
-                if actor.inventory.add(item.type) {
+                if take(item.pickup, by: &actor) {
                     collected.append(item.id)
                 }
             }

@@ -138,7 +138,7 @@ final class HotbarNode: SKNode {
 
         // Greyed out at full health, because that is when drinking is refused. The
         // rule itself lives in ConsumableSystem - this only shows it.
-        let usable = player.isAlive && player.health < GameConfig.Player.maxHealth
+        let usable = player.isAlive && player.health < player.maxHealth
 
         guard player.inventory != lastInventory || usable != lastUsable else { return }
         lastInventory = player.inventory

@@ -33,8 +33,11 @@ enum ItemType: Hashable, CaseIterable {
         }
     }
 
-    /// Health restored, in points.
-    var healAmount: Int {
-        Int((Double(GameConfig.Player.maxHealth) * healFraction).rounded())
+    /// Health restored, in points, for an actor with this much health at full.
+    ///
+    /// A share rather than a fixed number, so a drink is worth proportionally the
+    /// same whether you are bare-headed or wearing a Cosmic.
+    func healAmount(of maxHealth: Int) -> Int {
+        Int((Double(maxHealth) * healFraction).rounded())
     }
 }

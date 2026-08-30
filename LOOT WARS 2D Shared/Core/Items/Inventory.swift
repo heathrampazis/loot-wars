@@ -15,8 +15,10 @@ struct Inventory: Equatable {
 
     /// Total healing carried, in health points. What a bot uses to decide whether
     /// it is stocked well enough to go looking for a fight.
-    var totalHealing: Int {
-        slots.compactMap { $0 }.reduce(0) { $0 + $1.type.healAmount * $1.count }
+    func totalHealing(of maxHealth: Int) -> Int {
+        slots.compactMap { $0 }.reduce(0) {
+            $0 + $1.type.healAmount(of: maxHealth) * $1.count
+        }
     }
 
     /// Whether this item would actually fit. Not the same as "not full": a full

@@ -196,10 +196,10 @@ final class World {
         pendingLootboxes = stillWaiting
     }
 
-    func spawnGroundItem(_ type: ItemType, at position: Vec2) {
+    func spawnGroundItem(_ pickup: Pickup, at position: Vec2) {
         let id = GroundItemID(nextGroundItemID)
         nextGroundItemID += 1
-        groundItems[id] = GroundItem(id: id, type: type, position: position)
+        groundItems[id] = GroundItem(id: id, pickup: pickup, position: position)
     }
 
     func removeGroundItem(_ id: GroundItemID) {

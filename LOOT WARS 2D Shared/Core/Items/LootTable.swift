@@ -4,28 +4,36 @@
 //
 //  What comes out of a crate.
 //
-//  Weighted so the big heal is a find rather than a given: opening a crate is
-//  usually a juice, sometimes a soda, and occasionally the slushy that wins you a
-//  fight you had no business surviving.
+//  Weighted so most of what you find keeps you alive and a little of it makes you
+//  stronger. Roughly three crates in five are a drink; of the rest, the ladder
+//  drops away steeply - a Common is ordinary, a Cosmic is the find of the match.
 //
 
 enum LootTable {
 
-    private static let drinks: [(type: ItemType, weight: Int)] = [
-        (.juice, 55),
-        (.soda, 33),
-        (.slushy, 12)
+    private static let table: [(pickup: Pickup, weight: Int)] = [
+        (.item(.juice),  60),
+        (.item(.soda),   40),
+        (.item(.slushy), 16),
+
+        (.helmet(.common),    32),
+        (.helmet(.uncommon),  22),
+        (.helmet(.rare),      14),
+        (.helmet(.epic),       8),
+        (.helmet(.legendary),  5),
+        (.helmet(.mythical),   2),
+        (.helmet(.cosmic),     1)
     ]
 
-    static func roll(using rng: inout SeededRandom) -> ItemType {
-        let total = drinks.reduce(0) { $0 + $1.weight }
+    static func roll(using rng: inout SeededRandom) -> Pickup {
+        let total = table.reduce(0) { $0 + $1.weight }
         var pick = Int.random(in: 0..<total, using: &rng)
 
-        for entry in drinks {
-            if pick < entry.weight { return entry.type }
+        for entry in table {
+            if pick < entry.weight { return entry.pickup }
             pick -= entry.weight
         }
 
-        return .juice
+        return .item(.juice)
     }
 }

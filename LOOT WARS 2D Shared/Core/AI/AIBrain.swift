@@ -182,7 +182,7 @@ enum AIBrain {
         // timer means up to three more seconds of standing there being shot, which
         // is most of why a bot on its last legs looks like it is loitering.
         if case .fight(let id) = state.goal {
-            let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
+            let healthLeft = Double(actor.health) / Double(actor.maxHealth)
             if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
                 state.goal = .retreat(from: id)
                 state.goalAge = 0
@@ -201,7 +201,7 @@ enum AIBrain {
 
         guard let enemy = nearestVisibleEnemy(to: actor, in: world) else { return }
 
-        let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
+        let healthLeft = Double(actor.health) / Double(actor.maxHealth)
 
         state.goal = healthLeft < GameConfig.AI.retreatHealthFraction * state.caution
             ? .retreat(from: enemy.id)
@@ -213,7 +213,7 @@ enum AIBrain {
     /// Priority order: staying alive, then fighting, then loot, then roaming.
     private static func chooseGoal(for actor: Actor, state: AIState, in world: World) -> AIGoal {
         if let enemy = nearestVisibleEnemy(to: actor, in: world) {
-            let healthLeft = Double(actor.health) / Double(GameConfig.Player.maxHealth)
+            let healthLeft = Double(actor.health) / Double(actor.maxHealth)
 
             // Hurt and in danger: get out. Note this only holds while an enemy is
             // actually near - once it is safe, or once it has drunk its way back to
@@ -239,7 +239,7 @@ enum AIBrain {
         }
 
         // Almost out of drinks: go shopping, base or no base.
-        if actor.inventory.totalHealing < GameConfig.AI.emergencyHealingStock,
+        if actor.inventory.totalHealing(of: actor.maxHealth) < GameConfig.AI.emergencyHealingStock,
            state.lootCooldown <= 0 {
             if let item = nearestItem(to: actor, in: world) { return .collect(item.id) }
             if let crate = nearestCrate(to: actor, in: world) { return .loot(crate.id) }
@@ -269,14 +269,24 @@ enum AIBrain {
 
     private static func nearestItem(to actor: Actor, in world: World) -> GroundItem? {
         var closest: GroundItem?
-        var shortest = GameConfig.AI.itemSearchRange
+        var shortest = Double.greatestFiniteMagnitude
 
         for item in world.groundItems.values {
-            // No point walking to something there is no room for.
-            guard actor.inventory.canAccept(item.type) else { continue }
+            // Asks the actor the same question the pickup code will, so a bot can
+            // never set off for something it would then decline to take.
+            guard actor.wants(item.pickup) else { continue }
+
+            // A drink is worth a few steps. A better helmet is worth a walk - it is
+            // the difference between winning the next fight and losing it, so it
+            // gets the same reach a crate does.
+            let worthTravelling: Double
+            switch item.pickup {
+            case .item:   worthTravelling = GameConfig.AI.itemSearchRange
+            case .helmet: worthTravelling = GameConfig.AI.lootSearchRange
+            }
 
             let distance = (item.position - actor.position).length
-            guard distance < shortest else { continue }
+            guard distance < worthTravelling, distance < shortest else { continue }
             shortest = distance
             closest = item
         }
@@ -455,11 +465,11 @@ enum AIBrain {
     /// all reach for a drink on the same frame.
     private static func drinkToTake(_ state: inout AIState, actor: Actor) -> Int? {
         guard state.drinkTimer <= 0 else { return nil }
-        guard actor.health < GameConfig.Player.maxHealth else { return nil }
+        guard actor.health < actor.maxHealth else { return nil }
 
-        let maxHealth = Double(GameConfig.Player.maxHealth)
+        let maxHealth = Double(actor.maxHealth)
         let healthLeft = Double(actor.health) / maxHealth
-        let missing = GameConfig.Player.maxHealth - actor.health
+        let missing = actor.maxHealth - actor.health
 
         let desperate = healthLeft < GameConfig.AI.criticalHealthFraction * state.caution
 
@@ -488,7 +498,7 @@ enum AIBrain {
             guard let stack = slot,
                   ConsumableSystem.canUse(slot: index, actor: actor) else { continue }
 
-            let amount = stack.type.healAmount
+            let amount = stack.type.healAmount(of: actor.maxHealth)
 
             if amount >= missing, amount < smallestAmount {
                 smallestAmount = amount
@@ -507,7 +517,7 @@ enum AIBrain {
         // takes the whole hundred. Spending it on a graze is how a bot arrives at
         // its next fight with an empty bar and nothing left, so hold out for
         // something smaller unless properly hurt.
-        let poured = actor.inventory.slots[chosen]?.type.healAmount ?? 0
+        let poured = actor.inventory.slots[chosen]?.type.healAmount(of: actor.maxHealth) ?? 0
         if !desperate,
            Double(poured) > Double(missing) * GameConfig.AI.maximumOverdrink,
            healthLeft > GameConfig.AI.overdrinkBelowFraction {

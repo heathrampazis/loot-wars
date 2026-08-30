@@ -15,6 +15,6 @@ struct GroundItemID: Hashable {
 
 struct GroundItem {
     let id: GroundItemID
-    let type: ItemType
+    let pickup: Pickup
     let position: Vec2
 }
