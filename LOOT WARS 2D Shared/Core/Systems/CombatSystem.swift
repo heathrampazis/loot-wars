@@ -52,21 +52,44 @@ enum CombatSystem {
         // Stop dead rather than sliding on with whatever was last pressed.
         actor.moveInput = .zero
 
-        // The helmet falls where you did, and you come back bare-headed.
+        // Gear is always LOST on death - what is random is only whether it lands
+        // on the ground for somebody else.
         //
         // This is what makes a well-equipped actor worth hunting rather than just
-        // worth avoiding: killing someone in a Legendary is how you get one. It
-        // also keeps an early lead from compounding across a whole match.
-        if actor.helmet > .none {
-            world.spawnGroundItem(.helmet(actor.helmet), at: actor.position)
-            actor.helmet = .none
+        // worth avoiding: killing someone in a Legendary is how you get one. The
+        // chance keeps it a gamble rather than a transaction, and it rises with
+        // tier, so the good stuff is the stuff worth chasing.
+        drop(.helmet(actor.helmet), chance: actor.helmet.dropChance, at: actor.position, in: world)
+        actor.helmet = .none
+
+        // A starter blaster never drops - everybody already has one, so scattering
+        // them would only be a way of finding nothing.
+        drop(.blaster(actor.blaster), chance: actor.blaster.dropChance, at: actor.position, in: world)
+        actor.blaster = .starting
+    }
+
+    private static func drop(_ pickup: Pickup, chance: Double, at position: Vec2, in world: World) {
+        guard chance > 0, Double.random(in: 0..<1, using: &world.rng) < chance else { return }
+        world.spawnGroundItem(pickup, at: scatteredSpot(near: position, in: world))
+    }
+
+    /// Flings a drop clear of where its owner fell.
+    ///
+    /// Without this a helmet and a blaster from the same kill land on precisely the
+    /// same point and only the top one is visible - the second looks like it was
+    /// never dropped at all.
+    private static func scatteredSpot(near position: Vec2, in world: World) -> Vec2 {
+        for _ in 0..<GameConfig.Drops.scatterAttempts {
+            let angle = Double.random(in: 0..<(2 * .pi), using: &world.rng)
+            let distance = Double.random(in: (GameConfig.Drops.scatterRadius * 0.4)
+                                            ...GameConfig.Drops.scatterRadius,
+                                         using: &world.rng)
+
+            let spot = position + Vec2.fromAngle(angle) * distance
+            if world.isClearForDrop(spot) { return spot }
         }
 
-        // Only upgrades are worth dropping. Everyone respawns holding a starter
-        // blaster, so scattering those would just litter the map.
-        if actor.blaster > .starting {
-            world.spawnGroundItem(.blaster(actor.blaster), at: actor.position)
-            actor.blaster = .starting
-        }
+        // Hemmed in on every side: better stacked than stuck in a wall.
+        return position
     }
 }

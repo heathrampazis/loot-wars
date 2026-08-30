@@ -34,6 +34,15 @@ enum HelmetTier: Int, CaseIterable, Comparable {
         return Int((base * pow(HelmetTier.healthStep, Double(rawValue))).rounded())
     }
 
+    /// Chance this survives its owner's death and lands on the ground.
+    var dropChance: Double {
+        guard self > .none else { return 0 }
+
+        let above = Double(rawValue - 1)
+        return min(GameConfig.Drops.maximumChance,
+                   GameConfig.Drops.baseChance + GameConfig.Drops.chancePerTier * above)
+    }
+
     var name: String {
         switch self {
         case .none:      return "None"

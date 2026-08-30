@@ -41,6 +41,16 @@ enum BlasterTier: Int, CaseIterable, Comparable {
         GameConfig.Blaster.holdDistance + barrelLength
     }
 
+    /// Chance this survives its owner's death and lands on the ground. A starter
+    /// blaster never does - everybody already has one.
+    var dropChance: Double {
+        guard self > .starting else { return 0 }
+
+        let above = Double(rawValue - BlasterTier.starting.rawValue - 1)
+        return min(GameConfig.Drops.maximumChance,
+                   GameConfig.Drops.baseChance + GameConfig.Drops.chancePerTier * above)
+    }
+
     var assetName: String { "Blaster\(rawValue)" }
 
     static func < (a: BlasterTier, b: BlasterTier) -> Bool { a.rawValue < b.rawValue }

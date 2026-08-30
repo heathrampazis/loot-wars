@@ -196,6 +196,18 @@ final class World {
         pendingLootboxes = stillWaiting
     }
 
+    /// Whether a dropped item would be reachable here.
+    ///
+    /// Ground items have no collision of their own, so one flung into a tree or a
+    /// wall is not blocked - it is simply somewhere nobody can walk to.
+    func isClearForDrop(_ point: Vec2) -> Bool {
+        let tile = GridPoint(containing: point)
+
+        guard map.contains(tile), !map.isOccupied(tile) else { return false }
+        guard !trees.contains(where: { $0.contains(point) }) else { return false }
+        return !lootboxes.values.contains { $0.hitbox.contains(point) }
+    }
+
     func spawnGroundItem(_ pickup: Pickup, at position: Vec2) {
         let id = GroundItemID(nextGroundItemID)
         nextGroundItemID += 1

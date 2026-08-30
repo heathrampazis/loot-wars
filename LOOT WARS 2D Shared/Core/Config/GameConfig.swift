@@ -274,6 +274,30 @@ enum GameConfig {
         static let patience: Double = 25
     }
 
+    enum Drops {
+        /// Chance the lowest droppable tier survives its owner's death.
+        ///
+        /// Not a certainty on purpose. A guaranteed drop makes every kill a
+        /// transaction; a chance makes one a gamble, and makes finding a Cosmic on
+        /// the ground feel like something happened rather than like arithmetic.
+        static let baseChance = 0.35
+
+        /// Added per tier above that, so the good stuff is likelier to survive -
+        /// which is what makes hunting a well-equipped actor worth the risk.
+        static let chancePerTier = 0.08
+
+        static let maximumChance = 0.80
+
+        /// How far a drop is flung from where its owner fell, in tiles. Enough that
+        /// a helmet and a blaster from the same kill land side by side instead of
+        /// stacked on top of each other.
+        static let scatterRadius = 0.75
+
+        /// Tries this many spots before settling for the exact spot of the death -
+        /// a drop flung into a tree is a drop nobody can reach.
+        static let scatterAttempts = 8
+    }
+
     enum Loot {
         /// Lootboxes scattered across the map.
         static let lootboxCount = 42
