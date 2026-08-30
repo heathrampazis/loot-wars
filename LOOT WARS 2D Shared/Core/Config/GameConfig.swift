@@ -306,9 +306,18 @@ enum GameConfig {
     }
 
     enum Blaster {
-        /// Tiles per second. Against a target crossing your sights, this matters
-        /// more than damage does: it decides how far ahead you have to aim.
-        static let projectileSpeed: Double = 18
+        /// Tiles per second.
+        ///
+        /// Against a target crossing your sights this matters more than damage
+        /// does, because it decides how far ahead you have to aim - but push it too
+        /// high and shots stop reading as shots and start reading as missiles
+        /// teleporting out of the barrel.
+        ///
+        /// At the eight tiles bots fight at: 14 needs 2.17 tiles of lead, 15 needs
+        /// 2.03, 18 needs 1.69. Since a target is only 0.9 tiles wide, every one of
+        /// those still demands real leading, so the gameplay difference across that
+        /// range is small and the visual difference is not.
+        static let projectileSpeed: Double = 15
         /// Shots per second while the stick is held over.
         static let fireRate: Double = 4.5
         /// Tiles a shot travels before fizzling out.
