@@ -284,9 +284,18 @@ final class World {
                 case .move(let direction):
                     let input = direction.clampedToUnit()
                     actor.moveInput = input
-                    // Left/right is tracked on its own, so walking straight up does
-                    // not reset which way the figure is turned. Aiming overrides
-                    // this later in the tick, in WeaponSystem.
+
+                    // Walking points the weapon. Firing overrides it later in the
+                    // same tick, in WeaponSystem - which is the whole mechanism:
+                    // movement sets the aim, and a trigger pull wins because it
+                    // happens afterwards. Nothing has to know about the other.
+                    if input.length > 0.01 {
+                        actor.aim = input.normalized()
+                    }
+
+                    // Left/right is tracked separately so walking straight up or
+                    // down does not turn the figure to face the camera - it keeps
+                    // whichever side it was last heading.
                     if abs(input.x) > 0.01 {
                         actor.facesLeft = input.x < 0
                     }
