@@ -58,6 +58,11 @@ enum LootSystem {
             actor.helmet = tier
             actor.health = min(actor.maxHealth, actor.health + gained)
             return true
+
+        case .blaster(let tier):
+            guard tier > actor.blaster else { return false }
+            actor.blaster = tier
+            return true
         }
     }
 

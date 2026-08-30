@@ -61,5 +61,12 @@ enum CombatSystem {
             world.spawnGroundItem(.helmet(actor.helmet), at: actor.position)
             actor.helmet = .none
         }
+
+        // Only upgrades are worth dropping. Everyone respawns holding a starter
+        // blaster, so scattering those would just litter the map.
+        if actor.blaster > .starting {
+            world.spawnGroundItem(.blaster(actor.blaster), at: actor.position)
+            actor.blaster = .starting
+        }
     }
 }

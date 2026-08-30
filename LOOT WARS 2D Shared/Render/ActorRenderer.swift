@@ -31,22 +31,29 @@ final class ActorRenderer {
         let root = SKNode()
         let sprite: SKSpriteNode
         let healthFill: SKShapeNode
+        let blaster: SKSpriteNode
         let goalLabel: SKLabelNode?
         var lastHealthFraction: Double = -1
         /// So the figure can be re-dressed the moment its helmet changes.
         var lastHelmet: HelmetTier?
+        var lastBlaster: BlasterTier?
         /// Used only to notice a drop, which is what triggers the hit flash.
         var lastHealth: Int = Int.max
 
-        init(sprite: SKSpriteNode, healthFill: SKShapeNode, goalLabel: SKLabelNode?) {
+        init(sprite: SKSpriteNode,
+             healthFill: SKShapeNode,
+             blaster: SKSpriteNode,
+             goalLabel: SKLabelNode?) {
             self.sprite = sprite
             self.healthFill = healthFill
+            self.blaster = blaster
             self.goalLabel = goalLabel
         }
     }
 
     private var nodesByActor: [ActorID: ActorNodes] = [:]
     private var textureCache: [HelmetTier: SKTexture] = [:]
+    private var blasterCache: [BlasterTier: SKTexture] = [:]
 
     func sync(with world: World) {
         for (id, actor) in world.actors {
@@ -87,6 +94,13 @@ final class ActorRenderer {
                 nodes.lastHelmet = actor.helmet
                 nodes.sprite.texture = texture(for: actor.helmet)
             }
+
+            if nodes.lastBlaster != actor.blaster {
+                nodes.lastBlaster = actor.blaster
+                nodes.blaster.texture = blasterTexture(for: actor.blaster)
+            }
+
+            aim(nodes.blaster, along: actor.aim)
 
             setHealth(Double(actor.health) / Double(actor.maxHealth), on: nodes)
         }
@@ -143,14 +157,50 @@ final class ActorRenderer {
             goalLabel = label
         }
 
-        let nodes = ActorNodes(sprite: sprite, healthFill: fill, goalLabel: goalLabel)
+        // A sibling of the figure rather than a child of it: the figure mirrors on
+        // xScale when facing left, and a weapon must ROTATE instead - mirroring it
+        // would have the barrel swap ends.
+        let side = GridGeometry.length(ofTiles: GameConfig.Blaster.spriteSize)
+        let blaster = SKSpriteNode(texture: blasterTexture(for: actor.blaster),
+                                   size: CGSize(width: side, height: side))
+        // Anchored on the grip, so rotating swings the barrel round the hand.
+        blaster.anchorPoint = CGPoint(x: 0.30, y: 0.32)
+        blaster.zPosition = 1
+
+        let nodes = ActorNodes(sprite: sprite,
+                               healthFill: fill,
+                               blaster: blaster,
+                               goalLabel: goalLabel)
         nodes.root.addChild(sprite)
+        nodes.root.addChild(blaster)
         nodes.root.addChild(bar)
         if let goalLabel { nodes.root.addChild(goalLabel) }
 
         node.addChild(nodes.root)
         nodesByActor[actor.id] = nodes
         return nodes
+    }
+
+    /// Puts the weapon in the actor's hand, pointing where it is aiming.
+    ///
+    /// The grip swings around the body rather than staying pinned to one side, so
+    /// aiming upwards lifts the gun above the shoulder and aiming down drops it -
+    /// which is what sells a top-down character actually holding something.
+    private func aim(_ blaster: SKSpriteNode, along direction: Vec2) {
+        let hold = GridGeometry.length(ofTiles: GameConfig.Blaster.holdDistance)
+
+        blaster.position = CGPoint(
+            x: CGFloat(direction.x) * hold,
+            y: GridGeometry.length(ofTiles: GameConfig.Blaster.holdHeight)
+                + CGFloat(direction.y) * hold
+        )
+
+        blaster.zRotation = CGFloat(direction.angle)
+
+        // The art points right. Aiming left would turn it upside down, so flip it
+        // across the barrel instead - the usual trick, and the reason this is not
+        // parented to the mirrored figure.
+        blaster.yScale = direction.x < 0 ? -1 : 1
     }
 
     /// A quick white blink. Keyed, so rapid hits restart it rather than stacking up
@@ -196,6 +246,15 @@ final class ActorRenderer {
     }
 
     // MARK: - Textures
+
+    private func blasterTexture(for tier: BlasterTier) -> SKTexture {
+        if let cached = blasterCache[tier] { return cached }
+
+        let texture = SKTexture(imageNamed: tier.assetName)
+        texture.usesMipmaps = true
+        blasterCache[tier] = texture
+        return texture
+    }
 
     private func texture(for helmet: HelmetTier) -> SKTexture {
         if let cached = textureCache[helmet] { return cached }

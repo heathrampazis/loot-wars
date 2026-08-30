@@ -322,16 +322,20 @@ enum GameConfig {
         static let fireRate: Double = 4.5
         /// Tiles a shot travels before fizzling out.
         static let range: Double = 12
-        /// How far in front of the actor a shot appears, so you never shoot yourself.
-        static let muzzleOffset: Double = 0.5
+        /// How far in front of an actor's centre the weapon is gripped, in tiles.
+        /// Shared by the simulation and the renderer, so the shot leaves the barrel
+        /// you can see rather than a point near it - see BlasterTier.muzzleOffset.
+        static let holdDistance: Double = 0.12
+
+        /// How far up the figure the weapon is held, in tiles. Rendering only.
+        static let holdHeight: Double = 0.85
+
+        /// How big the weapon is drawn, in tiles. The art is square with the gun
+        /// filling more of it at higher tiers, so a Blaster6 looks like a Blaster6.
+        static let spriteSize: Double = 1.0
         /// Half the width of a projectile, in tiles. Only used for drawing today;
         /// hit detection arrives with health at M5.
         static let projectileRadius: Double = 0.18
-
-        /// Damage per hit. This is tier 1 from the design spec: nine hits to kill
-        /// an unarmoured actor, about 2.7 seconds. When helmet and blaster tiers
-        /// arrive, this number becomes a lookup on the actor's blaster.
-        static let damage = 12
 
         /// Shots you can fire before running dry.
         ///

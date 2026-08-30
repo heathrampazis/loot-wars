@@ -13,4 +13,5 @@
 enum Pickup: Hashable {
     case item(ItemType)
     case helmet(HelmetTier)
+    case blaster(BlasterTier)
 }

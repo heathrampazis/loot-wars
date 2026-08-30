@@ -226,12 +226,13 @@ final class World {
         groundItems = surviving
     }
 
-    func spawnProjectile(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2) {
+    func spawnProjectile(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2, damage: Int) {
         let projectile = Projectile(id: ProjectileID(nextProjectileID),
                                     owner: owner,
                                     team: team,
                                     position: position,
                                     velocity: velocity,
+                                    damage: damage,
                                     distanceRemaining: GameConfig.Blaster.range)
         nextProjectileID += 1
         projectiles.append(projectile)

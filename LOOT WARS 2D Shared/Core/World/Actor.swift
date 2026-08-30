@@ -30,6 +30,9 @@ struct Actor {
     /// What the actor is wearing. Everyone starts with nothing.
     var helmet: HelmetTier = .none
 
+    /// What the actor is shooting with. Everyone starts with the basic one.
+    var blaster: BlasterTier = .starting
+
     /// Full health for THIS actor, which depends on its helmet.
     var maxHealth: Int { helmet.maxHealth }
 
@@ -88,9 +91,11 @@ struct Actor {
         case .item(let type):
             return inventory.canAccept(type)
         case .helmet(let tier):
-            // Only an upgrade is worth having. A worse helmet stays on the ground
-            // for somebody who has nothing.
+            // Only an upgrade is worth having. A worse one stays on the ground for
+            // somebody who has nothing.
             return tier > helmet
+        case .blaster(let tier):
+            return tier > blaster
         }
     }
 

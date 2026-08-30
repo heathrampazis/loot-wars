@@ -12,17 +12,25 @@
 enum LootTable {
 
     private static let table: [(pickup: Pickup, weight: Int)] = [
-        (.item(.juice),  60),
-        (.item(.soda),   40),
-        (.item(.slushy), 16),
+        (.item(.juice),  55),
+        (.item(.soda),   35),
+        (.item(.slushy), 14),
 
-        (.helmet(.common),    32),
-        (.helmet(.uncommon),  22),
-        (.helmet(.rare),      14),
-        (.helmet(.epic),       8),
-        (.helmet(.legendary),  5),
+        (.helmet(.common),    28),
+        (.helmet(.uncommon),  19),
+        (.helmet(.rare),      12),
+        (.helmet(.epic),       7),
+        (.helmet(.legendary),  4),
         (.helmet(.mythical),   2),
-        (.helmet(.cosmic),     1)
+        (.helmet(.cosmic),     1),
+
+        // No starter blasters: everybody already has one, so dropping them would
+        // only be a way of finding nothing.
+        (.blaster(.two),   26),
+        (.blaster(.three), 16),
+        (.blaster(.four),  10),
+        (.blaster(.five),   5),
+        (.blaster(.six),    2)
     ]
 
     static func roll(using rng: inout SeededRandom) -> Pickup {

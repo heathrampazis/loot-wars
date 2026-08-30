@@ -20,6 +20,10 @@ struct Projectile {
     var position: Vec2
     let velocity: Vec2
 
+    /// Fixed when the trigger was pulled. A shot in flight is not re-priced if the
+    /// shooter picks up a better blaster before it lands.
+    let damage: Int
+
     /// Tiles left before it fizzles out. Counting distance rather than seconds means
     /// range stays the same if projectile speed is ever tuned.
     var distanceRemaining: Double

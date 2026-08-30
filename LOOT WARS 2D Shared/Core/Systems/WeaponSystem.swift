@@ -84,8 +84,12 @@ enum WeaponSystem {
         world.spawnProjectile(
             owner: id,
             team: actor.team,
-            position: actor.position + aim * GameConfig.Blaster.muzzleOffset,
-            velocity: aim * GameConfig.Blaster.projectileSpeed
+            // Out of the end of the barrel you can actually see - the offset comes
+            // from the blaster the actor is holding, and the renderer draws the gun
+            // from the same numbers.
+            position: actor.position + aim * actor.blaster.muzzleOffset,
+            velocity: aim * GameConfig.Blaster.projectileSpeed,
+            damage: actor.blaster.damage
         )
     }
 }

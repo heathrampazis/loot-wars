@@ -281,8 +281,10 @@ enum AIBrain {
             // gets the same reach a crate does.
             let worthTravelling: Double
             switch item.pickup {
-            case .item:   worthTravelling = GameConfig.AI.itemSearchRange
-            case .helmet: worthTravelling = GameConfig.AI.lootSearchRange
+            case .item:
+                worthTravelling = GameConfig.AI.itemSearchRange
+            case .helmet, .blaster:
+                worthTravelling = GameConfig.AI.lootSearchRange
             }
 
             let distance = (item.position - actor.position).length
@@ -643,7 +645,7 @@ enum AIBrain {
         guard distance > 0.01 else { return true }
 
         let direction = delta * (1 / distance)
-        var travelled = GameConfig.Blaster.muzzleOffset
+        var travelled = GameConfig.Blaster.holdDistance
 
         while travelled < distance {
             if blocksShot(start + direction * travelled, in: world) { return false }

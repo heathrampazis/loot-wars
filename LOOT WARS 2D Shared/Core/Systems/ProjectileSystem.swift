@@ -42,7 +42,7 @@ enum ProjectileSystem {
             }
 
             if let hit = actorHit(by: projectile, in: world, order: targets) {
-                CombatSystem.damage(hit, amount: GameConfig.Blaster.damage, in: world)
+                CombatSystem.damage(hit, amount: projectile.damage, in: world)
                 continue
             }
 
