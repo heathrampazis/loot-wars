@@ -359,6 +359,18 @@ enum GameConfig {
         /// eyes are the whole expression on these characters.
         static let holdHeight: Double = 0.62
 
+        /// How far the weapon drops, and how much further out it reaches, at full
+        /// tilt - in tiles, scaled by how steeply it is angled.
+        ///
+        /// Rotating a wide sprite about a grip near its lower-left swings the far
+        /// end upwards: a Blaster6 level sits 0.37 tiles above the grip, but at 45°
+        /// its top corner is 0.74 above, which lands it across the character's
+        /// face. Sliding the grip down and outward as it tilts keeps the barrel
+        /// clear of the head, and reads as an arm extending rather than a sprite
+        /// being nudged.
+        static let tiltDrop: Double = 0.30
+        static let tiltReach: Double = 0.28
+
         /// How far the weapon may tilt off horizontal, in radians (45°).
         ///
         /// This is the number that decides whether rotation looks right or looks
