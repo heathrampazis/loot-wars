@@ -195,6 +195,15 @@ final class ActorRenderer {
     /// resolves it: walking sets it, aiming overrides it. So the weapon follows
     /// your feet until you pull the trigger and then follows your aim.
     private func hold(_ blaster: SKSpriteNode, aiming direction: Vec2, facingLeft: Bool) {
+        let reach = GridGeometry.length(ofTiles: GameConfig.Blaster.holdDistance)
+
+        // The grip stays put on the body; the weapon pivots around it, the way a
+        // hand does.
+        blaster.position = CGPoint(
+            x: facingLeft ? -reach : reach,
+            y: GridGeometry.length(ofTiles: GameConfig.Blaster.holdHeight)
+        )
+
         // Mirroring makes the art point left, and a mirrored node's rotation reads
         // backwards - so measuring the tilt from the facing horizontal happens to
         // give the right value for both.
@@ -204,27 +213,7 @@ final class ActorRenderer {
         while tilt < -.pi { tilt += 2 * .pi }
 
         let limit = CGFloat(GameConfig.Blaster.maxTilt)
-        tilt = max(-limit, min(limit, tilt))
-
-        // The grip slides down and outward as the weapon angles away from level.
-        //
-        // Rotating about a grip near the sprite's lower-left swings its far end
-        // upwards - level, a Blaster6 reaches 0.37 tiles above the grip; at full
-        // tilt, 0.74 - which is what put the barrel across the character's face.
-        // Moving the hand rather than the barrel keeps the aim honest, and reads as
-        // an arm extending. It applies to downward tilt too, where the back of the
-        // weapon swings up instead.
-        let lean = abs(sin(tilt))
-        let reach = GridGeometry.length(
-            ofTiles: GameConfig.Blaster.holdDistance
-                + GameConfig.Blaster.tiltReach * Double(lean))
-        let height = GridGeometry.length(
-            ofTiles: GameConfig.Blaster.holdHeight
-                - GameConfig.Blaster.tiltDrop * Double(lean))
-
-        // The weapon pivots around the grip, the way a hand does.
-        blaster.position = CGPoint(x: facingLeft ? -reach : reach, y: height)
-        blaster.zRotation = tilt
+        blaster.zRotation = max(-limit, min(limit, tilt))
         blaster.xScale = facingLeft ? -1 : 1
     }
 
