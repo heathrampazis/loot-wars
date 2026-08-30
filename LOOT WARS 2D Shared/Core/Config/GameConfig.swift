@@ -284,6 +284,17 @@ enum GameConfig {
         /// because a solid crate means you are already touching it.
         static let openReach: Double = 0.3
 
+        /// How long a drop lies on the ground before it disappears.
+        ///
+        /// Short on purpose: it keeps the map from silting up with everything
+        /// anybody ever dropped, and it puts a clock on a kill - the helmet you
+        /// just knocked off somebody is only yours if you go and get it.
+        static let itemLifetime: Double = 10
+
+        /// How long before that it starts flashing, so nobody watches a drop
+        /// vanish without warning.
+        static let itemWarningTime: Double = 3
+
         /// Seconds before an opened crate comes back, in the same spot. Without
         /// this the map is stripped bare a minute into a match.
         static let respawnDelay: Double = 45

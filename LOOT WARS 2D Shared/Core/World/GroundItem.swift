@@ -17,4 +17,7 @@ struct GroundItem {
     let id: GroundItemID
     let pickup: Pickup
     let position: Vec2
+
+    /// Counts down to vanishing.
+    var timeRemaining: Double
 }

@@ -14,6 +14,10 @@ enum LootSystem {
     static func update(_ world: World, commands: [ActorID: [Command]], dt: Double) {
         openBoxes(world, commands: commands)
         sweepUpItems(world)
+
+        // After the sweep, so something you reached on its very last tick still
+        // counts as picked up rather than as having vanished under your feet.
+        world.ageGroundItems(by: dt)
         world.tickLootboxRespawns(dt: dt)
     }
 

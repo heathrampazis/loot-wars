@@ -199,11 +199,31 @@ final class World {
     func spawnGroundItem(_ pickup: Pickup, at position: Vec2) {
         let id = GroundItemID(nextGroundItemID)
         nextGroundItemID += 1
-        groundItems[id] = GroundItem(id: id, pickup: pickup, position: position)
+        groundItems[id] = GroundItem(id: id,
+                                     pickup: pickup,
+                                     position: position,
+                                     timeRemaining: GameConfig.Loot.itemLifetime)
     }
 
     func removeGroundItem(_ id: GroundItemID) {
         groundItems[id] = nil
+    }
+
+    func ageGroundItems(by dt: Double) {
+        guard !groundItems.isEmpty else { return }
+
+        // Rebuilt rather than edited in place: mutating a dictionary while walking
+        // it copies the whole storage on every single write.
+        var surviving: [GroundItemID: GroundItem] = [:]
+        surviving.reserveCapacity(groundItems.count)
+
+        for (id, item) in groundItems {
+            var ageing = item
+            ageing.timeRemaining -= dt
+            if ageing.timeRemaining > 0 { surviving[id] = ageing }
+        }
+
+        groundItems = surviving
     }
 
     func spawnProjectile(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2) {

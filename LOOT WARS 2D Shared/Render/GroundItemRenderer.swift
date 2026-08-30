@@ -18,12 +18,26 @@ final class GroundItemRenderer {
     private var nodesByItem: [GroundItemID: SKSpriteNode] = [:]
 
     func sync(with world: World) {
-        for (id, item) in world.groundItems where nodesByItem[id] == nil {
-            makeNode(for: item)
+        for (id, item) in world.groundItems {
+            guard let sprite = nodesByItem[id] else {
+                makeNode(for: item)
+                continue
+            }
+
+            // Flash once it is nearly gone, so nothing disappears from under
+            // somebody who was running for it.
+            if item.timeRemaining <= GameConfig.Loot.itemWarningTime,
+               sprite.action(forKey: "expiring") == nil {
+                sprite.run(.repeatForever(.sequence([
+                    .fadeAlpha(to: 0.25, duration: 0.22),
+                    .fadeAlpha(to: 1.0, duration: 0.22)
+                ])), withKey: "expiring")
+            }
         }
 
         for (id, sprite) in Array(nodesByItem) where world.groundItems[id] == nil {
             nodesByItem[id] = nil
+            sprite.removeAction(forKey: "expiring")
             // Snap towards the player's hand rather than vanishing.
             sprite.run(.sequence([
                 .group([.scale(to: 0.2, duration: 0.16), .fadeOut(withDuration: 0.16)]),
