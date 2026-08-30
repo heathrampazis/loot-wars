@@ -328,7 +328,13 @@ enum GameConfig {
         static let holdDistance: Double = 0.12
 
         /// How far up the figure the weapon is held, in tiles. Rendering only.
-        static let holdHeight: Double = 0.85
+        ///
+        /// Chest height, and it matters: the figure's eyes sit between 0.99 and
+        /// 1.17 tiles up, and the largest blaster art reaches about 0.37 tiles
+        /// above the grip. Anything above roughly 0.62 puts the barrel across the
+        /// character's face, which is what a held weapon must never do - the eyes
+        /// are the whole expression.
+        static let holdHeight: Double = 0.58
 
         /// How big the weapon is drawn, in tiles. The art is square with the gun
         /// filling more of it at higher tiers, so a Blaster6 looks like a Blaster6.
