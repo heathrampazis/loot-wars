@@ -46,7 +46,12 @@ enum GameConfig {
 
     enum Player {
         /// Tiles travelled per second at full stick.
-        static let moveSpeed: Double = 4.5
+        ///
+        /// Slower than it looks like it should be, and deliberately. How hard
+        /// somebody is to hit is really the ratio between how fast they move and
+        /// how fast a shot travels - trimming this and raising projectileSpeed
+        /// together is what turns a firefight from a guessing game into aiming.
+        static let moveSpeed: Double = 3.8
 
         /// Health with no helmet on. Every tier scales up from here - see
         /// HelmetTier.maxHealth - so an actor's real maximum is actor.maxHealth,
@@ -301,10 +306,11 @@ enum GameConfig {
     }
 
     enum Blaster {
-        /// Tiles per second.
-        static let projectileSpeed: Double = 14
-        /// Shots per second while the button is held.
-        static let fireRate: Double = 3.0
+        /// Tiles per second. Against a target crossing your sights, this matters
+        /// more than damage does: it decides how far ahead you have to aim.
+        static let projectileSpeed: Double = 18
+        /// Shots per second while the stick is held over.
+        static let fireRate: Double = 4.5
         /// Tiles a shot travels before fizzling out.
         static let range: Double = 12
         /// How far in front of the actor a shot appears, so you never shoot yourself.
@@ -319,13 +325,17 @@ enum GameConfig {
         static let damage = 12
 
         /// Shots you can fire before running dry.
-        static let magazineSize = 12
+        ///
+        /// Scaled up with the fire rate, so a magazine still lasts about four and a
+        /// half seconds of holding the trigger - and each shot now takes a smaller
+        /// bite out of the bar, so it drains at a pace you can read.
+        static let magazineSize = 20
 
         /// Quiet time after your last shot before ammo starts coming back. This is
         /// what makes bursts better than holding the trigger down.
         static let rechargeDelay: Double = 1.0
 
         /// Seconds per bullet once recharging has started.
-        static let rechargeInterval: Double = 0.6
+        static let rechargeInterval: Double = 0.35
     }
 }
