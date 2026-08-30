@@ -79,11 +79,15 @@ enum CombatSystem {
     /// same point and only the top one is visible - the second looks like it was
     /// never dropped at all.
     private static func scatteredSpot(near position: Vec2, in world: World) -> Vec2 {
+        // Bounds hoisted out rather than written inline: a range operator wrapped
+        // onto a new line parses as the PREFIX form (...x) instead of the infix
+        // one, and the error it produces points nowhere near the cause.
+        let nearest = GameConfig.Drops.scatterRadius * 0.4
+        let furthest = GameConfig.Drops.scatterRadius
+
         for _ in 0..<GameConfig.Drops.scatterAttempts {
-            let angle = Double.random(in: 0..<(2 * .pi), using: &world.rng)
-            let distance = Double.random(in: (GameConfig.Drops.scatterRadius * 0.4)
-                                            ...GameConfig.Drops.scatterRadius,
-                                         using: &world.rng)
+            let angle = Double.random(in: 0..<(2 * Double.pi), using: &world.rng)
+            let distance = Double.random(in: nearest...furthest, using: &world.rng)
 
             let spot = position + Vec2.fromAngle(angle) * distance
             if world.isClearForDrop(spot) { return spot }
