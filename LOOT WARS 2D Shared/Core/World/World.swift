@@ -30,6 +30,11 @@ final class World {
 
     var actors: [ActorID: Actor] = [:]
     var projectiles: [Projectile] = []
+    var bombs: [Bomb] = []
+
+    /// Where bombs went off this tick. Drained by the renderer, which is the only
+    /// thing that cares - the simulation has already applied the damage.
+    private(set) var recentBlasts: [Vec2] = []
 
     private(set) var lootboxes: [LootboxID: Lootbox] = [:]
     private(set) var groundItems: [GroundItemID: GroundItem] = [:]
@@ -43,6 +48,7 @@ final class World {
     private var pendingLootboxes: [PendingLootbox] = []
 
     private var nextProjectileID = 0
+    private var nextBombID = 0
     private var nextGroundItemID = 0
     private var nextLootboxID = 0
 
@@ -250,6 +256,31 @@ final class World {
         projectiles.append(projectile)
     }
 
+    func spawnBomb(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2, target: Vec2) {
+        let bomb = Bomb(id: BombID(nextBombID),
+                        owner: owner,
+                        team: team,
+                        position: position,
+                        velocity: velocity,
+                        target: target,
+                        distanceRemaining: GameConfig.Bomb.throwRange)
+        nextBombID += 1
+        bombs.append(bomb)
+    }
+
+    func recordBlast(at position: Vec2) {
+        recentBlasts.append(position)
+    }
+
+    /// Hands the blasts over and forgets them. Called once a frame by the renderer,
+    /// not once a tick - the fixed step can run several times between frames, and
+    /// every one of those explosions still deserves to be seen.
+    func takeBlasts() -> [Vec2] {
+        let blasts = recentBlasts
+        recentBlasts.removeAll()
+        return blasts
+    }
+
     func setTile(_ tile: TileType, at point: GridPoint) {
         guard map.contains(point), map[point] != tile else { return }
         map[point] = tile
@@ -265,6 +296,9 @@ final class World {
 
         applyMovementInput(everyone)
         BuildSystem.update(self, commands: everyone)
+        // Before movement, so a wall that comes down this tick is a gap somebody
+        // can already walk through.
+        BombSystem.update(self, commands: everyone, dt: dt)
         WeaponSystem.update(self, commands: everyone, dt: dt)
         ConsumableSystem.update(self, commands: everyone)
         MovementSystem.update(self, dt: dt)
@@ -299,7 +333,7 @@ final class World {
                     if abs(input.x) > 0.01 {
                         actor.facesLeft = input.x < 0
                     }
-                case .placeBlock, .shoot, .openLootbox, .useItem:
+                case .placeBlock, .shoot, .openLootbox, .useItem, .throwBomb:
                     break   // other systems' business, not movement's
                 }
             }

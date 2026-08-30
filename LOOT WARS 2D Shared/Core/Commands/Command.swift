@@ -25,4 +25,7 @@ enum Command {
     case openLootbox
     /// Drink whatever is in this hotbar slot.
     case useItem(slot: Int)
+    /// Lob a bomb at this tile. Whether one is thrown, and whether it reaches, is
+    /// the simulation's call.
+    case throwBomb(GridPoint)
 }

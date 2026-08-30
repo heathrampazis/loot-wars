@@ -35,6 +35,7 @@ final class GameScene: SKScene {
     private let blockRenderer = BlockRenderer()
     private let lootboxRenderer = LootboxRenderer()
     private let groundItemRenderer = GroundItemRenderer()
+    private let bombRenderer = BombRenderer()
     private let projectileRenderer = ProjectileRenderer()
     private let actorRenderer = ActorRenderer()
     private let cameraController = CameraController()
@@ -109,6 +110,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(blockRenderer.node)
         worldLayer.addChild(lootboxRenderer.node)
         worldLayer.addChild(groundItemRenderer.node)
+        worldLayer.addChild(bombRenderer.node)
         worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
         addChild(worldLayer)
@@ -184,6 +186,7 @@ final class GameScene: SKScene {
         blockRenderer.sync(with: world)
         lootboxRenderer.sync(with: world)
         groundItemRenderer.sync(with: world)
+        bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world)
         actorRenderer.sync(with: world)
         hud.update(with: world)
@@ -303,7 +306,7 @@ extension GameScene {
         releaseControls(matching: touches)
 
         if let tap = tapTouch, touches.contains(tap) {
-            requestBlock(at: tap.location(in: worldLayer))
+            tapMap(at: tap.location(in: worldLayer))
             tapTouch = nil
         }
     }
@@ -335,9 +338,20 @@ extension GameScene {
         }
     }
 
-    /// Asks for a block. Whether one appears is BuildSystem's call, not the scene's.
-    private func requestBlock(at pointInWorld: CGPoint) {
-        queuedCommands.append(.placeBlock(GridGeometry.gridPoint(for: pointInWorld)))
+    /// Tapping the map does one of two things, decided by what was tapped.
+    ///
+    /// A tile on your own claim is somewhere to build; anybody else's wall is
+    /// something to blow open. They can never be the same tile, so no mode switch
+    /// is needed - and whether either actually happens is the simulation's call,
+    /// not the scene's.
+    private func tapMap(at pointInWorld: CGPoint) {
+        let tile = GridGeometry.gridPoint(for: pointInWorld)
+
+        if let owner = world.map[tile].blockOwner, owner != world.localPlayer?.team {
+            queuedCommands.append(.throwBomb(tile))
+        } else {
+            queuedCommands.append(.placeBlock(tile))
+        }
     }
 }
 

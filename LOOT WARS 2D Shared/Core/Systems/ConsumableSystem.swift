@@ -25,7 +25,8 @@ enum ConsumableSystem {
     static func canUse(slot: Int, actor: Actor) -> Bool {
         guard actor.isAlive else { return false }
         guard actor.inventory.slots.indices.contains(slot),
-              actor.inventory.slots[slot] != nil else { return false }
+              let stack = actor.inventory.slots[slot],
+              stack.type.isDrink else { return false }
 
         // Drinking on full health would throw the item away for nothing.
         return actor.health < actor.maxHealth

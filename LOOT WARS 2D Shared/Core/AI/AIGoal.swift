@@ -21,6 +21,7 @@ enum AIGoal: Equatable {
     case fight(ActorID)
     case retreat(from: ActorID)
     case build(GridPoint)
+    case raid(GridPoint)
 
     var isBuild: Bool {
         if case .build = self { return true }
@@ -45,6 +46,7 @@ enum AIGoal: Equatable {
         case .fight: return "fight"
         case .retreat: return "flee"
         case .build: return "build"
+        case .raid:  return "raid"
         }
     }
 }

@@ -210,6 +210,11 @@ enum GameConfig {
         /// not all reach for a drink at the same instant.
         static let cautionRange: ClosedRange<Double> = 0.85...1.15
 
+        /// How close a bot has to be to somebody's claim before raiding it even
+        /// occurs to it, in tiles. Raiding is opportunistic - a bot blows open what
+        /// it walks past, it does not cross the map to do it.
+        static let raidRange: Double = 14
+
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26
 
@@ -272,6 +277,25 @@ enum GameConfig {
         /// Abandon a building trip that has taken this long - something is in the
         /// way and the bot has a match to be playing.
         static let patience: Double = 25
+    }
+
+    enum Bomb {
+        /// How far a bomb can be lobbed, in tiles.
+        static let throwRange: Double = 6
+
+        /// Tiles per second. Slower than a bullet on purpose - a bomb should look
+        /// thrown, and the flight is the warning a defender gets.
+        static let speed: Double = 9
+
+        /// Everything within this of the blast loses its walls, in tiles.
+        static let blastRadius: Double = 1.4
+
+        /// Damage at the centre of the blast, falling to nothing at the edge.
+        /// Terrain and trees are untouched - only walls come down.
+        static let damage = 45
+
+        /// How big the bomb is drawn, in tiles.
+        static let spriteSize: Double = 0.55
     }
 
     enum Drops {

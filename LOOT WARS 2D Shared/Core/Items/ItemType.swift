@@ -14,6 +14,7 @@ enum ItemType: Hashable, CaseIterable {
     case juice
     case soda
     case slushy
+    case bomb
 
     /// How many fit in one inventory slot.
     var maxStack: Int {
@@ -21,8 +22,14 @@ enum ItemType: Hashable, CaseIterable {
         case .juice:  return 5
         case .soda:   return 4
         case .slushy: return 2
+        case .bomb:   return 3
         }
     }
+
+    /// Whether this is something you drink. A bomb sits in the same four slots but
+    /// is thrown at a wall, not swallowed - and without this the hotbar would
+    /// happily let you drink one.
+    var isDrink: Bool { healFraction > 0 }
 
     /// Share of maximum health restored when drunk.
     var healFraction: Double {
@@ -30,6 +37,7 @@ enum ItemType: Hashable, CaseIterable {
         case .juice:  return 0.25
         case .soda:   return 0.50
         case .slushy: return 1.00
+        case .bomb:   return 0
         }
     }
 

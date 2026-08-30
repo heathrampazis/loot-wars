@@ -15,6 +15,7 @@ enum LootTable {
         (.item(.juice),  55),
         (.item(.soda),   35),
         (.item(.slushy), 14),
+        (.item(.bomb),   22),
 
         (.helmet(.common),    28),
         (.helmet(.uncommon),  19),

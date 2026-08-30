@@ -75,6 +75,10 @@ enum AIBrain {
             actor.ai = state
         }
 
+        if let tile = bombToThrow(state: state, actor: actor, in: world) {
+            commands.append(.throwBomb(tile))
+        }
+
         if let slot = drinkToTake(&state, actor: actor) {
             commands.append(.useItem(slot: slot))
             actor.ai = state
@@ -125,7 +129,9 @@ enum AIBrain {
                 state.buildUrgeTimer = Double.random(in: GameConfig.Build.urgeInterval,
                                                      using: &world.rng)
             }
-        case .wander, .fight, .retreat:
+        case .wander, .fight, .retreat, .raid:
+            // Raiding needs no patience of its own: it ends the moment the wall
+            // falls or the last bomb is spent, and raidTarget stops offering it.
             break
         }
 
@@ -193,9 +199,9 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect, .build:
-            // Building is interruptible. A bot laying bricks while somebody shoots
-            // at it is not a bot anyone believes in.
+        case .wander, .loot, .collect, .build, .raid:
+            // Both are interruptible. A bot laying bricks - or lining up a throw -
+            // while somebody shoots at it is not a bot anyone believes in.
             break
         }
 
@@ -236,6 +242,13 @@ enum AIBrain {
            state.blocksLeftToLay > 0,
            let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
+        }
+
+        // Standing next to somebody's wall with a bomb in the bag. Deliberately
+        // opportunistic rather than a plan: a bot does not march across the map to
+        // raid, it raids what it finds on the way past.
+        if let wall = raidTarget(for: actor, in: world) {
+            return .raid(wall)
         }
 
         // Almost out of drinks: go shopping, base or no base.
@@ -326,6 +339,16 @@ enum AIBrain {
         case .build(let tile):
             steer(&state, actor: actor,
                   to: standingSpot(for: tile, team: actor.team, in: world))
+
+        case .raid(let tile):
+            // Walk at the wall until close enough to throw, then stop closing -
+            // standing on top of a bomb you threw is a poor raid.
+            guard world.map[tile].blockOwner != nil else {
+                state.goal = .wander
+                state.goalAge = 0
+                return
+            }
+            steer(&state, actor: actor, to: tile.center)
 
         case .retreat(let id):
             steer(&state, actor: actor,
@@ -445,6 +468,52 @@ enum AIBrain {
             state.goalAge = 0
         }
 
+        return tile
+    }
+
+    // MARK: - Raiding
+
+    /// A wall worth blowing open, or nil.
+    ///
+    /// Three things have to be true at once: the bot is carrying a bomb, it is
+    /// already near somebody else's claim, and that claim actually has a wall
+    /// standing. Without the last one a bot would trudge to an empty patch of
+    /// ground and stand there looking pleased with itself.
+    private static func raidTarget(for actor: Actor, in world: World) -> GridPoint? {
+        guard actor.inventory.count(of: .bomb) > 0 else { return nil }
+
+        var closest: GridPoint?
+        var shortest = GameConfig.AI.raidRange
+
+        for (team, claim) in world.claims where team != actor.team {
+            // Cheap test first: the claim's middle is a good enough stand-in for
+            // whether it is worth looking at every tile in it.
+            guard (claim.centreTile.center - actor.position).length
+                    <= GameConfig.AI.raidRange + Double(claim.size) else { continue }
+
+            for col in claim.origin.col..<(claim.origin.col + claim.size) {
+                for row in claim.origin.row..<(claim.origin.row + claim.size) {
+                    let tile = GridPoint(col: col, row: row)
+                    guard world.map[tile].blockOwner != nil else { continue }
+
+                    let distance = (tile.center - actor.position).length
+                    guard distance < shortest else { continue }
+                    shortest = distance
+                    closest = tile
+                }
+            }
+        }
+
+        return closest
+    }
+
+    private static func bombToThrow(state: AIState, actor: Actor, in world: World) -> GridPoint? {
+        guard case .raid(let tile) = state.goal else { return nil }
+        guard world.map[tile].blockOwner != nil else { return nil }
+
+        // Asks the simulation the same question it will ask itself, so a bot never
+        // lobs one from out of range and wonders where it went.
+        guard BombSystem.canThrow(actor, at: tile) else { return nil }
         return tile
     }
 
@@ -598,7 +667,7 @@ enum AIBrain {
         switch state.goal {
         case .fight(let id):   targetID = id
         case .retreat(let id): targetID = id
-        case .wander, .loot, .collect, .build: targetID = nil
+        case .wander, .loot, .collect, .build, .raid: targetID = nil
         }
 
         guard let id = targetID,

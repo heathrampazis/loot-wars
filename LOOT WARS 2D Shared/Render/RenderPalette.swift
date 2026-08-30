@@ -34,6 +34,10 @@ enum RenderPalette {
         teams[team.raw % teams.count]
     }
 
+    /// The flash where a bomb goes off - the same pink as the crates it came out of.
+    static let blast = SKColor(red: 0xFF / 255.0, green: 0x8A / 255.0,
+                               blue: 0x5C / 255.0, alpha: 0.85)
+
     // Projectiles - the pale blue from the mockup, deliberately not team coloured
     // so shots stay readable against eight different team colours.
     static let projectile        = rgb(0xB3, 0xF0, 0xFA)

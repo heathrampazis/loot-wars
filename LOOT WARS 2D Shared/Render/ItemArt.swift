@@ -33,6 +33,7 @@ enum ItemArt {
         case .item(.juice):  return "Juice"
         case .item(.soda):   return "Soda"
         case .item(.slushy): return "Slushy"
+        case .item(.bomb):   return "Bomb"
         case .helmet(let tier):  return tier.name
         case .blaster(let tier): return tier.assetName
         }

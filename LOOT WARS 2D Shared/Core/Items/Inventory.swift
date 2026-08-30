@@ -21,6 +21,16 @@ struct Inventory: Equatable {
         }
     }
 
+    /// How many of something is being carried.
+    func count(of type: ItemType) -> Int {
+        slots.compactMap { $0 }.filter { $0.type == type }.reduce(0) { $0 + $1.count }
+    }
+
+    /// The first slot holding one of these, or nil.
+    func firstSlot(holding type: ItemType) -> Int? {
+        slots.firstIndex { $0?.type == type }
+    }
+
     /// Whether this item would actually fit. Not the same as "not full": a full
     /// inventory can still take more of something it already has room to stack.
     func canAccept(_ type: ItemType) -> Bool {
