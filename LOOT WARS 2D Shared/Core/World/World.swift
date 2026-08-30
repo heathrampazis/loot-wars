@@ -36,6 +36,10 @@ final class World {
     /// thing that cares - the simulation has already applied the damage.
     private(set) var recentBlasts: [Vec2] = []
 
+    /// An array rather than a dictionary, because machines never come or go during
+    /// a match - and a fixed order is what keeps their payouts deterministic.
+    var arcades: [Arcade] = []
+
     private(set) var lootboxes: [LootboxID: Lootbox] = [:]
     private(set) var groundItems: [GroundItemID: GroundItem] = [:]
 
@@ -77,6 +81,7 @@ final class World {
         }
         self.lootboxes = crates
         self.nextLootboxID = generated.lootboxes.count
+        self.arcades = generated.arcades
 
         // One actor per team, standing in the middle of its own claim.
         //
@@ -202,6 +207,21 @@ final class World {
         pendingLootboxes = stillWaiting
     }
 
+    // MARK: - Structures
+
+    /// Everything solid that is not a tile: crates and arcade machines.
+    ///
+    /// This exists as ONE question because the answer is needed in five places -
+    /// walking, shooting, dropping, a bot's pathing and a bot's line of sight - and
+    /// the arcade proved the point: adding a second kind of structure to five
+    /// separate `lootboxes.values.contains` checks means four of them are one day
+    /// going to be right and one is not.
+    func structureBlocks(_ point: Vec2) -> Bool {
+        if lootboxes.values.contains(where: { $0.hitbox.contains(point) }) { return true }
+        if arcades.contains(where: { $0.hitbox.contains(point) }) { return true }
+        return false
+    }
+
     /// Whether a dropped item would be reachable here.
     ///
     /// Ground items have no collision of their own, so one flung into a tree or a
@@ -211,7 +231,33 @@ final class World {
 
         guard map.contains(tile), !map.isOccupied(tile) else { return false }
         guard !trees.contains(where: { $0.contains(point) }) else { return false }
-        return !lootboxes.values.contains { $0.hitbox.contains(point) }
+        return !structureBlocks(point)
+    }
+
+    // MARK: - Arcades
+
+    /// How many of this machine's tokens are still lying around it.
+    func uncollectedTokens(around arcade: Arcade) -> Int {
+        let reach = arcade.hitbox.expanded(by: GameConfig.Arcade.collectionRadius)
+
+        var count = 0
+        for item in groundItems.values {
+            guard case .token = item.pickup else { continue }
+            if reach.contains(item.position) { count += 1 }
+        }
+        return count
+    }
+
+    /// Somewhere around the machine a token could actually be picked up from, or
+    /// nil if it is boxed in.
+    func freeSpot(around arcade: Arcade) -> Vec2? {
+        // Built in the ring's fixed order and then chosen from with the world's own
+        // generator, so the same seed drops tokens in the same places.
+        var options: [Vec2] = []
+        for tile in arcade.surroundingTiles where isClearForDrop(tile.center) {
+            options.append(tile.center)
+        }
+        return options.randomElement(using: &rng)
     }
 
     func spawnGroundItem(_ pickup: Pickup, at position: Vec2) {
@@ -220,7 +266,7 @@ final class World {
         groundItems[id] = GroundItem(id: id,
                                      pickup: pickup,
                                      position: position,
-                                     timeRemaining: GameConfig.Loot.itemLifetime)
+                                     timeRemaining: pickup.groundLifetime)
     }
 
     func removeGroundItem(_ id: GroundItemID) {
@@ -304,6 +350,9 @@ final class World {
         ProjectileSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
         LootSystem.update(self, commands: everyone, dt: dt)
+        // After the sweep: a token paid out this tick should be lying there to be
+        // seen, not swallowed instantly by whoever happens to be standing on it.
+        ArcadeSystem.update(self, dt: dt)
         CombatSystem.update(self, dt: dt)
         RespawnSystem.update(self, dt: dt)
         tick += 1

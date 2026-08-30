@@ -21,13 +21,15 @@ final class HUDNode: SKNode {
 
     static var size: CGSize {
         CGSize(width: padding * 2 + StatBarNode.totalWidth,
-               height: padding * 2 + StatBarNode.barHeight * 2 + rowSpacing)
+               height: padding * 2 + StatBarNode.barHeight * 2
+                     + StatCounterNode.height + rowSpacing * 2)
     }
 
     private let health = StatBarNode(iconNamed: "HealthIcon",
                                      fillColour: RenderPalette.healthBar)
     private let ammo = StatBarNode(iconNamed: "BulletIcon",
                                    fillColour: RenderPalette.ammoBar)
+    private let tokens = StatCounterNode(iconNamed: "Token")
 
     override init() {
         super.init()
@@ -40,13 +42,21 @@ final class HUDNode: SKNode {
         panel.strokeColor = .clear
         addChild(panel)
 
-        let firstRowCentre = -HUDNode.padding - StatBarNode.barHeight / 2
-        health.position = CGPoint(x: HUDNode.padding, y: firstRowCentre)
-        ammo.position = CGPoint(x: HUDNode.padding,
-                                y: firstRowCentre - StatBarNode.barHeight - HUDNode.rowSpacing)
+        // Rows stacked by walking DOWN the panel, each one placed against the
+        // bottom of the last. Deriving every row from the first is how the token
+        // counter first came out three points inside the ammo bar.
+        var edge = -HUDNode.padding
+
+        for (row, height) in [(health, StatBarNode.barHeight),
+                              (ammo, StatBarNode.barHeight),
+                              (tokens, StatCounterNode.height)] as [(SKNode, CGFloat)] {
+            row.position = CGPoint(x: HUDNode.padding, y: edge - height / 2)
+            edge -= height + HUDNode.rowSpacing
+        }
 
         addChild(health)
         addChild(ammo)
+        addChild(tokens)
 
         zPosition = 1000
     }
@@ -60,5 +70,6 @@ final class HUDNode: SKNode {
 
         health.setFraction(Double(player.health) / Double(player.maxHealth))
         ammo.setFraction(Double(player.ammo) / Double(GameConfig.Blaster.magazineSize))
+        tokens.setValue(player.tokens)
     }
 }

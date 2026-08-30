@@ -251,10 +251,13 @@ enum AIBrain {
             return .raid(wall)
         }
 
-        // Almost out of drinks: go shopping, base or no base.
+        // Almost out of drinks: go shopping, base or no base. Healing only - a
+        // token is no use to a bot that is about to die.
         if actor.inventory.totalHealing(of: actor.maxHealth) < GameConfig.AI.emergencyHealingStock,
            state.lootCooldown <= 0 {
-            if let item = nearestItem(to: actor, in: world) { return .collect(item.id) }
+            if let item = nearestItem(to: actor, in: world, include: isHealing) {
+                return .collect(item.id)
+            }
             if let crate = nearestCrate(to: actor, in: world) { return .loot(crate.id) }
         }
 
@@ -280,11 +283,21 @@ enum AIBrain {
         return .wander
     }
 
-    private static func nearestItem(to actor: Actor, in world: World) -> GroundItem? {
+    /// The nearest thing on the ground this bot would actually pick up.
+    ///
+    /// - Parameter include: narrows it to a kind of pickup. This is not decoration:
+    ///   a bot down to its last drink asks for healing specifically, and without the
+    ///   filter the nearest wanted item might be a token - sending it to collect
+    ///   currency in the exact moment it was about to die for want of a soda.
+    private static func nearestItem(to actor: Actor,
+                                    in world: World,
+                                    include: (Pickup) -> Bool = { _ in true }) -> GroundItem? {
         var closest: GroundItem?
         var shortest = Double.greatestFiniteMagnitude
 
         for item in world.groundItems.values {
+            guard include(item.pickup) else { continue }
+
             // Asks the actor the same question the pickup code will, so a bot can
             // never set off for something it would then decline to take.
             guard actor.wants(item.pickup) else { continue }
@@ -298,6 +311,8 @@ enum AIBrain {
                 worthTravelling = GameConfig.AI.itemSearchRange
             case .helmet, .blaster:
                 worthTravelling = GameConfig.AI.lootSearchRange
+            case .token:
+                worthTravelling = GameConfig.AI.tokenSearchRange
             }
 
             let distance = (item.position - actor.position).length
@@ -307,6 +322,11 @@ enum AIBrain {
         }
 
         return closest
+    }
+
+    private static func isHealing(_ pickup: Pickup) -> Bool {
+        guard case .item(let type) = pickup else { return false }
+        return type.isDrink
     }
 
     private static func nearestCrate(to actor: Actor, in world: World) -> Lootbox? {
@@ -738,7 +758,7 @@ enum AIBrain {
     private static func blocksShot(_ point: Vec2, in world: World) -> Bool {
         if world.map.isOccupied(GridPoint(containing: point)) { return true }
         if world.trees.contains(where: { $0.contains(point) }) { return true }
-        if world.lootboxes.values.contains(where: { $0.hitbox.contains(point) }) { return true }
+        if world.structureBlocks(point) { return true }
         return false
     }
 
@@ -815,7 +835,7 @@ enum AIBrain {
         guard world.map.contains(tile) else { return false }
         guard !world.map.blocksMovement(at: tile, for: team) else { return false }
         guard !world.trees.contains(where: { $0.contains(point) }) else { return false }
-        guard !world.lootboxes.values.contains(where: { $0.hitbox.contains(point) }) else { return false }
+        guard !world.structureBlocks(point) else { return false }
 
         return true
     }

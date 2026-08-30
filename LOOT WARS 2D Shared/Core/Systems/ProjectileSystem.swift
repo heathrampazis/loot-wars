@@ -35,11 +35,9 @@ enum ProjectileSystem {
 
             if world.trees.contains(where: { $0.contains(projectile.position) }) { continue }
 
-            // A crate is solid, so it stops a shot too - otherwise bullets sail
-            // through something you demonstrably cannot walk through.
-            if world.lootboxes.values.contains(where: { $0.hitbox.contains(projectile.position) }) {
-                continue
-            }
+            // Crates and machines are solid, so they stop a shot too - otherwise
+            // bullets sail through something you demonstrably cannot walk through.
+            if world.structureBlocks(projectile.position) { continue }
 
             if let hit = actorHit(by: projectile, in: world, order: targets) {
                 CombatSystem.damage(hit, amount: projectile.damage, in: world)

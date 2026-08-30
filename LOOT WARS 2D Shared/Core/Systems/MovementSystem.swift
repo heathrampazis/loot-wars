@@ -27,7 +27,7 @@ enum MovementSystem {
             // straight back out along the surface normal. That is what gives you
             // the smooth slide around a clump instead of catching on a corner.
             resolveTrees(&actor, in: world.trees)
-            resolveLootboxes(&actor, in: world.lootboxes)
+            resolveStructures(&actor, in: world)
 
             world.actors[id] = actor
         }
@@ -60,24 +60,31 @@ enum MovementSystem {
         }
     }
 
-    /// Crates are boxes, so they are resolved box against box: find how deeply the
-    /// two overlap on each axis and push back out along the shallower one, which is
-    /// the side the actor came in from.
-    private static func resolveLootboxes(_ actor: inout Actor, in lootboxes: [LootboxID: Lootbox]) {
-        for lootbox in lootboxes.values {
-            let actorBox = actor.hitbox
-            let crate = lootbox.hitbox
+    /// Crates and arcade machines are both boxes, and both push out of the way the
+    /// same. A machine is simply a bigger one - which is the whole reason this is
+    /// one function taking a Box rather than two that happen to agree.
+    private static func resolveStructures(_ actor: inout Actor, in world: World) {
+        for crate in world.lootboxes.values {
+            push(&actor, outOf: crate.hitbox)
+        }
+        for arcade in world.arcades {
+            push(&actor, outOf: arcade.hitbox)
+        }
+    }
 
-            guard actorBox.intersects(crate) else { continue }
+    /// Box against box: find how deeply the two overlap on each axis and push back
+    /// out along the shallower one, which is the side the actor came in from.
+    private static func push(_ actor: inout Actor, outOf solid: Box) {
+        let actorBox = actor.hitbox
+        guard actorBox.intersects(solid) else { return }
 
-            let overlapX = min(actorBox.upper.x, crate.upper.x) - max(actorBox.lower.x, crate.lower.x)
-            let overlapY = min(actorBox.upper.y, crate.upper.y) - max(actorBox.lower.y, crate.lower.y)
+        let overlapX = min(actorBox.upper.x, solid.upper.x) - max(actorBox.lower.x, solid.lower.x)
+        let overlapY = min(actorBox.upper.y, solid.upper.y) - max(actorBox.lower.y, solid.lower.y)
 
-            if overlapX < overlapY {
-                actor.position.x += actor.position.x < crate.centre.x ? -overlapX : overlapX
-            } else {
-                actor.position.y += actor.position.y < crate.centre.y ? -overlapY : overlapY
-            }
+        if overlapX < overlapY {
+            actor.position.x += actor.position.x < solid.centre.x ? -overlapX : overlapX
+        } else {
+            actor.position.y += actor.position.y < solid.centre.y ? -overlapY : overlapY
         }
     }
 

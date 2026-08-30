@@ -54,6 +54,11 @@ struct Actor {
 
     var inventory = Inventory()
 
+    /// Currency. Worth nothing yet - the shop is what will give it meaning - but
+    /// collected, dropped and counted from now so the economy has a history by the
+    /// time there is something to spend it on.
+    var tokens: Int = 0
+
     /// A bot's memory. nil for anything driven from outside - the local player
     /// today, a remote player later.
     var ai: AIState?
@@ -115,6 +120,9 @@ struct Actor {
             return tier > helmet
         case .blaster(let tier):
             return tier > blaster
+        case .token:
+            // Always. Currency never fills up and never becomes the wrong kind.
+            return true
         }
     }
 

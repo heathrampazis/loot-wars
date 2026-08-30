@@ -21,6 +21,7 @@ struct GeneratedMap {
     let claims: [TeamID: BaseClaim]
     let trees: [TreePatch]
     let lootboxes: [Lootbox]
+    let arcades: [Arcade]
     /// The wall plan each team builds to, in the order it lays them.
     let baseLayouts: [TeamID: BaseLayout]
     /// Which team this device plays. Random per seed, so your colour and your
@@ -39,7 +40,11 @@ enum MapFactory {
         sealEdges(of: &map)
         let (claims, localTeam) = makeClaims(in: map, using: &rng)
         let trees = plantTrees(in: map, avoiding: claims, using: &rng)
-        let lootboxes = scatterLootboxes(in: map, avoiding: claims, and: trees, using: &rng)
+        // Machines first: they are big and there are only a handful, so they get
+        // the pick of the open ground. Crates then fit around them.
+        let arcades = placeArcades(in: map, avoiding: claims, and: trees, using: &rng)
+        let lootboxes = scatterLootboxes(in: map, avoiding: claims, and: trees,
+                                         around: arcades, using: &rng)
 
         var baseLayouts: [TeamID: BaseLayout] = [:]
         for index in 0..<TeamID.count {
@@ -52,6 +57,7 @@ enum MapFactory {
                             claims: claims,
                             trees: trees,
                             lootboxes: lootboxes,
+                            arcades: arcades,
                             baseLayouts: baseLayouts,
                             localTeam: localTeam,
                             seed: seed)
@@ -165,6 +171,74 @@ enum MapFactory {
     }
 }
 
+// MARK: - Arcades
+
+extension MapFactory {
+
+    /// A handful of machines on open ground.
+    ///
+    /// The footprint AND the ring around it both have to be clear. A machine needs
+    /// somewhere to put a token or it pays out nothing, so one that spawns already
+    /// hemmed in by trees would be dead scenery for the whole match.
+    fileprivate static func placeArcades(in map: TileMap,
+                                         avoiding claims: [TeamID: BaseClaim],
+                                         and trees: [TreePatch],
+                                         using rng: inout SeededRandom) -> [Arcade] {
+        var placed: [Arcade] = []
+        // Measured: at 40 tries each, one map in fourteen came up a machine short.
+        // At 80 it is one in three hundred. Generation happens once, so the extra
+        // rejections cost nothing anyone can perceive.
+        let attempts = GameConfig.Arcade.count * 80
+
+        for _ in 0..<attempts {
+            guard placed.count < GameConfig.Arcade.count else { break }
+
+            let col = Int.random(in: 2...(map.width - Arcade.width - 2), using: &rng)
+            let row = Int.random(in: 2...(map.height - Arcade.height - 2), using: &rng)
+            let stagger = Double.random(in: 0...GameConfig.Arcade.emitInterval, using: &rng)
+
+            let candidate = Arcade(id: ArcadeID(placed.count),
+                                   origin: GridPoint(col: col, row: row),
+                                   emitTimer: stagger)
+
+            guard isClear(candidate, in: map, of: placed, trees: trees, claims: claims) else {
+                continue
+            }
+            placed.append(candidate)
+        }
+
+        return placed
+    }
+
+    private static func isClear(_ candidate: Arcade,
+                                in map: TileMap,
+                                of placed: [Arcade],
+                                trees: [TreePatch],
+                                claims: [TeamID: BaseClaim]) -> Bool {
+        // Standing room and paying-out room, checked together.
+        for tile in candidate.tiles + candidate.surroundingTiles {
+            guard map.contains(tile), map[tile] == .floor else { return false }
+            if trees.contains(where: { $0.overlaps(tile) }) { return false }
+        }
+
+        for other in placed {
+            let gap = (candidate.centre - other.centre).length
+            if gap < GameConfig.Arcade.spacing { return false }
+        }
+
+        // Well away from every base. Tokens should be worth leaving home for.
+        for claim in claims.values {
+            let home = Box(lower: Vec2(x: Double(claim.origin.col), y: Double(claim.origin.row)),
+                           upper: Vec2(x: Double(claim.origin.col + claim.size),
+                                       y: Double(claim.origin.row + claim.size)))
+            if home.expanded(by: GameConfig.Arcade.claimClearance)
+                .intersects(candidate.hitbox) { return false }
+        }
+
+        return true
+    }
+}
+
 // MARK: - Lootboxes
 
 extension MapFactory {
@@ -172,6 +246,7 @@ extension MapFactory {
     fileprivate static func scatterLootboxes(in map: TileMap,
                                              avoiding claims: [TeamID: BaseClaim],
                                              and trees: [TreePatch],
+                                             around arcades: [Arcade],
                                              using rng: inout SeededRandom) -> [Lootbox] {
         var placed: [Lootbox] = []
         let attempts = GameConfig.Loot.lootboxCount * 30
@@ -189,6 +264,11 @@ extension MapFactory {
 
             // Not buried inside a tree clump, where you could never reach it.
             if trees.contains(where: { $0.overlaps(tile) }) { continue }
+
+            // Not inside a machine, and not pressed against one either - a crate in
+            // the ring is one less place a token can be paid out to.
+            let boxed = Box(tile: tile)
+            if arcades.contains(where: { $0.hitbox.expanded(by: 1).intersects(boxed) }) { continue }
 
             // Spread out, so one corner of the map is not the only place worth going.
             let centre = tile.center

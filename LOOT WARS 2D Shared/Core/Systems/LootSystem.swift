@@ -63,6 +63,10 @@ enum LootSystem {
             guard tier > actor.blaster else { return false }
             actor.blaster = tier
             return true
+
+        case .token(let value):
+            actor.tokens += value
+            return true
         }
     }
 

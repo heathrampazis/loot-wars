@@ -15,6 +15,16 @@ final class GroundItemRenderer {
     /// Width on the ground, in tiles. Height follows the art's proportions.
     private static let widthInTiles: Double = 0.8
 
+    /// Tokens are drawn smaller. They arrive in threes and are worth less than
+    /// anything else on the floor, so at full size a machine looks like it is
+    /// surrounded by treasure.
+    private static let tokenWidthInTiles: Double = 0.5
+
+    private static func width(of pickup: Pickup) -> Double {
+        if case .token = pickup { return tokenWidthInTiles }
+        return widthInTiles
+    }
+
     private var nodesByItem: [GroundItemID: SKSpriteNode] = [:]
 
     func sync(with world: World) {
@@ -49,7 +59,7 @@ final class GroundItemRenderer {
     private func makeNode(for item: GroundItem) {
         let texture = ItemArt.texture(for: item.pickup)
 
-        let width = GridGeometry.length(ofTiles: GroundItemRenderer.widthInTiles)
+        let width = GridGeometry.length(ofTiles: GroundItemRenderer.width(of: item.pickup))
         let art = texture.size()
         let height = art.width > 0 ? width * (art.height / art.width) : width
 

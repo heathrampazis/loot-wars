@@ -237,6 +237,14 @@ enum GameConfig {
         /// a march across the map.
         static let itemSearchRange: Double = 8
 
+        /// How far a bot will go for a token.
+        ///
+        /// Between the two above on purpose. A token is worth crossing some ground
+        /// for - which is what sends bots on circuits between machines - but not
+        /// worth abandoning a fight or a base for, and a bot that chased every one
+        /// would never do anything else.
+        static let tokenSearchRange: Double = 16
+
         /// Give up on a crate it has not reached in this long, in seconds. Without
         /// this, a bot cut off from a crate walks at it until the match ends.
         static let lootPatience: Double = 8
@@ -362,6 +370,48 @@ enum GameConfig {
         /// Seconds before an opened crate comes back, in the same spot. Without
         /// this the map is stripped bare a minute into a match.
         static let respawnDelay: Double = 45
+    }
+
+    enum Arcade {
+        /// Machines on the map. Deliberately few: an arcade you have to travel to
+        /// is a place worth fighting over, one on every corner is furniture.
+        static let count = 5
+
+        /// Footprint in tiles. The art measures 496 x 808 opaque pixels - a ratio
+        /// of 0.61 against the 0.67 of a 2 x 3 block, close enough to sit on the
+        /// grid without stretching.
+        static let footprintWidth = 2
+        static let footprintHeight = 3
+
+        /// Seconds between payouts.
+        static let emitInterval: Double = 6
+
+        static let tokenValue = 1
+
+        /// How many of its own tokens a machine will let pile up before it stops.
+        ///
+        /// This is the anti-camping valve, and it is the only reason standing at a
+        /// machine does not beat moving between them. At three, a machine left
+        /// alone is full in eighteen seconds and then pays nothing.
+        static let maxUncollected = 3
+
+        /// How far out from the footprint a token still counts as this machine's,
+        /// for the cap above. Just past the ring it drops them on.
+        static let collectionRadius: Double = 1.5
+
+        /// How long a token lies there.
+        ///
+        /// Far longer than the ten seconds loot gets. A token is meant to form a
+        /// small visible pile you can spot from across the map and decide to go
+        /// for; on the loot clock the pile would never build up in the first place.
+        static let tokenLifetime: Double = 60
+
+        /// Minimum gap between two machines, in tiles.
+        static let spacing: Double = 16
+
+        /// How far a machine keeps from any claim. Tokens are supposed to be worth
+        /// leaving home for.
+        static let claimClearance: Double = 5
     }
 
     enum Blaster {
