@@ -100,7 +100,7 @@ final class ActorRenderer {
                 nodes.blaster.texture = blasterTexture(for: actor.blaster)
             }
 
-            aim(nodes.blaster, along: actor.aim)
+            hold(nodes.blaster, facingLeft: actor.facesLeft)
 
             setHealth(Double(actor.health) / Double(actor.maxHealth), on: nodes)
         }
@@ -157,9 +157,9 @@ final class ActorRenderer {
             goalLabel = label
         }
 
-        // A sibling of the figure rather than a child of it: the figure mirrors on
-        // xScale when facing left, and a weapon must ROTATE instead - mirroring it
-        // would have the barrel swap ends.
+        // Still a sibling of the figure rather than a child: both mirror the same
+        // way, but the weapon sits at its own offset from the body and would be
+        // dragged around by the figure's own anchor if it were parented to it.
         let side = GridGeometry.length(ofTiles: GameConfig.Blaster.spriteSize)
         let blaster = SKSpriteNode(texture: blasterTexture(for: actor.blaster),
                                    size: CGSize(width: side, height: side))
@@ -181,26 +181,27 @@ final class ActorRenderer {
         return nodes
     }
 
-    /// Puts the weapon in the actor's hand, pointing where it is aiming.
+    /// Puts the weapon in the actor's hand, pointing left or right.
     ///
-    /// The grip swings around the body rather than staying pinned to one side, so
-    /// aiming upwards lifts the gun above the shoulder and aiming down drops it -
-    /// which is what sells a top-down character actually holding something.
-    private func aim(_ blaster: SKSpriteNode, along direction: Vec2) {
-        let hold = GridGeometry.length(ofTiles: GameConfig.Blaster.holdDistance)
+    /// Deliberately NOT rotated to the aim. A weapon swinging freely around the
+    /// body reads as a turret, and it fights the figure itself, which only ever
+    /// faces two ways. Mirroring both together keeps them looking like one
+    /// character.
+    ///
+    /// Which way that is comes from Actor.facesLeft, which already resolves this
+    /// the way you would want: walking sets it, and aiming overrides it, so the
+    /// weapon follows your feet until you pull the trigger and then follows your
+    /// aim.
+    private func hold(_ blaster: SKSpriteNode, facingLeft: Bool) {
+        let reach = GridGeometry.length(ofTiles: GameConfig.Blaster.holdDistance)
 
         blaster.position = CGPoint(
-            x: CGFloat(direction.x) * hold,
+            x: facingLeft ? -reach : reach,
             y: GridGeometry.length(ofTiles: GameConfig.Blaster.holdHeight)
-                + CGFloat(direction.y) * hold
         )
 
-        blaster.zRotation = CGFloat(direction.angle)
-
-        // The art points right. Aiming left would turn it upside down, so flip it
-        // across the barrel instead - the usual trick, and the reason this is not
-        // parented to the mirrored figure.
-        blaster.yScale = direction.x < 0 ? -1 : 1
+        // The art points right, so a mirror is all it takes.
+        blaster.xScale = facingLeft ? -1 : 1
     }
 
     /// A quick white blink. Keyed, so rapid hits restart it rather than stacking up
