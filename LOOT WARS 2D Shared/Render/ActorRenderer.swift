@@ -100,7 +100,7 @@ final class ActorRenderer {
                 nodes.blaster.texture = blasterTexture(for: actor.blaster)
             }
 
-            hold(nodes.blaster, facingLeft: actor.facesLeft)
+            hold(nodes.blaster, aiming: actor.aim, facingLeft: actor.facesLeft)
 
             setHealth(Double(actor.health) / Double(actor.maxHealth), on: nodes)
         }
@@ -181,26 +181,39 @@ final class ActorRenderer {
         return nodes
     }
 
-    /// Puts the weapon in the actor's hand, pointing left or right.
+    /// Puts the weapon in the actor's hand, tilted towards where it is aiming.
     ///
-    /// Deliberately NOT rotated to the aim. A weapon swinging freely around the
-    /// body reads as a turret, and it fights the figure itself, which only ever
-    /// faces two ways. Mirroring both together keeps them looking like one
-    /// character.
+    /// The tilt is measured from whichever horizontal the figure is facing and
+    /// clamped, rather than following the aim all the way round. That clamp is the
+    /// whole trick. A weapon free to swing the full circle has to mirror itself as
+    /// it passes vertical, and that flip fires independently of the figure - one
+    /// frame the character faces right holding a gun that points up-left. Held
+    /// inside 45° of horizontal it never gets near vertical, so the only flip left
+    /// is the character turning round, and the weapon turns with it.
     ///
-    /// Which way that is comes from Actor.facesLeft, which already resolves this
-    /// the way you would want: walking sets it, and aiming overrides it, so the
-    /// weapon follows your feet until you pull the trigger and then follows your
-    /// aim.
-    private func hold(_ blaster: SKSpriteNode, facingLeft: Bool) {
+    /// Which way the figure faces comes from Actor.facesLeft, which already
+    /// resolves it: walking sets it, aiming overrides it. So the weapon follows
+    /// your feet until you pull the trigger and then follows your aim.
+    private func hold(_ blaster: SKSpriteNode, aiming direction: Vec2, facingLeft: Bool) {
         let reach = GridGeometry.length(ofTiles: GameConfig.Blaster.holdDistance)
 
+        // The grip stays put on the body; the weapon pivots around it, the way a
+        // hand does.
         blaster.position = CGPoint(
             x: facingLeft ? -reach : reach,
             y: GridGeometry.length(ofTiles: GameConfig.Blaster.holdHeight)
         )
 
-        // The art points right, so a mirror is all it takes.
+        // Mirroring makes the art point left, and a mirrored node's rotation reads
+        // backwards - so measuring the tilt from the facing horizontal happens to
+        // give the right value for both.
+        let facing: CGFloat = facingLeft ? .pi : 0
+        var tilt = CGFloat(direction.angle) - facing
+        while tilt > .pi { tilt -= 2 * .pi }
+        while tilt < -.pi { tilt += 2 * .pi }
+
+        let limit = CGFloat(GameConfig.Blaster.maxTilt)
+        blaster.zRotation = max(-limit, min(limit, tilt))
         blaster.xScale = facingLeft ? -1 : 1
     }
 

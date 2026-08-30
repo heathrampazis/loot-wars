@@ -325,16 +325,25 @@ enum GameConfig {
         /// How far in front of an actor's centre the weapon is gripped, in tiles.
         /// Shared by the simulation and the renderer, so the shot leaves the barrel
         /// you can see rather than a point near it - see BlasterTier.muzzleOffset.
-        static let holdDistance: Double = 0.12
+        static let holdDistance: Double = 0.28
 
         /// How far up the figure the weapon is held, in tiles. Rendering only.
         ///
-        /// Chest height, and it matters: the figure's eyes sit between 0.99 and
-        /// 1.17 tiles up, and the largest blaster art reaches about 0.37 tiles
-        /// above the grip. Anything above roughly 0.62 puts the barrel across the
-        /// character's face, which is what a held weapon must never do - the eyes
-        /// are the whole expression.
-        static let holdHeight: Double = 0.58
+        /// Just below the eyes, which sit between 0.99 and 1.17 tiles up. The
+        /// largest blaster art reaches about 0.37 tiles above the grip, so this is
+        /// as high as it can be held without the barrel crossing the face - and the
+        /// eyes are the whole expression on these characters.
+        static let holdHeight: Double = 0.62
+
+        /// How far the weapon may tilt off horizontal, in radians (45°).
+        ///
+        /// This is the number that decides whether rotation looks right or looks
+        /// broken. A weapon free to swing the full circle has to mirror itself as
+        /// it passes vertical, and that flip happens independently of the figure -
+        /// which is the snap that reads as janky. Kept inside 45° of horizontal it
+        /// never approaches vertical, so the only flip left is the character
+        /// turning round, and the weapon turns with it.
+        static let maxTilt: Double = 0.785
 
         /// How big the weapon is drawn, in tiles. The art is square with the gun
         /// filling more of it at higher tiers, so a Blaster6 looks like a Blaster6.
