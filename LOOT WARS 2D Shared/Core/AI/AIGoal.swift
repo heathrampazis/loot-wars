@@ -22,6 +22,8 @@ enum AIGoal: Equatable {
     case retreat(from: ActorID)
     case build(GridPoint)
     case raid(GridPoint)
+    /// Walk to an arcade machine and stand in its payouts.
+    case farm(ArcadeID)
 
     var isBuild: Bool {
         if case .build = self { return true }
@@ -47,6 +49,7 @@ enum AIGoal: Equatable {
         case .retreat: return "flee"
         case .build: return "build"
         case .raid:  return "raid"
+        case .farm:  return "coin"
         }
     }
 }

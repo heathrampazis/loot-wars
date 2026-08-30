@@ -236,6 +236,10 @@ final class World {
 
     // MARK: - Arcades
 
+    func arcade(_ id: ArcadeID) -> Arcade? {
+        arcades.first { $0.id == id }
+    }
+
     /// How many of this machine's tokens are still lying around it.
     func uncollectedTokens(around arcade: Arcade) -> Int {
         let reach = arcade.hitbox.expanded(by: GameConfig.Arcade.collectionRadius)

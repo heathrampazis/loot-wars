@@ -237,13 +237,20 @@ enum GameConfig {
         /// a march across the map.
         static let itemSearchRange: Double = 8
 
-        /// How far a bot will go for a token.
-        ///
-        /// Between the two above on purpose. A token is worth crossing some ground
-        /// for - which is what sends bots on circuits between machines - but not
-        /// worth abandoning a fight or a base for, and a bot that chased every one
-        /// would never do anything else.
+        /// How far a bot will go for a token lying on the ground.
         static let tokenSearchRange: Double = 16
+
+        /// How far away a bot will notice an arcade machine worth walking to.
+        ///
+        /// This is what actually sends bots to arcades. Reacting to loose tokens
+        /// was never going to: they live ten seconds, so at the moment a bot picks
+        /// a goal there is usually nothing lying there to react to. A bot has to
+        /// walk to the MACHINE and let the payouts happen while it is standing
+        /// there. Kept under the crate range, so a crate still wins from far off.
+        static let arcadeSearchRange: Double = 22
+
+        /// Close enough to a machine to count as having swept it.
+        static let arcadeReach: Double = 1.2
 
         /// Give up on a crate it has not reached in this long, in seconds. Without
         /// this, a bot cut off from a crate walks at it until the match ends.
@@ -401,10 +408,12 @@ enum GameConfig {
 
         /// How long a token lies there.
         ///
-        /// Far longer than the ten seconds loot gets. A token is meant to form a
-        /// small visible pile you can spot from across the map and decide to go
-        /// for; on the loot clock the pile would never build up in the first place.
-        static let tokenLifetime: Double = 60
+        /// The same clock loot runs on, kept as its own number so the two can be
+        /// tuned apart later. Note what this does to maxUncollected above: at one
+        /// token every six seconds and ten seconds of life, a machine averages
+        /// under two on the ground and never reaches the cap of three. The despawn
+        /// IS the cap now - the pile is a thing you catch, not a thing you find.
+        static let tokenLifetime: Double = 10
 
         /// Minimum gap between two machines, in tiles.
         static let spacing: Double = 16

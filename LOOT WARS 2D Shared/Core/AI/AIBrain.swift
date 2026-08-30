@@ -120,6 +120,21 @@ enum AIBrain {
             if state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
             }
+        case .farm(let id):
+            // Arrived, or given up trying to. Either way take the cooldown, so a
+            // bot sweeps a machine and moves on rather than orbiting an empty one -
+            // which is the camping the payout cap exists to prevent, and it would
+            // be a poor look to have the bots do it.
+            //
+            // The tokens themselves are picked up by .collect on the way in, so by
+            // the time it is standing here there is nothing left to wait for.
+            let arrived = world.arcade(id).map {
+                $0.hitbox.expanded(by: GameConfig.AI.arcadeReach).contains(actor.position)
+            } ?? true
+
+            if arrived || state.goalAge > GameConfig.AI.lootPatience {
+                state.lootCooldown = GameConfig.AI.lootCooldown
+            }
         case .build:
             if state.goalAge > GameConfig.Build.patience {
                 // Clearing the allowance is what releases the commitment above -
@@ -199,9 +214,10 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect, .build, .raid:
-            // Both are interruptible. A bot laying bricks - or lining up a throw -
-            // while somebody shoots at it is not a bot anyone believes in.
+        case .wander, .loot, .collect, .build, .raid, .farm:
+            // All interruptible. A bot laying bricks - or lining up a throw, or
+            // waiting on a payout - while somebody shoots at it is not a bot
+            // anyone believes in.
             break
         }
 
@@ -275,8 +291,28 @@ enum AIBrain {
                 return .collect(item.id)
             }
 
-            if let crate = nearestCrate(to: actor, in: world) {
+            // Crate or machine, whichever is actually nearer.
+            //
+            // Compared by distance rather than ranked, and that is not fussiness.
+            // Rank machines above crates and a bot stops opening crates; rank them
+            // below and it never visits a machine at all, because with forty-two
+            // crates on the map there is always one in range - the fall-through
+            // would be unreachable code that reads like a feature. That exact
+            // mistake is what stopped bots building their bases a few weeks ago.
+            let crate = nearestCrate(to: actor, in: world)
+            let machine = nearestArcade(to: actor, in: world)
+
+            switch (crate, machine) {
+            case let (crate?, machine?):
+                let toCrate = (crate.position - actor.position).length
+                let toMachine = (machine.centre - actor.position).length
+                return toMachine < toCrate ? .farm(machine.id) : .loot(crate.id)
+            case let (crate?, nil):
                 return .loot(crate.id)
+            case let (nil, machine?):
+                return .farm(machine.id)
+            case (nil, nil):
+                break
             }
         }
 
@@ -324,6 +360,37 @@ enum AIBrain {
         return closest
     }
 
+    private static func nearestArcade(to actor: Actor, in world: World) -> Arcade? {
+        var closest: Arcade?
+        var shortest = GameConfig.AI.arcadeSearchRange
+
+        for machine in world.arcades {
+            let distance = (machine.centre - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            closest = machine
+        }
+
+        return closest
+    }
+
+    /// Where to stand to work a machine: the nearest tile of the ring it pays out
+    /// onto. Walking at the machine itself only presses a bot into three tiles of
+    /// solid cabinet.
+    private static func approachSpot(for arcade: Arcade, from actor: Actor, in world: World) -> Vec2 {
+        var best = arcade.centre
+        var shortest = Double.greatestFiniteMagnitude
+
+        for tile in arcade.surroundingTiles where world.isClearForDrop(tile.center) {
+            let distance = (tile.center - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = tile.center
+        }
+
+        return best
+    }
+
     private static func isHealing(_ pickup: Pickup) -> Bool {
         guard case .item(let type) = pickup else { return false }
         return type.isDrink
@@ -355,6 +422,10 @@ enum AIBrain {
 
         case .collect(let id):
             steer(&state, actor: actor, to: world.groundItems[id]?.position)
+
+        case .farm(let id):
+            steer(&state, actor: actor,
+                  to: world.arcade(id).map { approachSpot(for: $0, from: actor, in: world) })
 
         case .build(let tile):
             steer(&state, actor: actor,
@@ -698,7 +769,7 @@ enum AIBrain {
         switch state.goal {
         case .fight(let id):   targetID = id
         case .retreat(let id): targetID = id
-        case .wander, .loot, .collect, .build, .raid: targetID = nil
+        case .wander, .loot, .collect, .build, .raid, .farm: targetID = nil
         }
 
         guard let id = targetID,
