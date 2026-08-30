@@ -34,9 +34,30 @@ enum RenderPalette {
         teams[team.raw % teams.count]
     }
 
-    /// The flash where a bomb goes off - the same pink as the crates it came out of.
-    static let blast = SKColor(red: 0xFF / 255.0, green: 0x8A / 255.0,
-                               blue: 0x5C / 255.0, alpha: 0.85)
+    /// The flare at the centre of a blast.
+    static let blast = SKColor(red: 0xFF / 255.0, green: 0xE9 / 255.0,
+                               blue: 0x9C / 255.0, alpha: 0.95)
+
+    /// Confetti. The team colours brightened, plus the HUD's own colours.
+    ///
+    /// Not `teams` verbatim: those are picked to sit calmly on grass all match, and
+    /// the darker ones (slate, purple) vanish against it at confetti size. An
+    /// explosion lasts half a second and has to read instantly, so these are the
+    /// same hues pushed up in value.
+    static let confetti: [SKColor] = [
+        rgb(0x3E, 0xE0, 0xA8),   // teal
+        rgb(0xFF, 0x5B, 0x6E),   // red
+        rgb(0x5A, 0xB4, 0xFF),   // blue
+        rgb(0xA9, 0x7B, 0xFF),   // purple
+        rgb(0xFF, 0xA6, 0x3D),   // orange
+        rgb(0xFF, 0x8A, 0xD0),   // pink
+        rgb(0xFF, 0xE0, 0x4A),   // yellow
+        rgb(0x6E, 0xF0, 0x6E),   // green
+        rgb(0xFF, 0x51, 0x7B),   // health pink
+        rgb(0xB3, 0xF0, 0xFA),   // bullet blue
+        rgb(0xFF, 0xC4, 0x63),   // helmet yellow
+        rgb(0xFF, 0xFF, 0xFF)
+    ]
 
     // Projectiles - the pale blue from the mockup, deliberately not team coloured
     // so shots stay readable against eight different team colours.
