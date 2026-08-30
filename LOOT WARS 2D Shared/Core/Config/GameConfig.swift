@@ -210,6 +210,11 @@ enum GameConfig {
         /// not all reach for a drink at the same instant.
         static let cautionRange: ClosedRange<Double> = 0.85...1.15
 
+        /// How close to lined up a bot needs to be before lobbing a bomb, in
+        /// radians. Generous - a bomb goes off on whatever it hits, so it does not
+        /// need the precision a shot does.
+        static let throwTolerance: Double = 0.45
+
         /// How close a bot has to be to somebody's claim before raiding it even
         /// occurs to it, in tiles. Raiding is opportunistic - a bot blows open what
         /// it walks past, it does not cross the map to do it.
@@ -280,8 +285,14 @@ enum GameConfig {
     }
 
     enum Bomb {
-        /// How far a bomb can be lobbed, in tiles.
+        /// How far a bomb can be lobbed, in tiles. It goes off where it lands even
+        /// over open ground, so a throw into nothing is a wasted bomb rather than
+        /// one that quietly disappears.
         static let throwRange: Double = 6
+
+        /// How far in front of the thrower it appears, so nobody drops one on their
+        /// own feet.
+        static let launchOffset: Double = 0.5
 
         /// Tiles per second. Slower than a bullet on purpose - a bomb should look
         /// thrown, and the flight is the warning a defender gets.

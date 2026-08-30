@@ -136,8 +136,9 @@ final class HotbarNode: SKNode {
     func update(with world: World) {
         guard let player = world.localPlayer else { return }
 
-        // Greyed out at full health, because that is when drinking is refused. The
-        // rule itself lives in ConsumableSystem - this only shows it.
+        // Whether each slot can be used is the actor's own answer, so a greyed
+        // slot always means the simulation would refuse it. A drink greys out at
+        // full health; a bomb never does.
         let usable = player.isAlive && player.health < player.maxHealth
 
         guard player.inventory != lastInventory || usable != lastUsable else { return }
@@ -161,7 +162,7 @@ final class HotbarNode: SKNode {
             icon.texture = texture
             icon.size = CGSize(width: width, height: height)
             icon.isHidden = false
-            icon.alpha = usable ? 1.0 : 0.35
+            icon.alpha = player.canUse(slot: index) ? 1.0 : 0.35
 
             // A badge on a single item is noise - it only earns its place once
             // there is more than one.

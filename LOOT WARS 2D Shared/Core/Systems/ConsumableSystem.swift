@@ -21,15 +21,12 @@ enum ConsumableSystem {
         }
     }
 
-    /// Whether an actor could drink what is in that slot right now.
+    /// Whether an actor could DRINK what is in that slot right now. A bomb in the
+    /// same slot is somebody else's business - see BombSystem.
     static func canUse(slot: Int, actor: Actor) -> Bool {
-        guard actor.isAlive else { return false }
-        guard actor.inventory.slots.indices.contains(slot),
-              let stack = actor.inventory.slots[slot],
-              stack.type.isDrink else { return false }
-
-        // Drinking on full health would throw the item away for nothing.
-        return actor.health < actor.maxHealth
+        guard actor.canUse(slot: slot),
+              actor.inventory.slots[slot]?.type.isDrink == true else { return false }
+        return true
     }
 
     private static func use(slot: Int, by id: ActorID, in world: World) {

@@ -23,9 +23,7 @@ enum Command {
     /// for a specific box would mean the input code deciding which one is closest,
     /// and that is the simulation's call.
     case openLootbox
-    /// Drink whatever is in this hotbar slot.
+    /// Use whatever is in this hotbar slot - drink it, or throw it. Which of those
+    /// happens depends on the item, so input never has to know the difference.
     case useItem(slot: Int)
-    /// Lob a bomb at this tile. Whether one is thrown, and whether it reaches, is
-    /// the simulation's call.
-    case throwBomb(GridPoint)
 }

@@ -22,37 +22,42 @@ enum BombSystem {
     private static func launch(_ world: World, commands: [ActorID: [Command]]) {
         for (id, list) in commands {
             for command in list {
-                guard case .throwBomb(let tile) = command else { continue }
-                throwBomb(by: id, at: tile, in: world)
+                guard case .useItem(let slot) = command else { continue }
+                throwBomb(by: id, from: slot, in: world)
                 break   // one per tick, however many times it was asked
             }
         }
     }
 
-    /// Whether this actor could lob one at that tile right now.
+    /// Whether this actor could throw the bomb in that slot right now.
     ///
-    /// Asked by the input code before it offers the action and by the throw itself,
-    /// so a bot cannot line up a raid the simulation would refuse.
-    static func canThrow(_ actor: Actor, at tile: GridPoint) -> Bool {
-        guard actor.isAlive, actor.inventory.count(of: .bomb) > 0 else { return false }
-        return (tile.center - actor.position).length <= GameConfig.Bomb.throwRange
+    /// Asked by the bots before they commit to a raid and by the throw itself, so a
+    /// bot can never line one up that the simulation would refuse.
+    static func canThrow(_ actor: Actor, from slot: Int) -> Bool {
+        actor.canUse(slot: slot) && actor.inventory.slots[slot]?.type == .bomb
     }
 
-    private static func throwBomb(by id: ActorID, at tile: GridPoint, in world: World) {
-        guard var actor = world.actors[id], canThrow(actor, at: tile) else { return }
-        guard let slot = actor.inventory.firstSlot(holding: .bomb) else { return }
+    /// The first slot with a bomb in it, or nil.
+    static func loadedSlot(of actor: Actor) -> Int? {
+        actor.inventory.firstSlot(holding: .bomb)
+    }
+
+    private static func throwBomb(by id: ActorID, from slot: Int, in world: World) {
+        guard var actor = world.actors[id], canThrow(actor, from: slot) else { return }
+
+        // Thrown along the aim, which is wherever the actor was last walking or
+        // shooting. Same rule for everybody: no separate targeting for bombs, and
+        // no way to lob one somewhere you were not already pointed.
+        let heading = actor.aim.normalized()
+        guard heading.length > 0 else { return }
+
         _ = actor.inventory.consume(at: slot)
         world.actors[id] = actor
 
-        let target = tile.center
-        let heading = target - actor.position
-        guard heading.length > 0.01 else { return }
-
         world.spawnBomb(owner: id,
                         team: actor.team,
-                        position: actor.position,
-                        velocity: heading.normalized() * GameConfig.Bomb.speed,
-                        target: target)
+                        position: actor.position + heading * GameConfig.Bomb.launchOffset,
+                        velocity: heading * GameConfig.Bomb.speed)
     }
 
     // MARK: - Flight
@@ -63,21 +68,13 @@ enum BombSystem {
         var stillFlying: [Bomb] = []
 
         for var bomb in world.bombs {
-            let before = bomb.position
             let step = bomb.velocity * dt
             bomb.position = bomb.position + step
             bomb.distanceRemaining -= step.length
 
-            // Reached what it was aimed at - detonate even over open ground, so a
-            // throw that misses still goes off rather than sailing away.
-            let passedTarget = (bomb.target - before).length <= step.length
-
-            if passedTarget || bomb.distanceRemaining <= 0 {
-                detonate(bomb, in: world)
-                continue
-            }
-
-            if hitsSomething(bomb.position, in: world) {
+            // Out of throw, or it hit something. Either way it goes off where it
+            // is - a bomb that ran out of arc still explodes rather than vanishing.
+            if bomb.distanceRemaining <= 0 || hitsSomething(bomb.position, in: world) {
                 detonate(bomb, in: world)
                 continue
             }

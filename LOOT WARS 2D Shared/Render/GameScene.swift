@@ -338,20 +338,10 @@ extension GameScene {
         }
     }
 
-    /// Tapping the map does one of two things, decided by what was tapped.
-    ///
-    /// A tile on your own claim is somewhere to build; anybody else's wall is
-    /// something to blow open. They can never be the same tile, so no mode switch
-    /// is needed - and whether either actually happens is the simulation's call,
-    /// not the scene's.
+    /// Asks for a block. Whether one appears is BuildSystem's call, not the scene's.
+    /// Bombs are thrown from the hotbar, like everything else you carry.
     private func tapMap(at pointInWorld: CGPoint) {
-        let tile = GridGeometry.gridPoint(for: pointInWorld)
-
-        if let owner = world.map[tile].blockOwner, owner != world.localPlayer?.team {
-            queuedCommands.append(.throwBomb(tile))
-        } else {
-            queuedCommands.append(.placeBlock(tile))
-        }
+        queuedCommands.append(.placeBlock(GridGeometry.gridPoint(for: pointInWorld)))
     }
 }
 

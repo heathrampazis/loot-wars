@@ -81,6 +81,25 @@ struct Actor {
         Vec2(x: position.x, y: position.y - GameConfig.Player.halfDepth)
     }
 
+    /// Whether the item in this hotbar slot can be used right now.
+    ///
+    /// The one answer, asked by the systems that act on it and by the hotbar that
+    /// greys it out - so what the player sees and what the simulation allows can
+    /// never disagree.
+    func canUse(slot index: Int) -> Bool {
+        guard isAlive,
+              inventory.slots.indices.contains(index),
+              let stack = inventory.slots[index] else { return false }
+
+        switch stack.type {
+        case .bomb:
+            return true
+        case .juice, .soda, .slushy:
+            // Drinking on full health would throw the item away for nothing.
+            return health < maxHealth
+        }
+    }
+
     /// Whether this actor has any use for something lying on the ground.
     ///
     /// One answer, asked by both the pickup code and the bots deciding whether a

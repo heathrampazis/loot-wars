@@ -256,13 +256,12 @@ final class World {
         projectiles.append(projectile)
     }
 
-    func spawnBomb(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2, target: Vec2) {
+    func spawnBomb(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2) {
         let bomb = Bomb(id: BombID(nextBombID),
                         owner: owner,
                         team: team,
                         position: position,
                         velocity: velocity,
-                        target: target,
                         distanceRemaining: GameConfig.Bomb.throwRange)
         nextBombID += 1
         bombs.append(bomb)
@@ -333,7 +332,7 @@ final class World {
                     if abs(input.x) > 0.01 {
                         actor.facesLeft = input.x < 0
                     }
-                case .placeBlock, .shoot, .openLootbox, .useItem, .throwBomb:
+                case .placeBlock, .shoot, .openLootbox, .useItem:
                     break   // other systems' business, not movement's
                 }
             }

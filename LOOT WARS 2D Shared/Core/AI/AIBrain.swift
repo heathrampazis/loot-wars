@@ -75,8 +75,8 @@ enum AIBrain {
             actor.ai = state
         }
 
-        if let tile = bombToThrow(state: state, actor: actor, in: world) {
-            commands.append(.throwBomb(tile))
+        if let slot = bombToThrow(state: state, actor: actor, in: world) {
+            commands.append(.useItem(slot: slot))
         }
 
         if let slot = drinkToTake(&state, actor: actor) {
@@ -507,14 +507,25 @@ enum AIBrain {
         return closest
     }
 
-    private static func bombToThrow(state: AIState, actor: Actor, in world: World) -> GridPoint? {
+    /// Which hotbar slot to lob, or nil for "not yet".
+    ///
+    /// A bomb flies along the aim, which for a raiding bot is wherever it is
+    /// walking - so it has to be close enough AND actually pointed at the wall
+    /// before throwing. Without the second test it would fling bombs sideways while
+    /// rounding the corner of somebody's base.
+    private static func bombToThrow(state: AIState, actor: Actor, in world: World) -> Int? {
         guard case .raid(let tile) = state.goal else { return nil }
         guard world.map[tile].blockOwner != nil else { return nil }
 
-        // Asks the simulation the same question it will ask itself, so a bot never
-        // lobs one from out of range and wonders where it went.
-        guard BombSystem.canThrow(actor, at: tile) else { return nil }
-        return tile
+        guard let slot = BombSystem.loadedSlot(of: actor),
+              BombSystem.canThrow(actor, from: slot) else { return nil }
+
+        let towards = tile.center - actor.position
+        guard towards.length <= GameConfig.Bomb.throwRange else { return nil }
+        guard abs(shortestAngle(from: actor.aim.angle, to: towards.angle))
+                <= GameConfig.AI.throwTolerance else { return nil }
+
+        return slot
     }
 
     // MARK: - Drinking

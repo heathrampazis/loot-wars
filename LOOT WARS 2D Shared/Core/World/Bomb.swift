@@ -27,10 +27,6 @@ struct Bomb {
     var position: Vec2
     let velocity: Vec2
 
-    /// Where it was aimed. It detonates on arrival even over open ground, so a
-    /// throw that misses still goes off rather than sailing away.
-    let target: Vec2
-
-    /// Tiles left before it falls short.
+    /// Tiles left before it runs out of throw and goes off where it lands.
     var distanceRemaining: Double
 }
