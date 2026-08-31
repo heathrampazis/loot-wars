@@ -6,7 +6,7 @@
 //
 //  Both halves are deliberately here rather than split between input and rendering:
 //  the rule about how close you have to stand exists once, and an AI walking over a
-//  soda picks it up through exactly the same code a player does.
+//  bandage picks it up through exactly the same code a player does.
 //
 
 enum LootSystem {

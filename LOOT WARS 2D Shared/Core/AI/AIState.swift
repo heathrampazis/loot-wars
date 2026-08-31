@@ -52,12 +52,12 @@ struct AIState {
     /// then, so it does not orbit forever in one direction.
     var strafeDirection: Double = 1
 
-    /// This bot's personal nerve. Scales its drinking thresholds, so no two bots
+    /// This bot's personal nerve. Scales its patch-up thresholds, so no two bots
     /// panic at exactly the same moment.
     var caution: Double = 1
 
-    /// Spaces out sips, so a hurt bot does not drink everything at once.
-    var drinkTimer: Double = 0
+    /// Spaces out treatments, so a hurt bot does not burn its whole bag at once.
+    var healTimer: Double = 0
 
     /// Counts down to the next urge to go home and add to the base.
     var buildUrgeTimer: Double = 0

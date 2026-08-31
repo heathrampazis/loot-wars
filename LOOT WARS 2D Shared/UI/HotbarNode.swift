@@ -137,7 +137,7 @@ final class HotbarNode: SKNode {
         guard let player = world.localPlayer else { return }
 
         // Whether each slot can be used is the actor's own answer, so a greyed
-        // slot always means the simulation would refuse it. A drink greys out at
+        // slot always means the simulation would refuse it. A bandage greys out at
         // full health; a bomb never does.
         let usable = player.isAlive && player.health < player.maxHealth
 
@@ -155,12 +155,10 @@ final class HotbarNode: SKNode {
             }
 
             let texture = ItemArt.texture(for: stack.type)
-            let art = texture.size()
-            let height = HotbarNode.slotSize - HotbarNode.iconInset
-            let width = art.height > 0 ? height * (art.width / art.height) : height
+            let box = HotbarNode.slotSize - HotbarNode.iconInset
 
             icon.texture = texture
-            icon.size = CGSize(width: width, height: height)
+            icon.size = ItemArt.size(of: texture, fittingInto: box)
             icon.isHidden = false
             icon.alpha = player.canUse(slot: index) ? 1.0 : 0.35
 

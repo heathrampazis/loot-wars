@@ -12,7 +12,7 @@ final class GroundItemRenderer {
 
     let node = SKNode()
 
-    /// Width on the ground, in tiles. Height follows the art's proportions.
+    /// The square an item is drawn to fit inside on the ground, in tiles.
     private static let widthInTiles: Double = 0.8
 
     /// Tokens are drawn smaller. They arrive in threes and are worth less than
@@ -59,12 +59,10 @@ final class GroundItemRenderer {
     private func makeNode(for item: GroundItem) {
         let texture = ItemArt.texture(for: item.pickup)
 
-        let width = GridGeometry.length(ofTiles: GroundItemRenderer.width(of: item.pickup))
-        let art = texture.size()
-        let height = art.width > 0 ? width * (art.height / art.width) : width
+        let box = GridGeometry.length(ofTiles: GroundItemRenderer.width(of: item.pickup))
 
         let sprite = SKSpriteNode(texture: texture,
-                                  size: CGSize(width: width, height: height))
+                                  size: ItemArt.size(of: texture, fittingInto: box))
         sprite.position = GridGeometry.point(for: item.position)
         sprite.zPosition = 4
 

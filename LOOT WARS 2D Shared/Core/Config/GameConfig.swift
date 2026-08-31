@@ -172,12 +172,13 @@ enum GameConfig {
         /// to work rather than cowering in its base for the rest of the match.
         static let retreatHealthFraction: Double = 0.35
 
-        // Drinking. These read as one set of habits: finish the fight, catch your
-        // breath, top up, and never tip a big drink down a small wound - unless you
+        // Patching up. These read as one set of habits: finish the fight, catch
+        // your breath, top up, and never spend a medkit on a scratch - unless you
         // are about to die, when none of that matters.
 
-        /// Below this, a bot drinks immediately, mid-fight, under fire, whatever is
-        /// to hand. Dying with a full inventory is the worst outcome there is.
+        /// Below this, a bot patches up immediately, mid-fight, under fire,
+        /// whatever is to hand. Dying with a full inventory is the worst outcome
+        /// there is.
         static let criticalHealthFraction: Double = 0.35
 
         /// When calm, a bot tops up once it has lost this much. Above it, the heal
@@ -191,23 +192,24 @@ enum GameConfig {
         /// Having been shot this recently counts as still being in the fight.
         static let combatRecency: Double = 3.0
 
-        /// And even once the shooting stops, a beat before drinking. Swigging on
-        /// the same frame the last bullet lands is a tell that nobody is home.
+        /// And even once the shooting stops, a beat before patching up. Winding a
+        /// bandage on the same frame the last bullet lands is a tell that nobody is
+        /// home.
         static let settleDelay: Double = 1.5
 
-        /// A bot will pour at most this many times the wound it is fixing. A
-        /// slushy into a scratch technically works and is a terrible idea.
-        static let maximumOverdrink: Double = 2.0
+        /// A bot will spend at most this many times the wound it is fixing. A
+        /// medkit on a scratch technically works and is a terrible idea.
+        static let maximumOverheal: Double = 2.0
 
         /// Unless it is at least this hurt, in which case topping up beats hoarding.
-        static let overdrinkBelowFraction: Double = 0.5
+        static let overhealBelowFraction: Double = 0.5
 
-        /// Seconds between sips, so a hurt bot does not empty its whole inventory
-        /// in a single tick.
-        static let drinkInterval: Double = 1.2
+        /// Seconds between treatments, so a hurt bot does not empty its whole
+        /// inventory in a single tick.
+        static let healInterval: Double = 1.2
 
         /// Each bot's thresholds are nudged by its own factor, so seven of them do
-        /// not all reach for a drink at the same instant.
+        /// not all reach for a bandage at the same instant.
         static let cautionRange: ClosedRange<Double> = 0.85...1.15
 
         /// How close to lined up a bot needs to be before lobbing a bomb, in
@@ -223,7 +225,7 @@ enum GameConfig {
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26
 
-        /// Carrying less healing than this - under two juices - a bot drops what it
+        /// Carrying less healing than this - under two bandaids - a bot drops what it
         /// is doing and goes shopping.
         ///
         /// Deliberately a near-empty bag rather than a comfortable one. Set at a
@@ -271,8 +273,8 @@ enum GameConfig {
         /// Long gaps, and more walls per trip. Short frequent trips finish a base
         /// just as fast but leave a bot commuting for most of the first two
         /// minutes - it barely loots, so it turns up to fights with nothing to
-        /// drink. Same build time either way; this version spends the difference
-        /// out on the map.
+        /// patch itself up with. Same build time either way; this version spends
+        /// the difference out on the map.
         static let urgeInterval: ClosedRange<Double> = 10...16
 
         /// Walls laid per trip.

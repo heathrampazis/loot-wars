@@ -4,7 +4,7 @@
 //
 //  Something lying on the ground waiting to be walked over.
 //
-//  Two kinds, and they behave completely differently: a drink goes into a hotbar
+//  Two kinds, and they behave completely differently: a bandage goes into a hotbar
 //  slot to be used later, while a helmet is worn the moment you touch it. Keeping
 //  them as one type here - rather than forcing helmets through the inventory -
 //  means the four hotbar slots stay for things you choose to use.
@@ -15,7 +15,7 @@ enum Pickup: Hashable {
     case helmet(HelmetTier)
     case blaster(BlasterTier)
     /// Currency. Goes straight to a running total rather than a hotbar slot, so
-    /// picking one up can never cost you a drink you were carrying.
+    /// picking one up can never cost you a bandage you were carrying.
     case token(Int)
 
     /// How long this lies on the ground before it vanishes.

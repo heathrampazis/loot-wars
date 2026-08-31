@@ -254,7 +254,7 @@ extension GameScene {
         for touch in touches {
             // Order matters. The two sticks get first refusal, then the hotbar and
             // the contextual button, and only what is left over counts as a tap on
-            // the map - otherwise drinking or opening would also try to lay a block.
+            // the map - otherwise healing or opening would also try to lay a block.
             if moveTouch == nil,
                moveStick.begin(atLocalPoint: touch.location(in: moveStick)) {
                 moveTouch = touch

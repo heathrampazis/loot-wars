@@ -28,15 +28,33 @@ enum ItemArt {
         texture(for: .item(type))
     }
 
+    /// The size to draw a texture at so it fits inside a square of `box`, whatever
+    /// shape it is.
+    ///
+    /// Fitting rather than matching one axis. While every item happened to be
+    /// roughly square this made no difference, and both the hotbar and the ground
+    /// simply scaled by whichever axis was convenient. A tall bandaid and a wide
+    /// medkit broke that immediately: matched on height, the medkit is half again
+    /// wider than its hotbar slot.
+    static func size(of texture: SKTexture, fittingInto box: CGFloat) -> CGSize {
+        let art = texture.size()
+        guard art.width > 0, art.height > 0 else {
+            return CGSize(width: box, height: box)
+        }
+
+        let scale = min(box / art.width, box / art.height)
+        return CGSize(width: art.width * scale, height: art.height * scale)
+    }
+
     private static func assetName(for pickup: Pickup) -> String {
         switch pickup {
-        case .item(.juice):  return "Juice"
-        case .item(.soda):   return "Soda"
-        case .item(.slushy): return "Slushy"
-        case .item(.bomb):   return "Bomb"
+        case .item(.bandaid):    return "Bandaid"
+        case .item(.bandage):    return "Bandage"
+        case .item(.medkit):     return "Medkit"
+        case .item(.bomb):       return "Bomb"
         case .helmet(let tier):  return tier.name
         case .blaster(let tier): return tier.assetName
-        case .token: return "Token"
+        case .token:             return "Token"
         }
     }
 }

@@ -5,17 +5,18 @@
 //  What comes out of a crate.
 //
 //  Weighted so most of what you find keeps you alive and a little of it makes you
-//  stronger. Roughly three crates in five are a drink; of the rest, the ladder
+//  stronger. Roughly three crates in five are something to patch up with; of the
+//  rest, the ladder
 //  drops away steeply - a Common is ordinary, a Cosmic is the find of the match.
 //
 
 enum LootTable {
 
     private static let table: [(pickup: Pickup, weight: Int)] = [
-        (.item(.juice),  55),
-        (.item(.soda),   35),
-        (.item(.slushy), 14),
-        (.item(.bomb),   22),
+        (.item(.bandaid), 55),
+        (.item(.bandage), 35),
+        (.item(.medkit),  14),
+        (.item(.bomb),    22),
 
         (.helmet(.common),    28),
         (.helmet(.uncommon),  19),
@@ -43,6 +44,6 @@ enum LootTable {
             pick -= entry.weight
         }
 
-        return .item(.juice)
+        return .item(.bandaid)
     }
 }

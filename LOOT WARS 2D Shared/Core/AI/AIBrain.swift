@@ -28,7 +28,7 @@ enum AIBrain {
         state.goalAge += dt
         state.lootCooldown = max(0, state.lootCooldown - dt)
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
-        state.drinkTimer = max(0, state.drinkTimer - dt)
+        state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
         state.reactionTimer = max(0, state.reactionTimer - dt)
         state.decisionTimer -= dt
@@ -79,7 +79,7 @@ enum AIBrain {
             commands.append(.useItem(slot: slot))
         }
 
-        if let slot = drinkToTake(&state, actor: actor) {
+        if let slot = healToUse(&state, actor: actor) {
             commands.append(.useItem(slot: slot))
             actor.ai = state
         }
@@ -267,7 +267,7 @@ enum AIBrain {
             return .raid(wall)
         }
 
-        // Almost out of drinks: go shopping, base or no base. Healing only - a
+        // Almost out of supplies: go shopping, base or no base. Healing only - a
         // token is no use to a bot that is about to die.
         if actor.inventory.totalHealing(of: actor.maxHealth) < GameConfig.AI.emergencyHealingStock,
            state.lootCooldown <= 0 {
@@ -322,9 +322,9 @@ enum AIBrain {
     /// The nearest thing on the ground this bot would actually pick up.
     ///
     /// - Parameter include: narrows it to a kind of pickup. This is not decoration:
-    ///   a bot down to its last drink asks for healing specifically, and without the
-    ///   filter the nearest wanted item might be a token - sending it to collect
-    ///   currency in the exact moment it was about to die for want of a soda.
+    ///   a bot down to its last bandage asks for healing specifically, and without
+    ///   the filter the nearest wanted item might be a token - sending it to collect
+    ///   currency in the exact moment it was about to die for want of a medkit.
     private static func nearestItem(to actor: Actor,
                                     in world: World,
                                     include: (Pickup) -> Bool = { _ in true }) -> GroundItem? {
@@ -338,7 +338,7 @@ enum AIBrain {
             // never set off for something it would then decline to take.
             guard actor.wants(item.pickup) else { continue }
 
-            // A drink is worth a few steps. A better helmet is worth a walk - it is
+            // A bandage is worth a few steps. A better helmet is worth a walk - it is
             // the difference between winning the next fight and losing it, so it
             // gets the same reach a crate does.
             let worthTravelling: Double
@@ -393,7 +393,7 @@ enum AIBrain {
 
     private static func isHealing(_ pickup: Pickup) -> Bool {
         guard case .item(let type) = pickup else { return false }
-        return type.isDrink
+        return type.isHealing
     }
 
     private static func nearestCrate(to actor: Actor, in world: World) -> Lootbox? {
@@ -619,25 +619,25 @@ enum AIBrain {
         return slot
     }
 
-    // MARK: - Drinking
+    // MARK: - Patching up
 
-    /// Which drink to reach for, if any.
+    /// Which supply to reach for, if any.
     ///
-    /// The whole point of this function is WHEN, not what. A bot that drinks the
-    /// instant its health dips is a bot that swigs mid-burst, in the open, while
-    /// somebody empties a magazine into it - and reads as a machine reacting to a
-    /// number. So the habits are:
+    /// The whole point of this function is WHEN, not what. A bot that patches up
+    /// the instant its health dips is a bot that stops to wind a bandage mid-burst,
+    /// in the open, while somebody empties a magazine into it - and reads as a
+    /// machine reacting to a number. So the habits are:
     ///
-    ///   - about to die: drink now, under fire, whatever is to hand
+    ///   - about to die: patch up now, under fire, whatever is to hand
     ///   - otherwise, finish the fight first
     ///   - then wait a beat after the shooting stops
     ///   - top up only if enough is missing to be worth it
-    ///   - and never tip a big drink down a small wound
+    ///   - and never spend a medkit on a scratch
     ///
     /// Each bot's thresholds are scaled by its own nerve, so seven of them do not
-    /// all reach for a drink on the same frame.
-    private static func drinkToTake(_ state: inout AIState, actor: Actor) -> Int? {
-        guard state.drinkTimer <= 0 else { return nil }
+    /// all reach for a bandage on the same frame.
+    private static func healToUse(_ state: inout AIState, actor: Actor) -> Int? {
+        guard state.healTimer <= 0 else { return nil }
         guard actor.health < actor.maxHealth else { return nil }
 
         let maxHealth = Double(actor.maxHealth)
@@ -647,8 +647,8 @@ enum AIBrain {
         let desperate = healthLeft < GameConfig.AI.criticalHealthFraction * state.caution
 
         if !desperate {
-            // Still in it: keep shooting. A drink taken mid-fight is usually a
-            // drink taken instead of the shot that would have won it.
+            // Still in it: keep shooting. A moment spent bandaging mid-fight is
+            // usually a moment spent instead of the shot that would have won it.
             let stillFighting = state.goal.isFight
                 || actor.secondsSinceHit < GameConfig.AI.combatRecency
             if stillFighting { return nil }
@@ -685,19 +685,19 @@ enum AIBrain {
 
         guard let chosen = smallestThatFills ?? biggest else { return nil }
 
-        // Check what that actually pours away. "Smallest that fills" is not enough
-        // on its own: with only slushies in the bag, a forty point wound still
-        // takes the whole hundred. Spending it on a graze is how a bot arrives at
-        // its next fight with an empty bar and nothing left, so hold out for
-        // something smaller unless properly hurt.
-        let poured = actor.inventory.slots[chosen]?.type.healAmount(of: actor.maxHealth) ?? 0
+        // Check what that actually spends. "Smallest that fills" is not enough on
+        // its own: with only medkits in the bag, a forty point wound still costs
+        // the whole hundred. Spending it on a graze is how a bot arrives at its
+        // next fight with an empty bar and nothing left, so hold out for something
+        // smaller unless properly hurt.
+        let spent = actor.inventory.slots[chosen]?.type.healAmount(of: actor.maxHealth) ?? 0
         if !desperate,
-           Double(poured) > Double(missing) * GameConfig.AI.maximumOverdrink,
-           healthLeft > GameConfig.AI.overdrinkBelowFraction {
+           Double(spent) > Double(missing) * GameConfig.AI.maximumOverheal,
+           healthLeft > GameConfig.AI.overhealBelowFraction {
             return nil
         }
 
-        state.drinkTimer = GameConfig.AI.drinkInterval
+        state.healTimer = GameConfig.AI.healInterval
         return chosen
     }
 

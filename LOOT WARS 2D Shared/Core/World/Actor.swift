@@ -99,8 +99,8 @@ struct Actor {
         switch stack.type {
         case .bomb:
             return true
-        case .juice, .soda, .slushy:
-            // Drinking on full health would throw the item away for nothing.
+        case .bandaid, .bandage, .medkit:
+            // Using one on full health would throw it away for nothing.
             return health < maxHealth
         }
     }
