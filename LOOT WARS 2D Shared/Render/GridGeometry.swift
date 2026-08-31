@@ -16,12 +16,12 @@ enum GridGeometry {
     /// level. This single number scales the entire game.
     /// Points per tile, and the game's zoom.
     ///
-    /// Dropped from 40 to 32 to buy back fighting distance. Bots now refuse to
-    /// engage beyond what the camera shows, and at 40 a landscape phone showed
-    /// under five tiles above and below the player - which would have forced every
-    /// fight to about three tiles, close enough that nobody could react. A fifth
-    /// off the zoom turns that into a bit over six.
-    static let tileSize: CGFloat = 32
+    /// Went out to 32 to buy fighting distance back, then in again to 36 once the
+    /// bots stopped measuring what they can see as a circle. The circle had to fit
+    /// the SHORT axis of a landscape screen, so it threw away most of the width;
+    /// asking the actual rectangle instead returns nearly eleven tiles sideways at
+    /// this zoom against five up and down, which is both fair and a real fight.
+    static let tileSize: CGFloat = 36
 
     static func point(for position: Vec2) -> CGPoint {
         CGPoint(x: CGFloat(position.x) * tileSize,

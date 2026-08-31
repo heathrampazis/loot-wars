@@ -147,6 +147,35 @@ enum GameConfig {
         /// twelve. Two and a half screens away, firing.
         static let visibleMargin: Double = 0.92
 
+        /// How long a bot will keep at a fight it is getting nothing out of.
+        ///
+        /// Counted only while it has NO shot - so a real firefight never trips it,
+        /// however long it runs. What it catches is the bot orbiting a base trying
+        /// to reach somebody stood behind their own wall, which it can neither
+        /// shoot through nor walk through, forever.
+        static let fightPatience: Double = 4.0
+
+        /// And it leaves that fight alone for this long afterwards, so it does not
+        /// simply re-acquire the same unreachable target on the next tick. Being
+        /// actually shot cancels it - giving up on somebody you cannot reach is
+        /// sensible, ignoring somebody hitting you is not.
+        static let fightCooldown: Double = 6.0
+
+        /// Seconds before a bot with no bombs left is handed one.
+        ///
+        /// A deliberate cheat, and bots only. Bombs come from crates at one in
+        /// seven, which is fine on average and useless in particular: a bot that
+        /// draws badly for two minutes simply cannot raid, and raiding is most of
+        /// what makes the bases worth anything. This is a floor under that, not a
+        /// supply - it only ever tops an EMPTY pocket up to one.
+        ///
+        /// Sixty rather than the forty I first wrote. A bot opening crates draws
+        /// about four bombs across a match; at forty seconds this could hand it
+        /// twelve, which would have made the cheat the main source and the crates
+        /// decoration. At sixty its ceiling is eight and its realistic contribution
+        /// is a good deal less, because it only ever fires on an empty pocket.
+        static let bombSupplyInterval: Double = 60
+
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
         /// of step with what is on screen.
@@ -246,7 +275,7 @@ enum GameConfig {
         ///
         /// Longer than raidRange, because this one is worth the walk: a chest with
         /// something in it is the only thing on the map that repays crossing it.
-        static let robRange: Double = 30
+        static let robRange: Double = 40
 
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26

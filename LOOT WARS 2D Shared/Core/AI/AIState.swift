@@ -41,6 +41,17 @@ struct AIState {
     /// immediately turn it straight back around.
     var lootCooldown: Double = 0
 
+    /// How long the current fight has gone without a shot being available. See
+    /// GameConfig.AI.fightPatience - this is what notices a bot orbiting a wall it
+    /// cannot get past.
+    var fightStale: Double = 0
+
+    /// While this is running the bot will not START a fight. Being hit cancels it.
+    var fightCooldown: Double = 0
+
+    /// Counts down to being handed a bomb, if it has none.
+    var bombSupplyTimer: Double = 0
+
     /// Counts down to the next look around for enemies.
     var threatScanTimer: Double = 0
 

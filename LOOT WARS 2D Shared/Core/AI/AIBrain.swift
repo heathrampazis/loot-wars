@@ -36,7 +36,15 @@ enum AIBrain {
         // timer: the moment of completion is brief and easy to walk past.
         if !world.baseIsBreached(actor.team) { state.baseWasComplete = true }
         state.reactionTimer = max(0, state.reactionTimer - dt)
+        state.fightCooldown = max(0, state.fightCooldown - dt)
         state.decisionTimer -= dt
+
+        // Being shot at cancels giving up. Walking away from somebody you cannot
+        // reach is sensible; ignoring somebody who is hitting you is not.
+        if actor.secondsSinceHit < GameConfig.AI.combatRecency {
+            state.fightCooldown = 0
+        }
+
 
         if state.decisionTimer <= 0 {
             changeOfMind(&state, actor: actor, in: world)
@@ -97,8 +105,32 @@ enum AIBrain {
         // back off, circle or run for home without ever taking the blaster off its
         // target. That one separation is what stops fights collapsing into two bots
         // walking into each other.
-        if let aim = shotToTake(state: state, actor: actor, in: world) {
+        // Worked out once and used twice: line of sight is a raycast against every
+        // tree and crate on the map, and this is the most expensive thing a brain
+        // does. Asking again for the staleness check below would double it.
+        let shot = shotToTake(state: state, actor: actor, in: world)
+
+        if let aim = shot {
             commands.append(.shoot(aim))
+        }
+
+        // A fight with no shot in it is going nowhere. This is the bot hanging
+        // outside a base trying to reach somebody stood behind their own wall,
+        // which it can neither shoot through nor walk through - so it counts the
+        // time it has spent achieving nothing and eventually goes back to the
+        // match. Any shot at all resets it, so a real firefight never trips it.
+        if state.goal.isFight, shot == nil {
+            state.fightStale += dt
+
+            if state.fightStale > GameConfig.AI.fightPatience {
+                state.fightStale = 0
+                state.fightCooldown = GameConfig.AI.fightCooldown
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+            }
+        } else {
+            state.fightStale = 0
         }
 
         actor.ai = state
@@ -241,6 +273,8 @@ enum AIBrain {
             return
         }
 
+        guard state.fightCooldown <= 0 else { return }
+
         switch state.goal {
         case .fight, .retreat:
             return
@@ -264,7 +298,7 @@ enum AIBrain {
 
     /// Priority order: staying alive, then fighting, then loot, then roaming.
     private static func chooseGoal(for actor: Actor, state: AIState, in world: World) -> AIGoal {
-        if let enemy = nearestVisibleEnemy(to: actor, in: world) {
+        if state.fightCooldown <= 0, let enemy = nearestVisibleEnemy(to: actor, in: world) {
             let healthLeft = Double(actor.health) / Double(actor.maxHealth)
 
             // Hurt and in danger: get out. Note this only holds while an enemy is
@@ -658,7 +692,8 @@ enum AIBrain {
         // STAYING on one does not, or a tree passing between two bots would end the
         // fight and they would both wander off.
         guard let enemy = world.actors[id], enemy.isAlive,
-              (enemy.position - actor.position).length <= fightRanges(in: world).disengage else {
+              (enemy.position - actor.position).length
+                <= fightRanges(against: enemy, in: world).disengage else {
             state.goal = .wander
             state.goalAge = 0
             return
@@ -672,7 +707,7 @@ enum AIBrain {
 
         // Too close, or nothing loaded: give ground. Backing off no longer costs a
         // bot its shot, so this is a reposition rather than a surrender.
-        let ranges = fightRanges(in: world)
+        let ranges = fightRanges(against: enemy, in: world)
 
         if gap < ranges.minimum || actor.ammo <= 0 {
             let escape = breakOffPoint(for: actor, awayFrom: enemy, in: world) - actor.position
@@ -739,14 +774,41 @@ enum AIBrain {
         let disengage: Double
     }
 
-    static func fightRanges(in world: World) -> FightRanges {
-        let onScreen = world.visibleHalfExtent.y * GameConfig.AI.visibleMargin
-        let engage = min(GameConfig.AI.engageRange, onScreen)
+    static func fightRanges(against target: Actor?, in world: World) -> FightRanges {
+        let engage = engageLimit(against: target, in: world)
 
         return FightRanges(engage: engage,
                            preferred: engage * GameConfig.AI.preferredFraction,
                            minimum: engage * GameConfig.AI.minimumFraction,
                            disengage: engage * GameConfig.AI.disengageFraction)
+    }
+
+    /// How far a bot may engage THIS target from.
+    ///
+    /// Only the local player is protected, because this rule is about the camera
+    /// and nobody is watching one bot shoot another. Bots fighting each other keep
+    /// the full range, which also keeps the map busy away from the player.
+    ///
+    /// The screen is a RECTANGLE, and asking it as one is most of the value here.
+    /// A circle has to fit the short axis of a landscape phone, so capping by
+    /// radius threw away two thirds of the width - bots ignored somebody stood ten
+    /// tiles to the side, in plain view, because somebody ten tiles ABOVE would
+    /// have been off screen. Now the limit is the distance to the screen edge along
+    /// the line to the target: nearly eleven tiles sideways, five straight up.
+    private static func engageLimit(against target: Actor?, in world: World) -> Double {
+        let ceiling = GameConfig.AI.engageRange
+
+        guard let target, target.id == world.localPlayerID,
+              let player = world.actors[world.localPlayerID] else { return ceiling }
+
+        let towards = target.position - player.position
+        let direction = towards.length > 0.001 ? towards.normalized() : Vec2(x: 1, y: 0)
+
+        let half = world.visibleHalfExtent
+        let toSide = abs(direction.x) > 0.001 ? half.x / abs(direction.x) : .greatestFiniteMagnitude
+        let toTopOrBottom = abs(direction.y) > 0.001 ? half.y / abs(direction.y) : .greatestFiniteMagnitude
+
+        return min(ceiling, min(toSide, toTopOrBottom) * GameConfig.AI.visibleMargin)
     }
 
     // MARK: - Keeping house
@@ -998,7 +1060,7 @@ enum AIBrain {
         guard away.length > 0.01 else { return home }
 
         let escape = actor.position + away.normalized() * GameConfig.AI.breakOffDistance
-        let urgency = max(0, min(1, 1 - away.length / fightRanges(in: world).engage))
+        let urgency = max(0, min(1, 1 - away.length / fightRanges(against: threat, in: world).engage))
 
         return escape * urgency + home * (1 - urgency)
     }
@@ -1015,7 +1077,8 @@ enum AIBrain {
                 $0.team != actor.team
                     && $0.isAlive
                     && $0.invulnerability <= 0
-                    && ($0.position - actor.position).length < fightRanges(in: world).engage
+                    && ($0.position - actor.position).length
+                        < fightRanges(against: $0, in: world).engage
             }
             // Nearest first; ties broken by id, so a seed always replays the same.
             .sorted {

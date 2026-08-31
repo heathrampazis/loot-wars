@@ -27,6 +27,8 @@ enum AISystem {
                   actor.ai != nil,
                   actor.isAlive else { continue }
 
+            resupply(&actor, dt: dt)
+
             let produced = AIBrain.think(for: &actor, in: world, dt: dt)
             world.actors[id] = actor
 
@@ -34,5 +36,29 @@ enum AISystem {
                 commands[id] = produced
             }
         }
+    }
+
+    /// Hands a bot with nothing to raid with a single bomb, now and then.
+    ///
+    /// A deliberate cheat, and worth naming as one. Bots get bombs from crates like
+    /// everyone else; this tops up ONLY an empty pocket, ONLY to one, and only every
+    /// forty seconds. One crate in seven carries a bomb, which is fine on average
+    /// and useless in particular - a bot that draws badly for two minutes simply
+    /// cannot raid, and raiding is most of what makes a base worth building. So this
+    /// is a floor under the supply rather than a supply.
+    private static func resupply(_ actor: inout Actor, dt: Double) {
+        guard var state = actor.ai else { return }
+
+        state.bombSupplyTimer -= dt
+
+        if state.bombSupplyTimer <= 0 {
+            state.bombSupplyTimer = GameConfig.AI.bombSupplyInterval
+
+            if actor.inventory.count(of: .bomb) == 0 {
+                _ = actor.inventory.add(.bomb)
+            }
+        }
+
+        actor.ai = state
     }
 }
