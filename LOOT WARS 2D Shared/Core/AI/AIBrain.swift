@@ -189,6 +189,12 @@ enum AIBrain {
             if arrived || state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
             }
+        case .stash:
+            // Backs off exactly as a build trip does when something is in the way.
+            if state.goalAge > GameConfig.Build.patience {
+                state.buildUrgeTimer = Double.random(in: GameConfig.Build.urgeInterval,
+                                                     using: &world.rng)
+            }
         case .build:
             if state.goalAge > GameConfig.Build.patience {
                 // Clearing the allowance is what releases the commitment above -
@@ -278,7 +284,7 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest:
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash:
             // All interruptible. A bot laying bricks - or lining up a throw, or
             // waiting on a payout - while somebody shoots at it is not a bot
             // anyone believes in.
@@ -390,6 +396,13 @@ enum AIBrain {
         // against whatever happens to be lying nearby.
         if state.buildUrgeTimer <= 0, let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
+        }
+
+        // Nothing left to build, but a chest in the bag and a floor to put it on.
+        // Shares the build urge's clock, because this IS a trip home - and it ends
+        // the moment the chest is out of the bag, so it can never hold the bot.
+        if state.buildUrgeTimer <= 0, let spot = chestSpotWanted(for: actor, in: world) {
+            return .stash(spot)
         }
 
         if state.lootCooldown <= 0 {
@@ -643,6 +656,9 @@ enum AIBrain {
             }
             steer(&state, actor: actor, to: chest.position)
 
+        case .stash(let tile):
+            steer(&state, actor: actor, to: tile.center)
+
         case .build(let tile):
             steer(&state, actor: actor,
                   to: standingSpot(for: tile, team: actor.team, in: world))
@@ -813,12 +829,21 @@ enum AIBrain {
 
     // MARK: - Keeping house
 
-    /// A tile to stand a carried chest on, if the bot is home and has one.
+    /// Where a carried chest wants to go, ignoring how far away the bot is.
     ///
-    /// No goal of its own. A chest goes down during a trip the bot was making
-    /// anyway, which is both how a person would do it and how this avoids
-    /// competing for priority with everything else - a goal this far down the list
-    /// would simply never be picked.
+    /// This exists because the reach-checked version below was unreachable in
+    /// practice. Placing needs a FINISHED base; every goal that took a bot home
+    /// needed an UNFINISHED one, because they all hang off nextBuildTile. The two
+    /// conditions are mutually exclusive, so a bot could only ever put a chest down
+    /// in the single moment it laid its last wall while already carrying one -
+    /// which is why bases kept ending up with nothing in them to raid.
+    private static func chestSpotWanted(for actor: Actor, in world: World) -> GridPoint? {
+        guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
+        guard !world.baseIsBreached(actor.team) else { return nil }
+        return world.nextChestTile(for: actor.team, near: actor.position)
+    }
+
+    /// A tile to stand a carried chest on, right now, from where the bot stands.
     private static func chestToPlace(actor: Actor, in world: World) -> GridPoint? {
         guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
 
@@ -943,7 +968,7 @@ enum AIBrain {
             target = tile
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
-        case .wander, .loot, .collect, .fight, .retreat, .build, .farm:
+        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash:
             target = nil
         }
 
@@ -1112,7 +1137,8 @@ enum AIBrain {
         switch state.goal {
         case .fight(let id):   targetID = id
         case .retreat(let id): targetID = id
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest: targetID = nil
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash:
+            targetID = nil
         }
 
         guard let id = targetID,

@@ -30,10 +30,10 @@
 enum LootTable {
 
     private static let table: [(pickup: Pickup, weight: Int)] = [
-        (.item(.bandage), 60),
-        (.item(.medkit),  15),
+        (.item(.bandage), 61),
+        (.item(.medkit),  16),
         (.item(.bomb),    36),
-        (.item(.chest),   14),
+        (.item(.chest),   20),
 
         (.helmet(.common),    28),
         (.helmet(.uncommon),  19),
