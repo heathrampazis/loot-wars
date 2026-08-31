@@ -261,13 +261,19 @@ final class GameScene: SKScene {
         // watching the door is the trade for reorganising your bag. The panel is
         // never a trap - the back button is large, and it closes itself the instant
         // anything puts the chest out of reach.
+        // Note what is NOT touched here: cornerAction. It records what the corner
+        // is SHOWING, and while the panel is up the corner shows nothing. Writing
+        // .aim into it here - which this used to do - was a lie that outlived the
+        // panel: on closing, the corner wanted .aim, found it already believed
+        // .aim, and skipped the work of putting the stick back. The stick stayed
+        // gone until walking back to the chest forced a different value through,
+        // which is exactly how the bug presented.
         if chestPanel.openChest != nil {
             moveStick.isHidden = true
             moveStick.end()
             aimStick.isHidden = true
             aimStick.end()
             openButton.isHidden = true
-            cornerAction = .aim
             return
         }
 
@@ -290,26 +296,30 @@ final class GameScene: SKScene {
             wanted = .aim
         }
 
-        guard wanted != cornerAction else { return }
-        cornerAction = wanted
+        // The glyph is the only thing here that is costly to change and the only
+        // thing that must never change under a thumb, so the glyph is the only
+        // thing the cache guards. Visibility is re-applied every frame from what is
+        // wanted right now - which is what makes it impossible for the nodes and
+        // the cache to disagree again, rather than merely fixing the one case where
+        // they did.
+        if wanted != cornerAction {
+            cornerAction = wanted
 
-        switch wanted {
-        case .aim:
-            aimStick.isHidden = false
-            openButton.isHidden = true
-        case .lootbox:
-            openButton.setGlyph(Glyphs.lootbox)
-            aimStick.isHidden = true
-            openButton.isHidden = false
-        case .chest:
-            openButton.setGlyph(Glyphs.chest)
-            aimStick.isHidden = true
-            openButton.isHidden = false
+            switch wanted {
+            case .lootbox: openButton.setGlyph(Glyphs.lootbox)
+            case .chest:   openButton.setGlyph(Glyphs.chest)
+            case .aim:     break
+            }
         }
 
-        // Make sure the stick is not left holding a direction it can no longer be
-        // asked to give up.
-        if wanted != .aim { aimStick.end() }
+        let offersButton = wanted != .aim
+        let alreadyOffering = !openButton.isHidden
+
+        aimStick.isHidden = offersButton
+        openButton.isHidden = !offersButton
+
+        // Do not leave the stick holding a direction it can no longer give up.
+        if offersButton, !alreadyOffering { aimStick.end() }
     }
 
     /// Input becomes a Command. Later, AI brains and network packets produce their
@@ -369,6 +379,15 @@ extension GameScene {
                 case .chest(let id):
                     armedChestSlot = nil
                     chestPanel.open(id)
+
+                    // Let go of the walking thumb. The move stick is about to be
+                    // hidden, and a finger still tracked against a hidden stick
+                    // kept driving it - walking the player straight out of range
+                    // of the chest they had just opened. That is what made this
+                    // look like a fault in the panel rather than in a touch that
+                    // outlived its control.
+                    moveStick.end()
+                    moveTouch = nil
                 case .aim:
                     break
                 }
@@ -388,7 +407,8 @@ extension GameScene {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if let active = moveTouch, touches.contains(active) {
+        // A hidden stick is not being driven, whatever the finger is doing.
+        if let active = moveTouch, touches.contains(active), !moveStick.isHidden {
             moveStick.update(toLocalPoint: active.location(in: moveStick))
         }
 
