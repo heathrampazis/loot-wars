@@ -104,19 +104,6 @@ final class GameScene: SKScene {
     /// shot at feels like the game has stopped listening.
     private static let holdDuration: TimeInterval = 0.4
 
-    /// Where the small item button sits relative to the aim stick: how far from its
-    /// centre, and how far round it, measured from straight up and going clockwise.
-    ///
-    /// Polar rather than an x/y offset, and that is the point. The rule keeping this
-    /// button honest is a MINIMUM DISTANCE BETWEEN THE TWO CENTRES - it must exceed
-    /// the button's grab radius plus the stick's visible radius (48 + 62 = 110), or
-    /// part of the stick you can see falls inside the button's grab area and a thumb
-    /// on the stick heals you instead of shooting. Written as x and y, sliding it
-    /// round the stick looks like two harmless nudges and can quietly break that.
-    /// Written like this, only `reach` is dangerous and `bearing` is free.
-    private static let itemButtonReach: CGFloat = 117      // 7pt clear of the 110 floor
-    private static let itemButtonBearing: CGFloat = 0.46   // radians - about 26 degrees over
-
     #if os(iOS) || os(tvOS)
     /// Which finger owns which control.
     private var moveTouch: UITouch?
@@ -220,80 +207,38 @@ final class GameScene: SKScene {
         layOutUI()
     }
 
-    /// The insets are not always known when the scene first lays itself out, and
-    /// they change on rotation without the size necessarily arriving first. Rather
-    /// than hunt for the one callback that covers both, notice the value changing -
-    /// it is four float comparisons a frame against a layout pass that is already
-    /// cheap enough to run on every resize.
-    private var laidOutFor: SafeEdges?
-
-    private func relayoutIfEdgesMoved() {
-        let safe = safeEdges
-        guard laidOutFor?.left != safe.left || laidOutFor?.right != safe.right
-                || laidOutFor?.top != safe.top || laidOutFor?.bottom != safe.bottom else {
-            return
-        }
-
-        laidOutFor = safe
-        layOutUI()
-    }
-
-    /// The edges of the screen you can actually put something on.
-    ///
-    /// The scene is .resizeFill, so a scene unit IS a view point and the system's
-    /// insets can be used here without conversion.
-    private struct SafeEdges {
-        var left: CGFloat = 0
-        var right: CGFloat = 0
-        var top: CGFloat = 0
-        var bottom: CGFloat = 0
-    }
-
-    private var safeEdges: SafeEdges {
-        #if os(iOS) || os(tvOS)
-        guard let insets = view?.safeAreaInsets else { return SafeEdges() }
-        return SafeEdges(left: insets.left, right: insets.right,
-                         top: insets.top, bottom: insets.bottom)
-        #else
-        return SafeEdges()
-        #endif
-    }
-
     private func layOutUI() {
-        // Everything below is measured from the usable edge, not the glass edge.
-        //
-        // In landscape the Dynamic Island eats about sixty points off one side, and
-        // anything drawn under it is simply not there. Laying out against the raw
-        // bounds had the aim stick already running under it - big enough that its
-        // centre stayed clear, so it read as fine - and the small item button, being
-        // further round, disappeared behind it outright.
-        let safe = safeEdges
-        let left = -size.width / 2 + safe.left
-        let right = size.width / 2 - safe.right
-        let top = size.height / 2 - safe.top
-        let bottom = -size.height / 2 + safe.bottom
-
         let margin: CGFloat = 110
-        moveStick.position = CGPoint(x: left + margin, y: bottom + margin)
+        moveStick.position = CGPoint(x: -size.width / 2 + margin,
+                                     y: -size.height / 2 + margin)
         // Same corner: they take it in turns rather than sharing it.
-        aimStick.position = CGPoint(x: right - margin, y: bottom + margin)
+        aimStick.position = CGPoint(x: size.width / 2 - margin,
+                                    y: -size.height / 2 + margin)
         openButton.position = aimStick.position
 
-        // Set round the stick rather than above it - see itemButtonBearing. Coming
-        // further round is what brings it lower without ever coming closer.
+        // Right edges flush with the stick below it, and tucked down close.
+        //
+        // The offset is solved, not eyeballed. This button has to be offered a
+        // touch BEFORE the aim stick (see touchesBegan), because it sits inside the
+        // stick's 120pt grab radius and would otherwise never be pressed at all.
+        // That priority then makes its OWN grab radius the hazard: no part of the
+        // stick you can see may fall inside it, or a thumb on the stick would heal
+        // you instead. So the centres must stay further apart than 48 + 62 = 110,
+        // and moving right buys some of that distance back - which is what lets it
+        // come down as far as it has.
         itemButton.position = CGPoint(
-            x: aimStick.position.x + GameScene.itemButtonReach * sin(GameScene.itemButtonBearing),
-            y: aimStick.position.y + GameScene.itemButtonReach * cos(GameScene.itemButtonBearing))
+            x: aimStick.position.x + JoystickNode.baseRadius - 40,
+            y: aimStick.position.y + 115)
 
 
         // The HUD's origin is its own top-left corner, so this is just an inset.
         let inset: CGFloat = 16
-        hud.position = CGPoint(x: left + inset, y: top - inset)
+        hud.position = CGPoint(x: -size.width / 2 + inset,
+                               y: size.height / 2 - inset)
 
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
-        // Centred horizontally, so only the home indicator's inset touches it.
         hotbar.position = CGPoint(x: 0,
-                                  y: bottom + inset + HotbarNode.size.height / 2)
+                                  y: -size.height / 2 + inset + HotbarNode.size.height / 2)
 
         // Hung in the gap between the HUD and the hotbar, measured rather than
         // guessed at, so it lands correctly on every screen instead of on the one
@@ -337,8 +282,6 @@ final class GameScene: SKScene {
     }
 
     private func syncRenderers() {
-        relayoutIfEdgesMoved()
-
         // Blocks only get rebuilt when a tile actually changed.
         if world.mapRevision != drawnMapRevision {
             blockRenderer.build(from: world.map)
