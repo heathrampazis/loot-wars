@@ -87,11 +87,24 @@ enum ChestSystem {
         for id in world.chests.keys.sorted(by: { $0.raw < $1.raw }) {
             guard var chest = world.chests[id], chest.selfStocking else { continue }
 
+            // Nothing comes back while there is a hole in the wall.
+            //
+            // The owner has to shut the base before it starts paying again, which
+            // is what stops a raider standing in a broken base collecting an item
+            // every half minute forever. Repair is now the thing that turns the
+            // supply back on, rather than a chore with no reward attached.
+            guard !world.baseIsBreached(chest.owner) else {
+                chest.restockTimer = GameConfig.Chest.restockInterval
+                world.chests[id] = chest
+                continue
+            }
+
             let held = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
             guard held < GameConfig.Chest.restockCeiling else {
-                // Full enough. Hold the timer at the ready so the next thing taken
-                // out starts refilling immediately rather than after a fresh wait.
-                chest.restockTimer = 0
+                // Full enough. A FULL wait is parked ahead of it rather than zero -
+                // parking zero here is what made the first item come straight back
+                // the instant a chest was emptied, which read as no cooldown at all.
+                chest.restockTimer = GameConfig.Chest.restockInterval
                 world.chests[id] = chest
                 continue
             }
@@ -180,6 +193,10 @@ enum ChestSystem {
         guard actor.inventory.canAccept(stack.type),
               chest.contents.consume(at: slot) != nil else { return }
         _ = actor.inventory.add(stack.type)
+
+        // Robbed. Start the clock again from the top, so emptying a chest always
+        // costs the full wait rather than however much of it had already elapsed.
+        chest.restockTimer = GameConfig.Chest.restockInterval
 
         world.actors[id] = actor
         world.chests[chestID] = chest

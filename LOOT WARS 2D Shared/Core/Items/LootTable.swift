@@ -21,13 +21,18 @@
 //  this, which is the price of a flat weighted table and worth paying while it is
 //  still this short.
 //
+//  Bombs went from 22 to 36 - a bomb in one crate in seven rather than one in
+//  eleven - because a bomb is the way into a base, and raids were rationed by how
+//  rarely anyone was carrying one. Healing was solved a third time to hold 17.5%
+//  through it.
+//
 
 enum LootTable {
 
     private static let table: [(pickup: Pickup, weight: Int)] = [
-        (.item(.bandage), 55),
-        (.item(.medkit),  14),
-        (.item(.bomb),    22),
+        (.item(.bandage), 60),
+        (.item(.medkit),  15),
+        (.item(.bomb),    36),
         (.item(.chest),   14),
 
         (.helmet(.common),    28),

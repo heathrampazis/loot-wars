@@ -307,6 +307,21 @@ enum AIBrain {
             return .build(wall)
         }
 
+        // Already inside somebody's base with the chest still full: finish the job.
+        //
+        // The same commitment a trip home gets, and for the same reason. Without
+        // it a bot that had just blown a hole in a wall would re-weigh the raid
+        // against every crate in sight on the very next decision and drift off,
+        // having done the expensive part and taken none of the reward. Bounded by
+        // the loot patience in changeOfMind, so it cannot become a bot standing
+        // outside a base it can never actually get into.
+        if case .robChest(let id) = state.goal,
+           let chest = world.chests[id],
+           chest.contents.slots.contains(where: { $0 != nil }),
+           (chest.position - actor.position).length <= GameConfig.AI.robRange {
+            return .robChest(id)
+        }
+
         // Somebody's chest, and a way to it. This is the top of the aggression
         // list on purpose: raiding is the point of bases existing, and it used to
         // sit below the supply check where it almost never came up.
@@ -580,12 +595,15 @@ enum AIBrain {
                   to: world.arcade(id).map { approachSpot(for: $0, from: actor, in: world) })
 
         case .robChest(let id):
-            // Gone, or emptied by somebody who got there first. Either way there is
-            // nothing here worth standing in an enemy base for.
+            // Emptied, or gone. Re-decide on the very next tick rather than waiting
+            // out the timer: the bot is standing INSIDE a base it paid a bomb to
+            // open, and there may well be another chest a few tiles away. Wandering
+            // off for three seconds first is how a raid ended up half done.
             guard let chest = world.chests[id],
                   chest.contents.slots.contains(where: { $0 != nil }) else {
                 state.goal = .wander
                 state.goalAge = 0
+                state.decisionTimer = 0
                 return
             }
             steer(&state, actor: actor, to: chest.position)
