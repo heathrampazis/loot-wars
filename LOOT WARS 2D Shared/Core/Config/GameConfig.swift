@@ -132,21 +132,30 @@ enum GameConfig {
         /// How far a bot will notice and go after an enemy, in tiles. Shorter than
         /// the blaster's range, so a fight starts with a bot closing in rather than
         /// sniping from off screen.
+        /// The furthest a bot will ever start a fight from - before the screen has
+        /// its say. See AIBrain.fightRanges: the real limit is usually what the
+        /// camera can show, and this is only the ceiling on top of that.
         static let engageRange: Double = 12
 
-        /// The range a bot tries to fight at, in tiles. Outside it, it closes in.
-        static let preferredRange: Double = 8
+        /// How much of the visible half-height a bot may fight across.
+        ///
+        /// Under one, so a bot is on screen BEFORE it starts shooting rather than
+        /// exactly at the edge. This is the number that fixes being shot by things
+        /// you cannot see: the ranges below used to be three independent constants
+        /// with no relationship to the camera at all, and on a phone in landscape
+        /// the camera shows under five tiles up or down while bots were engaging at
+        /// twelve. Two and a half screens away, firing.
+        static let visibleMargin: Double = 0.92
 
-        /// And inside THIS, it gives ground. Without a floor on the range, nothing
-        /// in a fight ever moves a bot backwards: every reason to move - closing,
-        /// re-aiming, chasing - points at the enemy, so two bots grind together
-        /// until they are standing on each other. A blaster that reaches twelve
-        /// tiles should not be fought with at two.
-        static let minimumRange: Double = 5
+        /// Where a fight sits inside whatever range is available, as fractions of
+        /// it. Fractions rather than tile counts so they can never again drift out
+        /// of step with what is on screen.
+        static let preferredFraction: Double = 0.72
+        static let minimumFraction: Double = 0.48
+        static let disengageFraction: Double = 1.35
 
-        /// It keeps chasing a target out to here even with no clear shot, so a tree
-        /// passing between them does not end the fight.
-        static let disengageRange: Double = 16
+
+
 
         /// How often a bot looks around for enemies, in seconds. Threats cannot
         /// wait for the ordinary decision timer - up to three seconds to notice
@@ -154,10 +163,21 @@ enum GameConfig {
         /// of sight is far too expensive to run every tick.
         static let threatScanInterval: Double = 0.1
 
-        /// Random wobble applied to a bot's aim, in radians (about 7°). This is
-        /// the only reason bots miss, now that aiming is no longer tangled up with
-        /// which way they happen to be walking.
-        static let aimError: Double = 0.12
+        /// How far to the side a bot's shot may stray, in TILES, at whatever range
+        /// it happens to be firing from.
+        ///
+        /// A distance, not an angle, and the difference matters the moment fights
+        /// move closer. As an angle - which this was, at 0.12 radians - the miss
+        /// shrinks with the range: the same wobble that threw a shot a whole tile
+        /// wide at eight tiles throws it half that at four. Bringing fights into
+        /// view would have quietly doubled every bot's accuracy, which is the exact
+        /// opposite of what shortening them was for.
+        ///
+        /// Set at 1.0 because the player is 0.9 tiles across, so a bot's aim is
+        /// uncertain by about one body width wherever it is standing - which is
+        /// what 0.12 radians used to work out at, at the range fights used to
+        /// happen at.
+        static let aimSpread: Double = 1.0
 
         /// Chance, at each change of mind, that a bot reverses the way it is
         /// circling. Never reversing reads as a machine on rails; reversing every

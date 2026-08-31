@@ -63,6 +63,16 @@ final class World {
     /// exactly, bots included.
     var rng: SeededRandom
 
+    /// How far the camera can see from the player, in tiles, on each axis.
+    ///
+    /// Set by the renderer, which is the only thing that knows the screen size, and
+    /// read by the bots so they will not open fire on somebody who cannot see them.
+    /// A plain Vec2 rather than anything SpriteKit-shaped, so Core stays Core.
+    ///
+    /// The default is deliberately generous: if nobody ever sets it, bots behave as
+    /// they did before rather than standing around refusing to fight.
+    var visibleHalfExtent = Vec2(x: 100, y: 100)
+
     /// Which actor this device is driving. Today it is the only one; later it is
     /// simply one of eight. Nothing else in the code assumes it is special.
     let localPlayerID: ActorID

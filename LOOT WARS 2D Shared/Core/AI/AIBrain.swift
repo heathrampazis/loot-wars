@@ -203,8 +203,9 @@ enum AIBrain {
             state.goalAge = 0
         }
 
-        state.aimNoise = Double.random(in: -GameConfig.AI.aimError...GameConfig.AI.aimError,
-                                       using: &world.rng)
+        // Rolled as a unit value and turned into an angle at the moment of firing,
+        // where the range is known. See GameConfig.AI.aimSpread.
+        state.aimNoise = Double.random(in: -1...1, using: &world.rng)
 
         if Double.random(in: 0..<1, using: &world.rng) < GameConfig.AI.strafeFlipChance {
             state.strafeDirection *= -1
@@ -657,7 +658,7 @@ enum AIBrain {
         // STAYING on one does not, or a tree passing between two bots would end the
         // fight and they would both wander off.
         guard let enemy = world.actors[id], enemy.isAlive,
-              (enemy.position - actor.position).length <= GameConfig.AI.disengageRange else {
+              (enemy.position - actor.position).length <= fightRanges(in: world).disengage else {
             state.goal = .wander
             state.goalAge = 0
             return
@@ -671,7 +672,9 @@ enum AIBrain {
 
         // Too close, or nothing loaded: give ground. Backing off no longer costs a
         // bot its shot, so this is a reposition rather than a surrender.
-        if gap < GameConfig.AI.minimumRange || actor.ammo <= 0 {
+        let ranges = fightRanges(in: world)
+
+        if gap < ranges.minimum || actor.ammo <= 0 {
             let escape = breakOffPoint(for: actor, awayFrom: enemy, in: world) - actor.position
             state.desiredHeading = escape.length > 0.01
                 ? escape.normalized()
@@ -680,7 +683,7 @@ enum AIBrain {
         }
 
         // Too far to be shooting from: close the distance.
-        if gap > GameConfig.AI.preferredRange {
+        if gap > ranges.preferred {
             state.desiredHeading = direct
             return
         }
@@ -714,6 +717,38 @@ enum AIBrain {
     /// Spaced out by a timer so walls go up one after another, and capped per trip
     /// so a bot lays a couple and gets back to the match rather than camping its
     /// claim until the base is finished.
+    // MARK: - How far a fight reaches
+
+    /// The distances a fight is actually fought at on THIS screen.
+    ///
+    /// Derived rather than configured, and that is the whole point. These were
+    /// three fixed tile counts chosen with no reference to the camera, and on a
+    /// phone held in landscape the camera shows under five tiles above and below
+    /// the player while bots were opening fire at twelve. You were being shot by
+    /// things two and a half screens away - correctly, by rules that had simply
+    /// never been asked whether you could see them.
+    ///
+    /// The vertical half-extent is what binds, because landscape is much wider than
+    /// it is tall and a bot approaching from above or below is the one that
+    /// disappears. Capped by engageRange as well, so a huge screen does not turn
+    /// bots into snipers.
+    struct FightRanges {
+        let engage: Double
+        let preferred: Double
+        let minimum: Double
+        let disengage: Double
+    }
+
+    static func fightRanges(in world: World) -> FightRanges {
+        let onScreen = world.visibleHalfExtent.y * GameConfig.AI.visibleMargin
+        let engage = min(GameConfig.AI.engageRange, onScreen)
+
+        return FightRanges(engage: engage,
+                           preferred: engage * GameConfig.AI.preferredFraction,
+                           minimum: engage * GameConfig.AI.minimumFraction,
+                           disengage: engage * GameConfig.AI.disengageFraction)
+    }
+
     // MARK: - Keeping house
 
     /// A tile to stand a carried chest on, if the bot is home and has one.
@@ -963,7 +998,7 @@ enum AIBrain {
         guard away.length > 0.01 else { return home }
 
         let escape = actor.position + away.normalized() * GameConfig.AI.breakOffDistance
-        let urgency = max(0, min(1, 1 - away.length / GameConfig.AI.engageRange))
+        let urgency = max(0, min(1, 1 - away.length / fightRanges(in: world).engage))
 
         return escape * urgency + home * (1 - urgency)
     }
@@ -980,7 +1015,7 @@ enum AIBrain {
                 $0.team != actor.team
                     && $0.isAlive
                     && $0.invulnerability <= 0
-                    && ($0.position - actor.position).length < GameConfig.AI.engageRange
+                    && ($0.position - actor.position).length < fightRanges(in: world).engage
             }
             // Nearest first; ties broken by id, so a seed always replays the same.
             .sorted {
@@ -1049,7 +1084,13 @@ enum AIBrain {
 
         // The wobble is the only reason a bot misses now that aiming is its own
         // input rather than a side effect of which way it happens to be walking.
-        return Vec2.fromAngle((leadPoint - actor.position).angle + state.aimNoise)
+        //
+        // Converted from a sideways distance into an angle HERE, because only here
+        // is the range known. A fixed angle would make a bot deadlier the closer it
+        // got, which is not how missing works and would have made bringing fights
+        // into view a straight buff to the people shooting at you.
+        let wobble = atan(GameConfig.AI.aimSpread / max(towards.length, 0.5))
+        return Vec2.fromAngle((leadPoint - actor.position).angle + state.aimNoise * wobble)
     }
 
     /// Samples along the line. Uses the same rules a bullet does - including that

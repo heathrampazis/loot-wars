@@ -208,6 +208,16 @@ final class GameScene: SKScene {
     }
 
     private func layOutUI() {
+        // Tell the simulation how much of the map this screen is actually showing,
+        // so bots will not open fire from somewhere the player cannot look. Done
+        // here because this is where the size is known, and it is the only thing
+        // Render ever pushes INTO the world - a plain number, no SpriteKit.
+        if world != nil {
+            world.visibleHalfExtent = Vec2(
+                x: Double(size.width / 2 / GridGeometry.tileSize),
+                y: Double(size.height / 2 / GridGeometry.tileSize))
+        }
+
         let margin: CGFloat = 110
         moveStick.position = CGPoint(x: -size.width / 2 + margin,
                                      y: -size.height / 2 + margin)
