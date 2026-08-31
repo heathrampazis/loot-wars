@@ -41,16 +41,25 @@ enum ItemType: Hashable, CaseIterable {
         }
     }
 
-    /// Whether tapping this in the hotbar uses it there and then.
+    /// What acts on this item once it has been picked out of the hotbar.
     ///
-    /// A bomb does, because you are already pointing somewhere and there is nothing
-    /// left to decide. Everything else is picked out first and then acted on: a
-    /// chest wants a tile, and a dressing wants a button under your shooting thumb
-    /// rather than a reach across to the hotbar in the middle of a fight.
-    var usedOnTap: Bool {
+    /// Everything is now picked out first and acted on second, so this is the whole
+    /// difference between the items: most want the button under the thumb already
+    /// on the right of the screen, and a chest wants you to say WHERE.
+    ///
+    /// This replaced a boolean for "used the moment you tap it", which stopped
+    /// being true of anything once the bomb moved to the button.
+    enum Use {
+        /// The small button above the corner.
+        case actionButton
+        /// Tap the map to say where.
+        case mapTap
+    }
+
+    var use: Use {
         switch self {
-        case .bomb: return true
-        case .bandage, .medkit, .chest: return false
+        case .bandage, .medkit, .bomb: return .actionButton
+        case .chest: return .mapTap
         }
     }
 

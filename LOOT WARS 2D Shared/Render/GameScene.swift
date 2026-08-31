@@ -61,18 +61,19 @@ final class GameScene: SKScene {
     private let aimStick = JoystickNode(glyph: Glyphs.crosshair)
     private let openButton = ActionButtonNode(glyph: Glyphs.lootbox)
 
-    /// Uses whatever you have picked out of the hotbar, sitting just above the
-    /// corner. Small, and up under the thumb that is already on the right-hand side
-    /// - the whole point is healing without reaching across to the hotbar mid-fight.
+    /// Uses whatever you have picked out of the hotbar, tucked above the corner.
+    /// Small, and under the thumb that is already on the right-hand side - the
+    /// whole point is healing, or lobbing a bomb, without reaching across to the
+    /// hotbar mid-fight.
     ///
-    /// It shows the selected item's own art, so it needs nothing added to serve
-    /// whatever gets picked out of the hotbar next.
-    private let healButton = ActionButtonNode(glyph: Glyphs.lootbox,
-                                              radius: 40, grabRadius: 60)
+    /// It shows the selected item's own art and issues useItem for that slot, so it
+    /// serves whatever gets picked out next without being taught about it.
+    private let itemButton = ActionButtonNode(glyph: Glyphs.lootbox,
+                                              radius: 40, grabRadius: 48)
 
     /// What the small button is currently showing, so its glyph is only rebuilt
     /// when the selection actually changes rather than every frame.
-    private var healGlyph: ItemType?
+    private var itemGlyph: ItemType?
 
     /// What that corner is currently for.
     private enum CornerAction: Equatable {
@@ -108,7 +109,7 @@ final class GameScene: SKScene {
     private var moveTouch: UITouch?
     private var aimTouch: UITouch?
     private var openTouch: UITouch?
-    private var healTouch: UITouch?
+    private var itemTouch: UITouch?
 
     /// A finger that has not yet decided whether it is a tap or a hold.
     ///
@@ -190,8 +191,8 @@ final class GameScene: SKScene {
         cameraController.node.addChild(aimStick)
         cameraController.node.addChild(openButton)
         openButton.isHidden = true
-        cameraController.node.addChild(healButton)
-        healButton.isHidden = true
+        cameraController.node.addChild(itemButton)
+        itemButton.isHidden = true
         cameraController.node.addChild(hud)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -215,15 +216,19 @@ final class GameScene: SKScene {
                                     y: -size.height / 2 + margin)
         openButton.position = aimStick.position
 
-        // Directly above the corner. The offset is not eyeballed: it sits inside
-        // the aim stick's 120pt grab radius, so the small button has to be offered
-        // a touch BEFORE the stick (see touchesBegan) - and that means its own 60pt
-        // grab must not reach down into the part of the stick you can SEE. At 130
-        // it stops 70 above the stick's centre, clear of its 62pt face, so every
-        // press that lands on the stick still goes to the stick. 28pt of daylight
-        // between the two, which is what stops them reading as one control.
-        healButton.position = CGPoint(x: aimStick.position.x,
-                                      y: aimStick.position.y + 130)
+        // Right edges flush with the stick below it, and tucked down close.
+        //
+        // The offset is solved, not eyeballed. This button has to be offered a
+        // touch BEFORE the aim stick (see touchesBegan), because it sits inside the
+        // stick's 120pt grab radius and would otherwise never be pressed at all.
+        // That priority then makes its OWN grab radius the hazard: no part of the
+        // stick you can see may fall inside it, or a thumb on the stick would heal
+        // you instead. So the centres must stay further apart than 48 + 62 = 110,
+        // and moving right buys some of that distance back - which is what lets it
+        // come down as far as it has.
+        itemButton.position = CGPoint(
+            x: aimStick.position.x + JoystickNode.baseRadius - 40,
+            y: aimStick.position.y + 115)
 
 
         // The HUD's origin is its own top-left corner, so this is just an inset.
@@ -309,7 +314,7 @@ final class GameScene: SKScene {
         hotbar.setSelected(selectedSlot)
 
         updateRightControl(with: world)
-        updateHealButton(with: world)
+        updateItemButton(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }
@@ -399,30 +404,30 @@ final class GameScene: SKScene {
     /// swapping the corner under a thumb, and those guards do not apply here: this
     /// button never swaps places with anything, so it can answer honestly every
     /// frame.
-    private func updateHealButton(with world: World) {
+    private func updateItemButton(with world: World) {
         guard let player = world.localPlayer,
               chestPanel.openChest == nil,
               let slot = selectedSlot,
               let stack = player.inventory.stack(at: slot),
-              stack.type.isHealing else {
-            guard !healButton.isHidden else { return }
-            healButton.isHidden = true
-            healButton.end()
-            healGlyph = nil
+              stack.type.use == .actionButton else {
+            guard !itemButton.isHidden else { return }
+            itemButton.isHidden = true
+            itemButton.end()
+            itemGlyph = nil
             return
         }
 
-        if healGlyph != stack.type {
-            healGlyph = stack.type
-            healButton.setGlyph(ItemArt.texture(for: stack.type))
+        if itemGlyph != stack.type {
+            itemGlyph = stack.type
+            itemButton.setGlyph(ItemArt.texture(for: stack.type))
         }
 
-        healButton.isHidden = false
+        itemButton.isHidden = false
 
         // Faint at full health, matching the hotbar slot it came from - the answer
         // is the actor's own, so what you see and what the simulation allows cannot
         // disagree.
-        healButton.setEnabled(player.canUse(slot: slot))
+        itemButton.setEnabled(player.canUse(slot: slot))
     }
 
     /// Input becomes a Command. Later, AI brains and network packets produce their
@@ -466,14 +471,14 @@ extension GameScene {
             // button sits inside the stick's 120pt grab circle, so offering the
             // stick first would swallow every press aimed at it. Small precise
             // targets beat large forgiving ones; the stick loses nothing it needs.
-            if healTouch == nil, !healButton.isHidden,
-               healButton.begin(atLocalPoint: touch.location(in: healButton)) {
-                healTouch = touch
+            if itemTouch == nil, !itemButton.isHidden,
+               itemButton.begin(atLocalPoint: touch.location(in: itemButton)) {
+                itemTouch = touch
 
                 // A one-shot action, so it fires on press. Refused politely when
                 // the button is faint - pressing a disabled control should do
                 // nothing rather than queue an intent the simulation will bin.
-                if healButton.isEnabled, let slot = selectedSlot {
+                if itemButton.isEnabled, let slot = selectedSlot {
                     queuedCommands.append(.useItem(slot: slot))
                 }
                 continue
@@ -632,30 +637,25 @@ extension GameScene {
             openTouch = nil
         }
 
-        if let active = healTouch, touches.contains(active) {
-            healButton.end()
-            healTouch = nil
+        if let active = itemTouch, touches.contains(active) {
+            itemButton.end()
+            itemTouch = nil
         }
     }
 
-    /// A bomb goes straight away; everything else is picked out first.
+    /// Picks a slot out, or puts it back.
     ///
-    /// Which of those it is belongs to the item, not to this screen - see
-    /// ItemType.usedOnTap. Tapping a picked-out slot again puts it back, because
-    /// changing your mind should not force you to spend the thing.
+    /// Nothing is spent by a tap on the hotbar any more - what acts on the picked
+    /// item is either the button or a tap on the map, and which of those belongs to
+    /// the item rather than to this screen (ItemType.use). Tapping the same slot
+    /// again puts it back, because changing your mind should not cost you the item.
     private func tapHotbar(_ slot: Int) {
-        guard let type = world.localPlayer?.inventory.stack(at: slot)?.type else {
+        guard world.localPlayer?.inventory.stack(at: slot) != nil else {
             selectedSlot = nil
             return
         }
 
-        guard type.usedOnTap else {
-            selectedSlot = (selectedSlot == slot) ? nil : slot
-            return
-        }
-
-        selectedSlot = nil
-        queuedCommands.append(.useItem(slot: slot))
+        selectedSlot = (selectedSlot == slot) ? nil : slot
     }
 
     /// Taps while a chest is open: out of the chest, into the chest, or done.
@@ -687,10 +687,10 @@ extension GameScene {
     private func tapMap(at pointInWorld: CGPoint) {
         let tile = GridGeometry.gridPoint(for: pointInWorld)
 
-        // Only a chest turns a map tap into a placement. Anything else picked out
-        // of the hotbar leaves the map meaning what it always meant.
+        // Only an item that wants a tile turns a map tap into a placement. Anything
+        // else picked out of the hotbar leaves the map meaning what it always meant.
         if let slot = selectedSlot,
-           world.localPlayer?.inventory.stack(at: slot)?.type == .chest {
+           world.localPlayer?.inventory.stack(at: slot)?.type.use == .mapTap {
             queuedCommands.append(.placeChest(tile))
             selectedSlot = nil
             return

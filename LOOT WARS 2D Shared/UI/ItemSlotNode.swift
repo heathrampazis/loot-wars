@@ -20,8 +20,15 @@ import SpriteKit
 
 final class ItemSlotNode: SKNode {
 
+    /// How much bigger a picked-out slot sits than its neighbours, and how far a
+    /// held one is squeezed. Both are scales on the whole slot rather than badges
+    /// added to it, so they compose: a selected slot being held squeezes from its
+    /// larger size and springs back to it.
+    private static let selectedScale: CGFloat = 1.14
+    private static let heldScale: CGFloat = 0.8
+
     private let side: CGFloat
-    private var selection: SKShapeNode!
+    private var selected = false
     private let icon = SKSpriteNode()
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -37,16 +44,6 @@ final class ItemSlotNode: SKNode {
         panel.fillColor = RenderPalette.hotbarSlot
         panel.strokeColor = .clear
         addChild(panel)
-
-        selection = SKShapeNode(rect: CGRect(x: -side / 2, y: -side / 2,
-                                             width: side, height: side),
-                                cornerRadius: side * 0.182)
-        selection.fillColor = .clear
-        selection.strokeColor = RenderPalette.countBadge
-        selection.lineWidth = side * 0.06
-        selection.zPosition = 3
-        selection.isHidden = true
-        addChild(selection)
 
         icon.zPosition = 1
         icon.isHidden = true
@@ -78,6 +75,11 @@ final class ItemSlotNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Where the slot rests: bigger while it is the one picked out.
+    private var restingScale: CGFloat {
+        selected ? ItemSlotNode.selectedScale : 1
+    }
+
     /// Squeezes over the length of a hold, so the press has somewhere to go while
     /// the finger is down.
     ///
@@ -85,19 +87,32 @@ final class ItemSlotNode: SKNode {
     /// tap that failed to register, and the player lifts off just before the thing
     /// they were waiting for would have happened.
     func beginHold(duration: TimeInterval) {
-        removeAction(forKey: "hold")
-        run(.scale(to: 0.84, duration: duration), withKey: "hold")
+        removeAction(forKey: "scale")
+        run(.scale(to: restingScale * ItemSlotNode.heldScale, duration: duration),
+            withKey: "hold")
     }
 
     func endHold() {
         removeAction(forKey: "hold")
-        run(.scale(to: 1, duration: 0.12))
+        settle()
     }
 
-    /// Ringed while this slot is armed - a chest waiting for you to pick a tile.
-    /// Without it, tapping a chest looks exactly like tapping nothing.
+    /// The picked-out slot simply sits larger than the others.
+    ///
+    /// It used to wear a ring. Growing it says the same thing without adding a
+    /// second colour to a bar that is already carrying item art and count badges -
+    /// and it reads at a glance on a screen held at arm's length, which an outline
+    /// four points wide does not.
     func setSelected(_ selected: Bool) {
-        selection.isHidden = !selected
+        guard selected != self.selected else { return }
+        self.selected = selected
+        removeAction(forKey: "hold")
+        settle()
+    }
+
+    private func settle() {
+        removeAction(forKey: "scale")
+        run(.scale(to: restingScale, duration: 0.12), withKey: "scale")
     }
 
     /// - Parameter dimmed: the item is there but cannot be used right now. Drawn

@@ -18,7 +18,9 @@ import SpriteKit
 final class JoystickNode: SKNode {
 
     /// How far the knob can travel from the centre.
-    private static let baseRadius: CGFloat = 62
+    /// Not private: the scene lines the small action button up against this edge,
+    /// and a second copy of the number would drift the moment either changed.
+    static let baseRadius: CGFloat = 62
     private static let knobRadius: CGFloat = 26
 
     /// A touch this far from the centre still grabs the stick. Generous - thumbs
