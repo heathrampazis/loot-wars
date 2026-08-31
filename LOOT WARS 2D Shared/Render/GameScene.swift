@@ -104,6 +104,19 @@ final class GameScene: SKScene {
     /// shot at feels like the game has stopped listening.
     private static let holdDuration: TimeInterval = 0.4
 
+    /// Where the small item button sits relative to the aim stick: how far from its
+    /// centre, and how far round it, measured from straight up and going clockwise.
+    ///
+    /// Polar rather than an x/y offset, and that is the point. The rule keeping this
+    /// button honest is a MINIMUM DISTANCE BETWEEN THE TWO CENTRES - it must exceed
+    /// the button's grab radius plus the stick's visible radius (48 + 62 = 110), or
+    /// part of the stick you can see falls inside the button's grab area and a thumb
+    /// on the stick heals you instead of shooting. Written as x and y, sliding it
+    /// round the stick looks like two harmless nudges and can quietly break that.
+    /// Written like this, only `reach` is dangerous and `bearing` is free.
+    private static let itemButtonReach: CGFloat = 117      // 7pt clear of the 110 floor
+    private static let itemButtonBearing: CGFloat = 0.46   // radians - about 26 degrees over
+
     #if os(iOS) || os(tvOS)
     /// Which finger owns which control.
     private var moveTouch: UITouch?
@@ -216,19 +229,11 @@ final class GameScene: SKScene {
                                     y: -size.height / 2 + margin)
         openButton.position = aimStick.position
 
-        // Right edges flush with the stick below it, and tucked down close.
-        //
-        // The offset is solved, not eyeballed. This button has to be offered a
-        // touch BEFORE the aim stick (see touchesBegan), because it sits inside the
-        // stick's 120pt grab radius and would otherwise never be pressed at all.
-        // That priority then makes its OWN grab radius the hazard: no part of the
-        // stick you can see may fall inside it, or a thumb on the stick would heal
-        // you instead. So the centres must stay further apart than 48 + 62 = 110,
-        // and moving right buys some of that distance back - which is what lets it
-        // come down as far as it has.
+        // Set round the stick rather than above it - see itemButtonBearing. Coming
+        // further round is what brings it lower without ever coming closer.
         itemButton.position = CGPoint(
-            x: aimStick.position.x + JoystickNode.baseRadius - 40,
-            y: aimStick.position.y + 115)
+            x: aimStick.position.x + GameScene.itemButtonReach * sin(GameScene.itemButtonBearing),
+            y: aimStick.position.y + GameScene.itemButtonReach * cos(GameScene.itemButtonBearing))
 
 
         // The HUD's origin is its own top-left corner, so this is just an inset.
