@@ -134,10 +134,16 @@ enum ChestSystem {
     }
 
     private static func add(oneItemTo chest: inout Chest, in world: World) {
-        let total = GameConfig.Chest.stockTable.reduce(0) { $0 + $1.weight }
+        // Same grace period the crates observe. A chest full of bombs in the first
+        // two minutes would be a way round the one thing the grace period is for.
+        let rows = world.bombsAllowed
+            ? GameConfig.Chest.stockTable
+            : GameConfig.Chest.stockTable.filter { $0.item != .bomb }
+
+        let total = rows.reduce(0) { $0 + $1.weight }
         var pick = Int.random(in: 0..<total, using: &world.rng)
 
-        for entry in GameConfig.Chest.stockTable {
+        for entry in rows {
             if pick < entry.weight {
                 _ = chest.contents.add(entry.item)
                 return

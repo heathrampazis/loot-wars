@@ -52,11 +52,17 @@ enum LootTable {
         (.blaster(.six),    2)
     ]
 
-    static func roll(using rng: inout SeededRandom) -> Pickup {
-        let total = table.reduce(0) { $0 + $1.weight }
+    /// - Parameter bombs: false during the opening grace period, when the bomb row
+    ///   is dropped and the rest of the table is renormalised around it. Everything
+    ///   else simply becomes correspondingly likelier, which is what should happen -
+    ///   a crate still gives you something.
+    static func roll(bombs: Bool, using rng: inout SeededRandom) -> Pickup {
+        let rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
+
+        let total = rows.reduce(0) { $0 + $1.weight }
         var pick = Int.random(in: 0..<total, using: &rng)
 
-        for entry in table {
+        for entry in rows {
             if pick < entry.weight { return entry.pickup }
             pick -= entry.weight
         }

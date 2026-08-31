@@ -13,6 +13,17 @@ final class World {
 
     private(set) var tick: Int = 0
 
+    /// Seconds of match played. Accumulated from the steps actually taken rather
+    /// than derived from the tick count, so it stays honest if the timestep ever
+    /// changes. The match timer and scoreboard will want this too.
+    private(set) var elapsed: Double = 0
+
+    /// Whether bombs have started turning up yet.
+    ///
+    /// Asked by everything that could hand one out, so the grace period cannot be
+    /// got round by finding a chest instead of a crate.
+    var bombsAllowed: Bool { elapsed >= GameConfig.Match.bombGrace }
+
     /// Read freely, but change only through setTile, so the renderer always knows
     /// when the map has moved on.
     private(set) var map: TileMap
@@ -496,6 +507,7 @@ final class World {
         CombatSystem.update(self, dt: dt)
         RespawnSystem.update(self, dt: dt)
         tick += 1
+        elapsed += dt
     }
 
     private func applyMovementInput(_ commands: [ActorID: [Command]]) {

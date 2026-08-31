@@ -27,7 +27,7 @@ enum AISystem {
                   actor.ai != nil,
                   actor.isAlive else { continue }
 
-            resupply(&actor, dt: dt)
+            resupply(&actor, dt: dt, in: world)
 
             let produced = AIBrain.think(for: &actor, in: world, dt: dt)
             world.actors[id] = actor
@@ -46,7 +46,11 @@ enum AISystem {
     /// and useless in particular - a bot that draws badly for two minutes simply
     /// cannot raid, and raiding is most of what makes a base worth building. So this
     /// is a floor under the supply rather than a supply.
-    private static func resupply(_ actor: inout Actor, dt: Double) {
+    private static func resupply(_ actor: inout Actor, dt: Double, in world: World) {
+        // Bots wait out the grace period like everybody else. A floor under the
+        // bomb supply that ignored it would simply move the raiding it was meant to
+        // hold back onto the bots.
+        guard world.bombsAllowed else { return }
         guard var state = actor.ai else { return }
 
         state.bombSupplyTimer -= dt

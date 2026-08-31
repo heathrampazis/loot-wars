@@ -15,6 +15,20 @@ enum GameConfig {
     /// bugs reproducible.
     static let fixedTimeStep: Double = 1.0 / 60.0
 
+    enum Match {
+        /// How long into a match before bombs start turning up, in seconds.
+        ///
+        /// Nothing can be raided until somebody is carrying the way in, so holding
+        /// bombs back holds raiding back - and that buys everyone the first two
+        /// minutes to loot, build and shut their walls without a hole appearing in
+        /// them. Bases finish around the minute mark, so this leaves a breather
+        /// after the wall goes up rather than cutting it fine.
+        ///
+        /// It applies to every source at once - crates, a bot's chest, and the
+        /// supply floor bots get. A grace period with one way round it is not one.
+        static let bombGrace: Double = 120
+    }
+
     enum Map {
         static let width = 64
         static let height = 64
