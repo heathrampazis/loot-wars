@@ -26,7 +26,16 @@ final class ChestRenderer {
 
         for (id, sprite) in Array(nodesByChest) where world.chests[id] == nil {
             nodesByChest[id] = nil
-            sprite.removeFromParent()
+
+            // Broken open rather than switched off. A chest stripped by a raider
+            // stops existing, and it should look like something happened to it.
+            sprite.run(.sequence([
+                .group([.scale(to: 1.25, duration: 0.08),
+                        .fadeAlpha(to: 0.9, duration: 0.08)]),
+                .group([.scale(to: 0.2, duration: 0.18),
+                        .fadeOut(withDuration: 0.18)]),
+                .removeFromParent()
+            ]))
         }
     }
 

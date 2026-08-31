@@ -254,6 +254,10 @@ final class World {
         return chest.id
     }
 
+    func removeChest(_ id: ChestID) {
+        chests[id] = nil
+    }
+
     /// The nearest chest you are standing close enough to open - anyone's.
     ///
     /// Lives here so the button that offers to open one and the system that moves

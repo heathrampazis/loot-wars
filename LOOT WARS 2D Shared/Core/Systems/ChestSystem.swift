@@ -194,11 +194,32 @@ enum ChestSystem {
               chest.contents.consume(at: slot) != nil else { return }
         _ = actor.inventory.add(stack.type)
 
-        // Robbed. Start the clock again from the top, so emptying a chest always
-        // costs the full wait rather than however much of it had already elapsed.
-        chest.restockTimer = GameConfig.Chest.restockInterval
-
         world.actors[id] = actor
+
+        // Stripped by somebody who does not own it: the chest goes with the
+        // contents.
+        //
+        // This is what makes a raid cost the victim something that lasts. Refilling
+        // alone meant a raid was a dent that healed itself - annoying, then gone.
+        // Losing the chest means finding another one and standing it up again, and
+        // since a chest cannot be placed until the wall is shut, it means fixing
+        // the hole first. One raid therefore costs a repair AND a replacement.
+        //
+        // Emptied rather than touched: a chest that vanished on the first item
+        // taken would hand a raider one bandage for a bomb, a breach and the walk.
+        // And taking your OWN things out is not a raid, so this never fires on the
+        // owner - otherwise nobody could ever use a chest for what it is for.
+        let emptied = chest.contents.slots.allSatisfy { $0 == nil }
+
+        if emptied, chest.owner != actor.team {
+            world.removeChest(chestID)
+            return
+        }
+
+        // Survived, with less in it. Start the clock again from the top, so a
+        // partial raid always costs the full wait rather than however much of it
+        // had already elapsed.
+        chest.restockTimer = GameConfig.Chest.restockInterval
         world.chests[chestID] = chest
     }
 }
