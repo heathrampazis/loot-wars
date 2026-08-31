@@ -78,6 +78,22 @@ final class ItemSlotNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Squeezes over the length of a hold, so the press has somewhere to go while
+    /// the finger is down.
+    ///
+    /// Not decoration. Four tenths of a second with no response at all reads as a
+    /// tap that failed to register, and the player lifts off just before the thing
+    /// they were waiting for would have happened.
+    func beginHold(duration: TimeInterval) {
+        removeAction(forKey: "hold")
+        run(.scale(to: 0.84, duration: duration), withKey: "hold")
+    }
+
+    func endHold() {
+        removeAction(forKey: "hold")
+        run(.scale(to: 1, duration: 0.12))
+    }
+
     /// Ringed while this slot is armed - a chest waiting for you to pick a tile.
     /// Without it, tapping a chest looks exactly like tapping nothing.
     func setSelected(_ selected: Bool) {

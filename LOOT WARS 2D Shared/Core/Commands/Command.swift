@@ -12,6 +12,8 @@
 enum Command {
     case move(Vec2)
     case placeBlock(GridPoint)
+    /// Take one of your own walls back down.
+    case removeBlock(GridPoint)
     /// Fire in this direction, independently of where the actor is walking.
     ///
     /// Aiming used to be a side effect of moving, which meant nobody could shoot
@@ -42,4 +44,11 @@ enum Command {
     /// is not a thing the simulation can work out for itself.
     case storeItem(chest: ChestID, slot: Int)
     case takeItem(chest: ChestID, slot: Int)
+
+    /// Throw one item out of a hotbar slot onto the ground.
+    ///
+    /// Where it lands is the simulation's business, not the input's - it has to
+    /// clear your own hitbox or you would walk straight back over it, and it has to
+    /// miss the walls and trees or nobody could reach it.
+    case dropItem(slot: Int)
 }

@@ -82,14 +82,47 @@ final class GameScene: SKScene {
     /// What crosses into Core is the finished intent - place a chest HERE.
     private var armedChestSlot: Int?
 
+    /// How long a finger must stay put to become a hold rather than a tap.
+    ///
+    /// Shorter than the system's half-second long press. This is a game action, not
+    /// a context menu, and half a second of nothing happening while you are being
+    /// shot at feels like the game has stopped listening.
+    private static let holdDuration: TimeInterval = 0.4
+
     #if os(iOS) || os(tvOS)
-    /// Which finger owns which control, and which one might still turn out to be a tap.
+    /// Which finger owns which control.
     private var moveTouch: UITouch?
     private var aimTouch: UITouch?
     private var openTouch: UITouch?
-    private var tapTouch: UITouch?
-    private var tapOrigin: CGPoint = .zero
-    /// Slide further than this and it was a drag, not a tap.
+
+    /// A finger that has not yet decided whether it is a tap or a hold.
+    ///
+    /// One at a time, deliberately. Tapping and holding are opposite meanings of
+    /// the same gesture, and two of them resolving at once on different targets is
+    /// a class of bug nobody would enjoy reproducing.
+    private struct PendingPress {
+        enum Target {
+            case map
+            case hotbar(slot: Int)
+        }
+
+        let touch: UITouch
+        let screenOrigin: CGPoint
+        /// Where the press landed on the MAP, captured at press time.
+        ///
+        /// Not looked up again when the hold fires: the camera follows the player,
+        /// so the same point on the screen is a different tile half a second later,
+        /// and the wall you pressed is the one you meant.
+        let worldOrigin: CGPoint
+        let beganAt: TimeInterval
+        let target: Target
+        /// The hold has already fired, so the release must not act as well.
+        var fired = false
+    }
+
+    private var pending: PendingPress?
+
+    /// Slide further than this and it was a drag - neither a tap nor a hold.
     private let tapSlop: CGFloat = 24
     #endif
 
@@ -205,6 +238,13 @@ final class GameScene: SKScene {
             world.step(commands: gatherCommands(), dt: GameConfig.fixedTimeStep)
             accumulator -= GameConfig.fixedTimeStep
         }
+
+        #if os(iOS) || os(tvOS)
+        // Checked against the frame clock rather than a timer, so a hold fires while
+        // the finger is still down - which is the whole difference between a hold
+        // and a slow tap.
+        resolveHold(at: currentTime)
+        #endif
 
         syncRenderers()
     }
@@ -394,15 +434,15 @@ extension GameScene {
                 continue
             }
 
+            // Note the hotbar no longer acts on PRESS. It cannot: a hold means drop
+            // it, and acting on press would use the item first and then drop it.
+            // Both targets now decide what they meant on release.
             if let slot = hotbar.slotIndex(atLocalPoint: touch.location(in: hotbar)) {
-                tapHotbar(slot)
+                beginPress(touch, target: .hotbar(slot: slot))
                 continue
             }
 
-            if tapTouch == nil {
-                tapTouch = touch
-                tapOrigin = touch.location(in: self)
-            }
+            beginPress(touch, target: .map)
         }
     }
 
@@ -416,11 +456,11 @@ extension GameScene {
             aimStick.update(toLocalPoint: active.location(in: aimStick))
         }
 
-        // A finger that wanders was never a tap.
-        if let tap = tapTouch, touches.contains(tap) {
-            let moved = tap.location(in: self) - tapOrigin
+        // A finger that wanders was neither a tap nor a hold.
+        if let press = pending, touches.contains(press.touch) {
+            let moved = press.touch.location(in: self) - press.screenOrigin
             if hypot(moved.x, moved.y) > tapSlop {
-                tapTouch = nil
+                cancelPress()
             }
         }
     }
@@ -428,17 +468,69 @@ extension GameScene {
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseControls(matching: touches)
 
-        if let tap = tapTouch, touches.contains(tap) {
-            tapMap(at: tap.location(in: worldLayer))
-            tapTouch = nil
+        guard let press = pending, touches.contains(press.touch) else { return }
+
+        // A hold that already fired has had its turn. Letting the release act too
+        // would delete a wall and then try to build one back on the same spot.
+        if !press.fired {
+            switch press.target {
+            case .map:
+                tapMap(at: press.touch.location(in: worldLayer))
+            case .hotbar(let slot):
+                tapHotbar(slot)
+            }
         }
+
+        cancelPress()
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseControls(matching: touches)
 
-        if let tap = tapTouch, touches.contains(tap) {
-            tapTouch = nil
+        if let press = pending, touches.contains(press.touch) {
+            cancelPress()
+        }
+    }
+
+    // MARK: - Tap or hold
+
+    private func beginPress(_ touch: UITouch, target: PendingPress.Target) {
+        guard pending == nil else { return }
+
+        pending = PendingPress(touch: touch,
+                               screenOrigin: touch.location(in: self),
+                               worldOrigin: touch.location(in: worldLayer),
+                               // UITouch timestamps share the frame clock's base,
+                               // so this is directly comparable in resolveHold.
+                               beganAt: touch.timestamp,
+                               target: target)
+
+        if case .hotbar(let slot) = target {
+            hotbar.beginHold(slot, duration: GameScene.holdDuration)
+        }
+    }
+
+    private func cancelPress() {
+        if let press = pending, case .hotbar = press.target { hotbar.endHold() }
+        pending = nil
+    }
+
+    /// Turns a finger that has stayed put into the second meaning of that gesture:
+    /// take your own wall back down, or throw the item away.
+    private func resolveHold(at now: TimeInterval) {
+        guard var press = pending,
+              !press.fired,
+              now - press.beganAt >= GameScene.holdDuration else { return }
+
+        press.fired = true
+        pending = press
+
+        switch press.target {
+        case .map:
+            queuedCommands.append(.removeBlock(GridGeometry.gridPoint(for: press.worldOrigin)))
+        case .hotbar(let slot):
+            queuedCommands.append(.dropItem(slot: slot))
+            hotbar.endHold()
         }
     }
 

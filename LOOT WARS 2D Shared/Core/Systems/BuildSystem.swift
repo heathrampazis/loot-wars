@@ -12,8 +12,18 @@ enum BuildSystem {
         for (id, list) in commands {
             guard let actor = world.actors[id], actor.isAlive else { continue }
             for command in list {
-                guard case .placeBlock(let point) = command else { continue }
-                place(at: point, by: actor, in: world)
+                switch command {
+                case .placeBlock(let point):
+                    place(at: point, by: actor, in: world)
+                case .removeBlock(let point):
+                    remove(at: point, by: actor, in: world)
+                // Listed rather than defaulted: a new Command should fail to
+                // compile here until somebody has decided whether building cares
+                // about it.
+                case .move, .shoot, .openLootbox, .useItem,
+                     .placeChest, .storeItem, .takeItem, .dropItem:
+                    break
+                }
             }
         }
     }
@@ -52,6 +62,29 @@ enum BuildSystem {
     static func place(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
         guard canPlace(at: point, by: actor, in: world) else { return false }
         world.setTile(.block(owner: actor.team), at: point)
+        return true
+    }
+
+    // MARK: - Taking one back down
+
+    /// Your own wall, and only from inside your own base.
+    ///
+    /// Deliberately the mirror of canPlace rather than a looser rule of its own. If
+    /// you had to be standing in your claim to put a wall up, the same should be
+    /// true of pulling it down - otherwise a base could be dismantled from outside
+    /// it, which is what raiding is for.
+    static func canRemove(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
+        guard world.map[point].blockOwner == actor.team else { return false }
+        return world.claim(for: actor.team)?.contains(GridPoint(containing: actor.feet)) == true
+    }
+
+    @discardableResult
+    static func remove(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
+        guard canRemove(at: point, by: actor, in: world) else { return false }
+
+        // No refund, because blocks are not yet a resource - there is nothing to
+        // give back. The day they cost something, this is where that goes.
+        world.setTile(.floor, at: point)
         return true
     }
 }

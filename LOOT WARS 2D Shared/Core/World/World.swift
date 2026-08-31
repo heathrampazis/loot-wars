@@ -427,8 +427,8 @@ final class World {
                     if abs(input.x) > 0.01 {
                         actor.facesLeft = input.x < 0
                     }
-                case .placeBlock, .shoot, .openLootbox, .useItem,
-                     .placeChest, .storeItem, .takeItem:
+                case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
+                     .placeChest, .storeItem, .takeItem, .dropItem:
                     break   // other systems' business, not movement's
                 }
             }

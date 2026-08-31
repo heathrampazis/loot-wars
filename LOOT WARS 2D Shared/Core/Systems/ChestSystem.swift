@@ -27,7 +27,8 @@ enum ChestSystem {
                     store(from: slot, by: id, into: chest, in: world)
                 case .takeItem(let chest, let slot):
                     take(from: slot, of: chest, by: id, in: world)
-                case .move, .placeBlock, .shoot, .openLootbox, .useItem:
+                case .move, .placeBlock, .removeBlock, .shoot,
+                     .openLootbox, .useItem, .dropItem:
                     break
                 }
             }

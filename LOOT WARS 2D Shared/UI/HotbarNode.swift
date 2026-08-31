@@ -28,6 +28,7 @@ final class HotbarNode: SKNode {
     }
 
     private var slots: [ItemSlotNode] = []
+    private var heldSlot: Int?
     private var lastInventory: Inventory?
     private var lastUsable: [Bool] = []
 
@@ -65,6 +66,19 @@ final class HotbarNode: SKNode {
         }
 
         return nil
+    }
+
+    /// Starts the squeeze on a slot being held down, and stops it again.
+    func beginHold(_ index: Int, duration: TimeInterval) {
+        endHold()
+        guard slots.indices.contains(index) else { return }
+        heldSlot = index
+        slots[index].beginHold(duration: duration)
+    }
+
+    func endHold() {
+        if let held = heldSlot { slots[held].endHold() }
+        heldSlot = nil
     }
 
     /// Rings one slot, or none. Kept out of `update` because arming is scene state

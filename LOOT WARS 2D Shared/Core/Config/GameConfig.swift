@@ -353,6 +353,15 @@ enum GameConfig {
         /// Tries this many spots before settling for the exact spot of the death -
         /// a drop flung into a tree is a drop nobody can reach.
         static let scatterAttempts = 8
+
+        /// How far in front of you an item you deliberately drop is thrown, in
+        /// tiles, nearest first.
+        ///
+        /// The shortest of these still clears the player's own hitbox, which is
+        /// 0.9 by 1.72. It has to: land one inside your own box and the pickup
+        /// sweep hands it straight back on the next tick, and dropping an item
+        /// would silently do nothing at all.
+        static let throwDistances: [Double] = [1.25, 1.6, 2.0]
     }
 
     enum Loot {
