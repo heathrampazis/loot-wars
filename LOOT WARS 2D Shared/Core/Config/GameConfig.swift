@@ -311,23 +311,24 @@ enum GameConfig {
         /// way and the bot has a match to be playing.
         static let patience: Double = 25
 
-        // MARK: - Furnishing the place
-
-        /// How much healing a bot insists on keeping on its person before it will
-        /// put anything in a chest.
+        /// How far behind the leading base a bot has to be before building stops
+        /// waiting for its turn, as a share of the whole wall.
         ///
-        /// Well above the emergency threshold of 60, and that gap is the point: a
-        /// bot should be topping its chest up out of genuine SURPLUS, never
-        /// shaving itself down to the level that sends it running for supplies.
-        /// Stowing must not be able to cause the thing it is meant to be spare of.
-        static let stowHealingReserve = 200
+        /// Bots do not fall behind by building slowly - they fall behind by being
+        /// interrupted, and the ones in the contested middle of the map get
+        /// interrupted most. Left alone that compounds: the bot that is losing
+        /// fights is also the one whose base never closes. A quarter of a wall is
+        /// far enough to be bad luck rather than noise.
+        static let catchUpGap: Double = 0.25
 
-        /// Bombs kept back for raiding rather than stored.
-        static let bombsKept = 2
-
-        /// Seconds between putting one item away, so filling a chest reads as
-        /// somebody unpacking rather than a bag emptying itself.
-        static let stowInterval: Double = 0.4
+        /// Walls laid per trip by a bot that is behind.
+        ///
+        /// Roughly double the usual armful, and this is the half of catching up
+        /// that does the work. Simulated, the bypass alone barely moved anything -
+        /// because the urge timer was never what was holding a laggard back. Being
+        /// interrupted was. A bot that is pulled away from home constantly gets few
+        /// chances, so the fix is not more chances, it is making each one count.
+        static let blocksWhenBehind: ClosedRange<Int> = 14...20
     }
 
     enum Bomb {
@@ -420,6 +421,26 @@ enum GameConfig {
     }
 
     enum Chest {
+        /// What a bot's chest is holding the moment it goes down.
+        ///
+        /// A shortcut, and worth being honest about which one: bots do not hoard
+        /// loot over a match and deposit it, they are simply credited with having
+        /// done so. The alternative was a bot walking back to its own chest often
+        /// enough to fill it, and it turned out never to do that.
+        ///
+        /// Sized against a crate, which is worth about 17.5% of a health bar. At
+        /// two or three items averaging 42 points each this is a hundred-odd points
+        /// of healing plus most of a bomb - six crates or so, for a bomb spent, a
+        /// wall breached and a walk into somebody's base under fire. Raise
+        /// stockCount before the weights if raids feel thin; it is the blunter dial.
+        static let stockCount: ClosedRange<Int> = 2...3
+
+        static let stockTable: [(item: ItemType, weight: Int)] = [
+            (.bandage, 60),
+            (.medkit,  12),
+            (.bomb,    28)
+        ]
+
         /// Footprint in tiles. The art is 1286 x 858 - a hair under 3:2 - and
         /// ChestRenderer draws it at exactly this size, so the chest you see is the
         /// chest you bump into.

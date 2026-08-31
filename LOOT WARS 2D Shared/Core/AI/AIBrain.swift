@@ -30,7 +30,6 @@ enum AIBrain {
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
         state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
-        state.stowTimer = max(0, state.stowTimer - dt)
 
         // Noticing the base is finished, so a gap in it later can be told apart
         // from never having built it. Checked here rather than on the decision
@@ -83,11 +82,6 @@ enum AIBrain {
 
         if let tile = chestToPlace(actor: actor, in: world) {
             commands.append(.placeChest(tile))
-        }
-
-        if let (chest, slot) = itemToStow(&state, actor: actor, in: world) {
-            commands.append(.storeItem(chest: chest, slot: slot))
-            actor.ai = state
         }
 
         if let slot = bombToThrow(state: state, actor: actor, in: world) {
@@ -188,7 +182,14 @@ enum AIBrain {
         }
 
         if case .build = wanted, !state.goal.isBuild {
-            state.blocksLeftToLay = Int.random(in: GameConfig.Build.blocksPerVisit, using: &world.rng)
+            // A bot that is behind takes a bigger armful, because it will get fewer
+            // trips - see GameConfig.Build.blocksWhenBehind for why this, and not
+            // the priority bump above, is what actually closes the gap.
+            let armful = world.isFallingBehind(actor.team)
+                ? GameConfig.Build.blocksWhenBehind
+                : GameConfig.Build.blocksPerVisit
+
+            state.blocksLeftToLay = Int.random(in: armful, using: &world.rng)
         }
 
         if wanted != state.goal {
@@ -313,6 +314,18 @@ enum AIBrain {
                 return .collect(item.id)
             }
             if let crate = nearestCrate(to: actor, in: world) { return .loot(crate.id) }
+        }
+
+        // Left behind. Build regardless of whose turn it is.
+        //
+        // Bots do not fall behind by building slowly, they fall behind by being
+        // interrupted - and the ones in the contested middle get interrupted most,
+        // so the bot losing fights is also the one whose base never closes. This
+        // cannot starve anything below it: at the start every base is at zero and
+        // the gap is zero, and it stops firing the moment the bot catches up.
+        if world.isFallingBehind(actor.team),
+           let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
         }
 
         // A chest standing in a base that is already open. This one IS worth the
@@ -661,53 +674,11 @@ enum AIBrain {
     /// would simply never be picked.
     private static func chestToPlace(actor: Actor, in world: World) -> GridPoint? {
         guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
-        guard let tile = world.nextChestTile(for: actor.team) else { return nil }
+        guard let tile = world.nextChestTile(for: actor.team,
+                                             near: actor.position) else { return nil }
         guard (tile.center - actor.position).length <= GameConfig.Build.reach else { return nil }
         guard ChestSystem.canPlace(at: tile, by: actor, in: world) else { return nil }
         return tile
-    }
-
-    /// Something worth putting away, and the chest to put it in.
-    ///
-    /// The rule that matters is the one about healing. A bot stows only what it
-    /// would still be comfortable without: it works out what its bag would hold
-    /// AFTER the item is gone, and refuses if that leaves it under its reserve.
-    /// Checking before rather than after is the difference between banking a
-    /// surplus and quietly disarming yourself - the reserve is set far above the
-    /// level that sends a bot running for supplies, so stowing can never be the
-    /// thing that triggers a supply run.
-    private static func itemToStow(_ state: inout AIState,
-                                   actor: Actor,
-                                   in world: World) -> (ChestID, Int)? {
-        guard state.stowTimer <= 0 else { return nil }
-        guard let chest = world.reachableChest(for: actor),
-              chest.owner == actor.team else { return nil }
-
-        for (index, slot) in actor.inventory.slots.enumerated() {
-            guard let stack = slot, chest.contents.canAccept(stack.type) else { continue }
-            guard isSpare(stack.type, of: actor) else { continue }
-
-            state.stowTimer = GameConfig.Build.stowInterval
-            return (chest.id, index)
-        }
-
-        return nil
-    }
-
-    private static func isSpare(_ type: ItemType, of actor: Actor) -> Bool {
-        switch type {
-        case .chest:
-            // Chests get stood up, not stored. A chest inside a chest helps nobody.
-            return false
-
-        case .bomb:
-            return actor.inventory.count(of: .bomb) > GameConfig.Build.bombsKept
-
-        case .bandage, .medkit:
-            let carried = actor.inventory.totalHealing(of: actor.maxHealth)
-            let losing = type.healAmount(of: actor.maxHealth)
-            return carried - losing >= GameConfig.Build.stowHealingReserve
-        }
     }
 
     /// The best thing in somebody else's chest that this bot could carry off.

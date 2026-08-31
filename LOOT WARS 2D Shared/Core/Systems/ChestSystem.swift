@@ -66,8 +66,38 @@ enum ChestSystem {
               owner.inventory.consume(at: slot) != nil else { return false }
 
         world.actors[actor.id] = owner
-        world.spawnChest(at: point, owner: actor.team)
+        let chest = world.spawnChest(at: point, owner: actor.team)
+
+        // A bot's chest arrives with something in it. See GameConfig.Chest.stockCount
+        // for why this is a credit rather than a simulation - and note it is bots
+        // only, because a player's chest is theirs to fill.
+        if actor.ai != nil { stock(chest, in: world) }
+
         return true
+    }
+
+    /// Fills a freshly placed bot chest, so there is something to raid it for.
+    ///
+    /// Draws from world.rng in a fixed order, so a seed still replays exactly.
+    private static func stock(_ id: ChestID, in world: World) {
+        guard var chest = world.chests[id] else { return }
+
+        let count = Int.random(in: GameConfig.Chest.stockCount, using: &world.rng)
+        let total = GameConfig.Chest.stockTable.reduce(0) { $0 + $1.weight }
+
+        for _ in 0..<count {
+            var pick = Int.random(in: 0..<total, using: &world.rng)
+
+            for entry in GameConfig.Chest.stockTable {
+                if pick < entry.weight {
+                    _ = chest.contents.add(entry.item)
+                    break
+                }
+                pick -= entry.weight
+            }
+        }
+
+        world.chests[id] = chest
     }
 
     // MARK: - Moving things in and out

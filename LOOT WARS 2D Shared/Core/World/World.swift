@@ -236,10 +236,12 @@ final class World {
 
     // MARK: - Chests
 
-    func spawnChest(at tile: GridPoint, owner: TeamID) {
+    @discardableResult
+    func spawnChest(at tile: GridPoint, owner: TeamID) -> ChestID {
         let chest = Chest(id: ChestID(nextChestID), tile: tile, owner: owner)
         nextChestID += 1
         chests[chest.id] = chest
+        return chest.id
     }
 
     /// The nearest chest you are standing close enough to open - anyone's.
@@ -278,15 +280,24 @@ final class World {
 
     // MARK: - Arcades
 
-    /// Somewhere inside this team's claim to stand a chest.
+    /// Somewhere inside this team's claim to stand a chest, nearest to here.
     ///
-    /// Kept off the wall plan, so a chest never takes the spot a wall is going to
-    /// want, and off the centre tile, which is where everyone spawns. Walks the
-    /// claim in a fixed order, so the same seed puts chests in the same places.
-    func nextChestTile(for team: TeamID) -> GridPoint? {
+    /// NEAREST, and that is the whole fix. This used to return the first legal tile
+    /// in scan order - one fixed corner of the base - while the only caller could
+    /// place a chest within a couple of tiles of where it stood. A bot laying walls
+    /// on the perimeter was essentially never near that one tile, so it carried
+    /// chests around all match and never put one down.
+    ///
+    /// Kept off the wall plan, so a chest never takes a tile a wall is going to
+    /// want - which is also what keeps it INSIDE the walls rather than in the
+    /// doorway - and off the centre tile, where everyone spawns.
+    func nextChestTile(for team: TeamID, near position: Vec2) -> GridPoint? {
         guard let claim = claims[team] else { return nil }
 
         let planned = Set(baseLayouts[team]?.tiles ?? [])
+
+        var best: GridPoint?
+        var shortest = Double.greatestFiniteMagnitude
 
         for col in claim.origin.col..<(claim.origin.col + claim.size) {
             for row in claim.origin.row..<(claim.origin.row + claim.size) {
@@ -295,11 +306,39 @@ final class World {
                 guard map[tile] == .floor else { continue }
                 guard !structureIntersects(Box(tile: tile)) else { continue }
                 guard !trees.contains(where: { $0.overlaps(tile) }) else { continue }
-                return tile
+
+                let distance = (tile.center - position).length
+                guard distance < shortest else { continue }
+                shortest = distance
+                best = tile
             }
         }
 
-        return nil
+        return best
+    }
+
+    /// How much of this team's wall is standing, 0 to 1.
+    func baseProgress(for team: TeamID) -> Double {
+        guard let plan = baseLayouts[team]?.tiles, !plan.isEmpty else { return 1 }
+        let built = plan.filter { map[$0].blockOwner == team }.count
+        return Double(built) / Double(plan.count)
+    }
+
+    /// The best any team is doing.
+    var bestBaseProgress: Double {
+        var best = 0.0
+        for index in 0..<TeamID.count {
+            best = max(best, baseProgress(for: TeamID(index)))
+        }
+        return best
+    }
+
+    /// Whether this team's wall is far enough behind the leader to stop waiting
+    /// its turn. One place, because two callers ask it and they must agree: the
+    /// goal that sends a bot home, and the size of the armful it takes when it
+    /// gets there.
+    func isFallingBehind(_ team: TeamID) -> Bool {
+        baseProgress(for: team) + GameConfig.Build.catchUpGap < bestBaseProgress
     }
 
     /// Whether this team's wall has a hole in it.

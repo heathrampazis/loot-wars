@@ -74,8 +74,6 @@ struct AIState {
     /// a way that the ordinary slow business of building does not.
     var baseWasComplete = false
 
-    /// Spaces out putting things into a chest.
-    var stowTimer: Double = 0
 
     /// Spaces out the individual walls within a trip.
     var placeTimer: Double = 0
