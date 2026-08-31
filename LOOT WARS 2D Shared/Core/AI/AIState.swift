@@ -65,6 +65,18 @@ struct AIState {
     /// Walls left to lay on this trip home.
     var blocksLeftToLay: Int = 0
 
+    /// Whether this bot has ever seen its base finished.
+    ///
+    /// The world cannot tell an unfinished wall from a bombed one - both are just
+    /// "something left to build". This is the difference, and it is why it has to
+    /// be remembered rather than looked up: once the base HAS been whole, a gap in
+    /// it means somebody put it there, and that deserves dropping everything for in
+    /// a way that the ordinary slow business of building does not.
+    var baseWasComplete = false
+
+    /// Spaces out putting things into a chest.
+    var stowTimer: Double = 0
+
     /// Spaces out the individual walls within a trip.
     var placeTimer: Double = 0
 

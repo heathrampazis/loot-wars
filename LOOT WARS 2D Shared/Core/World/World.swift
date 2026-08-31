@@ -242,16 +242,17 @@ final class World {
         chests[chest.id] = chest
     }
 
-    /// The nearest chest of your own that you are standing close enough to open.
+    /// The nearest chest you are standing close enough to open - anyone's.
     ///
     /// Lives here so the button that offers to open one and the system that moves
     /// items can never disagree about which chest, or about whether you are near
-    /// enough to be reaching into it.
+    /// enough to be reaching into it. Whether you may take from it or only look is
+    /// ChestSystem's call, not this one's.
     func reachableChest(for actor: Actor) -> Chest? {
         var closest: Chest?
         var shortest = Double.greatestFiniteMagnitude
 
-        for chest in chests.values where chest.owner == actor.team {
+        for chest in chests.values {
             guard ChestSystem.canReach(chest, from: actor) else { continue }
 
             let distance = (chest.position - actor.position).length
@@ -276,6 +277,46 @@ final class World {
     }
 
     // MARK: - Arcades
+
+    /// Somewhere inside this team's claim to stand a chest.
+    ///
+    /// Kept off the wall plan, so a chest never takes the spot a wall is going to
+    /// want, and off the centre tile, which is where everyone spawns. Walks the
+    /// claim in a fixed order, so the same seed puts chests in the same places.
+    func nextChestTile(for team: TeamID) -> GridPoint? {
+        guard let claim = claims[team] else { return nil }
+
+        let planned = Set(baseLayouts[team]?.tiles ?? [])
+
+        for col in claim.origin.col..<(claim.origin.col + claim.size) {
+            for row in claim.origin.row..<(claim.origin.row + claim.size) {
+                let tile = GridPoint(col: col, row: row)
+                guard !planned.contains(tile), tile != claim.centreTile else { continue }
+                guard map[tile] == .floor else { continue }
+                guard !structureIntersects(Box(tile: tile)) else { continue }
+                guard !trees.contains(where: { $0.overlaps(tile) }) else { continue }
+                return tile
+            }
+        }
+
+        return nil
+    }
+
+    /// Whether this team's wall has a hole in it.
+    ///
+    /// The same question as "is there anything left to build", which is why an
+    /// unfinished base and a bombed one look identical from here. Telling them
+    /// apart needs to know the base was once finished, and that is a thing a bot
+    /// remembers - see AIState.baseWasComplete.
+    func baseIsBreached(_ team: TeamID) -> Bool {
+        nextBuildTile(for: team) != nil
+    }
+
+    /// Enemy chests, for anyone deciding what is worth raiding.
+    func chests(notOwnedBy team: TeamID) -> [Chest] {
+        chests.values.filter { $0.owner != team }
+            .sorted { $0.id.raw < $1.id.raw }
+    }
 
     func arcade(_ id: ArcadeID) -> Arcade? {
         arcades.first { $0.id == id }

@@ -30,6 +30,12 @@ enum AIBrain {
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
         state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
+        state.stowTimer = max(0, state.stowTimer - dt)
+
+        // Noticing the base is finished, so a gap in it later can be told apart
+        // from never having built it. Checked here rather than on the decision
+        // timer: the moment of completion is brief and easy to walk past.
+        if !world.baseIsBreached(actor.team) { state.baseWasComplete = true }
         state.reactionTimer = max(0, state.reactionTimer - dt)
         state.decisionTimer -= dt
 
@@ -75,6 +81,15 @@ enum AIBrain {
             actor.ai = state
         }
 
+        if let tile = chestToPlace(actor: actor, in: world) {
+            commands.append(.placeChest(tile))
+        }
+
+        if let (chest, slot) = itemToStow(&state, actor: actor, in: world) {
+            commands.append(.storeItem(chest: chest, slot: slot))
+            actor.ai = state
+        }
+
         if let slot = bombToThrow(state: state, actor: actor, in: world) {
             commands.append(.useItem(slot: slot))
         }
@@ -97,6 +112,13 @@ enum AIBrain {
         // Open whatever is within reach, whatever the bot was busy doing. Walking
         // past an open-able crate and ignoring it is the sort of thing that gives
         // a bot away.
+        // Standing at somebody else's chest with room in the bag: help yourself.
+        // Whatever the bot was busy doing - the same reasoning as the crate below.
+        if let chest = world.reachableChest(for: actor), chest.owner != actor.team,
+           let slot = slotWorthRobbing(from: chest, actor: actor) {
+            commands.append(.takeItem(chest: chest.id, slot: slot))
+        }
+
         if world.reachableLootbox(for: actor) != nil {
             commands.append(.openLootbox)
 
@@ -117,6 +139,12 @@ enum AIBrain {
         // is in the way that steering cannot solve. Give up and look elsewhere.
         switch state.goal {
         case .loot, .collect:
+            if state.goalAge > GameConfig.AI.lootPatience {
+                state.lootCooldown = GameConfig.AI.lootCooldown
+            }
+        case .robChest:
+            // Same clock as a crate. A bot that cannot get to a chest has usually
+            // found a base that is not as open as its wall plan suggested.
             if state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
             }
@@ -214,7 +242,7 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect, .build, .raid, .farm:
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest:
             // All interruptible. A bot laying bricks - or lining up a throw, or
             // waiting on a payout - while somebody shoots at it is not a bot
             // anyone believes in.
@@ -248,6 +276,16 @@ enum AIBrain {
             return .fight(enemy.id)
         }
 
+        // Somebody has put a hole in a finished base. Everything else waits.
+        //
+        // Above the build commitment rather than folded into it, because this is
+        // not the slow business of building - it is a door standing open, and the
+        // chest behind it is being emptied while the bot thinks about it.
+        if state.baseWasComplete, world.baseIsBreached(actor.team),
+           let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
+        }
+
         // A trip home is a commitment.
         //
         // Without this a bot re-weighs building against every crate it walks past,
@@ -275,6 +313,17 @@ enum AIBrain {
                 return .collect(item.id)
             }
             if let crate = nearestCrate(to: actor, in: world) { return .loot(crate.id) }
+        }
+
+        // A chest standing in a base that is already open. This one IS worth the
+        // walk - it is the only thing on the map that repays crossing it.
+        //
+        // Below the supply check on purpose, even though a chest is FULL of
+        // supplies. A crate five tiles away beats a chest thirty away when you are
+        // one hit from dying, and a bot that walks past its own rescue to go
+        // shopping in somebody's base deserves what it gets.
+        if let chest = chestWorthRobbing(for: actor, in: world) {
+            return .robChest(chest.id)
         }
 
         // Otherwise the base gets its turn whenever the urge is up. The urge timer
@@ -360,6 +409,64 @@ enum AIBrain {
         return closest
     }
 
+    /// The nearest wall of a base that actually holds something.
+    ///
+    /// Nearest to the CHEST rather than to the bot, so the hole ends up somewhere
+    /// useful. Blowing the far side of a base open and then walking round it is
+    /// the sort of thing that makes a bot look like it is following a rule rather
+    /// than trying to get in.
+    private static func wallGuarding(aChestFor actor: Actor, in world: World) -> GridPoint? {
+        var best: GridPoint?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for chest in world.chests(notOwnedBy: actor.team) {
+            guard (chest.position - actor.position).length <= GameConfig.AI.raidRange
+                    + Double(GameConfig.Map.claimSize) else { continue }
+
+            for tile in world.baseLayouts[chest.owner]?.tiles ?? [] {
+                guard world.map[tile].blockOwner != nil else { continue }
+
+                // Near the chest, and near the bot: that is the tile whose removal
+                // actually opens a way through to it.
+                let toChest = (tile.center - chest.position).length
+                let toBot = (tile.center - actor.position).length
+                guard toBot <= GameConfig.AI.raidRange else { continue }
+
+                let score = toChest + toBot * 0.5
+                guard score < shortest else { continue }
+                shortest = score
+                best = tile
+            }
+        }
+
+        return best
+    }
+
+    /// An enemy chest that is worth going for, because there is a way in.
+    ///
+    /// "A way in" is answered by the base's own wall plan having a gap in it,
+    /// rather than by pathfinding - there is no pathfinder here, and the steering
+    /// will feel its way through an opening it can see. A base still sealed is left
+    /// to the bombs.
+    private static func chestWorthRobbing(for actor: Actor, in world: World) -> Chest? {
+        guard !actor.inventory.isFull else { return nil }
+
+        var best: Chest?
+        var shortest = GameConfig.AI.robRange
+
+        for chest in world.chests(notOwnedBy: actor.team) {
+            guard chest.contents.slots.contains(where: { $0 != nil }) else { continue }
+            guard world.baseIsBreached(chest.owner) else { continue }
+
+            let distance = (chest.position - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = chest
+        }
+
+        return best
+    }
+
     private static func nearestArcade(to actor: Actor, in world: World) -> Arcade? {
         var closest: Arcade?
         var shortest = GameConfig.AI.arcadeSearchRange
@@ -426,6 +533,17 @@ enum AIBrain {
         case .farm(let id):
             steer(&state, actor: actor,
                   to: world.arcade(id).map { approachSpot(for: $0, from: actor, in: world) })
+
+        case .robChest(let id):
+            // Gone, or emptied by somebody who got there first. Either way there is
+            // nothing here worth standing in an enemy base for.
+            guard let chest = world.chests[id],
+                  chest.contents.slots.contains(where: { $0 != nil }) else {
+                state.goal = .wander
+                state.goalAge = 0
+                return
+            }
+            steer(&state, actor: actor, to: chest.position)
 
         case .build(let tile):
             steer(&state, actor: actor,
@@ -533,6 +651,85 @@ enum AIBrain {
     /// Spaced out by a timer so walls go up one after another, and capped per trip
     /// so a bot lays a couple and gets back to the match rather than camping its
     /// claim until the base is finished.
+    // MARK: - Keeping house
+
+    /// A tile to stand a carried chest on, if the bot is home and has one.
+    ///
+    /// No goal of its own. A chest goes down during a trip the bot was making
+    /// anyway, which is both how a person would do it and how this avoids
+    /// competing for priority with everything else - a goal this far down the list
+    /// would simply never be picked.
+    private static func chestToPlace(actor: Actor, in world: World) -> GridPoint? {
+        guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
+        guard let tile = world.nextChestTile(for: actor.team) else { return nil }
+        guard (tile.center - actor.position).length <= GameConfig.Build.reach else { return nil }
+        guard ChestSystem.canPlace(at: tile, by: actor, in: world) else { return nil }
+        return tile
+    }
+
+    /// Something worth putting away, and the chest to put it in.
+    ///
+    /// The rule that matters is the one about healing. A bot stows only what it
+    /// would still be comfortable without: it works out what its bag would hold
+    /// AFTER the item is gone, and refuses if that leaves it under its reserve.
+    /// Checking before rather than after is the difference between banking a
+    /// surplus and quietly disarming yourself - the reserve is set far above the
+    /// level that sends a bot running for supplies, so stowing can never be the
+    /// thing that triggers a supply run.
+    private static func itemToStow(_ state: inout AIState,
+                                   actor: Actor,
+                                   in world: World) -> (ChestID, Int)? {
+        guard state.stowTimer <= 0 else { return nil }
+        guard let chest = world.reachableChest(for: actor),
+              chest.owner == actor.team else { return nil }
+
+        for (index, slot) in actor.inventory.slots.enumerated() {
+            guard let stack = slot, chest.contents.canAccept(stack.type) else { continue }
+            guard isSpare(stack.type, of: actor) else { continue }
+
+            state.stowTimer = GameConfig.Build.stowInterval
+            return (chest.id, index)
+        }
+
+        return nil
+    }
+
+    private static func isSpare(_ type: ItemType, of actor: Actor) -> Bool {
+        switch type {
+        case .chest:
+            // Chests get stood up, not stored. A chest inside a chest helps nobody.
+            return false
+
+        case .bomb:
+            return actor.inventory.count(of: .bomb) > GameConfig.Build.bombsKept
+
+        case .bandage, .medkit:
+            let carried = actor.inventory.totalHealing(of: actor.maxHealth)
+            let losing = type.healAmount(of: actor.maxHealth)
+            return carried - losing >= GameConfig.Build.stowHealingReserve
+        }
+    }
+
+    /// The best thing in somebody else's chest that this bot could carry off.
+    ///
+    /// Takes the biggest heal it can hold first, then anything else - a raider
+    /// with one trip's worth of pockets should leave with the good stuff.
+    private static func slotWorthRobbing(from chest: Chest, actor: Actor) -> Int? {
+        var best: Int?
+        var bestValue = -1
+
+        for (index, slot) in chest.contents.slots.enumerated() {
+            guard let stack = slot, actor.inventory.canAccept(stack.type) else { continue }
+
+            let value = stack.type.healAmount(of: actor.maxHealth)
+            guard value > bestValue else { continue }
+            bestValue = value
+            best = index
+        }
+
+        return best
+    }
+
     private static func wallToLay(_ state: inout AIState, actor: Actor, in world: World) -> GridPoint? {
         guard case .build = state.goal else { return nil }
         guard state.placeTimer <= 0, state.blocksLeftToLay > 0 else { return nil }
@@ -570,8 +767,16 @@ enum AIBrain {
     /// already near somebody else's claim, and that claim actually has a wall
     /// standing. Without the last one a bot would trudge to an empty patch of
     /// ground and stand there looking pleased with itself.
+    /// A wall worth blowing open.
+    ///
+    /// Prefers a base with a chest in it, and that preference is the difference
+    /// between raiding and vandalism. Bombing a wall for its own sake achieves
+    /// nothing anyone can see; bombing the wall in front of a full chest is the
+    /// whole point of carrying a bomb.
     private static func raidTarget(for actor: Actor, in world: World) -> GridPoint? {
         guard actor.inventory.count(of: .bomb) > 0 else { return nil }
+
+        if let worthwhile = wallGuarding(aChestFor: actor, in: world) { return worthwhile }
 
         var closest: GridPoint?
         var shortest = GameConfig.AI.raidRange
@@ -769,7 +974,7 @@ enum AIBrain {
         switch state.goal {
         case .fight(let id):   targetID = id
         case .retreat(let id): targetID = id
-        case .wander, .loot, .collect, .build, .raid, .farm: targetID = nil
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest: targetID = nil
         }
 
         guard let id = targetID,

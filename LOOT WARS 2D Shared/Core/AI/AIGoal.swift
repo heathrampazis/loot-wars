@@ -24,6 +24,8 @@ enum AIGoal: Equatable {
     case raid(GridPoint)
     /// Walk to an arcade machine and stand in its payouts.
     case farm(ArcadeID)
+    /// Walk to somebody else's chest and empty it.
+    case robChest(ChestID)
 
     var isBuild: Bool {
         if case .build = self { return true }
@@ -50,6 +52,7 @@ enum AIGoal: Equatable {
         case .build: return "build"
         case .raid:  return "raid"
         case .farm:  return "coin"
+        case .robChest: return "rob"
         }
     }
 }

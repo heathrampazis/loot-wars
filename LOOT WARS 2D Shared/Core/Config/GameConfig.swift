@@ -222,6 +222,12 @@ enum GameConfig {
         /// it walks past, it does not cross the map to do it.
         static let raidRange: Double = 14
 
+        /// How far a bot will travel for an enemy chest it could get at.
+        ///
+        /// Longer than raidRange, because this one is worth the walk: a chest with
+        /// something in it is the only thing on the map that repays crossing it.
+        static let robRange: Double = 30
+
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26
 
@@ -280,18 +286,18 @@ enum GameConfig {
         /// minutes - it barely loots, so it turns up to fights with nothing to
         /// patch itself up with. Same build time either way; this version spends
         /// the difference out on the map.
-        static let urgeInterval: ClosedRange<Double> = 10...16
+        static let urgeInterval: ClosedRange<Double> = 6...10
 
         /// Walls laid per trip.
         ///
         /// More walls per trip rather than more trips: the walk home is what a trip
         /// actually costs, so a bigger armful finishes the base faster without
         /// eating into the time a bot spends out on the map looting.
-        static let blocksPerVisit: ClosedRange<Int> = 4...7
+        static let blocksPerVisit: ClosedRange<Int> = 7...11
 
         /// Seconds between individual walls. Quick enough to read as somebody
         /// laying a run of them, slow enough that you can still see it happen.
-        static let placeInterval: Double = 0.5
+        static let placeInterval: Double = 0.32
 
         /// How close a bot must be to the tile it is laying, in tiles.
         static let reach: Double = 2.2
@@ -304,6 +310,24 @@ enum GameConfig {
         /// Abandon a building trip that has taken this long - something is in the
         /// way and the bot has a match to be playing.
         static let patience: Double = 25
+
+        // MARK: - Furnishing the place
+
+        /// How much healing a bot insists on keeping on its person before it will
+        /// put anything in a chest.
+        ///
+        /// Well above the emergency threshold of 60, and that gap is the point: a
+        /// bot should be topping its chest up out of genuine SURPLUS, never
+        /// shaving itself down to the level that sends it running for supplies.
+        /// Stowing must not be able to cause the thing it is meant to be spare of.
+        static let stowHealingReserve = 200
+
+        /// Bombs kept back for raiding rather than stored.
+        static let bombsKept = 2
+
+        /// Seconds between putting one item away, so filling a chest reads as
+        /// somebody unpacking rather than a bag emptying itself.
+        static let stowInterval: Double = 0.4
     }
 
     enum Bomb {

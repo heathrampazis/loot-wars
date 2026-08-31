@@ -82,6 +82,8 @@ enum ChestSystem {
         actor.hitbox.expanded(by: GameConfig.Chest.openReach).intersects(chest.hitbox)
     }
 
+    /// Putting something IN is still yours alone - stocking somebody else's base
+    /// is not a thing anyone wants to do.
     private static func store(from slot: Int, by id: ActorID,
                               into chestID: ChestID, in world: World) {
         guard var actor = world.actors[id],
@@ -99,11 +101,16 @@ enum ChestSystem {
         world.chests[chestID] = chest
     }
 
+    /// Taking something OUT needs only that you are standing at it.
+    ///
+    /// Not owner-only, and that asymmetry is the whole of chest raiding. A chest
+    /// that only its owner could open would be a safe, and a safe behind a wall is
+    /// worth nothing to anyone who breaks the wall - which would leave bombs with
+    /// nothing to be for.
     private static func take(from slot: Int, of chestID: ChestID,
                              by id: ActorID, in world: World) {
         guard var actor = world.actors[id],
               var chest = world.chests[chestID],
-              chest.owner == actor.team,
               canReach(chest, from: actor),
               let stack = chest.contents.stack(at: slot) else { return }
 
