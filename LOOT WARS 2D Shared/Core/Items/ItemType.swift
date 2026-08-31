@@ -5,13 +5,13 @@
 //  What an item IS. Deliberately says nothing about what it looks like - the art
 //  for each type lives in Render/ItemArt, so Core never learns about textures.
 //
-//  Note the trade the three supplies make: the bigger the heal, the fewer you can
-//  carry. Five bandaids restore more in total than two medkits, but a medkit is the
-//  one that saves you mid-fight.
+//  Note what the two supplies trade, because it is not total healing: four
+//  bandages and two medkits both come to twice your health bar, so a slot holds the
+//  same either way. What you are choosing is how FAST - a medkit is one action
+//  where a bandage is two, and mid-fight that is the whole difference.
 //
 
 enum ItemType: Hashable, CaseIterable {
-    case bandaid
     case bandage
     case medkit
     case bomb
@@ -19,7 +19,6 @@ enum ItemType: Hashable, CaseIterable {
     /// How many fit in one inventory slot.
     var maxStack: Int {
         switch self {
-        case .bandaid: return 5
         case .bandage: return 4
         case .medkit:  return 2
         case .bomb:    return 3
@@ -34,7 +33,6 @@ enum ItemType: Hashable, CaseIterable {
     /// Share of maximum health restored when used.
     var healFraction: Double {
         switch self {
-        case .bandaid: return 0.25
         case .bandage: return 0.50
         case .medkit:  return 1.00
         case .bomb:    return 0

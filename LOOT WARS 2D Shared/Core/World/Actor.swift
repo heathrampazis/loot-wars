@@ -99,7 +99,7 @@ struct Actor {
         switch stack.type {
         case .bomb:
             return true
-        case .bandaid, .bandage, .medkit:
+        case .bandage, .medkit:
             // Using one on full health would throw it away for nothing.
             return health < maxHealth
         }

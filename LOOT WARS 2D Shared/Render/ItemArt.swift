@@ -33,9 +33,9 @@ enum ItemArt {
     ///
     /// Fitting rather than matching one axis. While every item happened to be
     /// roughly square this made no difference, and both the hotbar and the ground
-    /// simply scaled by whichever axis was convenient. A tall bandaid and a wide
-    /// medkit broke that immediately: matched on height, the medkit is half again
-    /// wider than its hotbar slot.
+    /// simply scaled by whichever axis was convenient - until one arrived that was
+    /// half again wider than it was tall, and overflowed its hotbar slot. Fitting
+    /// costs nothing and means art can be any shape.
     static func size(of texture: SKTexture, fittingInto box: CGFloat) -> CGSize {
         let art = texture.size()
         guard art.width > 0, art.height > 0 else {
@@ -48,7 +48,6 @@ enum ItemArt {
 
     private static func assetName(for pickup: Pickup) -> String {
         switch pickup {
-        case .item(.bandaid):    return "Bandaid"
         case .item(.bandage):    return "Bandage"
         case .item(.medkit):     return "Medkit"
         case .item(.bomb):       return "Bomb"

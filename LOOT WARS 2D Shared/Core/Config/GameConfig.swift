@@ -225,14 +225,19 @@ enum GameConfig {
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26
 
-        /// Carrying less healing than this - under two bandaids - a bot drops what it
-        /// is doing and goes shopping.
+        /// Carrying less healing than this - at most one bandage - a bot drops what
+        /// it is doing and goes shopping.
+        ///
+        /// Raised from 50 when the bandaid went. The rule has always meant "one or
+        /// none of the smallest supply", and at 50 with nothing below a bandage it
+        /// would have meant "completely empty" instead - a bot setting off for
+        /// supplies only once it had none left, which is exactly too late.
         ///
         /// Deliberately a near-empty bag rather than a comfortable one. Set at a
         /// comfortable level it beats building almost permanently, because with
         /// crates everywhere there is always one worth a detour, and bases never
         /// get built.
-        static let emergencyHealingStock = 50
+        static let emergencyHealingStock = 60
 
         /// How far a bot will detour for an item lying on the ground, in tiles.
         /// Shorter than the crate range - a dropped item is worth a few steps, not
