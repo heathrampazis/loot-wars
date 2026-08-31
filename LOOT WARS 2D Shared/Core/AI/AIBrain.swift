@@ -299,44 +299,40 @@ enum AIBrain {
             return .build(wall)
         }
 
-        // Standing next to somebody's wall with a bomb in the bag. Deliberately
-        // opportunistic rather than a plan: a bot does not march across the map to
-        // raid, it raids what it finds on the way past.
+        // Behind on the wall. Building comes before any of the aggression below,
+        // because a bot that never closes its base is a bot that never has a chest
+        // worth anyone raiding - including its own reason to exist on this map.
+        if world.isFallingBehind(actor.team),
+           let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
+        }
+
+        // Somebody's chest, and a way to it. This is the top of the aggression
+        // list on purpose: raiding is the point of bases existing, and it used to
+        // sit below the supply check where it almost never came up.
+        if let chest = chestWorthRobbing(for: actor, in: world) {
+            return .robChest(chest.id)
+        }
+
+        // Standing next to somebody's wall with a bomb in the bag, and no chest
+        // worth the trip. Opportunistic vandalism - it opens a base up for later,
+        // and for everybody else.
         if let wall = raidTarget(for: actor, in: world) {
             return .raid(wall)
         }
 
         // Almost out of supplies: go shopping, base or no base. Healing only - a
         // token is no use to a bot that is about to die.
+        //
+        // Below robbing now, which is safe rather than lucky: chestWorthRobbing
+        // refuses to set out on an empty bag, so whenever this branch is true that
+        // one was false. The two cannot both want the bot at once.
         if actor.inventory.totalHealing(of: actor.maxHealth) < GameConfig.AI.emergencyHealingStock,
            state.lootCooldown <= 0 {
             if let item = nearestItem(to: actor, in: world, include: isHealing) {
                 return .collect(item.id)
             }
             if let crate = nearestCrate(to: actor, in: world) { return .loot(crate.id) }
-        }
-
-        // Left behind. Build regardless of whose turn it is.
-        //
-        // Bots do not fall behind by building slowly, they fall behind by being
-        // interrupted - and the ones in the contested middle get interrupted most,
-        // so the bot losing fights is also the one whose base never closes. This
-        // cannot starve anything below it: at the start every base is at zero and
-        // the gap is zero, and it stops firing the moment the bot catches up.
-        if world.isFallingBehind(actor.team),
-           let wall = world.nextBuildTile(for: actor.team) {
-            return .build(wall)
-        }
-
-        // A chest standing in a base that is already open. This one IS worth the
-        // walk - it is the only thing on the map that repays crossing it.
-        //
-        // Below the supply check on purpose, even though a chest is FULL of
-        // supplies. A crate five tiles away beats a chest thirty away when you are
-        // one hit from dying, and a bot that walks past its own rescue to go
-        // shopping in somebody's base deserves what it gets.
-        if let chest = chestWorthRobbing(for: actor, in: world) {
-            return .robChest(chest.id)
         }
 
         // Otherwise the base gets its turn whenever the urge is up. The urge timer
@@ -455,21 +451,32 @@ enum AIBrain {
         return best
     }
 
-    /// An enemy chest that is worth going for, because there is a way in.
+    /// An enemy chest worth going for.
     ///
-    /// "A way in" is answered by the base's own wall plan having a gap in it,
-    /// rather than by pathfinding - there is no pathfinder here, and the steering
-    /// will feel its way through an opening it can see. A base still sealed is left
-    /// to the bombs.
+    /// Two ways in, and adding the second is most of why raids were so rare. A
+    /// base already breached can simply be walked into. A base still sealed can be
+    /// OPENED - and a bot carrying a bomb is carrying the way in. Requiring
+    /// somebody else to have made the hole first meant that once bases were built
+    /// fast and repaired properly, almost nothing was ever open, so almost nothing
+    /// was ever robbed.
+    ///
+    /// The supply check is what lets this sit above the emergency branch. A bot
+    /// will not set out on a raid with an empty bag, so whenever this returns
+    /// something, that branch was not going to fire anyway - they can never both
+    /// want the bot at the same moment.
     private static func chestWorthRobbing(for actor: Actor, in world: World) -> Chest? {
         guard !actor.inventory.isFull else { return nil }
+        guard actor.inventory.totalHealing(of: actor.maxHealth)
+                >= GameConfig.AI.emergencyHealingStock else { return nil }
+
+        let carryingAWayIn = actor.inventory.count(of: .bomb) > 0
 
         var best: Chest?
         var shortest = GameConfig.AI.robRange
 
         for chest in world.chests(notOwnedBy: actor.team) {
             guard chest.contents.slots.contains(where: { $0 != nil }) else { continue }
-            guard world.baseIsBreached(chest.owner) else { continue }
+            guard carryingAWayIn || world.baseIsBreached(chest.owner) else { continue }
 
             let distance = (chest.position - actor.position).length
             guard distance < shortest else { continue }
@@ -478,6 +485,31 @@ enum AIBrain {
         }
 
         return best
+    }
+
+    /// The wall standing between this bot and the chest it came for.
+    ///
+    /// Nearest to the bot rather than nearest to the chest: by the time this is
+    /// asked the bot has walked up to the base and is facing whatever is in front
+    /// of it, and that is the tile whose removal lets it in.
+    private static func wallInTheWay(of chestID: ChestID,
+                                     for actor: Actor,
+                                     in world: World) -> GridPoint? {
+        guard let chest = world.chests[chestID] else { return nil }
+
+        var closest: GridPoint?
+        var shortest = GameConfig.Bomb.throwRange
+
+        for tile in world.baseLayouts[chest.owner]?.tiles ?? [] {
+            guard world.map[tile].blockOwner != nil else { continue }
+
+            let distance = (tile.center - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            closest = tile
+        }
+
+        return closest
     }
 
     private static func nearestArcade(to actor: Actor, in world: World) -> Arcade? {
@@ -674,6 +706,11 @@ enum AIBrain {
     /// would simply never be picked.
     private static func chestToPlace(actor: Actor, in world: World) -> GridPoint? {
         guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
+
+        // Not until the wall is shut. A chest standing in a half-built base is free
+        // loot for whoever wanders past, and nobody should be able to help
+        // themselves to a base they have not had to break into.
+        guard !world.baseIsBreached(actor.team) else { return nil }
         guard let tile = world.nextChestTile(for: actor.team,
                                              near: actor.position) else { return nil }
         guard (tile.center - actor.position).length <= GameConfig.Build.reach else { return nil }
@@ -781,7 +818,21 @@ enum AIBrain {
     /// before throwing. Without the second test it would fling bombs sideways while
     /// rounding the corner of somebody's base.
     private static func bombToThrow(state: AIState, actor: Actor, in world: World) -> Int? {
-        guard case .raid(let tile) = state.goal else { return nil }
+        // Thrown on either raiding goal. Vandalism has a target handed to it;
+        // robbing works out what is in the way, which is what turns "walk at the
+        // chest and hope" into "open the wall and walk in".
+        let target: GridPoint?
+
+        switch state.goal {
+        case .raid(let tile):
+            target = tile
+        case .robChest(let id):
+            target = wallInTheWay(of: id, for: actor, in: world)
+        case .wander, .loot, .collect, .fight, .retreat, .build, .farm:
+            target = nil
+        }
+
+        guard let tile = target else { return nil }
         guard world.map[tile].blockOwner != nil else { return nil }
 
         guard let slot = BombSystem.loadedSlot(of: actor),

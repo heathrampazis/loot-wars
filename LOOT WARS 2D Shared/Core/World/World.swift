@@ -288,30 +288,30 @@ final class World {
     /// on the perimeter was essentially never near that one tile, so it carried
     /// chests around all match and never put one down.
     ///
-    /// Kept off the wall plan, so a chest never takes a tile a wall is going to
-    /// want - which is also what keeps it INSIDE the walls rather than in the
-    /// doorway - and off the centre tile, where everyone spawns.
+    /// Searched over the ground the wall ENCLOSES, not the claim.
+    ///
+    /// The two are not the same: the wall goes round a random rectangle within the
+    /// claim, so most claims have ground that is theirs and yet outside their own
+    /// walls. Searching the claim put chests on that ground - protected by nothing,
+    /// free to anyone who strolled past, and no reason to raid anybody.
     func nextChestTile(for team: TeamID, near position: Vec2) -> GridPoint? {
-        guard let claim = claims[team] else { return nil }
-
-        let planned = Set(baseLayouts[team]?.tiles ?? [])
+        guard let layout = baseLayouts[team] else { return nil }
 
         var best: GridPoint?
         var shortest = Double.greatestFiniteMagnitude
 
-        for col in claim.origin.col..<(claim.origin.col + claim.size) {
-            for row in claim.origin.row..<(claim.origin.row + claim.size) {
-                let tile = GridPoint(col: col, row: row)
-                guard !planned.contains(tile), tile != claim.centreTile else { continue }
-                guard map[tile] == .floor else { continue }
-                guard !structureIntersects(Box(tile: tile)) else { continue }
-                guard !trees.contains(where: { $0.overlaps(tile) }) else { continue }
+        // Sorted, because Set iteration order is not stable and two runs of the
+        // same seed have to put the chest in the same place.
+        for tile in layout.region.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
+            guard tile != claims[team]?.centreTile else { continue }
+            guard map[tile] == .floor else { continue }
+            guard !structureIntersects(Box(tile: tile)) else { continue }
+            guard !trees.contains(where: { $0.overlaps(tile) }) else { continue }
 
-                let distance = (tile.center - position).length
-                guard distance < shortest else { continue }
-                shortest = distance
-                best = tile
-            }
+            let distance = (tile.center - position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = tile
         }
 
         return best
@@ -466,7 +466,7 @@ final class World {
 
         applyMovementInput(everyone)
         BuildSystem.update(self, commands: everyone)
-        ChestSystem.update(self, commands: everyone)
+        ChestSystem.update(self, commands: everyone, dt: dt)
         // Before movement, so a wall that comes down this tick is a gap somebody
         // can already walk through.
         BombSystem.update(self, commands: everyone, dt: dt)

@@ -435,6 +435,18 @@ enum GameConfig {
         /// stockCount before the weights if raids feel thin; it is the blunter dial.
         static let stockCount: ClosedRange<Int> = 2...3
 
+        /// Seconds between a raided bot chest putting one item back.
+        ///
+        /// Slow enough that emptying one still means something - a raider gets the
+        /// lot and the next caller finds bare boards - and quick enough that the
+        /// same base is worth a second visit later in a match. At this rate a
+        /// stripped chest is back to a useful two items after about a minute.
+        static let restockInterval: Double = 28
+
+        /// The most a chest will refill itself to. Below what a fresh one holds, so
+        /// the first raid on a base is always the best one.
+        static let restockCeiling = 2
+
         static let stockTable: [(item: ItemType, weight: Int)] = [
             (.bandage, 60),
             (.medkit,  12),

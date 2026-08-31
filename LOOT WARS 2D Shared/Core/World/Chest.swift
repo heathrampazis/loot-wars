@@ -29,6 +29,17 @@ struct Chest {
 
     var contents = Inventory()
 
+    /// Whether this chest refills itself. True for a bot's, false for yours.
+    ///
+    /// A standing reason to come back. A chest raided once and empty forever is a
+    /// one-off errand; one that fills again is a place on the map worth returning
+    /// to, which is what makes raiding a habit rather than an event.
+    var selfStocking = false
+
+    /// Counts down to the next item appearing. Slow on purpose - see
+    /// GameConfig.Chest.restockInterval.
+    var restockTimer: Double = 0
+
     var position: Vec2 { tile.center }
 
     /// Solid, and exactly the size the renderer draws.

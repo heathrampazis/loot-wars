@@ -12,7 +12,9 @@
 
 enum ChestSystem {
 
-    static func update(_ world: World, commands: [ActorID: [Command]]) {
+    static func update(_ world: World, commands: [ActorID: [Command]], dt: Double) {
+        restock(world, dt: dt)
+
         for (id, list) in commands {
             for command in list {
                 // Re-read the actor per command rather than once per list: two taps
@@ -76,28 +78,59 @@ enum ChestSystem {
         return true
     }
 
+    /// Puts an item back into raided bot chests, a little at a time.
+    ///
+    /// Iterated in id order rather than dictionary order: this draws from the
+    /// world's generator, and a dictionary's iteration order is not stable between
+    /// runs, so doing it the obvious way would quietly break seeded replays.
+    private static func restock(_ world: World, dt: Double) {
+        for id in world.chests.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var chest = world.chests[id], chest.selfStocking else { continue }
+
+            let held = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
+            guard held < GameConfig.Chest.restockCeiling else {
+                // Full enough. Hold the timer at the ready so the next thing taken
+                // out starts refilling immediately rather than after a fresh wait.
+                chest.restockTimer = 0
+                world.chests[id] = chest
+                continue
+            }
+
+            chest.restockTimer -= dt
+            if chest.restockTimer <= 0 {
+                chest.restockTimer = GameConfig.Chest.restockInterval
+                add(oneItemTo: &chest, in: world)
+            }
+
+            world.chests[id] = chest
+        }
+    }
+
     /// Fills a freshly placed bot chest, so there is something to raid it for.
     ///
     /// Draws from world.rng in a fixed order, so a seed still replays exactly.
     private static func stock(_ id: ChestID, in world: World) {
         guard var chest = world.chests[id] else { return }
 
+        chest.selfStocking = true
+
         let count = Int.random(in: GameConfig.Chest.stockCount, using: &world.rng)
-        let total = GameConfig.Chest.stockTable.reduce(0) { $0 + $1.weight }
-
-        for _ in 0..<count {
-            var pick = Int.random(in: 0..<total, using: &world.rng)
-
-            for entry in GameConfig.Chest.stockTable {
-                if pick < entry.weight {
-                    _ = chest.contents.add(entry.item)
-                    break
-                }
-                pick -= entry.weight
-            }
-        }
+        for _ in 0..<count { add(oneItemTo: &chest, in: world) }
 
         world.chests[id] = chest
+    }
+
+    private static func add(oneItemTo chest: inout Chest, in world: World) {
+        let total = GameConfig.Chest.stockTable.reduce(0) { $0 + $1.weight }
+        var pick = Int.random(in: 0..<total, using: &world.rng)
+
+        for entry in GameConfig.Chest.stockTable {
+            if pick < entry.weight {
+                _ = chest.contents.add(entry.item)
+                return
+            }
+            pick -= entry.weight
+        }
     }
 
     // MARK: - Moving things in and out

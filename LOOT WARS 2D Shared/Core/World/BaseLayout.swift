@@ -27,6 +27,15 @@
 struct BaseLayout {
     /// Every wall tile, in the order it should be laid. World coordinates.
     let tiles: [GridPoint]
+
+    /// The ground the wall encloses. World coordinates.
+    ///
+    /// Kept rather than thrown away, because "inside the base" is not the same
+    /// question as "inside the claim" and only this can answer it. The wall goes
+    /// round a random rectangle WITHIN the claim, so most claims have ground that
+    /// is theirs but stands outside their own walls - which is exactly where
+    /// chests were being left, in full view, for anyone to walk up to.
+    let region: Set<GridPoint>
 }
 
 enum BaseLayoutFactory {
@@ -36,9 +45,12 @@ enum BaseLayoutFactory {
         let wall = surroundingWall(of: region, in: claim.size)
         let ordered = buildOrder(of: wall, using: &rng)
 
-        return BaseLayout(tiles: ordered.map {
-            GridPoint(col: claim.origin.col + $0.col, row: claim.origin.row + $0.row)
-        })
+        func world(_ local: GridPoint) -> GridPoint {
+            GridPoint(col: claim.origin.col + local.col, row: claim.origin.row + local.row)
+        }
+
+        return BaseLayout(tiles: ordered.map(world),
+                          region: Set(region.map(world)))
     }
 
     /// The enclosed ground. Stays within 1...(size - 2), so the wall around it
