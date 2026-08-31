@@ -41,6 +41,19 @@ enum ItemType: Hashable, CaseIterable {
         }
     }
 
+    /// Whether tapping this in the hotbar uses it there and then.
+    ///
+    /// A bomb does, because you are already pointing somewhere and there is nothing
+    /// left to decide. Everything else is picked out first and then acted on: a
+    /// chest wants a tile, and a dressing wants a button under your shooting thumb
+    /// rather than a reach across to the hotbar in the middle of a fight.
+    var usedOnTap: Bool {
+        switch self {
+        case .bomb: return true
+        case .bandage, .medkit, .chest: return false
+        }
+    }
+
     /// Health restored, in points, for an actor with this much health at full.
     ///
     /// A share rather than a fixed number, so a bandage is worth proportionally the

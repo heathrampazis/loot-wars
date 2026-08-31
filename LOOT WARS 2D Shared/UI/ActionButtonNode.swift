@@ -7,9 +7,11 @@
 //  It reports state and nothing more: it does not know what it is for. GameScene
 //  turns a press into a Command and the simulation decides what that means.
 //
-//  It shares the aim stick's corner, and only one of the two is on screen at a
-//  time - the stick while there is shooting to do, this while there is a crate in
-//  reach. See GameScene.updateRightControl for why the swap waits for a lull.
+//  Two of these exist. The big one shares the aim stick's corner, only ever one of
+//  them on screen - the stick while there is shooting to do, the button while there
+//  is something in reach to open. The small one sits above it and uses whatever you
+//  have picked out of the hotbar. See GameScene.updateRightControl for why the
+//  corner's swap waits for a lull.
 //
 
 import Foundation
@@ -17,21 +19,24 @@ import SpriteKit
 
 final class ActionButtonNode: SKNode {
 
-    private static let radius: CGFloat = 62
-    /// Generous, like the joystick - thumbs are imprecise.
-    private static let grabRadius: CGFloat = 105
+    /// Grab radius is generous, like the joystick - thumbs are imprecise. Note the
+    /// small button's is proportionally MORE generous than the big one's, because
+    /// a small target needs the help and the big one does not.
+    private let grabRadius: CGFloat
+    private let glyphSize: CGFloat
 
-    /// Longest side a glyph is allowed to be. Art of any shape is fitted inside it.
-    private static let glyphSize: CGFloat = 62
-
-    private let base = SKShapeNode(circleOfRadius: ActionButtonNode.radius)
+    private let base: SKShapeNode
     private let glyph = SKSpriteNode()
 
     private(set) var isPressed = false
+    private(set) var isEnabled = true
 
-    init(glyph texture: SKTexture) {
+    init(glyph texture: SKTexture, radius: CGFloat = 62, grabRadius: CGFloat = 105) {
+        self.grabRadius = grabRadius
+        self.glyphSize = radius
+        self.base = SKShapeNode(circleOfRadius: radius)
+
         super.init()
-        setGlyph(texture)
 
         base.fillColor = RenderPalette.controlBackground
         base.strokeColor = .clear
@@ -41,6 +46,8 @@ final class ActionButtonNode: SKNode {
         zPosition = 1000
         addChild(base)
         addChild(glyph)
+
+        setGlyph(texture)
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -56,17 +63,24 @@ final class ActionButtonNode: SKNode {
         // Fit the art inside the glyph box rather than squashing it to a square.
         let art = texture.size()
         let scale = art.width > 0 && art.height > 0
-            ? min(ActionButtonNode.glyphSize / art.width, ActionButtonNode.glyphSize / art.height)
+            ? min(glyphSize / art.width, glyphSize / art.height)
             : 1
         glyph.size = CGSize(width: art.width * scale, height: art.height * scale)
+    }
+
+    /// Drawn faint when the simulation would refuse the press, exactly as a hotbar
+    /// slot greys out - so a button you can see but not use looks the part rather
+    /// than looking broken.
+    func setEnabled(_ enabled: Bool) {
+        guard enabled != isEnabled else { return }
+        isEnabled = enabled
+        alpha = enabled ? 1.0 : 0.4
     }
 
     /// - Parameter localPoint: the touch, in this node's own coordinate space.
     /// - Returns: true if the button is taking ownership of this touch.
     func begin(atLocalPoint localPoint: CGPoint) -> Bool {
-        guard hypot(localPoint.x, localPoint.y) <= ActionButtonNode.grabRadius else {
-            return false
-        }
+        guard hypot(localPoint.x, localPoint.y) <= grabRadius else { return false }
         isPressed = true
         setScale(0.92)
         return true

@@ -61,6 +61,19 @@ final class GameScene: SKScene {
     private let aimStick = JoystickNode(glyph: Glyphs.crosshair)
     private let openButton = ActionButtonNode(glyph: Glyphs.lootbox)
 
+    /// Uses whatever you have picked out of the hotbar, sitting just above the
+    /// corner. Small, and up under the thumb that is already on the right-hand side
+    /// - the whole point is healing without reaching across to the hotbar mid-fight.
+    ///
+    /// It shows the selected item's own art, so it needs nothing added to serve
+    /// whatever gets picked out of the hotbar next.
+    private let healButton = ActionButtonNode(glyph: Glyphs.lootbox,
+                                              radius: 40, grabRadius: 60)
+
+    /// What the small button is currently showing, so its glyph is only rebuilt
+    /// when the selection actually changes rather than every frame.
+    private var healGlyph: ItemType?
+
     /// What that corner is currently for.
     private enum CornerAction: Equatable {
         case aim
@@ -75,12 +88,13 @@ final class GameScene: SKScene {
     private let chestPanel = ChestPanelNode()
     private let respawnBanner = RespawnBanner()
 
-    /// A chest tapped in the hotbar, waiting for you to pick a tile.
+    /// The hotbar slot picked out, waiting to be acted on.
     ///
-    /// Scene state, not world state, and deliberately so: arming is a thing this
-    /// screen remembers between two taps, and the simulation never hears about it.
-    /// What crosses into Core is the finished intent - place a chest HERE.
-    private var armedChestSlot: Int?
+    /// Scene state, not world state, and deliberately so: a selection is a thing
+    /// this screen remembers between two taps, and the simulation never hears about
+    /// it. What crosses into Core is the finished intent - place a chest HERE, use
+    /// the thing in THAT slot.
+    private var selectedSlot: Int?
 
     /// How long a finger must stay put to become a hold rather than a tap.
     ///
@@ -94,6 +108,7 @@ final class GameScene: SKScene {
     private var moveTouch: UITouch?
     private var aimTouch: UITouch?
     private var openTouch: UITouch?
+    private var healTouch: UITouch?
 
     /// A finger that has not yet decided whether it is a tap or a hold.
     ///
@@ -175,6 +190,8 @@ final class GameScene: SKScene {
         cameraController.node.addChild(aimStick)
         cameraController.node.addChild(openButton)
         openButton.isHidden = true
+        cameraController.node.addChild(healButton)
+        healButton.isHidden = true
         cameraController.node.addChild(hud)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -197,6 +214,16 @@ final class GameScene: SKScene {
         aimStick.position = CGPoint(x: size.width / 2 - margin,
                                     y: -size.height / 2 + margin)
         openButton.position = aimStick.position
+
+        // Directly above the corner. The offset is not eyeballed: it sits inside
+        // the aim stick's 120pt grab radius, so the small button has to be offered
+        // a touch BEFORE the stick (see touchesBegan) - and that means its own 60pt
+        // grab must not reach down into the part of the stick you can SEE. At 130
+        // it stops 70 above the stick's centre, clear of its 62pt face, so every
+        // press that lands on the stick still goes to the stick. 28pt of daylight
+        // between the two, which is what stops them reading as one control.
+        healButton.position = CGPoint(x: aimStick.position.x,
+                                      y: aimStick.position.y + 130)
 
 
         // The HUD's origin is its own top-left corner, so this is just an inset.
@@ -271,15 +298,18 @@ final class GameScene: SKScene {
         // out of reach of it. Nothing else has to remember to do that.
         chestPanel.update(with: world)
 
-        // Forget an armed chest that is no longer in that slot - spent on a tile,
-        // or dropped on death. Otherwise the next map tap tries to place thin air.
-        if let slot = armedChestSlot,
-           world.localPlayer?.inventory.stack(at: slot)?.type != .chest {
-            armedChestSlot = nil
+        // Forget a selection whose slot has emptied - spent, dropped, or stored in
+        // a chest. This is what takes the heal button away when the last dressing
+        // is used, and it stops a stale slot index acting on whatever lands there
+        // next.
+        if let slot = selectedSlot,
+           world.localPlayer?.inventory.stack(at: slot) == nil {
+            selectedSlot = nil
         }
-        hotbar.setSelected(armedChestSlot)
+        hotbar.setSelected(selectedSlot)
 
         updateRightControl(with: world)
+        updateHealButton(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }
@@ -316,6 +346,7 @@ final class GameScene: SKScene {
             openButton.isHidden = true
             return
         }
+
 
         moveStick.isHidden = false
 
@@ -362,6 +393,38 @@ final class GameScene: SKScene {
         if offersButton, !alreadyOffering { aimStick.end() }
     }
 
+    /// Shows the picked-out item above the corner, or nothing.
+    ///
+    /// Deliberately not folded into updateRightControl. That one guards against
+    /// swapping the corner under a thumb, and those guards do not apply here: this
+    /// button never swaps places with anything, so it can answer honestly every
+    /// frame.
+    private func updateHealButton(with world: World) {
+        guard let player = world.localPlayer,
+              chestPanel.openChest == nil,
+              let slot = selectedSlot,
+              let stack = player.inventory.stack(at: slot),
+              stack.type.isHealing else {
+            guard !healButton.isHidden else { return }
+            healButton.isHidden = true
+            healButton.end()
+            healGlyph = nil
+            return
+        }
+
+        if healGlyph != stack.type {
+            healGlyph = stack.type
+            healButton.setGlyph(ItemArt.texture(for: stack.type))
+        }
+
+        healButton.isHidden = false
+
+        // Faint at full health, matching the hotbar slot it came from - the answer
+        // is the actor's own, so what you see and what the simulation allows cannot
+        // disagree.
+        healButton.setEnabled(player.canUse(slot: slot))
+    }
+
     /// Input becomes a Command. Later, AI brains and network packets produce their
     /// Commands exactly the same way, and the world cannot tell them apart.
     private func gatherCommands() -> [ActorID: [Command]] {
@@ -399,6 +462,23 @@ extension GameScene {
                 continue
             }
 
+            // BEFORE the aim stick, and that ordering is load-bearing. The small
+            // button sits inside the stick's 120pt grab circle, so offering the
+            // stick first would swallow every press aimed at it. Small precise
+            // targets beat large forgiving ones; the stick loses nothing it needs.
+            if healTouch == nil, !healButton.isHidden,
+               healButton.begin(atLocalPoint: touch.location(in: healButton)) {
+                healTouch = touch
+
+                // A one-shot action, so it fires on press. Refused politely when
+                // the button is faint - pressing a disabled control should do
+                // nothing rather than queue an intent the simulation will bin.
+                if healButton.isEnabled, let slot = selectedSlot {
+                    queuedCommands.append(.useItem(slot: slot))
+                }
+                continue
+            }
+
             if aimTouch == nil, !aimStick.isHidden,
                aimStick.begin(atLocalPoint: touch.location(in: aimStick)) {
                 aimTouch = touch
@@ -417,7 +497,7 @@ extension GameScene {
                 case .lootbox:
                     queuedCommands.append(.openLootbox)
                 case .chest(let id):
-                    armedChestSlot = nil
+                    selectedSlot = nil
                     chestPanel.open(id)
 
                     // Let go of the walking thumb. The move stick is about to be
@@ -551,20 +631,30 @@ extension GameScene {
             openButton.end()
             openTouch = nil
         }
+
+        if let active = healTouch, touches.contains(active) {
+            healButton.end()
+            healTouch = nil
+        }
     }
 
-    /// A chest arms; everything else is used where you stand.
+    /// A bomb goes straight away; everything else is picked out first.
     ///
-    /// The chest is the first item that takes two taps, because it is the first one
-    /// that needs a target. Tapping it again puts it away - an armed chest you
-    /// changed your mind about should not force you to place it somewhere.
+    /// Which of those it is belongs to the item, not to this screen - see
+    /// ItemType.usedOnTap. Tapping a picked-out slot again puts it back, because
+    /// changing your mind should not force you to spend the thing.
     private func tapHotbar(_ slot: Int) {
-        if world.localPlayer?.inventory.stack(at: slot)?.type == .chest {
-            armedChestSlot = (armedChestSlot == slot) ? nil : slot
+        guard let type = world.localPlayer?.inventory.stack(at: slot)?.type else {
+            selectedSlot = nil
             return
         }
 
-        armedChestSlot = nil
+        guard type.usedOnTap else {
+            selectedSlot = (selectedSlot == slot) ? nil : slot
+            return
+        }
+
+        selectedSlot = nil
         queuedCommands.append(.useItem(slot: slot))
     }
 
@@ -597,9 +687,12 @@ extension GameScene {
     private func tapMap(at pointInWorld: CGPoint) {
         let tile = GridGeometry.gridPoint(for: pointInWorld)
 
-        if armedChestSlot != nil {
+        // Only a chest turns a map tap into a placement. Anything else picked out
+        // of the hotbar leaves the map meaning what it always meant.
+        if let slot = selectedSlot,
+           world.localPlayer?.inventory.stack(at: slot)?.type == .chest {
             queuedCommands.append(.placeChest(tile))
-            armedChestSlot = nil
+            selectedSlot = nil
             return
         }
 
