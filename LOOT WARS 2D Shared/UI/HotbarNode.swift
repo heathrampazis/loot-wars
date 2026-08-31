@@ -8,64 +8,38 @@
 //  actually changes - which is why Inventory is Equatable.
 //
 //  Its origin is the centre of the bar, so it sits at the bottom of the screen with
-//  no arithmetic against its own width.
+//  no arithmetic against its own width. The slots themselves are ItemSlotNodes, the
+//  same ones the chest panel uses.
 //
-//  Every measurement below came off the reference art, scaled by its tile size:
-//  a slot is 1.64 tiles, the gap 0.39, an item 0.74 of a slot, and the badge 0.66.
+//  The measurements came off the reference art, scaled by its tile size: a slot is
+//  1.64 tiles and the gap 0.39.
 //
 
 import SpriteKit
 
 final class HotbarNode: SKNode {
 
-    private static let slotSize: CGFloat = 66
+    static let slotSize: CGFloat = 66
     private static let gap: CGFloat = 16
-    /// How much smaller the item is drawn than its slot.
-    private static let iconInset: CGFloat = 10
-
-    /// Badge geometry. The stroke straddles the circle, so the radius plus half the
-    /// outline is the outer edge - 13pt, matching the reference's 26pt across.
-    private static let badgeRadius: CGFloat = 11.5
-    private static let badgeOutline: CGFloat = 3
-    /// How far the badge's centre sits inside the slot's top-left corner, so it
-    /// overhangs slightly rather than floating free.
-    private static let badgeInset: CGFloat = 5
 
     static var size: CGSize {
         let count = CGFloat(Inventory.slotCount)
         return CGSize(width: count * slotSize + (count - 1) * gap, height: slotSize)
     }
 
-    private var icons: [SKSpriteNode] = []
-    private var badges: [SKNode] = []
-    private var counts: [SKLabelNode] = []
+    private var slots: [ItemSlotNode] = []
     private var lastInventory: Inventory?
-    private var lastUsable: Bool?
+    private var lastUsable: [Bool] = []
 
     override init() {
         super.init()
         zPosition = 1000
 
-        let total = HotbarNode.size.width
-
         for index in 0..<Inventory.slotCount {
-            let centreX = -total / 2
-                + HotbarNode.slotSize / 2
-                + CGFloat(index) * (HotbarNode.slotSize + HotbarNode.gap)
-
-            addChild(makeSlot(atX: centreX))
-
-            let icon = SKSpriteNode()
-            icon.position = CGPoint(x: centreX, y: 0)
-            icon.zPosition = 1
-            icon.isHidden = true
-            addChild(icon)
-            icons.append(icon)
-
-            let (badge, label) = makeBadge(atX: centreX)
-            addChild(badge)
-            badges.append(badge)
-            counts.append(label)
+            let slot = ItemSlotNode(side: HotbarNode.slotSize)
+            slot.position = CGPoint(x: HotbarNode.centreX(of: index), y: 0)
+            addChild(slot)
+            slots.append(slot)
         }
     }
 
@@ -73,43 +47,8 @@ final class HotbarNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// No outline: the slots are quiet panels the items sit on, not framed boxes.
-    private func makeSlot(atX centreX: CGFloat) -> SKShapeNode {
-        let side = HotbarNode.slotSize
-        let slot = SKShapeNode(rect: CGRect(x: centreX - side / 2,
-                                            y: -side / 2,
-                                            width: side,
-                                            height: side),
-                               cornerRadius: 12)
-        slot.fillColor = RenderPalette.hotbarSlot
-        slot.strokeColor = .clear
-        return slot
-    }
-
-    private func makeBadge(atX centreX: CGFloat) -> (SKNode, SKLabelNode) {
-        let badge = SKNode()
-        badge.position = CGPoint(
-            x: centreX - HotbarNode.slotSize / 2 + HotbarNode.badgeInset,
-            y: HotbarNode.slotSize / 2 - HotbarNode.badgeInset
-        )
-        badge.zPosition = 2
-        badge.isHidden = true
-
-        let circle = SKShapeNode(circleOfRadius: HotbarNode.badgeRadius)
-        circle.fillColor = RenderPalette.countBadge
-        circle.strokeColor = .black
-        circle.lineWidth = HotbarNode.badgeOutline
-        badge.addChild(circle)
-
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        label.fontSize = 14
-        label.fontColor = .white
-        label.horizontalAlignmentMode = .center
-        label.verticalAlignmentMode = .center
-        label.zPosition = 1
-        badge.addChild(label)
-
-        return (badge, label)
+    private static func centreX(of index: Int) -> CGFloat {
+        -size.width / 2 + slotSize / 2 + CGFloat(index) * (slotSize + gap)
     }
 
     /// Which slot a touch landed on, or nil if it missed the bar entirely.
@@ -120,52 +59,36 @@ final class HotbarNode: SKNode {
         let half = HotbarNode.slotSize / 2
         guard abs(point.y) <= half + 12 else { return nil }
 
-        let total = HotbarNode.size.width
-
         for index in 0..<Inventory.slotCount {
-            let centreX = -total / 2
-                + HotbarNode.slotSize / 2
-                + CGFloat(index) * (HotbarNode.slotSize + HotbarNode.gap)
-
+            let centreX = HotbarNode.centreX(of: index)
             if abs(point.x - centreX) <= half + HotbarNode.gap / 2 { return index }
         }
 
         return nil
     }
 
+    /// Rings one slot, or none. Kept out of `update` because arming is scene state
+    /// rather than world state - the simulation has no idea a chest is selected.
+    func setSelected(_ index: Int?) {
+        for (slot, node) in slots.enumerated() {
+            node.setSelected(slot == index)
+        }
+    }
+
     func update(with world: World) {
         guard let player = world.localPlayer else { return }
 
-        // Whether each slot can be used is the actor's own answer, so a greyed
-        // slot always means the simulation would refuse it. A bandage greys out at
-        // full health; a bomb never does.
-        let usable = player.isAlive && player.health < player.maxHealth
+        // Whether each slot can be used is the actor's own answer, so a greyed slot
+        // always means the simulation would refuse it. A bandage greys out at full
+        // health; a bomb and a chest never do.
+        let usable = (0..<Inventory.slotCount).map { player.canUse(slot: $0) }
 
         guard player.inventory != lastInventory || usable != lastUsable else { return }
         lastInventory = player.inventory
         lastUsable = usable
 
         for (index, stack) in player.inventory.slots.enumerated() {
-            let icon = icons[index]
-
-            guard let stack else {
-                icon.isHidden = true
-                badges[index].isHidden = true
-                continue
-            }
-
-            let texture = ItemArt.texture(for: stack.type)
-            let box = HotbarNode.slotSize - HotbarNode.iconInset
-
-            icon.texture = texture
-            icon.size = ItemArt.size(of: texture, fittingInto: box)
-            icon.isHidden = false
-            icon.alpha = player.canUse(slot: index) ? 1.0 : 0.35
-
-            // A badge on a single item is noise - it only earns its place once
-            // there is more than one.
-            badges[index].isHidden = stack.count <= 1
-            counts[index].text = "\(stack.count)"
+            slots[index].show(stack, dimmed: !usable[index])
         }
     }
 }

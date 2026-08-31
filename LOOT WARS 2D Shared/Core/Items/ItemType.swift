@@ -15,6 +15,7 @@ enum ItemType: Hashable, CaseIterable {
     case bandage
     case medkit
     case bomb
+    case chest
 
     /// How many fit in one inventory slot.
     var maxStack: Int {
@@ -22,6 +23,7 @@ enum ItemType: Hashable, CaseIterable {
         case .bandage: return 4
         case .medkit:  return 2
         case .bomb:    return 3
+        case .chest:   return 2
         }
     }
 
@@ -35,7 +37,7 @@ enum ItemType: Hashable, CaseIterable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb:    return 0
+        case .bomb, .chest: return 0
         }
     }
 

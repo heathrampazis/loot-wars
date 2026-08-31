@@ -26,6 +26,15 @@ struct Inventory: Equatable {
         slots.compactMap { $0 }.filter { $0.type == type }.reduce(0) { $0 + $1.count }
     }
 
+    /// What is in a slot, or nil - including when the index is out of range.
+    ///
+    /// Bounds-checked because a tap on a chest panel can arrive a tick after the
+    /// thing it was aimed at stopped existing, and a UI being slightly out of date
+    /// should never be able to trap the simulation.
+    func stack(at index: Int) -> ItemStack? {
+        slots.indices.contains(index) ? slots[index] : nil
+    }
+
     /// The first slot holding one of these, or nil.
     func firstSlot(holding type: ItemType) -> Int? {
         slots.firstIndex { $0?.type == type }

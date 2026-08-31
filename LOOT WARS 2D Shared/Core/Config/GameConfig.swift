@@ -386,6 +386,17 @@ enum GameConfig {
         static let respawnDelay: Double = 45
     }
 
+    enum Chest {
+        /// Footprint in tiles. The art is 1286 x 858 - a hair under 3:2 - and
+        /// ChestRenderer draws it at exactly this size, so the chest you see is the
+        /// chest you bump into.
+        static let size = Vec2(x: 1.05, y: 0.70)
+
+        /// How far past your own hitbox you can reach to open one. Small, because a
+        /// chest is solid and you are already touching it when you are beside it.
+        static let openReach: Double = 0.3
+    }
+
     enum Arcade {
         /// Machines on the map. Deliberately few: an arcade you have to travel to
         /// is a place worth fighting over, one on every corner is furniture.

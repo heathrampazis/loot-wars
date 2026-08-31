@@ -70,6 +70,9 @@ enum MovementSystem {
         for arcade in world.arcades {
             push(&actor, outOf: arcade.hitbox)
         }
+        for chest in world.chests.values {
+            push(&actor, outOf: chest.hitbox)
+        }
     }
 
     /// Box against box: find how deeply the two overlap on each axis and push back

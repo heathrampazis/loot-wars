@@ -99,6 +99,11 @@ struct Actor {
         switch stack.type {
         case .bomb:
             return true
+        case .chest:
+            // Always tappable. Whether it can go down HERE depends on the tile you
+            // then pick, which is ChestSystem's call - the hotbar cannot answer it
+            // and should not pretend to.
+            return true
         case .bandage, .medkit:
             // Using one on full health would throw it away for nothing.
             return health < maxHealth

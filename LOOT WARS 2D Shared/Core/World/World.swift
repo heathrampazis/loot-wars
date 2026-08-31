@@ -41,6 +41,7 @@ final class World {
     var arcades: [Arcade] = []
 
     private(set) var lootboxes: [LootboxID: Lootbox] = [:]
+    var chests: [ChestID: Chest] = [:]
     private(set) var groundItems: [GroundItemID: GroundItem] = [:]
 
     /// An opened crate, waiting to come back in the same spot.
@@ -51,6 +52,7 @@ final class World {
 
     private var pendingLootboxes: [PendingLootbox] = []
 
+    private var nextChestID = 0
     private var nextProjectileID = 0
     private var nextBombID = 0
     private var nextGroundItemID = 0
@@ -219,7 +221,46 @@ final class World {
     func structureBlocks(_ point: Vec2) -> Bool {
         if lootboxes.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         if arcades.contains(where: { $0.hitbox.contains(point) }) { return true }
+        if chests.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         return false
+    }
+
+    /// The same question asked of an area rather than a point, for the things that
+    /// reason about whole tiles - building, and putting a chest down.
+    func structureIntersects(_ box: Box) -> Bool {
+        if lootboxes.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
+        if arcades.contains(where: { $0.hitbox.intersects(box) }) { return true }
+        if chests.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
+        return false
+    }
+
+    // MARK: - Chests
+
+    func spawnChest(at tile: GridPoint, owner: TeamID) {
+        let chest = Chest(id: ChestID(nextChestID), tile: tile, owner: owner)
+        nextChestID += 1
+        chests[chest.id] = chest
+    }
+
+    /// The nearest chest of your own that you are standing close enough to open.
+    ///
+    /// Lives here so the button that offers to open one and the system that moves
+    /// items can never disagree about which chest, or about whether you are near
+    /// enough to be reaching into it.
+    func reachableChest(for actor: Actor) -> Chest? {
+        var closest: Chest?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for chest in chests.values where chest.owner == actor.team {
+            guard ChestSystem.canReach(chest, from: actor) else { continue }
+
+            let distance = (chest.position - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            closest = chest
+        }
+
+        return closest
     }
 
     /// Whether a dropped item would be reachable here.
@@ -345,6 +386,7 @@ final class World {
 
         applyMovementInput(everyone)
         BuildSystem.update(self, commands: everyone)
+        ChestSystem.update(self, commands: everyone)
         // Before movement, so a wall that comes down this tick is a gap somebody
         // can already walk through.
         BombSystem.update(self, commands: everyone, dt: dt)
@@ -385,7 +427,8 @@ final class World {
                     if abs(input.x) > 0.01 {
                         actor.facesLeft = input.x < 0
                     }
-                case .placeBlock, .shoot, .openLootbox, .useItem:
+                case .placeBlock, .shoot, .openLootbox, .useItem,
+                     .placeChest, .storeItem, .takeItem:
                     break   // other systems' business, not movement's
                 }
             }

@@ -26,4 +26,20 @@ enum Command {
     /// Use whatever is in this hotbar slot - apply it, or throw it. Which of those
     /// happens depends on the item, so input never has to know the difference.
     case useItem(slot: Int)
+
+    /// Put a carried chest down on this tile.
+    ///
+    /// Separate from useItem because a chest is the first thing you carry that
+    /// needs a TARGET. Everything else is used where you stand, or thrown where you
+    /// are already pointed. Which chest is taken from the bag is the simulation's
+    /// business, exactly as it is for a bomb.
+    case placeChest(GridPoint)
+
+    /// Move one item from a hotbar slot into an open chest, and back again.
+    ///
+    /// Both name the chest rather than assuming the nearest one. A panel can be
+    /// open while the world moves on underneath it, and "the chest I am looking at"
+    /// is not a thing the simulation can work out for itself.
+    case storeItem(chest: ChestID, slot: Int)
+    case takeItem(chest: ChestID, slot: Int)
 }

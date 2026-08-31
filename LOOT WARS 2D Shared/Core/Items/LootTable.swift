@@ -16,13 +16,19 @@
 //  is still worth 17.5% of a health bar on average, exactly as before. You now find
 //  healing less often and get more of it when you do.
 //
+//  Adding the chest meant solving them again - a new row dilutes every old one - so
+//  bandage and medkit went up to hold that same 17.5%. Any future row means redoing
+//  this, which is the price of a flat weighted table and worth paying while it is
+//  still this short.
+//
 
 enum LootTable {
 
     private static let table: [(pickup: Pickup, weight: Int)] = [
-        (.item(.bandage), 50),
-        (.item(.medkit),  13),
+        (.item(.bandage), 55),
+        (.item(.medkit),  14),
         (.item(.bomb),    22),
+        (.item(.chest),   14),
 
         (.helmet(.common),    28),
         (.helmet(.uncommon),  19),

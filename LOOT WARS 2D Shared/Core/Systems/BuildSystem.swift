@@ -28,8 +28,7 @@ enum BuildSystem {
         guard !world.map.isOccupied(point) else { return false }
         guard !world.trees.contains(where: { $0.overlaps(point) }) else { return false }
 
-        let tileBox = Box(tile: point)
-        return !world.lootboxes.values.contains { $0.hitbox.intersects(tileBox) }
+        return !world.structureIntersects(Box(tile: point))
     }
 
     static func canPlace(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
