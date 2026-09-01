@@ -353,6 +353,15 @@ enum AIBrain {
             return .build(wall)
         }
 
+        // A chest in the bag and a base to put it in. Above the aggression list
+        // because it is a short errand with a large payoff - a base with no chest in
+        // it is a base nobody has any reason to break into, including the bot's own
+        // reason to have built it. It ends the moment the chest is out of the bag,
+        // so it cannot hold anyone up.
+        if state.buildUrgeTimer <= 0, let spot = chestSpotWanted(for: actor, in: world) {
+            return .stash(spot)
+        }
+
         // Behind on the wall. Building comes before any of the aggression below,
         // because a bot that never closes its base is a bot that never has a chest
         // worth anyone raiding - including its own reason to exist on this map.
@@ -409,13 +418,6 @@ enum AIBrain {
         // against whatever happens to be lying nearby.
         if state.buildUrgeTimer <= 0, let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
-        }
-
-        // Nothing left to build, but a chest in the bag and a floor to put it on.
-        // Shares the build urge's clock, because this IS a trip home - and it ends
-        // the moment the chest is out of the bag, so it can never hold the bot.
-        if state.buildUrgeTimer <= 0, let spot = chestSpotWanted(for: actor, in: world) {
-            return .stash(spot)
         }
 
         if state.lootCooldown <= 0 {
@@ -586,6 +588,24 @@ enum AIBrain {
         }
 
         return closest
+    }
+
+    /// How far away a target FEELS, given how well they are doing.
+    ///
+    /// The leader reads as closer than they are. Scaling the distance rather than
+    /// replacing it is what keeps this sane: a bot never ignores somebody standing
+    /// next to it in order to cross the map, it just breaks ties towards the player
+    /// worth stopping.
+    private static func weightedDistance(from actor: Actor,
+                                         to target: Actor,
+                                         in world: World) -> Double {
+        let distance = (target.position - actor.position).length
+
+        let best = world.bestScore
+        guard best > 0 else { return distance }
+
+        let standing = Double(world.score(for: target.team)) / Double(best)
+        return distance * (1 - GameConfig.AI.leaderPull * standing)
     }
 
     private static func nearestArcade(to actor: Actor, in world: World) -> Arcade? {
@@ -1150,10 +1170,12 @@ enum AIBrain {
                     && ($0.position - actor.position).length
                         < fightRanges(against: $0, in: world).engage
             }
-            // Nearest first; ties broken by id, so a seed always replays the same.
+            // Nearest first - but weighted by standing, so a bot will walk past
+            // somebody nearer to go after whoever is winning. Ties broken by id, so
+            // a seed always replays the same.
             .sorted {
-                let a = ($0.position - actor.position).length
-                let b = ($1.position - actor.position).length
+                let a = weightedDistance(from: actor, to: $0, in: world)
+                let b = weightedDistance(from: actor, to: $1, in: world)
                 return a == b ? $0.id.raw < $1.id.raw : a < b
             }
 

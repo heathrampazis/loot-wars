@@ -94,6 +94,10 @@ final class World {
 
     func score(for team: TeamID) -> Int { scores[team] ?? 0 }
 
+    /// The leading score, or zero before anyone has any. What a bot measures a
+    /// target's standing against when deciding who is worth going after.
+    var bestScore: Int { scores.values.max() ?? 0 }
+
     /// Adds to a team's score.
     ///
     /// Called from wherever the thing actually happened, which is why there is no

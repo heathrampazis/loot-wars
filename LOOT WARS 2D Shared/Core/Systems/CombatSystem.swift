@@ -55,9 +55,15 @@ enum CombatSystem {
         // Nobody is paid for a team killing itself, and nobody is paid when there is
         // no killer to speak of.
         if let attacker, let killer = world.actors[attacker], killer.team != actor.team {
-            world.awardTokens(GameConfig.Tokens.perKill, to: attacker)
+            // Priced by what they were carrying, and read BEFORE the gear is stripped
+            // a few lines down. A fresh respawn and somebody in a Cosmic with a
+            // Blaster 6 are not the same job, and used to pay the same.
+            let worth = actor.gearWorth
 
-            var points = GameConfig.Score.kill
+            world.awardTokens(GameConfig.Tokens.perKill
+                              + worth * GameConfig.Tokens.perTierKilled, to: attacker)
+
+            var points = GameConfig.Score.kill + worth * GameConfig.Score.killPerTier
 
             // Caught inside their own walls. Their ground and their advantage, so
             // taking it off them there is worth more - and it is the reason to

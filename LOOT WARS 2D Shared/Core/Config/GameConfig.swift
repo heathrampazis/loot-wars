@@ -30,6 +30,21 @@ enum GameConfig {
     enum Score {
         static let kill = 50
 
+        /// Added per tier the victim was carrying - helmet rung plus blaster rung
+        /// above the starter, so nought to twelve.
+        ///
+        /// A kill used to be worth the same whether you took down somebody fresh off
+        /// a respawn or somebody in a Cosmic with a Blaster 6, which are not remotely
+        /// the same job. This makes the second worth 110 against the first's 50, and
+        /// it is self-balancing in a way a flat number cannot be: the player running
+        /// away with the match is also the one worth the most to stop.
+        ///
+        /// Five rather than the eight I first wrote. Eight took fighting from 30% of
+        /// the board to 41%, which would have made the leaderboard mostly a kill
+        /// count and squeezed raiding and base work for room. At five it sits at 37 -
+        /// up, which is the point, without swallowing the other three.
+        static let killPerTier = 5
+
         /// On top of the kill, for catching somebody inside their own walls. Their
         /// ground and their advantage - taking it off them there is worth more.
         static let killInTheirBase = 25
@@ -72,6 +87,16 @@ enum GameConfig {
         /// Paid to whoever got the kill. The largest single source, because a kill
         /// is the hardest thing on this list to arrange.
         static let perKill = 8
+
+        /// And more for a better-equipped victim, on the same nought-to-twelve scale
+        /// the score bounty uses. Somebody fully kitted pays 20 tokens against a
+        /// fresh spawn's 8.
+        ///
+        /// One rather than two. At two, a match paid about 129 tokens, which reaches
+        /// Cosmic from bare-headed and undoes the whole point of the ladder being
+        /// something you cannot finish. At one it pays 109 and reaches Mythical -
+        /// still a long climb, with the top rung left as something to be denied.
+        static let perTierKilled = 1
 
         /// Every crate. Small, because you open a great many of them and it is the
         /// one source that needs no decision at all - at two a crate it out-earned
@@ -444,6 +469,19 @@ enum GameConfig {
         /// Longer than raidRange, because this one is worth the walk: a chest with
         /// something in it is the only thing on the map that repays crossing it.
         static let robRange: Double = 40
+
+        /// How much a target's standing pulls a bot towards them, 0 to 1.
+        ///
+        /// A bot picks the nearest enemy it can see. At 0.4 the team top of the
+        /// leaderboard reads as 40% closer than it is, so a bot will walk past
+        /// somebody nearer to go after the leader - without ever ignoring a threat
+        /// standing next to it, because the pull scales distance rather than
+        /// replacing it.
+        ///
+        /// This is the counterweight to a runaway leader. Get far enough ahead and
+        /// seven opponents start preferring you, which is also what makes their kill
+        /// bounty worth having.
+        static let leaderPull: Double = 0.4
 
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26

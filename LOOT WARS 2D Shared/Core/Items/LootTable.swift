@@ -35,14 +35,20 @@
 //  healing up to 40% of crates and 24% of a health bar each, bombs down from one
 //  crate in seven to one in nine.
 //
+//  Bombs then came back up to one in seven, and chests from one in twelve to one in
+//  eleven, because raiding was still the thing not happening enough. Healing was
+//  solved a fifth time and holds at 24% of a health bar per crate - the table grew
+//  rather than the healing shrinking, which is the only way to make two things more
+//  common without making a third rarer.
+//
 
 enum LootTable {
 
     private static let table: [(pickup: Pickup, weight: Int)] = [
-        (.item(.bandage), 78),
-        (.item(.medkit),  20),
-        (.item(.bomb),    26),
-        (.item(.chest),   20),
+        (.item(.bandage), 88),
+        (.item(.medkit),  22),
+        (.item(.bomb),    38),
+        (.item(.chest),   26),
 
         // Stops at Rare. Everything above it is bought, not found - see
         // GameConfig.Shop. A crate that can hand you a Cosmic makes the whole

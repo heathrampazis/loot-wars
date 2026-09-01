@@ -118,6 +118,16 @@ struct Actor {
         }
     }
 
+    /// How well equipped this actor is, from 0 to 12.
+    ///
+    /// Helmet rung plus blaster rungs above the starter. Used to price a kill: what
+    /// somebody was carrying is the closest thing there is to how hard they were to
+    /// take down, and it is already sitting on the actor rather than needing to be
+    /// tracked.
+    var gearWorth: Int {
+        helmet.rawValue + (blaster.rawValue - BlasterTier.starting.rawValue)
+    }
+
     /// Whether this item could be taken at all, from wherever it is coming from.
     ///
     /// An upgrade is always takeable, room or no room, because it goes ONTO the
