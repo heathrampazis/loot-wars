@@ -11,7 +11,10 @@ import SpriteKit
 
 final class StatCounterNode: SKNode {
 
-    static let height: CGFloat = StatBarNode.iconSize
+    /// Its own number rather than the icon's size, which it used to borrow. The
+    /// counter row is the only one with no bar in it, so it can afford to be
+    /// shorter than a bar row - and at 84 points the panel needed it to be.
+    static let height: CGFloat = 20
 
     private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private var lastValue = Int.min
@@ -25,14 +28,14 @@ final class StatCounterNode: SKNode {
 
         // Sized by height, not width. The icons are not all the same shape, and a
         // fixed width would make a wide one tower over a narrow one.
-        let height = StatBarNode.iconSize * 0.8
+        let height = StatCounterNode.height * 0.8
         let width = art.height > 0 ? height * (art.width / art.height) : height
 
         let icon = SKSpriteNode(texture: texture, size: CGSize(width: width, height: height))
         icon.position = CGPoint(x: StatBarNode.iconSize / 2, y: 0)
         addChild(icon)
 
-        label.fontSize = 20
+        label.fontSize = 16
         label.fontColor = .white
         label.horizontalAlignmentMode = .left
         label.verticalAlignmentMode = .center

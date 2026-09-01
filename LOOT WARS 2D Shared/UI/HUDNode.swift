@@ -16,8 +16,8 @@ import SpriteKit
 
 final class HUDNode: SKNode {
 
-    private static let padding: CGFloat = 12
-    private static let rowSpacing: CGFloat = 8
+    private static let padding: CGFloat = 8
+    private static let rowSpacing: CGFloat = 6
 
     static var size: CGSize {
         CGSize(width: padding * 2 + StatBarNode.totalWidth,

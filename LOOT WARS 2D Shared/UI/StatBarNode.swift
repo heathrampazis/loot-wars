@@ -14,12 +14,15 @@ import SpriteKit
 
 final class StatBarNode: SKNode {
 
-    static let iconSize: CGFloat = 30
+    /// Rescaled to bring the HUD down to the leaderboard's 192 x 84. The whole set
+    /// moved together rather than only the bar, because shrinking one part of a row
+    /// and not the rest is how a panel ends up looking assembled instead of drawn.
+    static let iconSize: CGFloat = 24
     /// Outer dimensions, outline included.
-    static let barWidth: CGFloat = 150
-    static let barHeight: CGFloat = 22
-    static let outline: CGFloat = 4.5
-    static let gap: CGFloat = 10
+    static let barWidth: CGFloat = 144
+    static let barHeight: CGFloat = 18
+    static let outline: CGFloat = 3.5
+    static let gap: CGFloat = 8
 
     /// Total width of icon plus bar, so the panel can size itself around it.
     static var totalWidth: CGFloat { iconSize + gap + barWidth }
