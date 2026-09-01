@@ -118,6 +118,46 @@ struct Actor {
         }
     }
 
+    /// Whether this item could be taken at all, from wherever it is coming from.
+    ///
+    /// An upgrade is always takeable, room or no room, because it goes ONTO the
+    /// actor rather than into a slot. Everything else - gear at or below what is
+    /// already worn included - needs somewhere to sit. A spare is worth carrying;
+    /// it is not worth a full bag.
+    func canAcquire(_ type: ItemType) -> Bool {
+        if case .helmet(let tier) = type, tier > helmet { return true }
+        if case .blaster(let tier) = type, tier > blaster { return true }
+        return inventory.canAccept(type)
+    }
+
+    /// Takes an item: worn if it beats what is on, bagged if it does not.
+    ///
+    /// The one place this rule lives. Walking over a helmet, pulling one out of a
+    /// chest and robbing one off somebody else's shelf are the same act from the
+    /// actor's point of view, and each used to answer it separately - which is
+    /// three chances for them to disagree about what an upgrade is.
+    ///
+    /// Returns false when there was nowhere for it to go, and the caller is
+    /// expected to leave it where it was rather than quietly destroying it.
+    mutating func acquire(_ type: ItemType) -> Bool {
+        switch type {
+        case .helmet(let tier) where tier > helmet:
+            // The extra capacity arrives as actual health, so a helmet found
+            // mid-fight is a real reprieve and not just a longer empty bar.
+            let gained = tier.maxHealth - maxHealth
+            helmet = tier
+            health = min(maxHealth, health + gained)
+            return true
+
+        case .blaster(let tier) where tier > blaster:
+            blaster = tier
+            return true
+
+        default:
+            return inventory.add(type)
+        }
+    }
+
     /// Whether this actor has any use for something lying on the ground.
     ///
     /// One answer, asked by both the pickup code and the bots deciding whether a
@@ -125,15 +165,8 @@ struct Actor {
     /// would then decline to pick up.
     func wants(_ pickup: Pickup) -> Bool {
         switch pickup {
-        // An upgrade is always worth having, room or no room - it goes onto you
-        // rather than into a slot.
-        case .item(.helmet(let tier)) where tier > helmet: return true
-        case .item(.blaster(let tier)) where tier > blaster: return true
-
         case .item(let type):
-            // Everything else, gear at or below what is worn included, needs a slot
-            // to go in. A spare is worth carrying; it is not worth a full bag.
-            return inventory.canAccept(type)
+            return canAcquire(type)
         case .token:
             // Always. Currency never fills up and never becomes the wrong kind.
             return true

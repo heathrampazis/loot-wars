@@ -876,7 +876,7 @@ enum AIBrain {
         var bestValue = -1
 
         for (index, slot) in chest.contents.slots.enumerated() {
-            guard let stack = slot, actor.inventory.canAccept(stack.type) else { continue }
+            guard let stack = slot, actor.canAcquire(stack.type) else { continue }
 
             let value = stack.type.healAmount(of: actor.maxHealth)
             guard value > bestValue else { continue }

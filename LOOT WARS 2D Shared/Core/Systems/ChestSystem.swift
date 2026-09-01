@@ -196,9 +196,12 @@ enum ChestSystem {
               canReach(chest, from: actor),
               let stack = chest.contents.stack(at: slot) else { return }
 
-        guard actor.inventory.canAccept(stack.type),
+        // Same question the ground asks, so a helmet that would be worn where it
+        // fell is worn when it comes out of a chest too - and a bag with no room
+        // is no obstacle to an upgrade, because an upgrade does not need a slot.
+        guard actor.canAcquire(stack.type),
               chest.contents.consume(at: slot) != nil else { return }
-        _ = actor.inventory.add(stack.type)
+        _ = actor.acquire(stack.type)
 
         world.actors[id] = actor
 

@@ -103,25 +103,11 @@ enum LootSystem {
     /// Walking over something and having it vanish is worse than leaving it.
     private static func take(_ pickup: Pickup, by actor: inout Actor) -> Bool {
         switch pickup {
-        case .item(.helmet(let tier)) where tier > actor.helmet:
-            // A better helmet is worn on the spot, and the extra capacity arrives
-            // as actual health - so finding one mid-fight is a real reprieve
-            // rather than just a longer bar to refill.
-            let gained = tier.maxHealth - actor.maxHealth
-            actor.helmet = tier
-            actor.health = min(actor.maxHealth, actor.health + gained)
-            return true
-
-        case .item(.blaster(let tier)) where tier > actor.blaster:
-            actor.blaster = tier
-            return true
-
         case .item(let type):
-            // Anything that is not an upgrade goes in the bag if there is room.
-            // That includes gear at or BELOW what is already worn, which is the
-            // whole point of the change: a spare is worthless to you now and worth
-            // a great deal the moment you respawn with a bare head.
-            return actor.inventory.add(type)
+            // Worn if it beats what is on, bagged if it does not - and that rule
+            // lives on the Actor, so walking over a helmet and pulling one out of a
+            // chest cannot come to different conclusions.
+            return actor.acquire(type)
 
         case .token(let value):
             actor.tokens += value
