@@ -713,14 +713,6 @@ enum GameConfig {
         /// Gear is about a quarter of what a chest holds, so roughly every other
         /// chest is worth breaking into for a tier rather than for supplies. Modest
         /// tiers: a chest should be a leg up, not a jackpot that ends the match.
-        /// Paid for blowing up somebody's machine.
-        ///
-        /// More than it cost them, which is deliberate: raiding one has to beat
-        /// owning one or nobody would bother crossing the map for it. It is a lump
-        /// sum rather than a slow drip - the opposite of what the machine does for
-        /// its owner, and about a quarter of a match's income in one go.
-        static let destroyedReward = 25
-
         static let stockTable: [(item: ItemType, weight: Int)] = [
             (.bandage, 60),
             (.medkit,  12),
@@ -745,6 +737,14 @@ enum GameConfig {
     }
 
     enum Arcade {
+        /// Paid for blowing up somebody's machine.
+        ///
+        /// More than it cost them, which is deliberate: raiding one has to beat
+        /// owning one or nobody would bother crossing the map for it. It is a lump
+        /// sum rather than a slow drip - the opposite of what the machine does for
+        /// its owner, and about a quarter of a match's income in one go.
+        static let destroyedReward = 25
+
         /// Machines on the map. Deliberately few: an arcade you have to travel to
         /// is a place worth fighting over, one on every corner is furniture.
         static let count = 5
