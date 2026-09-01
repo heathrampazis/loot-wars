@@ -27,6 +27,16 @@ final class World {
     /// Seconds left on the clock, floored at zero.
     var timeRemaining: Double { max(0, GameConfig.Match.duration - elapsed) }
 
+    /// How far the match has run, nought to one.
+    ///
+    /// The one place the phrase "late in the match" is defined. Chest loot and the
+    /// respawn kit both read it, so "late" means the same thing to both and a
+    /// change to the match length moves them together rather than leaving tuned
+    /// constants behind in two files.
+    var matchProgress: Double {
+        min(1, max(0, elapsed / GameConfig.Match.duration))
+    }
+
     /// Whether the whistle has gone.
     ///
     /// Nothing in Core acts on this - systems do not check it and would happily
@@ -61,6 +71,9 @@ final class World {
     /// Where bombs went off this tick. Drained by the renderer, which is the only
     /// thing that cares - the simulation has already applied the damage.
     private(set) var recentBlasts: [Vec2] = []
+
+    /// Sales made since the screen last looked. See recordPurchase.
+    private var recentPurchases: [(actor: ActorID, item: ItemType)] = []
 
     /// An array rather than a dictionary, because machines never come or go during
     /// a match - and a fixed order is what keeps their payouts deterministic.
@@ -578,6 +591,26 @@ final class World {
 
     func recordBlast(at position: Vec2) {
         recentBlasts.append(position)
+    }
+
+    /// Something was bought. Recorded so the screen can say so.
+    ///
+    /// The same shape as a blast, and for the same reason: the simulation states
+    /// what happened and the UI decides what that looks like. The alternative -
+    /// the shop panel watching the purse for a dip and inferring a sale - would
+    /// invent a purchase out of any other way of losing tokens, and would miss
+    /// every one that changes nothing in the bag, which is every gear upgrade.
+    func recordPurchase(_ item: ItemType, by id: ActorID) {
+        recentPurchases.append((actor: id, item: item))
+    }
+
+    /// Hands the purchases over and forgets them. Drained every frame whether or
+    /// not the shop is open, or a sale made behind a closed panel would queue up
+    /// and arrive all at once the next time it opened.
+    func takePurchases() -> [(actor: ActorID, item: ItemType)] {
+        let purchases = recentPurchases
+        recentPurchases.removeAll()
+        return purchases
     }
 
     /// Hands the blasts over and forgets them. Called once a frame by the renderer,

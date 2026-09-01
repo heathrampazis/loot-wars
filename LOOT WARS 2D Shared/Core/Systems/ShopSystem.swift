@@ -123,5 +123,6 @@ enum ShopSystem {
         actor.tokens -= price
         _ = actor.acquire(type)
         world.actors[id] = actor
+        world.recordPurchase(type, by: id)
     }
 }

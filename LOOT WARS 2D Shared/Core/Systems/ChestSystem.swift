@@ -100,20 +100,26 @@ enum ChestSystem {
                 continue
             }
 
-            let held = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
-            guard held < GameConfig.Chest.restockCeiling else {
-                // Full enough. A FULL wait is parked ahead of it rather than zero -
-                // parking zero here is what made the first item come straight back
-                // the instant a chest was emptied, which read as no cooldown at all.
-                chest.restockTimer = GameConfig.Chest.restockInterval
-                world.chests[id] = chest
-                continue
-            }
-
             chest.restockTimer -= dt
+
             if chest.restockTimer <= 0 {
                 chest.restockTimer = GameConfig.Chest.restockInterval
-                add(oneItemTo: &chest, in: world)
+
+                // Room for more: put something back. Full: bring what is already in
+                // there up to date instead.
+                //
+                // A full chest used to simply park its timer, which meant a base
+                // nobody raided sat on its opening-minute Commons for the whole
+                // match - the chests that were hardest to reach were the ones
+                // holding the most out-of-date loot. Now the same clock that
+                // refills a raided chest ages an unraided one forwards.
+                let held = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
+
+                if held < GameConfig.Chest.restockCeiling {
+                    add(oneItemTo: &chest, in: world)
+                } else {
+                    refresh(&chest, in: world)
+                }
             }
 
             world.chests[id] = chest
@@ -135,12 +141,7 @@ enum ChestSystem {
     }
 
     private static func add(oneItemTo chest: inout Chest, in world: World) {
-        // Same grace period the crates observe. A chest full of bombs in the first
-        // two minutes would be a way round the one thing the grace period is for.
-        let rows = world.bombsAllowed
-            ? GameConfig.Chest.stockTable
-            : GameConfig.Chest.stockTable.filter { $0.item != .bomb }
-
+        let rows = stockRows(in: world)
         let total = rows.reduce(0) { $0 + $1.weight }
         var pick = Int.random(in: 0..<total, using: &world.rng)
 
@@ -151,6 +152,116 @@ enum ChestSystem {
             }
             pick -= entry.weight
         }
+    }
+
+    /// The band the match is in, minus anything it is too early for.
+    ///
+    /// Same grace period the crates observe: a chest full of bombs in the first two
+    /// minutes would be a way round the one thing the grace period is for.
+    private static func stockRows(in world: World) -> [(item: ItemType, weight: Int)] {
+        let rows = GameConfig.Chest.stockTable(at: world.matchProgress)
+        return world.bombsAllowed ? rows : rows.filter { $0.item != .bomb }
+    }
+
+    // MARK: - Keeping pace with the match
+
+    /// Swaps the most out-of-date thing in a full chest for something the match
+    /// would hand out now.
+    ///
+    /// Replaces rather than adds - the chest holds exactly what it held, so this
+    /// cannot be farmed by leaving a base alone, and a raid on an old base is worth
+    /// making rather than worth more.
+    ///
+    /// One conversion, then upgrades only. A chest with nothing but supplies in it
+    /// turns ONE of them into gear and no more, because a rule that kept converting
+    /// would end every long match with chests full of helmets and no bandages in
+    /// them anywhere.
+    private static func refresh(_ chest: inout Chest, in world: World) {
+        let rows = stockRows(in: world)
+        let gear = rows.filter { $0.item.isGear }
+        guard !gear.isEmpty else { return }
+
+        guard let slot = staleSlot(in: chest, against: gear) else { return }
+
+        let total = gear.reduce(0) { $0 + $1.weight }
+        var pick = Int.random(in: 0..<total, using: &world.rng)
+
+        var replacement: ItemType?
+        for entry in gear {
+            if pick < entry.weight { replacement = entry.item; break }
+            pick -= entry.weight
+        }
+
+        guard let item = replacement,
+              let removed = chest.contents.consume(at: slot) else { return }
+
+        // Put the old one back if the new one will not fit. Everything else in this
+        // file checks there is room BEFORE it takes, and it cannot here - freeing
+        // the slot is sometimes what makes the room - so this is the same safety
+        // property arrived at from the other end. A chest quietly losing an item to
+        // an upgrade that never landed is the bug that ordering exists to prevent.
+        if !chest.contents.add(item) { _ = chest.contents.add(removed) }
+    }
+
+    /// The slot worth replacing, or nil if the chest is already current.
+    ///
+    /// Gear the band has left behind goes first, and the two ladders are judged
+    /// SEPARATELY - a helmet is compared against the helmets on offer and a blaster
+    /// against the blasters. Ranking them on one scale would be arithmetic on two
+    /// different things, and would eventually decide a Common helmet outranks a
+    /// Blaster 4.
+    ///
+    /// Failing that, and only in a chest holding no gear at all, a supply slot is
+    /// converted, so that a base sitting on two bandages still becomes worth
+    /// breaking into.
+    private static func staleSlot(in chest: Chest,
+                                  against gear: [(item: ItemType, weight: Int)]) -> Int? {
+        let helmetFloor = gear.compactMap { helmet(in: $0.item) }.min()
+        let blasterFloor = gear.compactMap { blaster(in: $0.item) }.min()
+
+        var worst: (slot: Int, gap: Int)?
+        var holdsGear = false
+
+        for (index, stack) in chest.contents.slots.enumerated() {
+            guard let stack, stack.type.isGear else { continue }
+            holdsGear = true
+
+            var gap = 0
+
+            if let worn = helmet(in: stack.type), let floor = helmetFloor, worn < floor {
+                gap = rungs(from: worn, to: floor, in: HelmetTier.allCases)
+            } else if let held = blaster(in: stack.type), let floor = blasterFloor, held < floor {
+                gap = rungs(from: held, to: floor, in: BlasterTier.allCases)
+            }
+
+            guard gap > 0 else { continue }
+
+            // Furthest behind first; ties fall to the lower slot, so the same chest
+            // in the same state always makes the same swap.
+            if worst == nil || gap > worst!.gap { worst = (index, gap) }
+        }
+
+        if let worst { return worst.slot }
+        guard !holdsGear else { return nil }
+
+        // Nothing but supplies. The last occupied slot, so the conversion is
+        // deterministic rather than a second draw on the generator.
+        return chest.contents.slots.lastIndex(where: { $0 != nil })
+    }
+
+    private static func helmet(in type: ItemType) -> HelmetTier? {
+        if case .helmet(let tier) = type { return tier }
+        return nil
+    }
+
+    private static func blaster(in type: ItemType) -> BlasterTier? {
+        if case .blaster(let tier) = type { return tier }
+        return nil
+    }
+
+    /// How many rungs apart two tiers are on their own ladder.
+    private static func rungs<T: Comparable>(from lower: T, to upper: T, in ladder: [T]) -> Int {
+        ladder.filter { $0 > lower && $0 <= upper }.count
     }
 
     // MARK: - Moving things in and out

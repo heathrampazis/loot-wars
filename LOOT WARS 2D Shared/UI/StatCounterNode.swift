@@ -52,7 +52,57 @@ final class StatCounterNode: SKNode {
     func setValue(_ value: Int) {
         // Runs every frame; setting a label's text rebuilds its glyphs.
         guard value != lastValue else { return }
+
+        let previous = lastValue
         lastValue = value
         label.text = "\(value)"
+
+        // The first paint is not a change - the counter opening on zero should not
+        // announce itself.
+        guard previous != Int.min else { return }
+        announce(value - previous)
+    }
+
+    /// Says what just happened to the number.
+    ///
+    /// Tokens arrive from four places and leave from one, and until now all five
+    /// were silent: the number simply differed from the number you last happened to
+    /// look at. A kill paid eleven and nothing on screen said so, and a purchase
+    /// took fifteen out with no more ceremony than the shop card going faint.
+    ///
+    /// It lives on the counter rather than on any of the five, so every source is
+    /// covered by construction - including the ones added later - and the one place
+    /// it can be seen is the place you already look to find out how rich you are.
+    private func announce(_ delta: Int) {
+        guard delta != 0 else { return }
+
+        let gained = delta > 0
+
+        label.removeAction(forKey: "pulse")
+        label.setScale(1)
+        label.run(.sequence([
+            .scale(to: gained ? 1.35 : 0.82, duration: 0.09),
+            .scale(to: 1.0, duration: 0.16)
+        ]), withKey: "pulse")
+
+        // A number that rises off the counter and fades. Made fresh each time
+        // rather than reused, so two payments a moment apart both get seen instead
+        // of the second one restarting the first.
+        let float = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        float.text = gained ? "+\(delta)" : "\(delta)"
+        float.fontSize = 15
+        float.fontColor = gained ? RenderPalette.placementValid : RenderPalette.placementBlocked
+        float.horizontalAlignmentMode = .left
+        float.verticalAlignmentMode = .center
+        float.position = CGPoint(x: label.position.x + 26, y: 0)
+        float.zPosition = 2
+        addChild(float)
+
+        float.run(.sequence([
+            .group([.moveBy(x: 0, y: 22, duration: 0.7),
+                    .sequence([.wait(forDuration: 0.28),
+                               .fadeOut(withDuration: 0.42)])]),
+            .removeFromParent()
+        ]))
     }
 }

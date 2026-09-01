@@ -143,15 +143,36 @@ enum GameConfig {
             let stock: Stock
         }
 
+        /// The shelf, repriced against what the things actually DO rather than
+        /// against each other.
+        ///
+        /// A bomb was six. A bomb opens a wall, and blowing up somebody's machine
+        /// pays twenty-five - so six tokens bought a raid that returned nineteen,
+        /// over and over, and the cheapest thing on the shelf was also the most
+        /// decisive. At eleven the raid still profits, which it should, but the
+        /// travel and the risk are now part of the price rather than a formality.
+        ///
+        /// A machine was eighteen. Modelled against how often its owner actually
+        /// walks past it - it stops paying out at three uncollected, so a machine
+        /// earns what you collect rather than what it makes - eighteen paid for
+        /// itself even if you barely visited, and printed money if you hung around
+        /// your own base. At twenty-four it wants both: bought in the first half
+        /// AND worked. Bought late it is a luxury, which is the correct shape for
+        /// the one purchase that pays you back.
+        ///
+        /// The gear ladder below is untouched. The complaint was that the shelf was
+        /// cheap, not that the climb was - and the climb is where the best kit in
+        /// the game comes from, so making it steeper would work against the very
+        /// thing the late game is supposed to show off.
         static let tabs: [Tab] = [
             Tab(name: "HEALING", stock: .shelf([
-                Item(type: .bandage, price: 5),
-                Item(type: .medkit,  price: 12)
+                Item(type: .bandage, price: 6),
+                Item(type: .medkit,  price: 15)
             ])),
             Tab(name: "BUILDING", stock: .shelf([
-                Item(type: .bomb,   price: 6),
-                Item(type: .chest,  price: 10),
-                Item(type: .arcade, price: 18)
+                Item(type: .bomb,   price: 11),
+                Item(type: .chest,  price: 14),
+                Item(type: .arcade, price: 24)
             ])),
             Tab(name: "GEAR", stock: .upgrades)
         ]
@@ -249,6 +270,39 @@ enum GameConfig {
 
         /// Seconds spent dead before respawning at your own claim.
         static let respawnDelay: Double = 3.0
+
+        /// The kit you come back in, by how far the match has run.
+        ///
+        /// Death strips everything, which is right, and for four minutes it stays
+        /// right. It stops being right in the last ninety seconds: by then the map
+        /// is full of Epics and Blaster 4s, and one death dropped you out of the
+        /// match entirely - back to bare-headed with a starter blaster, against
+        /// people three tiers up, with no time left to climb. The closing minutes
+        /// were being decided by who had most recently died rather than by who was
+        /// playing best, and the game's best gear was on show precisely when the
+        /// people wearing it stopped being challenged.
+        ///
+        /// So a respawn is topped UP to a floor that rises with the clock. It never
+        /// takes anything away - what you kept, you keep - and the floor stays well
+        /// under what the shop and the chests are handing out by then, so it is a
+        /// way back INTO the fight rather than a replacement for having won one.
+        /// Everybody respawns to the same floor, bots included, which is what stops
+        /// the last minute filling up with free kills.
+        static let respawnFloor: [(progress: Double, helmet: HelmetTier, blaster: BlasterTier)] = [
+            (0.50, .common,    .two),
+            (0.70, .uncommon,  .three),
+            (0.85, .rare,      .four)
+        ]
+
+        /// What a respawn is worth right now, or nil in the opening half when it is
+        /// worth nothing at all.
+        static func respawnKit(at progress: Double)
+            -> (helmet: HelmetTier, blaster: BlasterTier)? {
+            guard let band = respawnFloor.last(where: { progress >= $0.progress }) else {
+                return nil
+            }
+            return (band.helmet, band.blaster)
+        }
 
         /// Seconds of immunity after respawning, so you cannot be spawn-camped.
         /// Shots pass straight through a protected actor rather than being absorbed,
@@ -742,21 +796,46 @@ enum GameConfig {
         /// the first raid on a base is always the best one.
         static let restockCeiling = 2
 
-        /// Gear is about a quarter of what a chest holds, so roughly every other
-        /// chest is worth breaking into for a tier rather than for supplies. Modest
-        /// tiers: a chest should be a leg up, not a jackpot that ends the match.
-        static let stockTable: [(item: ItemType, weight: Int)] = [
-            (.bandage, 60),
-            (.medkit,  12),
-            (.bomb,    28),
-
-            // Capped at the same place the crates are. A chest is a better source
-            // than a crate, not a different ladder.
-            (.helmet(.common),   10),
-            (.helmet(.rare),      5),
-            (.blaster(.two),     10),
-            (.blaster(.three),    5)
+        /// What a chest holds, and it MOVES with the match.
+        ///
+        /// One table meant a chest raided in the last minute paid out the same
+        /// opening-minute Commons as one raided in the first, so by the end the
+        /// only things worth crossing the map for were the ones nobody had to
+        /// break a wall to get. Raiding got less rewarding exactly as it got
+        /// harder, which is backwards.
+        ///
+        /// Three bands, and only the GEAR rows differ between them. The supply rows
+        /// are identical in all three on purpose: healing throughput per chest is a
+        /// number solved several times over in LootTable, and a band that quietly
+        /// carried more bandages would undo it. Gear holds 30 of the 130 weight in
+        /// every band too, so a chest is worth breaking into exactly as often as it
+        /// was - what changes is what you find when you do.
+        ///
+        /// The ceiling stops at Legendary. Mythical and Cosmic stay behind the
+        /// token ladder, because the point of the top two rungs is that they are
+        /// climbed rather than found.
+        static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
+            (0.00, [
+                (.bandage, 60), (.medkit, 12), (.bomb, 28),
+                (.helmet(.common), 10), (.helmet(.rare), 5),
+                (.blaster(.two),   10), (.blaster(.three), 5)
+            ]),
+            (0.40, [
+                (.bandage, 60), (.medkit, 12), (.bomb, 28),
+                (.helmet(.rare), 10), (.helmet(.epic), 5),
+                (.blaster(.three), 10), (.blaster(.four), 5)
+            ]),
+            (0.70, [
+                (.bandage, 60), (.medkit, 12), (.bomb, 28),
+                (.helmet(.epic), 9), (.helmet(.legendary), 6),
+                (.blaster(.four), 9), (.blaster(.five), 6)
+            ])
         ]
+
+        /// The band the match is currently in.
+        static func stockTable(at progress: Double) -> [(item: ItemType, weight: Int)] {
+            stockTables.last { progress >= $0.from }?.rows ?? stockTables[0].rows
+        }
 
         /// Footprint in tiles. The art is 1286 x 858 - a hair under 3:2 - and
         /// ChestRenderer draws it at exactly this size, so the chest you see is the

@@ -45,6 +45,11 @@ final class ShopPanelNode: SKNode {
         let price: SKLabelNode
         let pill: SKShapeNode
         let token: SKSpriteNode
+        /// Lit for a moment when the sale goes through. Its own node rather than a
+        /// colour on the plate, because the plate's fill and the holder's alpha are
+        /// both rewritten by the next redraw - which lands on the same frame as the
+        /// purchase, and would wipe the confirmation before it was seen.
+        let flash: SKShapeNode
         var type: ItemType?
     }
 
@@ -58,6 +63,14 @@ final class ShopPanelNode: SKNode {
     private(set) var isOpen = false
     private var selectedTab = 0
     private var lastDrawn: [Int] = []
+
+    /// The card the finger last landed on.
+    ///
+    /// Remembered rather than matched by item, because the card does not always
+    /// still hold what you bought: buying a Rare helmet redraws that column as an
+    /// Epic, so by the time the sale is confirmed there is nothing on the panel
+    /// with the bought item's name on it. The position is the thing that stays put.
+    private var lastPressed: Int?
 
     override init() {
         super.init()
@@ -142,13 +155,23 @@ final class ShopPanelNode: SKNode {
                                   y: 0)
         addChild(holder)
 
-        let plate = SKShapeNode(path: CGPath(
+        let outline = CGPath(
             roundedRect: CGRect(x: -card.width / 2, y: -card.height / 2,
                                 width: card.width, height: card.height),
-            cornerWidth: 12, cornerHeight: 12, transform: nil))
+            cornerWidth: 12, cornerHeight: 12, transform: nil)
+
+        let plate = SKShapeNode(path: outline)
         plate.fillColor = SKColor(white: 1, alpha: 0.10)
         plate.strokeColor = .clear
         holder.addChild(plate)
+
+        let flash = SKShapeNode(path: outline)
+        flash.fillColor = RenderPalette.placementValid
+        flash.strokeColor = RenderPalette.placementValid
+        flash.lineWidth = 3
+        flash.alpha = 0
+        flash.zPosition = 5
+        holder.addChild(flash)
 
         let name = SKLabelNode(fontNamed: "AvenirNext-Bold")
         name.fontSize = 15
@@ -200,7 +223,7 @@ final class ShopPanelNode: SKNode {
         holder.addChild(token)
 
         return Card(holder: holder, icon: icon, name: name,
-                    price: price, pill: pill, token: token, type: nil)
+                    price: price, pill: pill, token: token, flash: flash, type: nil)
     }
 
     private func buildBackButton(below size: CGSize) {
@@ -261,14 +284,37 @@ final class ShopPanelNode: SKNode {
     func item(atLocalPoint point: CGPoint) -> ItemType? {
         let card = ShopPanelNode.cardSize
 
-        for entry in cards where entry.type != nil && !entry.holder.isHidden {
+        for (index, entry) in cards.enumerated()
+        where entry.type != nil && !entry.holder.isHidden {
             let local = CGPoint(x: point.x - entry.holder.position.x,
                                 y: point.y - entry.holder.position.y)
             if abs(local.x) <= card.width / 2 && abs(local.y) <= card.height / 2 {
+                lastPressed = index
                 return entry.type
             }
         }
         return nil
+    }
+
+    /// The sale went through: light the card that was pressed.
+    ///
+    /// Driven by the world rather than by the tap, so a card that was pressed and
+    /// refused stays dark. Nothing here decides whether the purchase happened -
+    /// it is told.
+    func confirm() {
+        guard let index = lastPressed, cards.indices.contains(index) else { return }
+        let card = cards[index]
+
+        card.holder.removeAction(forKey: "bought")
+        card.holder.setScale(1)
+        card.holder.run(.sequence([
+            .scale(to: 1.09, duration: 0.07),
+            .scale(to: 1.0, duration: 0.13)
+        ]), withKey: "bought")
+
+        card.flash.removeAllActions()
+        card.flash.alpha = 0.42
+        card.flash.run(.fadeAlpha(to: 0, duration: 0.45))
     }
 
     func selectTab(_ index: Int) {

@@ -45,6 +45,25 @@ enum RespawnSystem {
             actor.position = claim.centreTile.center
         }
 
+        // Topped up to whatever the clock says a respawn is worth by now.
+        //
+        // Raised to the floor and never lowered to it, which is the whole
+        // distinction: somebody who kept a Legendary through a death - they did
+        // not, death strips it, but somebody who bought one back - is not pulled
+        // down to a Rare by coming back to life. See GameConfig.Player.respawnFloor
+        // for why the last ninety seconds needed this at all.
+        if let kit = GameConfig.Player.respawnKit(at: world.matchProgress) {
+            if actor.helmet < kit.helmet {
+                actor.helmet = kit.helmet
+                // Health is scaled by the helmet, and it was just set to the old
+                // maximum. Re-topped here rather than moved above, because the
+                // order is the bug: fill first and the new helmet's extra hearts
+                // arrive empty.
+                actor.health = actor.maxHealth
+            }
+            if actor.blaster < kit.blaster { actor.blaster = kit.blaster }
+        }
+
         // A bot that died halfway across the map should not come back still
         // pointed the way it was going. Face it out of its own base and let it
         // choose again shortly.

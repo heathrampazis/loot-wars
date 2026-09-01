@@ -455,9 +455,24 @@ final class GameScene: SKScene {
         updateRightControl(with: world)
         updateItemButton(with: world)
         updatePlacementGhost(with: world)
+        reportPurchases(from: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }
+    }
+
+    /// Tells the shop when one of its cards actually sold.
+    ///
+    /// Drained every frame rather than only while the panel is open, or a bot's
+    /// spending would pile up behind a closed shop and all arrive at once the next
+    /// time you opened it. Everybody else's purchases are read and discarded here;
+    /// only yours has anything to show for it.
+    ///
+    /// Note the money side needs nothing: the token counter animates on any change
+    /// it sees, so the price leaving your purse is already accounted for.
+    private func reportPurchases(from world: World) {
+        let mine = world.takePurchases().contains { $0.actor == world.localPlayerID }
+        if mine { shopPanel.confirm() }
     }
 
     /// Keeps the placement outline honest.
