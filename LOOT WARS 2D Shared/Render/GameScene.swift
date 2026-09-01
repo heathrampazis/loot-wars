@@ -92,13 +92,16 @@ final class GameScene: SKScene {
     /// the only gap that is clear on every size. Under the HUD, which was the
     /// obvious spot, it lands inside the move stick's grab radius on anything
     /// smaller than a Pro Max.
+    private static let shopButtonRadius: CGFloat = 26
+
     private let shopButton = ActionButtonNode(glyph: Glyphs.shoppingBag,
-                                              radius: 26, grabRadius: 34,
+                                              radius: shopButtonRadius, grabRadius: 34,
                                               shape: .roundedSquare,
                                               fill: RenderPalette.hudPanel,
-                                              // 0.6 of the plate, measured off the
-                                              // reference.
-                                              glyphSize: 31)
+                                              // 0.73 of the plate. The reference
+                                              // draws it at 0.6, which left more air
+                                              // round it than the button wanted.
+                                              glyphSize: 38)
     private let shopPanel = ShopPanelNode()
     private let results = ResultsNode()
     private let hotbar = HotbarNode()
@@ -309,12 +312,20 @@ final class GameScene: SKScene {
         matchTimer.position = CGPoint(x: 0, y: size.height / 2 - inset)
         results.layOut(for: size)
 
-        // Centred in the gap between the clock and the leaderboard, so it lands in
-        // clear space whatever the width happens to be.
-        let clockRight = MatchTimerNode.size.width / 2
-        let boardLeft = size.width / 2 - inset - islandInset - LeaderboardNode.size.width
-        shopButton.position = CGPoint(x: (clockRight + boardLeft) / 2,
-                                      y: size.height / 2 - inset - 26)
+        // Tucked against the right-hand edge of the HUD, top-aligned with it.
+        //
+        // Clamped so it can never reach the clock. On a phone as narrow as an SE
+        // there is only 51 points between the two and the button wants 70, so the
+        // clamp bites and it overlaps the HUD's edge by about 8 instead. That is the
+        // better of the two failures by a distance: the HUD is a readout nobody
+        // presses, so a few points of overlap costs nothing, whereas lapping the
+        // clock would cover a number you need.
+        let radius = GameScene.shopButtonRadius
+        let besideTheHUD = hud.position.x + HUDNode.size.width + 10 + radius
+        let clearOfTheClock = -MatchTimerNode.size.width / 2 - 8 - radius
+
+        shopButton.position = CGPoint(x: min(besideTheHUD, clearOfTheClock),
+                                      y: size.height / 2 - inset - radius)
 
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
         hotbar.position = CGPoint(x: 0,
