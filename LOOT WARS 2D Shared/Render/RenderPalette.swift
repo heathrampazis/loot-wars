@@ -77,6 +77,11 @@ enum RenderPalette {
     static let countBadge = rgb(0xFF, 0x51, 0x7B)
     static let ammoBar   = rgb(0x3E, 0xA1, 0x80)
 
+    // Placement preview. Green while a footprint would take, red while it would
+    // not - the only two colours nobody has to be taught.
+    static let placementValid   = rgb(0x6E, 0xF0, 0x6E)
+    static let placementBlocked = rgb(0xFF, 0x4B, 0x54)
+
     // On-screen controls
     static let controlBackground = SKColor(white: 0.0, alpha: 0.18)
     static let controlForeground = SKColor(white: 0.0, alpha: 0.30)

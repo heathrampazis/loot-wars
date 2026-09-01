@@ -36,6 +36,14 @@ enum GridGeometry {
         CGFloat(tiles) * tileSize
     }
 
+    /// Where a point on screen falls in tile space, KEEPING the fraction.
+    ///
+    /// The tile-rounded version below cannot centre a footprint: half of an even
+    /// width is half a tile, and that half is exactly what this preserves.
+    static func position(for point: CGPoint) -> Vec2 {
+        Vec2(x: Double(point.x / tileSize), y: Double(point.y / tileSize))
+    }
+
     /// The tile a point on screen falls in. The inverse of the functions above, and
     /// the only way a touch is allowed to become a coordinate.
     static func gridPoint(for point: CGPoint) -> GridPoint {

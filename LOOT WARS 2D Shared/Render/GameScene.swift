@@ -40,6 +40,7 @@ final class GameScene: SKScene {
     private let bombRenderer = BombRenderer()
     private let projectileRenderer = ProjectileRenderer()
     private let actorRenderer = ActorRenderer()
+    private let placementGhost = PlacementGhost()
     private let cameraController = CameraController()
 
     /// The map revision the block layer was last drawn from, so it is only rebuilt
@@ -116,6 +117,29 @@ final class GameScene: SKScene {
     /// the thing in THAT slot.
     private var selectedSlot: Int?
 
+    /// Where the thing being placed is currently pointed.
+    ///
+    /// Scene state like the selection, and for the same reason: an aim is a thing
+    /// this screen is holding between two moments of a gesture. What crosses into
+    /// Core is the finished intent - put it HERE - and only on release.
+    private var ghostOrigin: GridPoint?
+
+    /// What the ghost is aiming, so a fresh selection starts somewhere sensible
+    /// rather than wherever the last one was left pointing.
+    private var ghostType: ItemType?
+
+    /// The item picked out of the hotbar that wants a tile, if there is one.
+    ///
+    /// Asked in three places, so it is one question rather than three spellings of
+    /// it - and it reads from the inventory each time, so an item spent, dropped or
+    /// stored stops being placeable the same frame.
+    private var placingType: ItemType? {
+        guard let slot = selectedSlot,
+              let type = world?.localPlayer?.inventory.stack(at: slot)?.type,
+              type.use == .mapTap else { return nil }
+        return type
+    }
+
     /// How long a finger must stay put to become a hold rather than a tap.
     ///
     /// Shorter than the system's half-second long press. This is a game action, not
@@ -129,6 +153,15 @@ final class GameScene: SKScene {
     private var aimTouch: UITouch?
     private var openTouch: UITouch?
     private var itemTouch: UITouch?
+
+    /// The finger aiming something onto the map.
+    ///
+    /// Deliberately NOT a PendingPress. Positioning is a drag, and a drag past the
+    /// slop cancels a pending press - so lining a machine up would have quietly
+    /// stopped counting as anything. It also has no hold meaning: holding the map
+    /// takes a wall down, and doing that while placing a machine on the same spot
+    /// is not a gesture anybody wants to discover by accident.
+    private var placingTouch: UITouch?
 
     /// A finger that has not yet decided whether it is a tap or a hold.
     ///
@@ -201,6 +234,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(bombRenderer.node)
         worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
+        worldLayer.addChild(placementGhost.node)
         addChild(worldLayer)
 
         // The UI rides on the camera, so it stays put on screen while the map moves.
@@ -420,9 +454,48 @@ final class GameScene: SKScene {
 
         updateRightControl(with: world)
         updateItemButton(with: world)
+        updatePlacementGhost(with: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }
+    }
+
+    /// Keeps the placement outline honest.
+    ///
+    /// Re-asked every frame rather than only when the finger moves, because the
+    /// answer changes while standing still: walk two tiles and the spot that was
+    /// out of your claim is inside it, and the spot under your own feet stops being
+    /// blocked the moment you step off it. An outline that went green at press time
+    /// and stayed green would be the same lie the old blind tap told, just prettier.
+    private func updatePlacementGhost(with world: World) {
+        guard !world.isOver,
+              chestPanel.openChest == nil,
+              !shopPanel.isOpen,
+              let type = placingType,
+              let player = world.localPlayer else {
+            ghostType = nil
+            ghostOrigin = nil
+            placementGhost.hide()
+            return
+        }
+
+        // A fresh selection starts on a spot that works, so picking a machine out
+        // shows you where it could go instead of a red rectangle over your feet.
+        // Only the FIRST frame - after that it is yours to aim.
+        if ghostType != type {
+            ghostType = type
+            ghostOrigin = PlacementSystem.suggestion(for: type, by: player, in: world)
+                ?? PlacementSystem.origin(of: type, tappedAt: player.feet)
+        }
+
+        guard let origin = ghostOrigin else {
+            placementGhost.hide()
+            return
+        }
+
+        placementGhost.show(type, at: origin,
+                            valid: PlacementSystem.canPlace(type, at: origin,
+                                                            by: player, in: world))
     }
 
     /// Swaps the bottom-right corner between the aim stick and the Open button.
@@ -696,6 +769,24 @@ extension GameScene {
                 continue
             }
 
+            // Something out of the bag wants a tile, so a finger on the map is
+            // aiming it rather than tapping. It places on release, and only if the
+            // outline is green - which is why it can be dragged around first.
+            //
+            // One finger owns the aim, like every other control on this screen, and
+            // any others are swallowed rather than passed on. Taking a second one
+            // would orphan the first, whose release would then go nowhere; letting
+            // it through to the map would arm a HOLD, and a second thumb quietly
+            // demolishing a wall while you line up a machine is not a gesture
+            // anybody would go looking for.
+            if placingType != nil {
+                if placingTouch == nil {
+                    placingTouch = touch
+                    aimPlacement(at: touch.location(in: worldLayer))
+                }
+                continue
+            }
+
             beginPress(touch, target: .map)
         }
     }
@@ -710,6 +801,10 @@ extension GameScene {
             aimStick.update(toLocalPoint: active.location(in: aimStick))
         }
 
+        if let active = placingTouch, touches.contains(active) {
+            aimPlacement(at: active.location(in: worldLayer))
+        }
+
         // A finger that wanders was neither a tap nor a hold.
         if let press = pending, touches.contains(press.touch) {
             let moved = press.touch.location(in: self) - press.screenOrigin
@@ -721,6 +816,11 @@ extension GameScene {
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseControls(matching: touches)
+
+        if let active = placingTouch, touches.contains(active) {
+            placingTouch = nil
+            commitPlacement()
+        }
 
         guard let press = pending, touches.contains(press.touch) else { return }
 
@@ -740,6 +840,16 @@ extension GameScene {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseControls(matching: touches)
+
+        // A cancelled placing finger leaves the outline where it was and places
+        // nothing. The item is still picked out, so it can be aimed again - a call
+        // arriving mid-gesture should not cost you a machine, and it should not
+        // spend one either. Note this is NOT done in releaseControls: that runs
+        // first on release too, and clearing the finger there would unset it before
+        // the release could act on it.
+        if let active = placingTouch, touches.contains(active) {
+            placingTouch = nil
+        }
 
         if let press = pending, touches.contains(press.touch) {
             cancelPress()
@@ -887,23 +997,52 @@ extension GameScene {
         // the map should not throw you out of a chest you are halfway through.
     }
 
-    /// Asks for a block, or for a chest if one is armed. Whether either appears is
-    /// a system's call in Core, not the scene's. Bombs are thrown from the hotbar,
-    /// like everything else you carry.
+    /// Asks for a block. Whether one appears is BuildSystem's call, not the
+    /// scene's, and bombs are thrown from the hotbar like everything else you carry.
+    ///
+    /// Placing a chest or a machine no longer arrives here. It used to: a tap was
+    /// read straight into a placement, which is why putting a machine down felt
+    /// like a coin flip - the footprint went up and to the right of the finger,
+    /// nothing showed you where it would land, and a refusal looked exactly like
+    /// the game ignoring you. That is a drag with an outline on it now, below.
     private func tapMap(at pointInWorld: CGPoint) {
-        let tile = GridGeometry.gridPoint(for: pointInWorld)
+        queuedCommands.append(.placeBlock(GridGeometry.gridPoint(for: pointInWorld)))
+    }
 
-        // Only an item that wants a tile turns a map tap into a placement. Anything
-        // else picked out of the hotbar leaves the map meaning what it always meant.
-        if let slot = selectedSlot,
-           let type = world.localPlayer?.inventory.stack(at: slot)?.type,
-           type.use == .mapTap {
-            queuedCommands.append(type == .arcade ? .placeArcade(tile) : .placeChest(tile))
-            selectedSlot = nil
-            return
-        }
+    // MARK: - Aiming something onto the map
 
-        queuedCommands.append(.placeBlock(tile))
+    /// Points the outline at a spot on the map.
+    ///
+    /// Where the footprint goes is PlacementSystem's answer, not this file's, so
+    /// what is drawn under the finger is the same rectangle the placement will use.
+    private func aimPlacement(at pointInWorld: CGPoint) {
+        guard let type = placingType else { return }
+        ghostOrigin = PlacementSystem.origin(
+            of: type, tappedAt: GridGeometry.position(for: pointInWorld))
+    }
+
+    /// Lets go of it.
+    ///
+    /// A refusal keeps both the item and the aim. The outline was already red, so
+    /// nothing is being explained after the fact - and having to pick the machine
+    /// back out of the bag to try one tile further left would be a punishment for
+    /// the screen's own vagueness.
+    private func commitPlacement() {
+        // A panel that opened under the finger takes the gesture with it. Placing
+        // something you can no longer see the map for would be the same class of
+        // fault as the corner button that stayed hidden: an input outliving the
+        // state it was made in.
+        guard chestPanel.openChest == nil, !shopPanel.isOpen, !world.isOver else { return }
+
+        guard let type = placingType,
+              let origin = ghostOrigin,
+              let player = world.localPlayer,
+              PlacementSystem.canPlace(type, at: origin, by: player, in: world),
+              let command = PlacementSystem.command(for: type, at: origin) else { return }
+
+        queuedCommands.append(command)
+        selectedSlot = nil
+        ghostOrigin = nil
     }
 }
 

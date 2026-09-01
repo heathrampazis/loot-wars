@@ -101,8 +101,15 @@ enum ShopSystem {
         // standing, or you could buy a spare and be eighteen tokens out of pocket
         // for a thing with nowhere to go.
         if type == .arcade {
-            return !world.hasArcade(actor.team)
-                && actor.inventory.firstSlot(holding: .arcade) == nil
+            guard !world.hasArcade(actor.team),
+                  actor.inventory.firstSlot(holding: .arcade) == nil else { return false }
+
+            // And not one your walls have no room for. A machine needs a clear
+            // 2 x 3 inside the base, and about one base in seven is a small enough
+            // rectangle that a chest already leaves it without one. Refusing the
+            // sale is the only honest answer: the alternative is taking eighteen
+            // tokens for something the map will never let you stand up.
+            return world.nextArcadeOrigin(for: actor.team, near: actor.position) != nil
         }
 
         return true

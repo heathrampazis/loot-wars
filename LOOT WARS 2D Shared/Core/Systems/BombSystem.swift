@@ -85,8 +85,17 @@ enum BombSystem {
         world.bombs = stillFlying
     }
 
+    /// What stops a bomb in flight.
+    ///
+    /// Machines are in here, and were not: a bomb sailed straight through an arcade
+    /// and went off somewhere behind it, which meant the one thing a machine is
+    /// vulnerable to could not reliably be aimed at it. It is solid to a walking
+    /// actor and solid to a shot; it is solid to a bomb now too, and since a bomb
+    /// stopped by a machine goes off against its side, that is also what makes
+    /// raiding one work.
     private static func hitsSomething(_ point: Vec2, in world: World) -> Bool {
         if world.map.isOccupied(GridPoint(containing: point)) { return true }
+        if world.arcades.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         return world.trees.contains { $0.contains(point) }
     }
 

@@ -31,7 +31,9 @@ final class ArcadeRenderer {
                                         width: 496.0 / 926.0,
                                         height: 808.0 / 928.0)
 
-    private lazy var texture: SKTexture = {
+    /// Shared, because the placement preview draws the same machine before it
+    /// exists. Two copies of the crop would be two chances to remeasure only one.
+    static let machine: SKTexture = {
         let sheet = SKTexture(imageNamed: "Arcade")
         let cropped = SKTexture(rect: ArcadeRenderer.artwork, in: sheet)
         cropped.usesMipmaps = true
@@ -61,7 +63,7 @@ final class ArcadeRenderer {
 
     private func make(_ machine: Arcade) {
         let sprite = SKSpriteNode(
-            texture: texture,
+            texture: ArcadeRenderer.machine,
             size: CGSize(width: GridGeometry.length(ofTiles: Double(Arcade.width)),
                          height: GridGeometry.length(ofTiles: Double(Arcade.height))))
 
