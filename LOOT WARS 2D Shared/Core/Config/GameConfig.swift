@@ -72,16 +72,58 @@ enum GameConfig {
             let price: Int
         }
 
+        /// What a tab is stocked with.
+        ///
+        /// Two kinds, because gear does not behave like a bandage. A shelf is the
+        /// same for everybody; an upgrade depends on what you are already wearing,
+        /// and listing all seven tiers would be seven cards where two will do and a
+        /// shop full of things you cannot buy.
+        enum Stock {
+            case shelf([Item])
+            case upgrades
+        }
+
         struct Tab {
             let name: String
-            let items: [Item]
+            let stock: Stock
         }
 
         static let tabs: [Tab] = [
-            Tab(name: "HEALING", items: [
+            Tab(name: "HEALING", stock: .shelf([
                 Item(type: .bandage, price: 5),
                 Item(type: .medkit,  price: 12)
-            ])
+            ])),
+            Tab(name: "GEAR", stock: .upgrades)
+        ]
+
+        /// What it costs to step UP to each tier.
+        ///
+        /// EVERY rung is priced, not just the ones crates no longer carry. The
+        /// first version only listed Epic upwards, which left anyone below Rare
+        /// staring at an empty tab - correct, in that the floor is where they should
+        /// be looking, and indistinguishable from a broken shop.
+        ///
+        /// So the low rungs are here and they are nearly free. A Common is three
+        /// tokens because a Common is nearly worthless: the shop is topping you up,
+        /// not selling you a shortcut past the crates. The shape is what matters -
+        /// cheap at the bottom, steep at the top, so the shop's real value is
+        /// exactly where the crates now stop.
+        ///
+        /// Priced against a match: a balanced player collects about 25 tokens in
+        /// five minutes and somebody working the arcades about 42. Epic is half a
+        /// match, Cosmic is a match and a half, and the whole climb from bare-headed
+        /// is 190 - six or seven matches. Nobody tops out in one, which is the point.
+        ///
+        /// And every rung is lost on death, which is what stops a bought Cosmic from
+        /// simply deciding the match. It is a lead to hold on to, not a purchase.
+        static let helmetPrices: [HelmetTier: Int] = [
+            .common: 3, .uncommon: 5, .rare: 8,
+            .epic: 13, .legendary: 20, .mythical: 28, .cosmic: 38
+        ]
+
+        static let blasterPrices: [BlasterTier: Int] = [
+            .two: 3, .three: 6,
+            .four: 13, .five: 21, .six: 32
         ]
     }
 
@@ -591,10 +633,12 @@ enum GameConfig {
             (.medkit,  12),
             (.bomb,    28),
 
+            // Capped at the same place the crates are. A chest is a better source
+            // than a crate, not a different ladder.
             (.helmet(.common),   10),
             (.helmet(.rare),      5),
             (.blaster(.two),     10),
-            (.blaster(.four),     5)
+            (.blaster(.three),    5)
         ]
 
         /// Footprint in tiles. The art is 1286 x 858 - a hair under 3:2 - and

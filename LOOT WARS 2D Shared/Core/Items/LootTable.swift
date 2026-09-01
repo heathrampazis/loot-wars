@@ -23,33 +23,38 @@
 //
 //  Bombs went from 22 to 36 - a bomb in one crate in seven rather than one in
 //  eleven - because a bomb is the way into a base, and raids were rationed by how
-//  rarely anyone was carrying one. Healing was solved a third time to hold 17.5%
-//  through it.
+//  rarely anyone was carrying one.
+//
+//  Then a balance pass took the ceiling off the table entirely. Gear stops at Rare
+//  and Blaster 3; the four helmet tiers and three blaster tiers above them are
+//  bought with tokens instead. A crate that can hand you a Cosmic makes the ladder a
+//  lottery - won in the first minute or not at all - where an upgrade you save for
+//  is a thing you climb.
+//
+//  With 12% of the table gone the rest was resolved rather than left to inflate:
+//  healing up to 40% of crates and 24% of a health bar each, bombs down from one
+//  crate in seven to one in nine.
 //
 
 enum LootTable {
 
     private static let table: [(pickup: Pickup, weight: Int)] = [
-        (.item(.bandage), 61),
-        (.item(.medkit),  16),
-        (.item(.bomb),    36),
+        (.item(.bandage), 78),
+        (.item(.medkit),  20),
+        (.item(.bomb),    26),
         (.item(.chest),   20),
 
+        // Stops at Rare. Everything above it is bought, not found - see
+        // GameConfig.Shop. A crate that can hand you a Cosmic makes the whole
+        // upgrade ladder a lottery you either win in the first minute or do not.
         (.item(.helmet(.common)),    28),
         (.item(.helmet(.uncommon)),  19),
         (.item(.helmet(.rare)),      12),
-        (.item(.helmet(.epic)),       7),
-        (.item(.helmet(.legendary)),  4),
-        (.item(.helmet(.mythical)),   2),
-        (.item(.helmet(.cosmic)),     1),
 
         // No starter blasters: everybody already has one, so dropping them would
         // only be a way of finding nothing.
         (.item(.blaster(.two)),   26),
-        (.item(.blaster(.three)), 16),
-        (.item(.blaster(.four)),  10),
-        (.item(.blaster(.five)),   5),
-        (.item(.blaster(.six)),    2)
+        (.item(.blaster(.three)), 16)
     ]
 
     /// - Parameter bombs: false during the opening grace period, when the bomb row

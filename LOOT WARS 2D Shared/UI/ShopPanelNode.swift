@@ -85,6 +85,7 @@ final class ShopPanelNode: SKNode {
         let tab = ShopPanelNode.tabSize
 
         for (index, definition) in GameConfig.Shop.tabs.enumerated() {
+
             let holder = SKNode()
             holder.position = CGPoint(
                 x: -size.width / 2 + ShopPanelNode.padding + tab.width / 2
@@ -271,11 +272,14 @@ final class ShopPanelNode: SKNode {
     func update(with world: World) {
         guard isOpen, let player = world.localPlayer else { return }
 
-        let items = GameConfig.Shop.tabs[selectedTab].items
+        // The gear tab's cards depend on what you are wearing, so the offers come
+        // from Core rather than straight out of the config.
+        let items = ShopSystem.offers(on: selectedTab, for: player)
 
-        // Redraw only when the tab, your purse, or your bag changes - the three
+        // Redraw only when the tab, your purse, your gear or your bag changes - the
         // things that can alter what this panel should say.
-        let fingerprint = [selectedTab, player.tokens]
+        let fingerprint = [selectedTab, player.tokens, items.count]
+            + items.map { $0.price }
             + items.map { ShopSystem.canBuy($0.type, actor: player) ? 1 : 0 }
         guard fingerprint != lastDrawn else { return }
         lastDrawn = fingerprint
@@ -319,8 +323,11 @@ final class ShopPanelNode: SKNode {
         case .medkit:  return "Medkit"
         case .bomb:    return "Bomb"
         case .chest:   return "Chest"
-        case .helmet:  return "Helmet"
-        case .blaster: return "Blaster"
+        // Named by the TIER rather than by the slot, because on the gear tab the
+        // tier is the whole offer - "Helmet" twice would say nothing about which
+        // rung you are being sold.
+        case .helmet(let tier):  return tier.name
+        case .blaster(let tier): return "Blaster \(tier.rawValue)"
         }
     }
 }
