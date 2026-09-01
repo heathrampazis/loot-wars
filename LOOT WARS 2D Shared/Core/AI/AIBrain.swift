@@ -312,9 +312,15 @@ enum AIBrain {
 
         let healthLeft = Double(actor.health) / Double(actor.maxHealth)
 
-        state.goal = healthLeft < GameConfig.AI.retreatHealthFraction * state.caution
-            ? .retreat(from: enemy.id)
-            : .fight(enemy.id)
+        if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
+            state.goal = .retreat(from: enemy.id)
+        } else {
+            // Spotting somebody is no longer a reason to drop everything. It has to
+            // be a fight worth interrupting a trip home for.
+            guard shouldEngage(enemy, actor: actor, in: world) else { return }
+            state.goal = .fight(enemy.id)
+        }
+
         state.goalAge = 0
         state.reactionTimer = Double.random(in: GameConfig.AI.reactionDelay, using: &world.rng)
     }
@@ -328,11 +334,18 @@ enum AIBrain {
             // actually near - once it is safe, or once it has drunk its way back to
             // health, the bot turns round and fights rather than hiding at home for
             // the rest of the match.
+            //
+            // Running is judged on seeing ANYBODY, unlike fighting. You flee from
+            // whoever is there; you do not pick who to flee from.
             if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
                 return .retreat(from: enemy.id)
             }
 
-            return .fight(enemy.id)
+            // A fight it does not want simply falls through to the rest of the list,
+            // and the bot gets on with looting, building or raiding instead.
+            if shouldEngage(enemy, actor: actor, in: world) {
+                return .fight(enemy.id)
+            }
         }
 
         // Somebody has put a hole in a finished base. Everything else waits.
@@ -594,6 +607,56 @@ enum AIBrain {
         return closest
     }
 
+    /// Whether this fight is worth having.
+    ///
+    /// Seeing somebody was the whole test before, which is why every bot on the map
+    /// converged on you the moment you came into view - eight actors who could see
+    /// each other were eight actors fighting, every time, regardless of whether it
+    /// made any sense.
+    ///
+    /// Now a bot fights when it MUST, or when the fight is worth crossing ground
+    /// for. Must covers the three cases where declining would look stupid: somebody
+    /// shooting at it, somebody at arm's length, and somebody standing in its base.
+    /// Past that it weighs the target, and the weighing is already done for it -
+    /// a kill is priced by what the victim was carrying, so a well-equipped bot
+    /// hunting a fresh spawn is spending a minute on 50 points when a chest is
+    /// worth more. The AI is just agreeing with the scoreboard.
+    static func shouldEngage(_ enemy: Actor, actor: Actor, in world: World) -> Bool {
+        // Shot at. Nothing else matters.
+        if actor.secondsSinceHit < GameConfig.AI.combatRecency { return true }
+
+        let distance = (enemy.position - actor.position).length
+        if distance <= fightRanges(against: enemy, in: world).pressing { return true }
+
+        // In its base. Whatever they came for, they are not getting it.
+        if world.claim(for: actor.team)?
+            .contains(GridPoint(containing: enemy.feet)) == true { return true }
+
+        // Whoever is winning is worth stopping, wherever they are and whatever they
+        // happen to be wearing.
+        if world.bestScore > 0, world.score(for: enemy.team) >= world.bestScore {
+            return true
+        }
+
+        // Otherwise the target has to be worth the ground between them, and the
+        // further away they are the more they have to be worth. Somebody a step
+        // outside arm's length is worth going for; the same person at the edge of
+        // vision is somebody else's problem.
+        let ranges = fightRanges(against: enemy, in: world)
+        let band = max(0.001, ranges.engage - ranges.pressing)
+        let reach = min(1, (distance - ranges.pressing) / band)
+
+        let wanted = Double(GameConfig.AI.worthChasingGear)
+            + reach * Double(GameConfig.AI.worthChasingAtRange)
+
+        guard Double(enemy.gearWorth) >= wanted else { return false }
+
+        // And one reason to decline anyway: far weaker, so there is little to win.
+        // Punching down pays 50 points and 8 tokens where the same minute spent on
+        // a chest pays more, so a bot in a Cosmic has better uses for its time.
+        return enemy.gearWorth + GameConfig.AI.punchDownSlack >= actor.gearWorth
+    }
+
     /// How far away a target FEELS, given how well they are doing.
     ///
     /// The leader reads as closer than they are. Scaling the distance rather than
@@ -825,6 +888,8 @@ enum AIBrain {
         let preferred: Double
         let minimum: Double
         let disengage: Double
+        /// Close enough that a fight is not a decision.
+        let pressing: Double
     }
 
     static func fightRanges(against target: Actor?, in world: World) -> FightRanges {
@@ -833,7 +898,8 @@ enum AIBrain {
         return FightRanges(engage: engage,
                            preferred: engage * GameConfig.AI.preferredFraction,
                            minimum: engage * GameConfig.AI.minimumFraction,
-                           disengage: engage * GameConfig.AI.disengageFraction)
+                           disengage: engage * GameConfig.AI.disengageFraction,
+                           pressing: engage * GameConfig.AI.pressingFraction)
     }
 
     /// How far a bot may engage THIS target from.
@@ -888,16 +954,16 @@ enum AIBrain {
         // later anyway, and keeps the machine.
         if !world.hasArcade(actor.team),
            actor.inventory.firstSlot(holding: .arcade) == nil,
-           ShopSystem.canBuy(.arcade, actor: actor) {
+           ShopSystem.canBuy(.arcade, actor: actor, in: world) {
             return .arcade
         }
 
-        return upgradeToBuy(actor: actor)
+        return upgradeToBuy(actor: actor, in: world)
     }
 
-    private static func upgradeToBuy(actor: Actor) -> ItemType? {
+    private static func upgradeToBuy(actor: Actor, in world: World) -> ItemType? {
         ShopSystem.upgradeOffers(for: actor)
-            .filter { worthBuying($0.type) && ShopSystem.canBuy($0.type, actor: actor) }
+            .filter { worthBuying($0.type) && ShopSystem.canBuy($0.type, actor: actor, in: world) }
             .min { $0.price < $1.price }?
             .type
     }

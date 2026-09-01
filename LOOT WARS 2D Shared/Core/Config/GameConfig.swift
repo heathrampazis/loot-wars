@@ -384,6 +384,38 @@ enum GameConfig {
         static let minimumFraction: Double = 0.48
         static let disengageFraction: Double = 1.35
 
+        /// Inside this share of the engage range, a bot fights whoever is there and
+        /// does not think about it. Arm's length: somebody this close is a problem
+        /// whatever else was on your list.
+        static let pressingFraction: Double = 0.45
+
+        /// How much better equipped a bot has to be before it stops bothering with
+        /// somebody, in tiers.
+        ///
+        /// Punching down pays almost nothing now that a kill is priced by what the
+        /// victim was carrying - a Cosmic killing a fresh spawn earns 50 and 8
+        /// tokens, where the same minute spent on a chest earns far more. So the
+        /// bounty already says this is a poor use of a strong bot's time; this is
+        /// the AI agreeing with it.
+        static let punchDownSlack = 4
+
+        /// How much gear makes somebody worth crossing open ground for, at the
+        /// near edge of the band - and how much MORE is wanted at the far edge.
+        ///
+        /// The requirement grows with the distance, which is the part that matters.
+        /// A flat threshold barely changed anything: by the middle of a match almost
+        /// everybody is carrying enough to clear it, so seven bots still converged
+        /// from the edge of vision. Sliding it from 3 up to 9 across the band means
+        /// somebody a step away is worth fighting and the same person at maximum
+        /// range is not - which is the actual complaint.
+        ///
+        /// Measured over 150,000 encounters with gear that climbs across a match:
+        /// engagements fall from 100% to 79% overall, 62% early on when nobody has
+        /// anything worth taking, and 95% late when everyone does. Late being high
+        /// is correct - by then a fight IS the game.
+        static let worthChasingGear = 3
+        static let worthChasingAtRange = 6
+
 
 
 

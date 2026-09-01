@@ -92,14 +92,25 @@ enum ShopSystem {
 
     /// Whether this actor could buy this right now. Asked by the shop panel so a
     /// card it draws as affordable is one the simulation will actually sell.
-    static func canBuy(_ type: ItemType, actor: Actor) -> Bool {
+    static func canBuy(_ type: ItemType, actor: Actor, in world: World) -> Bool {
         guard actor.isAlive, let price = price(of: type) else { return false }
-        return actor.tokens >= price && actor.canAcquire(type)
+        guard actor.tokens >= price, actor.canAcquire(type) else { return false }
+
+        // One machine to a base, and the shop will not sell you a second you could
+        // never put down - counting the one in your bag as well as the one already
+        // standing, or you could buy a spare and be eighteen tokens out of pocket
+        // for a thing with nowhere to go.
+        if type == .arcade {
+            return !world.hasArcade(actor.team)
+                && actor.inventory.firstSlot(holding: .arcade) == nil
+        }
+
+        return true
     }
 
     private static func buy(_ type: ItemType, by id: ActorID, in world: World) {
         guard var actor = world.actors[id],
-              canBuy(type, actor: actor),
+              canBuy(type, actor: actor, in: world),
               let price = price(of: type) else { return }
 
         actor.tokens -= price

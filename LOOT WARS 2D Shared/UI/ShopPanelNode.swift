@@ -290,7 +290,7 @@ final class ShopPanelNode: SKNode {
         // things that can alter what this panel should say.
         let fingerprint = [selectedTab, player.tokens, items.count]
             + items.map { $0.price }
-            + items.map { ShopSystem.canBuy($0.type, actor: player) ? 1 : 0 }
+            + items.map { ShopSystem.canBuy($0.type, actor: player, in: world) ? 1 : 0 }
         guard fingerprint != lastDrawn else { return }
         lastDrawn = fingerprint
 
@@ -322,7 +322,7 @@ final class ShopPanelNode: SKNode {
             card.price.text = "\(item.price)"
 
             // Faint when you cannot have it, from the same answer the purchase uses.
-            let affordable = ShopSystem.canBuy(item.type, actor: player)
+            let affordable = ShopSystem.canBuy(item.type, actor: player, in: world)
             card.holder.alpha = affordable ? 1.0 : 0.45
 
             cards[index] = card

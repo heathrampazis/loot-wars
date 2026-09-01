@@ -30,6 +30,11 @@ enum ArcadeSystem {
     /// ones where the spawn tile sits in the only gap.
     static func canPlace(at origin: GridPoint, by actor: Actor, in world: World) -> Bool {
         guard actor.inventory.firstSlot(holding: .arcade) != nil else { return false }
+
+        // One to a base. Two machines in the same walls would double an income that
+        // is already the safest on the map, and the shop refuses to sell a second
+        // for the same reason - this is the backstop for one found any other way.
+        guard !world.hasArcade(actor.team) else { return false }
         guard let layout = world.baseLayouts[actor.team] else { return false }
 
         // Placed from inside, like everything else you build.
