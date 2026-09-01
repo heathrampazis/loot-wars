@@ -4,16 +4,18 @@
 //
 //  Something lying on the ground waiting to be walked over.
 //
-//  Two kinds, and they behave completely differently: a bandage goes into a hotbar
-//  slot to be used later, while a helmet is worn the moment you touch it. Keeping
-//  them as one type here - rather than forcing helmets through the inventory -
-//  means the four hotbar slots stay for things you choose to use.
+//  Helmets and blasters used to have cases of their own here, because they were
+//  worn on touch and could not be carried. Now that they can be carried they are
+//  ItemTypes like everything else, and this is down to two cases: a thing, or
+//  money. Two ways of saying "a helmet" would have been one too many.
+//
+//  Being an ItemType does not make gear behave like a bandage. LootSystem still
+//  puts a better one straight onto your head; what changed is that a worse one now
+//  has somewhere to go instead of being left in the grass.
 //
 
 enum Pickup: Hashable {
     case item(ItemType)
-    case helmet(HelmetTier)
-    case blaster(BlasterTier)
     /// Currency. Goes straight to a running total rather than a hotbar slot, so
     /// picking one up can never cost you a bandage you were carrying.
     case token(Int)

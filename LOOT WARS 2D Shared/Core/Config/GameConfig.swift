@@ -510,10 +510,18 @@ enum GameConfig {
         /// the first raid on a base is always the best one.
         static let restockCeiling = 2
 
+        /// Gear is about a quarter of what a chest holds, so roughly every other
+        /// chest is worth breaking into for a tier rather than for supplies. Modest
+        /// tiers: a chest should be a leg up, not a jackpot that ends the match.
         static let stockTable: [(item: ItemType, weight: Int)] = [
             (.bandage, 60),
             (.medkit,  12),
-            (.bomb,    28)
+            (.bomb,    28),
+
+            (.helmet(.common),   10),
+            (.helmet(.rare),      5),
+            (.blaster(.two),     10),
+            (.blaster(.four),     5)
         ]
 
         /// Footprint in tiles. The art is 1286 x 858 - a hair under 3:2 - and

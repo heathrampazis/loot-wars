@@ -96,6 +96,15 @@ enum AIBrain {
             commands.append(.useItem(slot: slot))
         }
 
+        // Anything in the bag that beats what it is wearing goes on at once. This
+        // is how a bot re-arms itself after respawning bare-headed, from a spare it
+        // picked up earlier - the same move a player makes from the hotbar.
+        if let slot = (0..<Inventory.slotCount).first(where: {
+            EquipSystem.canEquip(slot: $0, actor: actor)
+        }) {
+            commands.append(.useItem(slot: slot))
+        }
+
         if let slot = healToUse(&state, actor: actor) {
             commands.append(.useItem(slot: slot))
             actor.ai = state
@@ -464,10 +473,10 @@ enum AIBrain {
             // gets the same reach a crate does.
             let worthTravelling: Double
             switch item.pickup {
+            case .item(.helmet), .item(.blaster):
+                worthTravelling = GameConfig.AI.lootSearchRange
             case .item:
                 worthTravelling = GameConfig.AI.itemSearchRange
-            case .helmet, .blaster:
-                worthTravelling = GameConfig.AI.lootSearchRange
             case .token:
                 worthTravelling = GameConfig.AI.tokenSearchRange
             }

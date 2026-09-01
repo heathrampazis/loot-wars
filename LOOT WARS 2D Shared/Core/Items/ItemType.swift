@@ -11,11 +11,21 @@
 //  where a bandage is two, and mid-fight that is the whole difference.
 //
 
-enum ItemType: Hashable, CaseIterable {
+enum ItemType: Hashable {
     case bandage
     case medkit
     case bomb
     case chest
+
+    /// Gear you can carry rather than wear.
+    ///
+    /// Worn gear lives on the Actor - helmet and blaster - and always has. These
+    /// are the SPARE: a tier sitting in a bag or a chest waiting to be put on.
+    /// Making them item types rather than a second parallel system is what lets a
+    /// chest hold one, a raider steal one, and the hotbar show one, all through
+    /// code that already existed.
+    case helmet(HelmetTier)
+    case blaster(BlasterTier)
 
     /// How many fit in one inventory slot.
     var maxStack: Int {
@@ -24,6 +34,9 @@ enum ItemType: Hashable, CaseIterable {
         case .medkit:  return 2
         case .bomb:    return 3
         case .chest:   return 2
+        // One apiece. Two tiers of the same gear are different item types anyway,
+        // so a stack of them could never have meant anything.
+        case .helmet, .blaster: return 1
         }
     }
 
@@ -37,7 +50,7 @@ enum ItemType: Hashable, CaseIterable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .chest: return 0
+        case .bomb, .chest, .helmet, .blaster: return 0
         }
     }
 
@@ -58,8 +71,16 @@ enum ItemType: Hashable, CaseIterable {
 
     var use: Use {
         switch self {
-        case .bandage, .medkit, .bomb: return .actionButton
+        case .bandage, .medkit, .bomb, .helmet, .blaster: return .actionButton
         case .chest: return .mapTap
+        }
+    }
+
+    /// Whether this is something you put on rather than use up.
+    var isGear: Bool {
+        switch self {
+        case .helmet, .blaster: return true
+        case .bandage, .medkit, .bomb, .chest: return false
         }
     }
 

@@ -35,21 +35,21 @@ enum LootTable {
         (.item(.bomb),    36),
         (.item(.chest),   20),
 
-        (.helmet(.common),    28),
-        (.helmet(.uncommon),  19),
-        (.helmet(.rare),      12),
-        (.helmet(.epic),       7),
-        (.helmet(.legendary),  4),
-        (.helmet(.mythical),   2),
-        (.helmet(.cosmic),     1),
+        (.item(.helmet(.common)),    28),
+        (.item(.helmet(.uncommon)),  19),
+        (.item(.helmet(.rare)),      12),
+        (.item(.helmet(.epic)),       7),
+        (.item(.helmet(.legendary)),  4),
+        (.item(.helmet(.mythical)),   2),
+        (.item(.helmet(.cosmic)),     1),
 
         // No starter blasters: everybody already has one, so dropping them would
         // only be a way of finding nothing.
-        (.blaster(.two),   26),
-        (.blaster(.three), 16),
-        (.blaster(.four),  10),
-        (.blaster(.five),   5),
-        (.blaster(.six),    2)
+        (.item(.blaster(.two)),   26),
+        (.item(.blaster(.three)), 16),
+        (.item(.blaster(.four)),  10),
+        (.item(.blaster(.five)),   5),
+        (.item(.blaster(.six)),    2)
     ]
 
     /// - Parameter bombs: false during the opening grace period, when the bomb row

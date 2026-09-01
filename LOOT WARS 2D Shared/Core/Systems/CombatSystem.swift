@@ -59,12 +59,33 @@ enum CombatSystem {
         // worth avoiding: killing someone in a Legendary is how you get one. The
         // chance keeps it a gamble rather than a transaction, and it rises with
         // tier, so the good stuff is the stuff worth chasing.
-        drop(.helmet(actor.helmet), chance: actor.helmet.dropChance, at: actor.position, in: world)
+        drop(.item(.helmet(actor.helmet)), chance: actor.helmet.dropChance,
+             at: actor.position, in: world)
         actor.helmet = .none
 
         // A starter blaster never drops - everybody already has one, so scattering
         // them would only be a way of finding nothing.
-        drop(.blaster(actor.blaster), chance: actor.blaster.dropChance, at: actor.position, in: world)
+        drop(.item(.blaster(actor.blaster)), chance: actor.blaster.dropChance,
+             at: actor.position, in: world)
+
+        // Spares in the bag go the same way, on the same tier odds.
+        //
+        // This is what keeps a chest worth having. If carried gear survived death
+        // there would be no reason to bank any of it, and dying would stop costing
+        // anything at all - you would simply stand up and put your spare back on.
+        // A chest is the safe place; your pockets are not.
+        for stack in actor.inventory.slots.compactMap({ $0 }) {
+            switch stack.type {
+            case .helmet(let tier):
+                drop(.item(.helmet(tier)), chance: tier.dropChance,
+                     at: actor.position, in: world)
+            case .blaster(let tier):
+                drop(.item(.blaster(tier)), chance: tier.dropChance,
+                     at: actor.position, in: world)
+            case .bandage, .medkit, .bomb, .chest:
+                break
+            }
+        }
         actor.blaster = .starting
     }
 

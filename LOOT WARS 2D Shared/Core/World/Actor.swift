@@ -107,6 +107,14 @@ struct Actor {
         case .bandage, .medkit:
             // Using one on full health would throw it away for nothing.
             return health < maxHealth
+
+        // The no-downgrade rule, and the only place it is written. The hotbar greys
+        // the slot out from this same answer, so a spare you cannot use yet LOOKS
+        // unusable - and lights up by itself the moment you respawn bare-headed.
+        case .helmet(let tier):
+            return tier > helmet
+        case .blaster(let tier):
+            return tier > blaster
         }
     }
 
@@ -117,14 +125,15 @@ struct Actor {
     /// would then decline to pick up.
     func wants(_ pickup: Pickup) -> Bool {
         switch pickup {
+        // An upgrade is always worth having, room or no room - it goes onto you
+        // rather than into a slot.
+        case .item(.helmet(let tier)) where tier > helmet: return true
+        case .item(.blaster(let tier)) where tier > blaster: return true
+
         case .item(let type):
+            // Everything else, gear at or below what is worn included, needs a slot
+            // to go in. A spare is worth carrying; it is not worth a full bag.
             return inventory.canAccept(type)
-        case .helmet(let tier):
-            // Only an upgrade is worth having. A worse one stays on the ground for
-            // somebody who has nothing.
-            return tier > helmet
-        case .blaster(let tier):
-            return tier > blaster
         case .token:
             // Always. Currency never fills up and never becomes the wrong kind.
             return true
