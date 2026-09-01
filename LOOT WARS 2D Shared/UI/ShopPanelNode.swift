@@ -74,7 +74,7 @@ final class ShopPanelNode: SKNode {
 
         buildTabs(above: size)
         for column in 0..<ShopPanelNode.columns {
-            cards.append(makeCard(at: column, in: size))
+            cards.append(makeCard(at: column))
         }
         buildBackButton(below: size)
     }
@@ -134,7 +134,9 @@ final class ShopPanelNode: SKNode {
         return -spread / 2 + card.width / 2 + CGFloat(column) * (card.width + cardGap)
     }
 
-    private func makeCard(at column: Int, in size: CGSize) -> Card {
+    private func makeCard(at column: Int) -> Card {
+        let card = ShopPanelNode.cardSize
+
         let holder = SKNode()
         holder.position = CGPoint(x: ShopPanelNode.centreX(of: column, outOf: ShopPanelNode.columns),
                                   y: 0)
