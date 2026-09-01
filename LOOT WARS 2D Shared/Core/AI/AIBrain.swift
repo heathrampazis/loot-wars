@@ -237,12 +237,21 @@ enum AIBrain {
         }
 
         if case .build = wanted, !state.goal.isBuild {
-            // A bot that is behind takes a bigger armful, because it will get fewer
-            // trips - see GameConfig.Build.blocksWhenBehind for why this, and not
-            // the priority bump above, is what actually closes the gap.
-            let armful = world.isFallingBehind(actor.team)
-                ? GameConfig.Build.blocksWhenBehind
-                : GameConfig.Build.blocksPerVisit
+            // Three sizes of armful, in order of urgency. A hole in a finished
+            // base is the urgent one: it has to be enough to actually close the
+            // breach, or the bot walks off with its base still open and gets
+            // robbed again by the next person past. Behind on the wall is the
+            // slow-burn one - see GameConfig.Build.blocksWhenBehind for why the
+            // armful, and not the priority bump, is what closes that gap.
+            let armful: ClosedRange<Int>
+
+            if world.baseIsBreached(actor.team) {
+                armful = GameConfig.Build.blocksWhenBreached
+            } else if world.isFallingBehind(actor.team) {
+                armful = GameConfig.Build.blocksWhenBehind
+            } else {
+                armful = GameConfig.Build.blocksPerVisit
+            }
 
             state.blocksLeftToLay = Int.random(in: armful, using: &world.rng)
         }
@@ -513,37 +522,61 @@ enum AIBrain {
         return closest
     }
 
-    /// The nearest wall of a base that actually holds something.
+    /// The wall of the base most worth opening, at the point most worth opening it.
     ///
-    /// Nearest to the CHEST rather than to the bot, so the hole ends up somewhere
-    /// useful. Blowing the far side of a base open and then walking round it is
-    /// the sort of thing that makes a bot look like it is following a rule rather
-    /// than trying to get in.
-    private static func wallGuarding(aChestFor actor: Actor, in world: World) -> GridPoint? {
-        var best: GridPoint?
-        var shortest = Double.greatestFiniteMagnitude
+    /// Two questions, and they are answered in that order. WHICH base is worth what
+    /// is inside it less the walk - see World.lootValue, which prices a base once so
+    /// this and chestWorthRobbing cannot disagree about which one is rich. WHERE is
+    /// then the tile nearest the loot itself, so the hole comes out somewhere
+    /// useful: blowing the far side open and walking round is the sort of thing
+    /// that makes a bot look like it is following a rule rather than robbing
+    /// somebody.
+    ///
+    /// A machine counts as loot here, which is what puts a base with nothing but an
+    /// arcade in it back on the map. The blast that opens a wall beside one usually
+    /// takes the machine with it, so the twenty-five tokens come out of the same
+    /// bomb as the hole.
+    private static func wallGuarding(theLootOf actor: Actor, in world: World) -> GridPoint? {
+        var bestTile: GridPoint?
+        var bestScore = Double(GameConfig.AI.raidWorthOpening)
 
-        for chest in world.chests(notOwnedBy: actor.team) {
-            guard (chest.position - actor.position).length <= GameConfig.AI.raidRange
-                    + Double(GameConfig.Map.claimSize) else { continue }
+        for (team, claim) in world.claims.sorted(by: { $0.key.raw < $1.key.raw })
+        where team != actor.team {
+            let value = world.lootValue(of: team)
+            guard value > 0 else { continue }
 
-            for tile in world.baseLayouts[chest.owner]?.tiles ?? [] {
-                guard world.map[tile].blockOwner != nil else { continue }
+            let toBase = (claim.centreTile.center - actor.position).length
+            let score = Double(value) - toBase * GameConfig.AI.raidDistanceCost
+            guard score > bestScore else { continue }
 
-                // Near the chest, and near the bot: that is the tile whose removal
-                // actually opens a way through to it.
-                let toChest = (tile.center - chest.position).length
-                let toBot = (tile.center - actor.position).length
-                guard toBot <= GameConfig.AI.raidRange else { continue }
+            let spots = world.lootSpots(of: team)
+            guard !spots.isEmpty else { continue }
 
-                let score = toChest + toBot * 0.5
-                guard score < shortest else { continue }
-                shortest = score
-                best = tile
+            var tile: GridPoint?
+            var closest = Double.greatestFiniteMagnitude
+
+            for candidate in world.baseLayouts[team]?.tiles ?? [] {
+                guard world.map[candidate].blockOwner != nil else { continue }
+
+                let toLoot = spots
+                    .map { (candidate.center - $0).length }
+                    .min() ?? Double.greatestFiniteMagnitude
+                let toBot = (candidate.center - actor.position).length
+
+                // Near the loot, and near the bot: the tile whose removal actually
+                // opens a way through to it.
+                let placement = toLoot + toBot * 0.5
+                guard placement < closest else { continue }
+                closest = placement
+                tile = candidate
             }
+
+            guard let tile else { continue }
+            bestScore = score
+            bestTile = tile
         }
 
-        return best
+        return bestTile
     }
 
     /// An enemy chest worth going for.
@@ -560,22 +593,42 @@ enum AIBrain {
     /// something, that branch was not going to fire anyway - they can never both
     /// want the bot at the same moment.
     private static func chestWorthRobbing(for actor: Actor, in world: World) -> Chest? {
-        guard !actor.inventory.isFull else { return nil }
+        // The healing gate stays exactly where it is, and it is not a raiding dial.
+        // It is what lets this branch sit ABOVE the emergency supply run: a bot
+        // that would fail this test wanted supplies anyway, so the two can never
+        // both be trying to move it at once. Lower it and a bot on its last legs
+        // sets out to rob somebody instead of patching up, and never arrives.
         guard actor.inventory.totalHealing(of: actor.maxHealth)
                 >= GameConfig.AI.emergencyHealingStock else { return nil }
 
         let carryingAWayIn = actor.inventory.count(of: .bomb) > 0
 
         var best: Chest?
-        var shortest = GameConfig.AI.robRange
+        var bestScore = 0.0
 
         for chest in world.chests(notOwnedBy: actor.team) {
-            guard chest.contents.slots.contains(where: { $0 != nil }) else { continue }
             guard carryingAWayIn || world.baseIsBreached(chest.owner) else { continue }
 
+            // Something in there this bot could actually leave with. This replaced
+            // a flat "bag is not full" test, which was both too strict and too
+            // loose: it turned away a fully laden bot standing in front of a
+            // Legendary - gear goes ON, it does not need a slot - while waving
+            // through a bot with room in its pockets and nothing in the chest but
+            // the helmet it is already wearing.
+            guard slotWorthRobbing(from: chest, actor: actor) != nil else { continue }
+
             let distance = (chest.position - actor.position).length
-            guard distance < shortest else { continue }
-            shortest = distance
+            guard distance < GameConfig.AI.robRange else { continue }
+
+            // Worth what is in it, less the walk. This is the whole difference
+            // between robbing the nearest base and robbing the rich one: four
+            // items pull a raider four times as far as one does.
+            let items = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
+            let score = Double(items * GameConfig.AI.chestItemWorth)
+                - distance * GameConfig.AI.raidDistanceCost
+
+            guard score > bestScore else { continue }
+            bestScore = score
             best = chest
         }
 
@@ -1063,7 +1116,10 @@ enum AIBrain {
         guard (tile.center - actor.position).length <= GameConfig.Build.reach else { return nil }
         guard BuildSystem.canPlace(at: tile, by: actor, in: world) else { return nil }
 
-        state.placeTimer = GameConfig.Build.placeInterval
+        // Quicker while there is a hole in it. Patching is not building.
+        state.placeTimer = world.baseIsBreached(actor.team)
+            ? GameConfig.Build.repairInterval
+            : GameConfig.Build.placeInterval
         state.blocksLeftToLay -= 1
 
         if state.blocksLeftToLay <= 0 {
@@ -1094,7 +1150,7 @@ enum AIBrain {
     private static func raidTarget(for actor: Actor, in world: World) -> GridPoint? {
         guard actor.inventory.count(of: .bomb) > 0 else { return nil }
 
-        if let worthwhile = wallGuarding(aChestFor: actor, in: world) { return worthwhile }
+        if let worthwhile = wallGuarding(theLootOf: actor, in: world) { return worthwhile }
 
         var closest: GridPoint?
         var shortest = GameConfig.AI.raidRange

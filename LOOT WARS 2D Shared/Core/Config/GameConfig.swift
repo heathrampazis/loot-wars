@@ -554,9 +554,13 @@ enum GameConfig {
         static let throwTolerance: Double = 0.45
 
         /// How close a bot has to be to somebody's claim before raiding it even
-        /// occurs to it, in tiles. Raiding is opportunistic - a bot blows open what
-        /// it walks past, it does not cross the map to do it.
-        static let raidRange: Double = 14
+        /// occurs to it, in tiles.
+        ///
+        /// This is the VANDALISM range - opening a wall for its own sake, with no
+        /// particular prize behind it. Eighteen rather than fourteen: still short
+        /// enough that it reads as blowing open what you walk past, long enough
+        /// that walking past happens.
+        static let raidRange: Double = 18
 
         /// How far a bot will travel for an enemy chest it could get at.
         ///
@@ -572,6 +576,30 @@ enum GameConfig {
         /// standing next to it, because the pull scales distance rather than
         /// replacing it.
         ///
+        /// What a raider thinks a base is worth, and what the walk costs.
+        ///
+        /// Raids used to be chosen by NEARNESS alone - the closest reachable chest
+        /// won, whatever was in it - so a base with one bandage in it beat a base
+        /// across the way holding four items and a machine. Nobody was ever robbed
+        /// for being rich, which is the one reason a base should be robbed at all,
+        /// and hoarding was therefore free.
+        ///
+        /// Now a target is worth what is in it, less what it costs to get there.
+        /// The units are arbitrary and only the RATIO matters: at ten a point and a
+        /// tile a point, an item is worth ten tiles of walking, so a four-item
+        /// chest pulls a raider four times as far as a one-item chest. A machine
+        /// counts for more than any single item because blowing one up pays
+        /// twenty-five tokens on its own - it is the only thing in a base that is
+        /// worth raiding even when the chests are bare.
+        static let chestItemWorth = 10
+        static let machineWorth = 25
+        static let raidDistanceCost: Double = 1.0
+
+        /// What a base has to be worth before a bot will cross the map to open it
+        /// rather than get on with the match. Above a single item, so a lone
+        /// bandage behind a wall is not a reason to go anywhere.
+        static let raidWorthOpening = 15
+
         /// This is the counterweight to a runaway leader. Get far enough ahead and
         /// seven opponents start preferring you, which is also what makes their kill
         /// bounty worth having.
@@ -669,6 +697,28 @@ enum GameConfig {
         /// fights is also the one whose base never closes. A quarter of a wall is
         /// far enough to be bad luck rather than noise.
         static let catchUpGap: Double = 0.25
+
+        /// Seconds between walls while there is a HOLE in a finished base.
+        ///
+        /// Repairing is not building, and it was running at building's pace: a
+        /// raided base took the best part of a minute to close, during which its
+        /// chests refuse to restock, so one bomb bought a quiet base for far longer
+        /// than the raid itself lasted. Patching a hole you are standing in front
+        /// of should look urgent, and the sooner it is shut the sooner there is
+        /// something in it worth coming back for.
+        static let repairInterval: Double = 0.18
+
+        /// Walls laid per trip while patching a breach.
+        ///
+        /// Sized against the damage, which is smaller than it feels: measured over
+        /// the wall line, one bomb takes out three tiles and never more than three,
+        /// so this covers a two-bomb hole in a single trip with something in hand.
+        ///
+        /// Deliberately not larger. An armful that runs out mid-repair costs a
+        /// decision interval - one to three seconds of standing about before the
+        /// bot re-commits - but an armful far bigger than the hole just keeps it at
+        /// home laying wall nobody breached, and time at home is time not raiding.
+        static let blocksWhenBreached: ClosedRange<Int> = 8...12
 
         /// Walls laid per trip by a bot that is behind.
         ///
@@ -783,6 +833,14 @@ enum GameConfig {
         /// wall breached and a walk into somebody's base under fire. Raise
         /// stockCount before the weights if raids feel thin; it is the blunter dial.
         static let stockCount: ClosedRange<Int> = 2...3
+
+        /// The wait after a raid, specifically.
+        ///
+        /// Shorter than the standing interval. A raided base should come back to
+        /// life rather than be finished for the match - the first item is the one
+        /// that makes it worth calling on again, and everything after it can take
+        /// its time.
+        static let restockAfterRaid: Double = 16
 
         /// Seconds between a raided bot chest putting one item back.
         ///

@@ -67,19 +67,35 @@ enum LootSystem {
         }
     }
 
-    /// Somewhere in front of the actor an item can actually be left.
+    /// Somewhere BEHIND the actor an item can actually be left.
     ///
-    /// Thrown along the aim first, then swept round the compass if that direction
-    /// is blocked. Two conditions, and both matter: the spot has to be reachable -
-    /// not inside a wall, a tree or a crate - AND outside the thrower's own hitbox,
-    /// or the pickup sweep would return it on the next tick and dropping would
-    /// appear to do nothing.
+    /// Behind, and that is the whole of it. Thrown forwards, an item landed in the
+    /// direction you were already travelling, so dropping something on the run put
+    /// it exactly where your next step took you and the pickup sweep handed it
+    /// straight back - you could only ever get rid of anything by stopping first.
+    /// Dropped over your shoulder, walking away from it is the default rather than
+    /// something you have to arrange.
     ///
-    /// No randomness here, unlike a death drop. A deliberate throw should go where
-    /// you were pointing, and a fixed search order keeps a seeded match reproducible
-    /// without having to touch the world's generator at all.
+    /// Behind means opposite the WALK, not opposite the aim, and the two are
+    /// different on a twin-stick game: running one way while shooting another is
+    /// the normal state of a fight, and it is the walking that decides where you
+    /// are about to be. The aim is the fallback for somebody standing still, who
+    /// has no direction of travel to be opposite to.
+    ///
+    /// The compass sweep behind it is unchanged: the spot still has to be reachable
+    /// - not inside a wall, a tree or a crate - AND outside the thrower's own
+    /// hitbox, so a drop against a wall at your back still finds somewhere to go
+    /// rather than being refused.
+    ///
+    /// No randomness here, unlike a death drop. A fixed search order keeps a seeded
+    /// match reproducible without touching the world's generator at all.
     private static func spotToThrow(from actor: Actor, in world: World) -> Vec2? {
-        let facing = actor.aim.length > 0.01 ? actor.aim.normalized() : Vec2(x: 1, y: 0)
+        let travel = actor.moveInput.length > 0.01
+            ? actor.moveInput.normalized()
+            : (actor.aim.length > 0.01 ? actor.aim.normalized() : Vec2(x: 1, y: 0))
+
+        // Over the shoulder. The sweep below starts here and works round.
+        let facing = travel * -1
         let box = actor.hitbox
         let turn = 2 * Double.pi / 8
 

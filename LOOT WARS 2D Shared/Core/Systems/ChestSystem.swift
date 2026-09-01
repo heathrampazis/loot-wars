@@ -343,10 +343,11 @@ enum ChestSystem {
             return
         }
 
-        // Survived, with less in it. Start the clock again from the top, so a
-        // partial raid always costs the full wait rather than however much of it
-        // had already elapsed.
-        chest.restockTimer = GameConfig.Chest.restockInterval
+        // Survived, with less in it. The clock starts again rather than carrying
+        // on from wherever it had got to, so a partial raid always costs a full
+        // wait - but it is the SHORTER wait, because a base that has just been
+        // robbed should be worth calling on again before the whistle.
+        chest.restockTimer = GameConfig.Chest.restockAfterRaid
         world.chests[chestID] = chest
     }
 }

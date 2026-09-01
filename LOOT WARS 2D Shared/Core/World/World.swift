@@ -358,6 +358,52 @@ final class World {
         arcades[id] = nil
     }
 
+    /// What there is worth taking in this team's base.
+    ///
+    /// The one place a base is priced, so the bot deciding WHETHER to cross the map
+    /// and the bot deciding WHICH wall to open cannot come to different conclusions
+    /// about which base is the rich one. It counts the things a raider actually
+    /// leaves with: items sitting in chests, and a machine, which pays out on being
+    /// destroyed whether or not anything else in the base survives.
+    func lootValue(of team: TeamID) -> Int {
+        var value = 0
+
+        for chest in chests.values where chest.owner == team {
+            let items = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
+            value += items * GameConfig.AI.chestItemWorth
+        }
+
+        if hasArcade(team) { value += GameConfig.AI.machineWorth }
+        return value
+    }
+
+    /// Where that loot actually stands, so a hole can be made in front of it.
+    ///
+    /// A base is not a point: the wall worth opening is the one nearest the thing
+    /// you came for, and blowing the far side open and walking round is what makes
+    /// a bot look like it is following a rule rather than robbing somebody.
+    func lootSpots(of team: TeamID) -> [Vec2] {
+        // Built in id order rather than dictionary order. Nothing here draws from
+        // the generator, but the caller picks a minimum out of it, and two spots at
+        // the same distance would otherwise resolve differently between runs of the
+        // same seed - which is the kind of divergence that shows up once in a
+        // thousand replays and takes a day to find.
+        var spots: [Vec2] = []
+
+        for id in chests.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let chest = chests[id], chest.owner == team,
+                  chest.contents.slots.contains(where: { $0 != nil }) else { continue }
+            spots.append(chest.position)
+        }
+
+        for id in arcades.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let machine = arcades[id], machine.owner == team else { continue }
+            spots.append(machine.centre)
+        }
+
+        return spots
+    }
+
     func hasArcade(_ team: TeamID) -> Bool {
         arcades.values.contains { $0.owner == team }
     }
