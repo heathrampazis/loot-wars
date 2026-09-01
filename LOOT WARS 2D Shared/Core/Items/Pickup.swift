@@ -27,7 +27,7 @@ enum Pickup: Hashable {
     /// worth walking to - so they get their own, much longer one.
     var groundLifetime: Double {
         switch self {
-        case .item, .helmet, .blaster:
+        case .item:
             return GameConfig.Loot.itemLifetime
         case .token:
             return GameConfig.Arcade.tokenLifetime

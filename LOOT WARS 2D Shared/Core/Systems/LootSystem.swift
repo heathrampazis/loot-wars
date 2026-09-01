@@ -123,7 +123,6 @@ enum LootSystem {
             // a great deal the moment you respawn with a bare head.
             return actor.inventory.add(type)
 
-
         case .token(let value):
             actor.tokens += value
             return true
