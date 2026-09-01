@@ -41,7 +41,7 @@ enum ProjectileSystem {
 
             if let hit = actorHit(by: projectile, in: world, order: targets) {
                 CombatSystem.damage(hit, amount: projectile.damage,
-                                    from: projectile.team, in: world)
+                                    from: projectile.owner, in: world)
                 continue
             }
 

@@ -100,6 +100,17 @@ final class World {
     /// ScoreSystem. One that ran afterwards would have to work out what had occurred
     /// by comparing states, and would get it wrong the first time two of them
     /// happened in the same tick.
+    /// Puts tokens in an actor's pocket.
+    ///
+    /// Tokens belong to the ACTOR rather than the team, unlike score - they are
+    /// spent by somebody standing at a shop, and a team-wide purse would be a
+    /// different game.
+    func awardTokens(_ count: Int, to id: ActorID) {
+        guard count > 0, var actor = actors[id] else { return }
+        actor.tokens += count
+        actors[id] = actor
+    }
+
     func award(_ points: Int, to team: TeamID) {
         guard points != 0 else { return }
         scores[team, default: 0] += points

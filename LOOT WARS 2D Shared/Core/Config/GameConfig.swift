@@ -49,7 +49,34 @@ enum GameConfig {
         /// deliberately - it sits at the end of the longest chain of work there is.
         static let itemStolen = 20
 
-        static let tokenCollected = 1
+        /// Zero, deliberately. A token is already its own reward - it buys the
+        /// upgrade ladder - and paying score for it as well is the same act counted
+        /// twice. At one point each, quadrupling token income made the economy the
+        /// biggest slice of the board at 36% and pushed fighting into second, which
+        /// would have turned the leaderboard into a measure of who did the most
+        /// arcade laps. At zero the split sits at fighting 30, economy 30, raiding
+        /// 24, base work 16 - which is the shape it had before the change.
+        ///
+        /// Left as a number rather than deleted, because it is a dial worth having.
+        static let tokenCollected = 0
+    }
+
+    /// Where tokens come from, other than the arcades.
+    ///
+    /// Tokens do not survive a match - every actor starts on zero and there is no
+    /// carry-over - so the whole upgrade ladder has to be climbable inside five
+    /// minutes. It was not: arcades alone paid a balanced player about 21, which
+    /// reaches the third rung of seven. These two sources and the faster machines
+    /// take that to about 89, which reaches the sixth.
+    enum Tokens {
+        /// Paid to whoever got the kill. The largest single source, because a kill
+        /// is the hardest thing on this list to arrange.
+        static let perKill = 8
+
+        /// Every crate. Small, because you open a great many of them and it is the
+        /// one source that needs no decision at all - at two a crate it out-earned
+        /// both of the others put together.
+        static let perLootbox = 1
     }
 
     /// What tokens buy.
@@ -663,7 +690,9 @@ enum GameConfig {
         static let footprintHeight = 3
 
         /// Seconds between payouts.
-        static let emitInterval: Double = 6
+        /// Down from 6. Machines hold about 2.5 at a time now instead of 1.7,
+        /// which is most of where the extra income came from.
+        static let emitInterval: Double = 4
 
         static let tokenValue = 1
 

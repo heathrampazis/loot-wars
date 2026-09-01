@@ -21,13 +21,13 @@ enum CombatSystem {
         }
     }
 
-    /// - Parameter attacker: whose doing it was, for the scoreboard.
+    /// - Parameter attacker: WHO did it, for the scoreboard and the purse.
     ///
-    /// Damage had no idea who caused it, which was fine while nothing depended on
-    /// the answer and impossible the moment a kill had to be credited to somebody.
-    /// Both callers already knew - a projectile and a bomb each carry their owner's
-    /// team - so it only ever needed passing along.
-    static func damage(_ id: ActorID, amount: Int, from attacker: TeamID?, in world: World) {
+    /// The actor rather than the team, which it used to be. Score belongs to a team
+    /// but tokens belong to a person - they are spent by somebody standing at a
+    /// shop - so crediting a kill needs to name the individual. Both callers already
+    /// carry their owner's id, so this cost nothing to tighten.
+    static func damage(_ id: ActorID, amount: Int, from attacker: ActorID?, in world: World) {
         guard var actor = world.actors[id],
               actor.isAlive,
               actor.invulnerability <= 0 else { return }
@@ -51,10 +51,12 @@ enum CombatSystem {
         world.actors[id] = actor
     }
 
-    private static func kill(_ actor: inout Actor, by attacker: TeamID?, in world: World) {
-        // Nobody scores for a team killing itself, and nobody scores when there is
+    private static func kill(_ actor: inout Actor, by attacker: ActorID?, in world: World) {
+        // Nobody is paid for a team killing itself, and nobody is paid when there is
         // no killer to speak of.
-        if let attacker, attacker != actor.team {
+        if let attacker, let killer = world.actors[attacker], killer.team != actor.team {
+            world.awardTokens(GameConfig.Tokens.perKill, to: attacker)
+
             var points = GameConfig.Score.kill
 
             // Caught inside their own walls. Their ground and their advantage, so
@@ -64,7 +66,7 @@ enum CombatSystem {
                 points += GameConfig.Score.killInTheirBase
             }
 
-            world.award(points, to: attacker)
+            world.award(points, to: killer.team)
         }
 
         actor.health = 0

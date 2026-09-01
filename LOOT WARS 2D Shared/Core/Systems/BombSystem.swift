@@ -124,7 +124,7 @@ enum BombSystem {
             // rather than a death sentence.
             let share = 1 - (distance / radius)
             let hurt = Int((Double(GameConfig.Bomb.damage) * share).rounded())
-            CombatSystem.damage(id, amount: max(1, hurt), from: bomb.team, in: world)
+            CombatSystem.damage(id, amount: max(1, hurt), from: bomb.owner, in: world)
         }
 
         world.recordBlast(at: bomb.position)

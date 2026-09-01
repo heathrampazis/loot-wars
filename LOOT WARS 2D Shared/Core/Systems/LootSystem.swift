@@ -38,6 +38,7 @@ enum LootSystem {
 
                 world.removeLootbox(box.id)
                 world.award(GameConfig.Score.lootboxOpened, to: actor.team)
+                world.awardTokens(GameConfig.Tokens.perLootbox, to: id)
                 world.spawnGroundItem(LootTable.roll(bombs: world.bombsAllowed,
                                                     using: &world.rng),
                                       at: box.position)
