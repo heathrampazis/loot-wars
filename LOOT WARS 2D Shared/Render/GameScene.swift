@@ -534,6 +534,14 @@ extension GameScene {
                 continue
             }
 
+            // After the item button on purpose. The expanded board reaches over
+            // that button, and healing must never lose to a leaderboard - so the
+            // button takes the overlap and the board only gets what is left.
+            if leaderboard.contains(localPoint: touch.location(in: leaderboard)) {
+                leaderboard.toggle()
+                continue
+            }
+
             if aimTouch == nil, !aimStick.isHidden,
                aimStick.begin(atLocalPoint: touch.location(in: aimStick)) {
                 aimTouch = touch
