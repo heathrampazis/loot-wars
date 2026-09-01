@@ -68,12 +68,23 @@ enum CombatSystem {
         drop(.item(.blaster(actor.blaster)), chance: actor.blaster.dropChance,
              at: actor.position, in: world)
 
-        // Spares in the bag go the same way, on the same tier odds.
+        actor.blaster = .starting
+
+        // The bag goes with the body.
         //
-        // This is what keeps a chest worth having. If carried gear survived death
-        // there would be no reason to bank any of it, and dying would stop costing
-        // anything at all - you would simply stand up and put your spare back on.
-        // A chest is the safe place; your pockets are not.
+        // Everything carried is lost, and only SOME of it lands where somebody can
+        // pick it up - spare gear rolls the same tier odds worn gear does, while
+        // bandages, bombs and chests simply go. That asymmetry is deliberate rather
+        // than unfinished: a kill should be worth walking over to, but eight actors
+        // dying repeatedly and shedding their whole bags would carpet the map in
+        // loot nobody had to work for.
+        //
+        // It is also what keeps a chest meaningful. If pockets survived death there
+        // would be no reason to bank anything, and dying would stop costing
+        // anything - you would stand up and put your spare straight back on. A
+        // chest is the safe place; your pockets are not.
+        //
+        // Read before it is emptied, obviously.
         for stack in actor.inventory.slots.compactMap({ $0 }) {
             switch stack.type {
             case .helmet(let tier):
@@ -86,7 +97,8 @@ enum CombatSystem {
                 break
             }
         }
-        actor.blaster = .starting
+
+        actor.inventory = Inventory()
     }
 
     private static func drop(_ pickup: Pickup, chance: Double, at position: Vec2, in world: World) {
