@@ -90,15 +90,33 @@ enum ShopSystem {
         ladder.first { $0 > current }
     }
 
-    /// Whether this actor could buy this right now. Asked by the shop panel so a
-    /// card it draws as affordable is one the simulation will actually sell.
+    /// Whether this actor could buy this right now. The purchase itself asks this,
+    /// and so does the tap, so nothing is ever charged for something it cannot have.
     static func canBuy(_ type: ItemType, actor: Actor, in world: World) -> Bool {
+        // Room in the bag is the only part the shop does not SHOW - see
+        // looksBuyable, which is everything below this line.
+        looksBuyable(type, actor: actor, in: world) && actor.canAcquire(type)
+    }
+
+    /// What the shop draws as available.
+    ///
+    /// Everything canBuy asks except whether the bag has room, and the split is
+    /// deliberate. A greyed card should mean something about the SHOP - you cannot
+    /// afford it, or you already have the one machine you are allowed - and those
+    /// stay true while you look at them. A full bag is neither: it is a thing about
+    /// you, it changes the moment you use a bandage, and greying half the shelf out
+    /// for it made the shop look shut.
+    ///
+    /// This does cost the old guarantee that a card drawn bright is a card the
+    /// simulation will sell. The tap pays for that instead: it asks canBuy, and a
+    /// refusal shakes the card rather than silently doing nothing.
+    static func looksBuyable(_ type: ItemType, actor: Actor, in world: World) -> Bool {
         guard actor.isAlive, let price = price(of: type) else { return false }
-        guard actor.tokens >= price, actor.canAcquire(type) else { return false }
+        guard actor.tokens >= price else { return false }
 
         // One machine to a base, and the shop will not sell you a second you could
         // never put down - counting the one in your bag as well as the one already
-        // standing, or you could buy a spare and be eighteen tokens out of pocket
+        // standing, or you could buy a spare and be twenty-four tokens out of pocket
         // for a thing with nowhere to go.
         if type == .arcade {
             guard !world.hasArcade(actor.team),
@@ -107,8 +125,8 @@ enum ShopSystem {
             // And not one your walls have no room for. A machine needs a clear
             // 2 x 3 inside the base, and about one base in seven is a small enough
             // rectangle that a chest already leaves it without one. Refusing the
-            // sale is the only honest answer: the alternative is taking eighteen
-            // tokens for something the map will never let you stand up.
+            // sale is the only honest answer: the alternative is taking
+            // twenty-four tokens for something the map will never let you stand up.
             return world.nextArcadeOrigin(for: actor.team, near: actor.position) != nil
         }
 

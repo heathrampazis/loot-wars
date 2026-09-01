@@ -118,6 +118,27 @@ struct Actor {
         }
     }
 
+    /// Whether the HOTBAR should draw this slot as unavailable.
+    ///
+    /// Deliberately not the same question as canUse, and the difference is what a
+    /// grey slot is for. Greying says "you have this and you cannot use it", which
+    /// is worth saying about a spare helmet that is worse than the one you have on
+    /// - that stays true until you die, and it explains itself. It is not worth
+    /// saying about a bandage at full health: full health is the state you spend
+    /// most of the match in, so the useful half of your bag sat grey almost all the
+    /// time and the grey stopped meaning anything at all.
+    ///
+    /// The button still asks canUse, so a bandage on a full health bar is faint on
+    /// the one control that would spend it - which is where the warning belongs,
+    /// because that is the moment you would waste it.
+    func showsAsUnusable(slot index: Int) -> Bool {
+        guard inventory.slots.indices.contains(index),
+              let stack = inventory.slots[index] else { return false }
+
+        if stack.type.isHealing { return false }
+        return !canUse(slot: index)
+    }
+
     /// How well equipped this actor is, from 0 to 12.
     ///
     /// Helmet rung plus blaster rungs above the starter. Used to price a kill: what

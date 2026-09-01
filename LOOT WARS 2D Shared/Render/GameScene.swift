@@ -984,6 +984,17 @@ extension GameScene {
         }
 
         if let item = shopPanel.item(atLocalPoint: point) {
+            // Asked HERE as well as by the simulation, because the card no longer
+            // greys out for a bag with no room in it - so a tap can now be refused
+            // by something the shop never showed you. Same answer either way; this
+            // one just gets to say no out loud instead of the command quietly
+            // going nowhere.
+            guard let player = world.localPlayer,
+                  ShopSystem.canBuy(item, actor: player, in: world) else {
+                shopPanel.refuse()
+                return
+            }
+
             queuedCommands.append(.buyItem(item))
             return
         }

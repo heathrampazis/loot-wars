@@ -10,9 +10,12 @@
 //  today that means one tab, because a BUILDING tab with nothing behind it would be
 //  a promise the shop cannot keep.
 //
-//  A card greys out when you cannot afford it, and that answer comes from
-//  ShopSystem.canBuy - the same one the purchase itself will use, so a card that
-//  looks buyable is one the simulation will actually sell.
+//  A card greys out when the SHOP is the obstacle - you cannot afford it, or you
+//  already have the one machine you are allowed - and that answer comes from
+//  ShopSystem.looksBuyable. A bag with no room in it greys nothing: it is a fact
+//  about you rather than about the shelf, it stops being true the moment you use a
+//  bandage, and it had the healing tab looking permanently shut. The tap asks the
+//  stricter question and shakes the card when the answer is no.
 //
 
 import SpriteKit
@@ -296,6 +299,39 @@ final class ShopPanelNode: SKNode {
         return nil
     }
 
+    /// The sale was refused: shake the card that was pressed.
+    ///
+    /// The other half of not greying cards out for a full bag. Something has to
+    /// answer a tap that cannot go through, and a card that simply sat there would
+    /// be the shop looking broken rather than the shop saying no.
+    func refuse() {
+        guard let index = lastPressed, cards.indices.contains(index) else { return }
+        let card = cards[index]
+
+        card.holder.removeAction(forKey: "bought")
+        card.holder.setScale(1)
+
+        // A wobble rather than a slide, and that is not a stylistic choice. The
+        // redraw owns card POSITION - it is what puts a card in its column - so a
+        // moveBy interrupted by a tab change would fight it and could leave the
+        // card parked at the position it had before. Rotation and scale are
+        // nobody else's, so an interrupted wobble can only ever end where it
+        // started.
+        card.holder.run(.sequence([
+            .group([.rotate(toAngle: -0.05, duration: 0.05),
+                    .scale(to: 0.95, duration: 0.05)]),
+            .rotate(toAngle: 0.05, duration: 0.09),
+            .group([.rotate(toAngle: 0, duration: 0.05),
+                    .scale(to: 1.0, duration: 0.05)])
+        ]), withKey: "bought")
+
+        card.flash.removeAllActions()
+        card.flash.fillColor = RenderPalette.placementBlocked
+        card.flash.strokeColor = RenderPalette.placementBlocked
+        card.flash.alpha = 0.38
+        card.flash.run(.fadeAlpha(to: 0, duration: 0.35))
+    }
+
     /// The sale went through: light the card that was pressed.
     ///
     /// Driven by the world rather than by the tap, so a card that was pressed and
@@ -307,12 +343,15 @@ final class ShopPanelNode: SKNode {
 
         card.holder.removeAction(forKey: "bought")
         card.holder.setScale(1)
+        card.holder.zRotation = 0
         card.holder.run(.sequence([
             .scale(to: 1.09, duration: 0.07),
             .scale(to: 1.0, duration: 0.13)
         ]), withKey: "bought")
 
         card.flash.removeAllActions()
+        card.flash.fillColor = RenderPalette.placementValid
+        card.flash.strokeColor = RenderPalette.placementValid
         card.flash.alpha = 0.42
         card.flash.run(.fadeAlpha(to: 0, duration: 0.45))
     }
@@ -336,7 +375,7 @@ final class ShopPanelNode: SKNode {
         // things that can alter what this panel should say.
         let fingerprint = [selectedTab, player.tokens, items.count]
             + items.map { $0.price }
-            + items.map { ShopSystem.canBuy($0.type, actor: player, in: world) ? 1 : 0 }
+            + items.map { ShopSystem.looksBuyable($0.type, actor: player, in: world) ? 1 : 0 }
         guard fingerprint != lastDrawn else { return }
         lastDrawn = fingerprint
 
@@ -367,9 +406,12 @@ final class ShopPanelNode: SKNode {
             card.icon.size = ItemArt.size(of: texture, fittingInto: 40)
             card.price.text = "\(item.price)"
 
-            // Faint when you cannot have it, from the same answer the purchase uses.
-            let affordable = ShopSystem.canBuy(item.type, actor: player, in: world)
-            card.holder.alpha = affordable ? 1.0 : 0.45
+            // Faint when the SHOP is the obstacle - the price, or the one machine
+            // you are allowed. A bag with no room in it does not grey anything out
+            // any more; see ShopSystem.looksBuyable for why those are different
+            // kinds of no.
+            let available = ShopSystem.looksBuyable(item.type, actor: player, in: world)
+            card.holder.alpha = available ? 1.0 : 0.45
 
             cards[index] = card
         }

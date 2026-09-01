@@ -95,7 +95,9 @@ final class HotbarNode: SKNode {
         // Whether each slot can be used is the actor's own answer, so a greyed slot
         // always means the simulation would refuse it. A bandage greys out at full
         // health; a bomb and a chest never do.
-        let usable = (0..<Inventory.slotCount).map { player.canUse(slot: $0) }
+        // Not canUse: see Actor.showsAsUnusable for why the hotbar and the use
+        // button are asking two different questions on purpose.
+        let usable = (0..<Inventory.slotCount).map { !player.showsAsUnusable(slot: $0) }
 
         guard player.inventory != lastInventory || usable != lastUsable else { return }
         lastInventory = player.inventory
