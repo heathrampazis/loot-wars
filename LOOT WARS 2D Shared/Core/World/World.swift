@@ -24,6 +24,21 @@ final class World {
     /// got round by finding a chest instead of a crate.
     var bombsAllowed: Bool { elapsed >= GameConfig.Match.bombGrace }
 
+    /// Seconds left on the clock, floored at zero.
+    var timeRemaining: Double { max(0, GameConfig.Match.duration - elapsed) }
+
+    /// Whether the whistle has gone.
+    ///
+    /// Nothing in Core acts on this - systems do not check it and would happily
+    /// keep running. Stopping is the scene's job, because "should the simulation
+    /// advance" is a question about the app rather than about the world, and a
+    /// networked host would answer it somewhere else again.
+    var isOver: Bool { timeRemaining <= 0 }
+
+    /// Who won, and by how much. Just the standings with a nicer name at the point
+    /// where they stop changing.
+    var winner: TeamID? { standings.first?.team }
+
     /// Read freely, but change only through setTile, so the renderer always knows
     /// when the map has moved on.
     private(set) var map: TileMap

@@ -86,6 +86,8 @@ final class GameScene: SKScene {
 
     private let hud = HUDNode()
     private let leaderboard = LeaderboardNode()
+    private let matchTimer = MatchTimerNode()
+    private let results = ResultsNode()
     private let hotbar = HotbarNode()
     private let chestPanel = ChestPanelNode()
     private let respawnBanner = RespawnBanner()
@@ -196,6 +198,8 @@ final class GameScene: SKScene {
         itemButton.isHidden = true
         cameraController.node.addChild(hud)
         cameraController.node.addChild(leaderboard)
+        cameraController.node.addChild(matchTimer)
+        cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
         cameraController.node.addChild(respawnBanner)
@@ -284,6 +288,12 @@ final class GameScene: SKScene {
                                        y: size.height / 2 - inset)
         laidOutForIsland = islandInset
 
+        // The one strip of the top edge nothing else wants: the HUD holds the left
+        // corner, the leaderboard the right, and the middle is clear on every size
+        // those two fit on.
+        matchTimer.position = CGPoint(x: 0, y: size.height / 2 - inset)
+        results.layOut(for: size)
+
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
         hotbar.position = CGPoint(x: 0,
                                   y: -size.height / 2 + inset + HotbarNode.size.height / 2)
@@ -314,9 +324,18 @@ final class GameScene: SKScene {
         // every missed tick at once, or the game freezes trying to fast-forward.
         accumulator = min(accumulator, 0.25)
 
-        while accumulator >= GameConfig.fixedTimeStep {
+        // The clock is the one thing that stops the simulation, and it stops it
+        // HERE rather than inside Core. Whether the world should advance is a
+        // question about the app - a networked host would answer it somewhere else
+        // again - so nothing in a system has to know a match can end.
+        while accumulator >= GameConfig.fixedTimeStep, !world.isOver {
             world.step(commands: gatherCommands(), dt: GameConfig.fixedTimeStep)
             accumulator -= GameConfig.fixedTimeStep
+        }
+
+        if world.isOver {
+            accumulator = 0
+            endMatch()
         }
 
         #if os(iOS) || os(tvOS)
@@ -346,6 +365,7 @@ final class GameScene: SKScene {
         hud.update(with: world)
         repositionLeaderboardIfNeeded()
         leaderboard.update(with: world)
+        matchTimer.update(with: world)
         hotbar.update(with: world)
         respawnBanner.update(with: world)
 
@@ -377,6 +397,8 @@ final class GameScene: SKScene {
     /// somebody mid-fight because they happened to walk past a crate would be
     /// indefensible, and walking past crates during a fight is exactly what happens.
     private func updateRightControl(with world: World) {
+        // The match is finished; nothing gets its controls back.
+        guard !world.isOver else { return }
         guard let player = world.localPlayer else { return }
 
         // Both sticks go away while you have your head in a chest.
@@ -448,6 +470,36 @@ final class GameScene: SKScene {
         if offersButton, !alreadyOffering { aimStick.end() }
     }
 
+    /// Puts the controls away and brings the table up.
+    ///
+    /// Called every frame once the clock runs out, and guarded by the results node
+    /// already being visible, so the work happens exactly once.
+    private func endMatch() {
+        guard results.isHidden else { return }
+
+        results.show(with: world)
+
+        // Everything you could press goes, including the chest panel if you happened
+        // to have your head in one when the whistle went.
+        chestPanel.close()
+        moveStick.isHidden = true
+        moveStick.end()
+        aimStick.isHidden = true
+        aimStick.end()
+        openButton.isHidden = true
+        itemButton.isHidden = true
+        hotbar.isHidden = true
+        respawnBanner.isHidden = true
+
+        #if os(iOS) || os(tvOS)
+        moveTouch = nil
+        aimTouch = nil
+        openTouch = nil
+        itemTouch = nil
+        pending = nil
+        #endif
+    }
+
     /// Shows the picked-out item above the corner, or nothing.
     ///
     /// Deliberately not folded into updateRightControl. That one guards against
@@ -455,6 +507,7 @@ final class GameScene: SKScene {
     /// button never swaps places with anything, so it can answer honestly every
     /// frame.
     private func updateItemButton(with world: World) {
+        guard !world.isOver else { return }
         guard let player = world.localPlayer,
               chestPanel.openChest == nil,
               let slot = selectedSlot,
@@ -501,6 +554,16 @@ final class GameScene: SKScene {
 extension GameScene {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // Once the whistle has gone there is exactly one thing left to press.
+        if world != nil, world.isOver {
+            for touch in touches
+            where results.isPlayAgain(atLocalPoint: touch.location(in: results)) {
+                restart()
+                return
+            }
+            return
+        }
+
         for touch in touches {
             // Order matters. The two sticks get first refusal, then the hotbar and
             // the contextual button, and only what is left over counts as a tap on
@@ -691,6 +754,18 @@ extension GameScene {
             itemButton.end()
             itemTouch = nil
         }
+    }
+
+    /// Starts a whole new match by presenting a fresh scene.
+    ///
+    /// A new scene rather than resetting this one. Half a dozen renderers cache
+    /// nodes against ids - chests, lootboxes, ground items, bombs - and clearing
+    /// every one of those correctly is a list somebody eventually forgets to add to.
+    /// Building a scene from nothing is the same code path as launching the game,
+    /// which is the path that gets exercised every single time.
+    private func restart() {
+        guard let view else { return }
+        view.presentScene(GameScene.newGameScene())
     }
 
     /// Picks a slot out, or puts it back.

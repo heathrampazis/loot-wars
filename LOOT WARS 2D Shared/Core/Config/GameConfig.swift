@@ -53,6 +53,9 @@ enum GameConfig {
     }
 
     enum Match {
+        /// How long a match runs, in seconds.
+        static let duration: Double = 300
+
         /// How long into a match before bombs start turning up, in seconds.
         ///
         /// Nothing can be raided until somebody is carrying the way in, so holding
