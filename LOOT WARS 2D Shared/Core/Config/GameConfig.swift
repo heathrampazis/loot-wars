@@ -317,6 +317,18 @@ enum GameConfig {
         /// sensible, ignoring somebody hitting you is not.
         static let fightCooldown: Double = 6.0
 
+        // MARK: - Shopping
+
+        /// Bots leave these tiers to the crates and save their tokens for what only
+        /// the shop sells.
+        ///
+        /// Set at exactly where the loot table stops. Buying a Common for three
+        /// tokens is three tokens not spent on an Epic, and a bot would have found
+        /// that Common in a crate within the minute anyway - so below this line
+        /// spending is worse than saving. Above it there is no other way up.
+        static let buysHelmetsAbove: HelmetTier = .rare
+        static let buysBlastersAbove: BlasterTier = .three
+
         /// Seconds before a bot with no bombs left is handed one.
         ///
         /// A deliberate cheat, and bots only. Bombs come from crates at one in

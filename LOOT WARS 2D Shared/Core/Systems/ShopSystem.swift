@@ -41,6 +41,16 @@ enum ShopSystem {
         }
     }
 
+    /// The gear tab's offers, without the caller needing to know which tab that is.
+    static func upgradeOffers(for actor: Actor) -> [GameConfig.Shop.Item] {
+        for index in GameConfig.Shop.tabs.indices {
+            if case .upgrades = GameConfig.Shop.tabs[index].stock {
+                return offers(on: index, for: actor)
+            }
+        }
+        return []
+    }
+
     /// What this actor is being offered on a tab right now.
     ///
     /// A shelf is the same for everybody. The gear tab is not: it offers the ONE

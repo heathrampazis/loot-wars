@@ -96,6 +96,10 @@ enum AIBrain {
             commands.append(.useItem(slot: slot))
         }
 
+        if let purchase = upgradeToBuy(actor: actor) {
+            commands.append(.buyItem(purchase))
+        }
+
         // Anything in the bag that beats what it is wearing goes on at once. This
         // is how a bot re-arms itself after respawning bare-headed, from a spare it
         // picked up earlier - the same move a player makes from the hotbar.
@@ -834,6 +838,38 @@ enum AIBrain {
         let toTopOrBottom = abs(direction.y) > 0.001 ? half.y / abs(direction.y) : .greatestFiniteMagnitude
 
         return min(ceiling, min(toSide, toTopOrBottom) * GameConfig.AI.visibleMargin)
+    }
+
+    // MARK: - Spending
+
+    /// What this bot should buy, if anything.
+    ///
+    /// Bots shop from the same counter the player does, at the same prices, with
+    /// tokens earned the same three ways - so the top of the ladder stops being a
+    /// thing only you can reach. Without this the crates cap every bot at Rare and
+    /// Blaster 3 for the whole match while you climb past them, which is exactly the
+    /// too-easy feeling: you are not outplaying seven opponents, you are outspending
+    /// them in a shop they cannot use.
+    ///
+    /// The CHEAPER of the two offers wins, so both ladders climb together rather
+    /// than one bot hoarding for a Cosmic while carrying a starter blaster. Modelled
+    /// against a bot's income, that lands it around Legendary and Blaster 5 by the
+    /// whistle, with the buying happening in the second half - late enough to be a
+    /// difficulty curve rather than a head start.
+    private static func upgradeToBuy(actor: Actor) -> ItemType? {
+        ShopSystem.upgradeOffers(for: actor)
+            .filter { worthBuying($0.type) && ShopSystem.canBuy($0.type, actor: actor) }
+            .min { $0.price < $1.price }?
+            .type
+    }
+
+    /// Whether this is a rung the shop is the only way to reach.
+    private static func worthBuying(_ type: ItemType) -> Bool {
+        switch type {
+        case .helmet(let tier):  return tier > GameConfig.AI.buysHelmetsAbove
+        case .blaster(let tier): return tier > GameConfig.AI.buysBlastersAbove
+        case .bandage, .medkit, .bomb, .chest: return false
+        }
     }
 
     // MARK: - Keeping house
