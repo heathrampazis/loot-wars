@@ -15,10 +15,12 @@ final class MatchTimerNode: SKNode {
 
     /// Not private: the scene lines the shop button up against this edge, and a
     /// second copy of the number would drift the moment either changed.
-    static let size = CGSize(width: 86, height: 32)
+    static let size = CGSize(width: 104, height: 32)
 
     /// When the clock starts warning you, in seconds.
     private static let urgentBelow: Double = 30
+
+    private static let iconSize: CGFloat = 18
 
     private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private var lastShown = -1
@@ -37,11 +39,22 @@ final class MatchTimerNode: SKNode {
         panel.strokeColor = .clear
         addChild(panel)
 
+        // Icon then time, the pair centred together rather than the text centred
+        // and the icon hung off it - otherwise the panel looks lopsided.
+        let icon = SKSpriteNode(texture: Glyphs.clock)
+        let iconSide = MatchTimerNode.iconSize
+        icon.size = CGSize(width: iconSide, height: iconSide)
+        // The pair is centred as a unit: an 18pt icon, 7pt of air, and a four
+        // character time is 62 points across, so it starts 31 left of centre.
+        icon.position = CGPoint(x: -22, y: -size.height / 2)
+        icon.alpha = 0.9
+        addChild(icon)
+
         label.fontSize = 19
         label.fontColor = .white
-        label.horizontalAlignmentMode = .center
+        label.horizontalAlignmentMode = .left
         label.verticalAlignmentMode = .center
-        label.position = CGPoint(x: 0, y: -size.height / 2)
+        label.position = CGPoint(x: icon.position.x + iconSide / 2 + 7, y: -size.height / 2)
         addChild(label)
     }
 

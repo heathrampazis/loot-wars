@@ -19,11 +19,20 @@ import SpriteKit
 
 final class ActionButtonNode: SKNode {
 
+    /// Round for the things you press mid-fight, square for the ones that open a
+    /// menu. Not decoration: a shape is the fastest thing to tell apart without
+    /// reading, so a control and a way out of the game should not share one.
+    enum Shape {
+        case circle
+        case roundedSquare
+    }
+
     /// Grab radius is generous, like the joystick - thumbs are imprecise. Note the
     /// small button's is proportionally MORE generous than the big one's, because
     /// a small target needs the help and the big one does not.
     private let grabRadius: CGFloat
     private let glyphSize: CGFloat
+    private let shape: Shape
 
     private let base: SKShapeNode
     private let glyph = SKSpriteNode()
@@ -31,14 +40,31 @@ final class ActionButtonNode: SKNode {
     private(set) var isPressed = false
     private(set) var isEnabled = true
 
-    init(glyph texture: SKTexture, radius: CGFloat = 62, grabRadius: CGFloat = 105) {
+    init(glyph texture: SKTexture,
+         radius: CGFloat = 62,
+         grabRadius: CGFloat = 105,
+         shape: Shape = .circle,
+         fill: SKColor = RenderPalette.controlBackground,
+         glyphSize: CGFloat? = nil) {
         self.grabRadius = grabRadius
-        self.glyphSize = radius
-        self.base = SKShapeNode(circleOfRadius: radius)
+        // Defaults to half the button, which is right for art that already has its
+        // own margin. The drawn glyphs do not, so they say how big they want to be.
+        self.glyphSize = glyphSize ?? radius
+        self.shape = shape
+
+        switch shape {
+        case .circle:
+            self.base = SKShapeNode(circleOfRadius: radius)
+        case .roundedSquare:
+            // Corner radius measured off the reference at 0.16 of the side.
+            self.base = SKShapeNode(
+                rect: CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2),
+                cornerRadius: radius * 2 * 0.16)
+        }
 
         super.init()
 
-        base.fillColor = RenderPalette.controlBackground
+        base.fillColor = fill
         base.strokeColor = .clear
 
         glyph.alpha = 0.85
@@ -80,7 +106,17 @@ final class ActionButtonNode: SKNode {
     /// - Parameter localPoint: the touch, in this node's own coordinate space.
     /// - Returns: true if the button is taking ownership of this touch.
     func begin(atLocalPoint localPoint: CGPoint) -> Bool {
-        guard hypot(localPoint.x, localPoint.y) <= grabRadius else { return false }
+        // The catch follows the shape, so a square button is not quietly pressable
+        // at its corners' diagonal and a round one is not pressable off its edge.
+        let caught: Bool
+        switch shape {
+        case .circle:
+            caught = hypot(localPoint.x, localPoint.y) <= grabRadius
+        case .roundedSquare:
+            caught = abs(localPoint.x) <= grabRadius && abs(localPoint.y) <= grabRadius
+        }
+
+        guard caught else { return false }
         isPressed = true
         setScale(0.92)
         return true

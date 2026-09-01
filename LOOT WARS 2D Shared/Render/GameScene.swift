@@ -92,8 +92,13 @@ final class GameScene: SKScene {
     /// the only gap that is clear on every size. Under the HUD, which was the
     /// obvious spot, it lands inside the move stick's grab radius on anything
     /// smaller than a Pro Max.
-    private let shopButton = ActionButtonNode(glyph: ItemArt.texture(for: .token(1)),
-                                              radius: 26, grabRadius: 40)
+    private let shopButton = ActionButtonNode(glyph: Glyphs.shoppingBag,
+                                              radius: 26, grabRadius: 34,
+                                              shape: .roundedSquare,
+                                              fill: RenderPalette.hudPanel,
+                                              // 0.6 of the plate, measured off the
+                                              // reference.
+                                              glyphSize: 31)
     private let shopPanel = ShopPanelNode()
     private let results = ResultsNode()
     private let hotbar = HotbarNode()
