@@ -88,6 +88,10 @@ enum AIBrain {
             actor.ai = state
         }
 
+        if let origin = arcadeToPlace(actor: actor, in: world) {
+            commands.append(.placeArcade(origin))
+        }
+
         if let tile = chestToPlace(actor: actor, in: world) {
             commands.append(.placeChest(tile))
         }
@@ -96,7 +100,7 @@ enum AIBrain {
             commands.append(.useItem(slot: slot))
         }
 
-        if let purchase = upgradeToBuy(actor: actor) {
+        if let purchase = purchaseToMake(actor: actor, in: world) {
             commands.append(.buyItem(purchase))
         }
 
@@ -612,7 +616,7 @@ enum AIBrain {
         var closest: Arcade?
         var shortest = GameConfig.AI.arcadeSearchRange
 
-        for machine in world.arcades {
+        for machine in world.arcades.values {
             let distance = (machine.centre - actor.position).length
             guard distance < shortest else { continue }
             shortest = distance
@@ -876,6 +880,21 @@ enum AIBrain {
     /// against a bot's income, that lands it around Legendary and Blaster 5 by the
     /// whistle, with the buying happening in the second half - late enough to be a
     /// difficulty curve rather than a head start.
+    private static func purchaseToMake(actor: Actor, in world: World) -> ItemType? {
+        // A machine first, and before any gear. It is the only thing on the shelf
+        // that pays for itself: bought early it earns back more than it cost, which
+        // then buys the gear. A bot that spends its first tokens on a helmet has
+        // bought one helmet; a bot that spends them on a machine buys the helmet
+        // later anyway, and keeps the machine.
+        if !world.hasArcade(actor.team),
+           actor.inventory.firstSlot(holding: .arcade) == nil,
+           ShopSystem.canBuy(.arcade, actor: actor) {
+            return .arcade
+        }
+
+        return upgradeToBuy(actor: actor)
+    }
+
     private static func upgradeToBuy(actor: Actor) -> ItemType? {
         ShopSystem.upgradeOffers(for: actor)
             .filter { worthBuying($0.type) && ShopSystem.canBuy($0.type, actor: actor) }
@@ -888,7 +907,7 @@ enum AIBrain {
         switch type {
         case .helmet(let tier):  return tier > GameConfig.AI.buysHelmetsAbove
         case .blaster(let tier): return tier > GameConfig.AI.buysBlastersAbove
-        case .bandage, .medkit, .bomb, .chest: return false
+        case .bandage, .medkit, .bomb, .chest, .arcade: return false
         }
     }
 
@@ -903,16 +922,22 @@ enum AIBrain {
     /// in the single moment it laid its last wall while already carrying one -
     /// which is why bases kept ending up with nothing in them to raid.
     private static func chestSpotWanted(for actor: Actor, in world: World) -> GridPoint? {
-        guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
         guard !world.baseIsBreached(actor.team) else { return nil }
+
+        // A machine before a chest when carrying both, because it starts earning the
+        // moment it is down and a chest only holds what you put in it.
+        if actor.inventory.firstSlot(holding: .arcade) != nil,
+           let origin = world.nextArcadeOrigin(for: actor.team, near: actor.position) {
+            return origin
+        }
+
+        guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
         return world.nextChestTile(for: actor.team, near: actor.position)
     }
 
     /// A tile to stand a carried chest on, right now, from where the bot stands.
     private static func chestToPlace(actor: Actor, in world: World) -> GridPoint? {
-        guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
-
-        // Not until the wall is shut. A chest standing in a half-built base is free
+        // Not until the wall is shut. Anything standing in a half-built base is free
         // loot for whoever wanders past, and nobody should be able to help
         // themselves to a base they have not had to break into.
         guard !world.baseIsBreached(actor.team) else { return nil }
@@ -921,6 +946,20 @@ enum AIBrain {
         guard (tile.center - actor.position).length <= GameConfig.Build.reach else { return nil }
         guard ChestSystem.canPlace(at: tile, by: actor, in: world) else { return nil }
         return tile
+    }
+
+    /// A spot to stand a carried machine up, from where the bot is now.
+    private static func arcadeToPlace(actor: Actor, in world: World) -> GridPoint? {
+        guard !world.baseIsBreached(actor.team) else { return nil }
+        guard let origin = world.nextArcadeOrigin(for: actor.team,
+                                                  near: actor.position) else { return nil }
+
+        let machine = Arcade(id: ArcadeID(-1), origin: origin, owner: actor.team, emitTimer: 0)
+        guard (machine.centre - actor.position).length <= GameConfig.Build.reach + 1.5 else {
+            return nil
+        }
+        guard ArcadeSystem.canPlace(at: origin, by: actor, in: world) else { return nil }
+        return origin
     }
 
     /// The best thing in somebody else's chest that this bot could carry off.

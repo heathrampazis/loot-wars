@@ -189,7 +189,7 @@ final class GameScene: SKScene {
         tileRenderer.build(from: generated.map)
         claimRenderer.build(claims: generated.claims)
         treeRenderer.build(patches: generated.trees)
-        arcadeRenderer.build(arcades: generated.arcades, mapHeight: generated.map.height)
+        arcadeRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(claimRenderer.node)
         worldLayer.addChild(treeRenderer.node)
@@ -391,6 +391,7 @@ final class GameScene: SKScene {
         blockRenderer.sync(with: world)
         lootboxRenderer.sync(with: world)
         chestRenderer.sync(with: world)
+        arcadeRenderer.sync(with: world)
         groundItemRenderer.sync(with: world)
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world)
@@ -895,8 +896,9 @@ extension GameScene {
         // Only an item that wants a tile turns a map tap into a placement. Anything
         // else picked out of the hotbar leaves the map meaning what it always meant.
         if let slot = selectedSlot,
-           world.localPlayer?.inventory.stack(at: slot)?.type.use == .mapTap {
-            queuedCommands.append(.placeChest(tile))
+           let type = world.localPlayer?.inventory.stack(at: slot)?.type,
+           type.use == .mapTap {
+            queuedCommands.append(type == .arcade ? .placeArcade(tile) : .placeChest(tile))
             selectedSlot = nil
             return
         }

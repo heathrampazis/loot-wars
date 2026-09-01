@@ -44,6 +44,10 @@ enum Command {
     /// input never sends a price, or it could send the wrong one.
     case buyItem(ItemType)
 
+    /// Stand a carried arcade machine up on this tile. Two wide and three high, so
+    /// the tile is its bottom-left corner.
+    case placeArcade(GridPoint)
+
     /// Move one item from a hotbar slot into an open chest, and back again.
     ///
     /// Both name the chest rather than assuming the nearest one. A panel can be

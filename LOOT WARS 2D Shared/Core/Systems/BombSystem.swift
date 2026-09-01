@@ -114,6 +114,19 @@ enum BombSystem {
             }
         }
 
+        // Machines somebody put down. The map's own are scenery and survive - a
+        // bomb that could clear those would strip the board of its economy.
+        for machineID in world.arcades.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let machine = world.arcades[machineID],
+                  let owner = machine.owner,
+                  owner != bomb.team,
+                  machine.hitbox.expanded(by: radius).contains(bomb.position) else { continue }
+
+            world.removeArcade(machineID)
+            world.award(GameConfig.Score.arcadeDestroyed, to: bomb.team)
+            world.awardTokens(GameConfig.Arcade.destroyedReward, to: bomb.owner)
+        }
+
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let actor = world.actors[id], actor.isAlive else { continue }
 

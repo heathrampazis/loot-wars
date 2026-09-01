@@ -67,7 +67,7 @@ enum MovementSystem {
         for crate in world.lootboxes.values {
             push(&actor, outOf: crate.hitbox)
         }
-        for arcade in world.arcades {
+        for arcade in world.arcades.values {
             push(&actor, outOf: arcade.hitbox)
         }
         for chest in world.chests.values {

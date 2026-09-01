@@ -27,6 +27,10 @@ enum ItemType: Hashable {
     case helmet(HelmetTier)
     case blaster(BlasterTier)
 
+    /// A machine you carry home and stand up in your own base, where it pays out
+    /// somewhere nobody can reach without breaking in.
+    case arcade
+
     /// How many fit in one inventory slot.
     var maxStack: Int {
         switch self {
@@ -37,6 +41,7 @@ enum ItemType: Hashable {
         // One apiece. Two tiers of the same gear are different item types anyway,
         // so a stack of them could never have meant anything.
         case .helmet, .blaster: return 1
+        case .arcade: return 1
         }
     }
 
@@ -50,7 +55,7 @@ enum ItemType: Hashable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .chest, .helmet, .blaster: return 0
+        case .bomb, .chest, .helmet, .blaster, .arcade: return 0
         }
     }
 
@@ -72,7 +77,8 @@ enum ItemType: Hashable {
     var use: Use {
         switch self {
         case .bandage, .medkit, .bomb, .helmet, .blaster: return .actionButton
-        case .chest: return .mapTap
+        // Both want you to say WHERE.
+        case .chest, .arcade: return .mapTap
         }
     }
 
@@ -80,7 +86,7 @@ enum ItemType: Hashable {
     var isGear: Bool {
         switch self {
         case .helmet, .blaster: return true
-        case .bandage, .medkit, .bomb, .chest: return false
+        case .bandage, .medkit, .bomb, .chest, .arcade: return false
         }
     }
 

@@ -24,6 +24,14 @@ struct Arcade {
     /// Bottom-left tile of the footprint. The machine extends right and up.
     let origin: GridPoint
 
+    /// Whose it is, or nil for the ones the map came with.
+    ///
+    /// The distinction decides two things: only an owned machine can be blown up,
+    /// because the map's are scenery rather than property, and only an owned one is
+    /// placed inside somebody's walls where they can work it in safety. That safety
+    /// is the whole reason to buy one.
+    var owner: TeamID?
+
     /// Counts down to the next token. Starts staggered, so several machines on
     /// one map do not pay out in lockstep.
     var emitTimer: Double

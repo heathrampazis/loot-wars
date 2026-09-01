@@ -74,6 +74,9 @@ enum GameConfig {
         ///
         /// Left as a number rather than deleted, because it is a dial worth having.
         static let tokenCollected = 0
+
+        /// Blowing up a machine. Between a wall at 15 and a chest emptied.
+        static let arcadeDestroyed = 40
     }
 
     /// Where tokens come from, other than the arcades.
@@ -144,6 +147,11 @@ enum GameConfig {
             Tab(name: "HEALING", stock: .shelf([
                 Item(type: .bandage, price: 5),
                 Item(type: .medkit,  price: 12)
+            ])),
+            Tab(name: "BUILDING", stock: .shelf([
+                Item(type: .bomb,   price: 6),
+                Item(type: .chest,  price: 10),
+                Item(type: .arcade, price: 18)
             ])),
             Tab(name: "GEAR", stock: .upgrades)
         ]
@@ -705,6 +713,14 @@ enum GameConfig {
         /// Gear is about a quarter of what a chest holds, so roughly every other
         /// chest is worth breaking into for a tier rather than for supplies. Modest
         /// tiers: a chest should be a leg up, not a jackpot that ends the match.
+        /// Paid for blowing up somebody's machine.
+        ///
+        /// More than it cost them, which is deliberate: raiding one has to beat
+        /// owning one or nobody would bother crossing the map for it. It is a lump
+        /// sum rather than a slow drip - the opposite of what the machine does for
+        /// its owner, and about a quarter of a match's income in one go.
+        static let destroyedReward = 25
+
         static let stockTable: [(item: ItemType, weight: Int)] = [
             (.bandage, 60),
             (.medkit,  12),

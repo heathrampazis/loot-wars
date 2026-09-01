@@ -25,8 +25,12 @@ final class ShopPanelNode: SKNode {
     private static let tabSize = CGSize(width: 118, height: 32)
     private static let tabGap: CGFloat = 6
 
-    /// The most cards a tab can show in one row. Two is what fits a phone.
-    private static let columns = 2
+    /// The most cards a tab can show in one row.
+    ///
+    /// Three, since BUILDING sells a bomb, a chest and a machine. The panel is
+    /// always sized for three and the cards it does have are CENTRED in it, so the
+    /// two-card tabs do not sit lopsided against the left edge of a wider panel.
+    private static let columns = 3
 
     static var panelSize: CGSize {
         CGSize(width: padding * 2 + cardSize.width * CGFloat(columns)
@@ -123,13 +127,17 @@ final class ShopPanelNode: SKNode {
         }
     }
 
+    /// Where a card sits when a tab is showing `count` of them, centred as a group.
+    private static func centreX(of column: Int, outOf count: Int) -> CGFloat {
+        let card = cardSize
+        let spread = card.width * CGFloat(count) + cardGap * CGFloat(count - 1)
+        return -spread / 2 + card.width / 2 + CGFloat(column) * (card.width + cardGap)
+    }
+
     private func makeCard(at column: Int, in size: CGSize) -> Card {
-        let card = ShopPanelNode.cardSize
         let holder = SKNode()
-        holder.position = CGPoint(
-            x: -size.width / 2 + ShopPanelNode.padding + card.width / 2
-                + CGFloat(column) * (card.width + ShopPanelNode.cardGap),
-            y: 0)
+        holder.position = CGPoint(x: ShopPanelNode.centreX(of: column, outOf: ShopPanelNode.columns),
+                                  y: 0)
         addChild(holder)
 
         let plate = SKShapeNode(path: CGPath(
@@ -303,6 +311,8 @@ final class ShopPanelNode: SKNode {
             let texture = ItemArt.texture(for: .item(item.type))
 
             card.holder.isHidden = false
+            card.holder.position = CGPoint(
+                x: ShopPanelNode.centreX(of: index, outOf: items.count), y: 0)
             card.type = item.type
             card.name.text = ShopPanelNode.name(of: item.type)
             card.icon.texture = texture
@@ -323,6 +333,7 @@ final class ShopPanelNode: SKNode {
         case .medkit:  return "Medkit"
         case .bomb:    return "Bomb"
         case .chest:   return "Chest"
+        case .arcade:  return "Arcade"
         // Named by the TIER rather than by the slot, because on the gear tab the
         // tier is the whole offer - "Helmet" twice would say nothing about which
         // rung you are being sold.

@@ -199,6 +199,7 @@ extension MapFactory {
 
             let candidate = Arcade(id: ArcadeID(placed.count),
                                    origin: GridPoint(col: col, row: row),
+                                   owner: nil,
                                    emitTimer: stagger)
 
             guard isClear(candidate, in: map, of: placed, trees: trees, claims: claims) else {

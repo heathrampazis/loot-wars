@@ -122,7 +122,7 @@ enum CombatSystem {
             case .blaster(let tier):
                 drop(.item(.blaster(tier)), chance: tier.dropChance,
                      at: actor.position, in: world)
-            case .bandage, .medkit, .bomb, .chest:
+            case .bandage, .medkit, .bomb, .chest, .arcade:
                 break
             }
         }

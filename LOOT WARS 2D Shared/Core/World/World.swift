@@ -64,7 +64,13 @@ final class World {
 
     /// An array rather than a dictionary, because machines never come or go during
     /// a match - and a fixed order is what keeps their payouts deterministic.
-    var arcades: [Arcade] = []
+    /// Keyed rather than an array, because machines come and go now - bought and
+    /// placed, and blown up by whoever gets through the wall. An array indexed
+    /// during iteration was fine while the set was fixed for the match and is a
+    /// bug waiting to happen once it is not.
+    var arcades: [ArcadeID: Arcade] = [:]
+
+    private var nextArcadeID = 0
 
     private(set) var lootboxes: [LootboxID: Lootbox] = [:]
     var chests: [ChestID: Chest] = [:]
@@ -158,7 +164,10 @@ final class World {
         }
         self.lootboxes = crates
         self.nextLootboxID = generated.lootboxes.count
-        self.arcades = generated.arcades
+        var machines: [ArcadeID: Arcade] = [:]
+        for machine in generated.arcades { machines[machine.id] = machine }
+        self.arcades = machines
+        self.nextArcadeID = generated.arcades.count
 
         // One actor per team, standing in the middle of its own claim.
         //
@@ -295,7 +304,7 @@ final class World {
     /// going to be right and one is not.
     func structureBlocks(_ point: Vec2) -> Bool {
         if lootboxes.values.contains(where: { $0.hitbox.contains(point) }) { return true }
-        if arcades.contains(where: { $0.hitbox.contains(point) }) { return true }
+        if arcades.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         if chests.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         return false
     }
@@ -304,7 +313,7 @@ final class World {
     /// reason about whole tiles - building, and putting a chest down.
     func structureIntersects(_ box: Box) -> Bool {
         if lootboxes.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
-        if arcades.contains(where: { $0.hitbox.intersects(box) }) { return true }
+        if arcades.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
         if chests.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
         return false
     }
@@ -321,6 +330,56 @@ final class World {
 
     func removeChest(_ id: ChestID) {
         chests[id] = nil
+    }
+
+    @discardableResult
+    func spawnArcade(at origin: GridPoint, owner: TeamID?) -> ArcadeID {
+        let machine = Arcade(id: ArcadeID(nextArcadeID), origin: origin,
+                             owner: owner, emitTimer: GameConfig.Arcade.emitInterval)
+        nextArcadeID += 1
+        arcades[machine.id] = machine
+        return machine.id
+    }
+
+    func removeArcade(_ id: ArcadeID) {
+        arcades[id] = nil
+    }
+
+    func hasArcade(_ team: TeamID) -> Bool {
+        arcades.values.contains { $0.owner == team }
+    }
+
+    /// Where a machine could stand inside this team's walls, nearest to here.
+    ///
+    /// Six tiles rather than one, checked as a block - a footprint half inside a
+    /// wall is not a placement. Walks the region in a fixed order so the same seed
+    /// puts machines in the same places.
+    func nextArcadeOrigin(for team: TeamID, near position: Vec2) -> GridPoint? {
+        guard let layout = baseLayouts[team] else { return nil }
+
+        var best: GridPoint?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for origin in layout.region.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
+            let machine = Arcade(id: ArcadeID(-1), origin: origin, owner: team, emitTimer: 0)
+
+            var fits = true
+            for tile in machine.tiles {
+                guard layout.region.contains(tile),
+                      tile != claims[team]?.centreTile,
+                      map[tile] == .floor,
+                      !structureIntersects(Box(tile: tile)),
+                      !trees.contains(where: { $0.overlaps(tile) }) else { fits = false; break }
+            }
+            guard fits else { continue }
+
+            let distance = (machine.centre - position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = origin
+        }
+
+        return best
     }
 
     /// The nearest chest you are standing close enough to open - anyone's.
@@ -437,7 +496,7 @@ final class World {
     }
 
     func arcade(_ id: ArcadeID) -> Arcade? {
-        arcades.first { $0.id == id }
+        arcades[id]
     }
 
     /// How many of this machine's tokens are still lying around it.
@@ -559,7 +618,7 @@ final class World {
         LootSystem.update(self, commands: everyone, dt: dt)
         // After the sweep: a token paid out this tick should be lying there to be
         // seen, not swallowed instantly by whoever happens to be standing on it.
-        ArcadeSystem.update(self, dt: dt)
+        ArcadeSystem.update(self, commands: everyone, dt: dt)
         CombatSystem.update(self, dt: dt)
         RespawnSystem.update(self, dt: dt)
         tick += 1
@@ -590,7 +649,8 @@ final class World {
                         actor.facesLeft = input.x < 0
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
-                     .placeChest, .storeItem, .takeItem, .dropItem, .buyItem:
+                     .placeChest, .placeArcade, .storeItem, .takeItem,
+                     .dropItem, .buyItem:
                     break   // other systems' business, not movement's
                 }
             }
