@@ -87,6 +87,14 @@ final class GameScene: SKScene {
     private let hud = HUDNode()
     private let leaderboard = LeaderboardNode()
     private let matchTimer = MatchTimerNode()
+
+    /// Opens the shop. Sits on the top edge between the clock and the leaderboard -
+    /// the only gap that is clear on every size. Under the HUD, which was the
+    /// obvious spot, it lands inside the move stick's grab radius on anything
+    /// smaller than a Pro Max.
+    private let shopButton = ActionButtonNode(glyph: ItemArt.texture(for: .token(1)),
+                                              radius: 26, grabRadius: 40)
+    private let shopPanel = ShopPanelNode()
     private let results = ResultsNode()
     private let hotbar = HotbarNode()
     private let chestPanel = ChestPanelNode()
@@ -199,6 +207,8 @@ final class GameScene: SKScene {
         cameraController.node.addChild(hud)
         cameraController.node.addChild(leaderboard)
         cameraController.node.addChild(matchTimer)
+        cameraController.node.addChild(shopButton)
+        cameraController.node.addChild(shopPanel)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -294,6 +304,13 @@ final class GameScene: SKScene {
         matchTimer.position = CGPoint(x: 0, y: size.height / 2 - inset)
         results.layOut(for: size)
 
+        // Centred in the gap between the clock and the leaderboard, so it lands in
+        // clear space whatever the width happens to be.
+        let clockRight = MatchTimerNode.size.width / 2
+        let boardLeft = size.width / 2 - inset - islandInset - LeaderboardNode.size.width
+        shopButton.position = CGPoint(x: (clockRight + boardLeft) / 2,
+                                      y: size.height / 2 - inset - 26)
+
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
         hotbar.position = CGPoint(x: 0,
                                   y: -size.height / 2 + inset + HotbarNode.size.height / 2)
@@ -366,6 +383,7 @@ final class GameScene: SKScene {
         repositionLeaderboardIfNeeded()
         leaderboard.update(with: world)
         matchTimer.update(with: world)
+        shopPanel.update(with: world)
         hotbar.update(with: world)
         respawnBanner.update(with: world)
 
@@ -415,14 +433,19 @@ final class GameScene: SKScene {
         // .aim, and skipped the work of putting the stick back. The stick stayed
         // gone until walking back to the chest forced a different value through,
         // which is exactly how the bug presented.
-        if chestPanel.openChest != nil {
+        if chestPanel.openChest != nil || shopPanel.isOpen {
             moveStick.isHidden = true
             moveStick.end()
             aimStick.isHidden = true
             aimStick.end()
             openButton.isHidden = true
+            shopButton.isHidden = shopPanel.isOpen
+            hotbar.isHidden = shopPanel.isOpen
             return
         }
+
+        shopButton.isHidden = false
+        hotbar.isHidden = false
 
 
         moveStick.isHidden = false
@@ -482,6 +505,8 @@ final class GameScene: SKScene {
         // Everything you could press goes, including the chest panel if you happened
         // to have your head in one when the whistle went.
         chestPanel.close()
+        shopPanel.close()
+        shopButton.isHidden = true
         moveStick.isHidden = true
         moveStick.end()
         aimStick.isHidden = true
@@ -510,6 +535,7 @@ final class GameScene: SKScene {
         guard !world.isOver else { return }
         guard let player = world.localPlayer,
               chestPanel.openChest == nil,
+              !shopPanel.isOpen,
               let slot = selectedSlot,
               let stack = player.inventory.stack(at: slot),
               stack.type.use == .actionButton else {
@@ -577,6 +603,19 @@ extension GameScene {
             // With a chest open, every touch belongs to the panel.
             if chestPanel.openChest != nil {
                 handleChestTouch(touch)
+                continue
+            }
+
+            // Same for the shop.
+            if shopPanel.isOpen {
+                handleShopTouch(touch)
+                continue
+            }
+
+            if !shopButton.isHidden,
+               shopButton.begin(atLocalPoint: touch.location(in: shopButton)) {
+                shopButton.end()
+                shopPanel.open()
                 continue
             }
 
@@ -781,6 +820,31 @@ extension GameScene {
         }
 
         selectedSlot = (selectedSlot == slot) ? nil : slot
+    }
+
+    /// Taps while the shop is open: a tab, a card, or done.
+    ///
+    /// A card raises a buyItem and nothing more. Whether you can afford it, and
+    /// whether it has anywhere to go, are ShopSystem's answers - the panel greys a
+    /// card out from that same answer, so it never asks for something that will be
+    /// refused, and could not charge you if it did.
+    private func handleShopTouch(_ touch: UITouch) {
+        let point = touch.location(in: shopPanel)
+
+        if shopPanel.isBackButton(atLocalPoint: point) {
+            shopPanel.close()
+            return
+        }
+
+        if let tab = shopPanel.tabIndex(atLocalPoint: point) {
+            shopPanel.selectTab(tab)
+            return
+        }
+
+        if let item = shopPanel.item(atLocalPoint: point) {
+            queuedCommands.append(.buyItem(item))
+            return
+        }
     }
 
     /// Taps while a chest is open: out of the chest, into the chest, or done.

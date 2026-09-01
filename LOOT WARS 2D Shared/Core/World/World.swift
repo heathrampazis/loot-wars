@@ -537,6 +537,7 @@ final class World {
         WeaponSystem.update(self, commands: everyone, dt: dt)
         ConsumableSystem.update(self, commands: everyone)
         EquipSystem.update(self, commands: everyone)
+        ShopSystem.update(self, commands: everyone)
         MovementSystem.update(self, dt: dt)
         ProjectileSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
@@ -574,7 +575,7 @@ final class World {
                         actor.facesLeft = input.x < 0
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
-                     .placeChest, .storeItem, .takeItem, .dropItem:
+                     .placeChest, .storeItem, .takeItem, .dropItem, .buyItem:
                     break   // other systems' business, not movement's
                 }
             }

@@ -37,6 +37,13 @@ enum Command {
     /// business, exactly as it is for a bomb.
     case placeChest(GridPoint)
 
+    /// Buy one of something with tokens.
+    ///
+    /// Names the ITEM rather than a row in a menu, so the shop's layout can change
+    /// without the simulation knowing. What it costs is the simulation's business -
+    /// input never sends a price, or it could send the wrong one.
+    case buyItem(ItemType)
+
     /// Move one item from a hotbar slot into an open chest, and back again.
     ///
     /// Both name the chest rather than assuming the nearest one. A panel can be

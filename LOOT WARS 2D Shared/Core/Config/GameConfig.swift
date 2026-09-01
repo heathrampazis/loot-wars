@@ -52,6 +52,39 @@ enum GameConfig {
         static let tokenCollected = 1
     }
 
+    /// What tokens buy.
+    ///
+    /// Grouped into tabs, and the SHAPE is the point rather than the contents: a
+    /// second tab is a row added here, not a change to the shop. Only tabs that
+    /// have something in them are drawn, so today that is one.
+    ///
+    /// Prices are set against what a match actually earns, which I worked out
+    /// before choosing them rather than after. A machine holds about 1.7 tokens at
+    /// a time and a full circuit of the five is 36 seconds, so somebody doing
+    /// nothing else makes 14 a minute - and a player splitting their attention
+    /// makes perhaps 20 across a five-minute match. A bandage at 5 is roughly a
+    /// minute of collecting; a medkit at 12 is a real decision. The old spec's 3
+    /// was written for eight-minute matches and would buy nine of them, which makes
+    /// the arcades a vending machine rather than a choice.
+    enum Shop {
+        struct Item {
+            let type: ItemType
+            let price: Int
+        }
+
+        struct Tab {
+            let name: String
+            let items: [Item]
+        }
+
+        static let tabs: [Tab] = [
+            Tab(name: "HEALING", items: [
+                Item(type: .bandage, price: 5),
+                Item(type: .medkit,  price: 12)
+            ])
+        ]
+    }
+
     enum Match {
         /// How long a match runs, in seconds.
         static let duration: Double = 300

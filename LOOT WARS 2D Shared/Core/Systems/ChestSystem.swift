@@ -30,7 +30,7 @@ enum ChestSystem {
                 case .takeItem(let chest, let slot):
                     take(from: slot, of: chest, by: id, in: world)
                 case .move, .placeBlock, .removeBlock, .shoot,
-                     .openLootbox, .useItem, .dropItem:
+                     .openLootbox, .useItem, .dropItem, .buyItem:
                     break
                 }
             }

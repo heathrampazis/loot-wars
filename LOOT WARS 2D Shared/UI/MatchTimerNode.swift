@@ -13,7 +13,9 @@ import SpriteKit
 
 final class MatchTimerNode: SKNode {
 
-    private static let size = CGSize(width: 86, height: 32)
+    /// Not private: the scene lines the shop button up against this edge, and a
+    /// second copy of the number would drift the moment either changed.
+    static let size = CGSize(width: 86, height: 32)
 
     /// When the clock starts warning you, in seconds.
     private static let urgentBelow: Double = 30
