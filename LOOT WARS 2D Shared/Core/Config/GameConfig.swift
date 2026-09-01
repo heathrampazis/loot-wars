@@ -15,6 +15,43 @@ enum GameConfig {
     /// bugs reproducible.
     static let fixedTimeStep: Double = 1.0 / 60.0
 
+    /// What each thing you can do is worth.
+    ///
+    /// Points are awarded where the thing HAPPENS - inside the system that does it -
+    /// rather than by something watching afterwards and inferring. A wall is scored
+    /// by BuildSystem as it goes down, a kill by CombatSystem as it lands. Nothing
+    /// has to reconstruct what took place by comparing one tick's state to the last,
+    /// which is the version that goes wrong the first time two things happen at once.
+    ///
+    /// The shape of the table IS the design. Raiding pays best because it costs a
+    /// bomb, a breach and a walk into somebody's base under fire. Building pays
+    /// least per action because you do it forty times, at home, in safety - it
+    /// should add up to something without making patience a way to win.
+    enum Score {
+        static let kill = 50
+
+        /// On top of the kill, for catching somebody inside their own walls. Their
+        /// ground and their advantage - taking it off them there is worth more.
+        static let killInTheirBase = 25
+
+        static let lootboxOpened = 10
+
+        /// Per wall. Small on purpose: forty of them is a base, not a strategy.
+        static let wallPlaced = 2
+
+        /// Blowing a hole in somebody else's. Their wall cost them two points to
+        /// put up; taking it down costs you a bomb and puts you somewhere dangerous.
+        static let wallDestroyed = 15
+
+        static let chestPlaced = 15
+
+        /// Per item lifted out of somebody else's chest. The best rate in the game,
+        /// deliberately - it sits at the end of the longest chain of work there is.
+        static let itemStolen = 20
+
+        static let tokenCollected = 1
+    }
+
     enum Match {
         /// How long into a match before bombs start turning up, in seconds.
         ///

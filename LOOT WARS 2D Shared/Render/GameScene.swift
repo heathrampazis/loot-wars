@@ -85,6 +85,7 @@ final class GameScene: SKScene {
     private var cornerAction: CornerAction = .aim
 
     private let hud = HUDNode()
+    private let leaderboard = LeaderboardNode()
     private let hotbar = HotbarNode()
     private let chestPanel = ChestPanelNode()
     private let respawnBanner = RespawnBanner()
@@ -194,6 +195,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(itemButton)
         itemButton.isHidden = true
         cameraController.node.addChild(hud)
+        cameraController.node.addChild(leaderboard)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
         cameraController.node.addChild(respawnBanner)
@@ -204,6 +206,31 @@ final class GameScene: SKScene {
 
     override func didChangeSize(_ oldSize: CGSize) {
         super.didChangeSize(oldSize)
+        layOutUI()
+    }
+
+    /// How much the right edge is eaten by the Dynamic Island, in points.
+    private var islandInset: CGFloat {
+        #if os(iOS) || os(tvOS)
+        return view?.safeAreaInsets.right ?? 0
+        #else
+        return 0
+        #endif
+    }
+
+    private var laidOutForIsland: CGFloat = -1
+
+    /// The insets are not known when the scene first lays itself out, and they
+    /// change on rotation. Rather than hunt for the callback that covers both, this
+    /// notices the value moving - one float compare a frame, against a reposition
+    /// that is a single assignment.
+    ///
+    /// Scoped to the leaderboard alone on purpose. Laying the WHOLE interface out
+    /// from the safe area moved the sticks sixty points inboard and you did not like
+    /// it, so the controls still measure from the glass. Only the thing that has to
+    /// be readable gets out of the island's way.
+    private func repositionLeaderboardIfNeeded() {
+        guard laidOutForIsland != islandInset else { return }
         layOutUI()
     }
 
@@ -245,6 +272,17 @@ final class GameScene: SKScene {
         let inset: CGFloat = 16
         hud.position = CGPoint(x: -size.width / 2 + inset,
                                y: size.height / 2 - inset)
+
+        // Mirrored in the opposite corner, and the ONE thing here that respects the
+        // safe area. In landscape the Dynamic Island eats about sixty points off one
+        // side and the top-right corner is exactly where it lands, so a leaderboard
+        // measured from the glass would be half hidden behind it. The sticks stay
+        // measured from the glass because that is where they felt right - this is a
+        // thing you read rather than a thing you press, so it is the one that has to
+        // move out of the way.
+        leaderboard.position = CGPoint(x: size.width / 2 - inset - islandInset,
+                                       y: size.height / 2 - inset)
+        laidOutForIsland = islandInset
 
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
         hotbar.position = CGPoint(x: 0,
@@ -306,6 +344,8 @@ final class GameScene: SKScene {
         projectileRenderer.sync(with: world)
         actorRenderer.sync(with: world)
         hud.update(with: world)
+        repositionLeaderboardIfNeeded()
+        leaderboard.update(with: world)
         hotbar.update(with: world)
         respawnBanner.update(with: world)
 

@@ -62,6 +62,7 @@ enum BuildSystem {
     static func place(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
         guard canPlace(at: point, by: actor, in: world) else { return false }
         world.setTile(.block(owner: actor.team), at: point)
+        world.award(GameConfig.Score.wallPlaced, to: actor.team)
         return true
     }
 

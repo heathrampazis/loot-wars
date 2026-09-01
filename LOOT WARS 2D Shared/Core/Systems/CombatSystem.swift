@@ -21,7 +21,13 @@ enum CombatSystem {
         }
     }
 
-    static func damage(_ id: ActorID, amount: Int, in world: World) {
+    /// - Parameter attacker: whose doing it was, for the scoreboard.
+    ///
+    /// Damage had no idea who caused it, which was fine while nothing depended on
+    /// the answer and impossible the moment a kill had to be credited to somebody.
+    /// Both callers already knew - a projectile and a bomb each carry their owner's
+    /// team - so it only ever needed passing along.
+    static func damage(_ id: ActorID, amount: Int, from attacker: TeamID?, in world: World) {
         guard var actor = world.actors[id],
               actor.isAlive,
               actor.invulnerability <= 0 else { return }
@@ -30,7 +36,7 @@ enum CombatSystem {
         actor.secondsSinceHit = 0
 
         if actor.health <= 0 {
-            kill(&actor, in: world)
+            kill(&actor, by: attacker, in: world)
         }
 
         world.actors[id] = actor
@@ -45,7 +51,22 @@ enum CombatSystem {
         world.actors[id] = actor
     }
 
-    private static func kill(_ actor: inout Actor, in world: World) {
+    private static func kill(_ actor: inout Actor, by attacker: TeamID?, in world: World) {
+        // Nobody scores for a team killing itself, and nobody scores when there is
+        // no killer to speak of.
+        if let attacker, attacker != actor.team {
+            var points = GameConfig.Score.kill
+
+            // Caught inside their own walls. Their ground and their advantage, so
+            // taking it off them there is worth more - and it is the reason to
+            // follow somebody home rather than let them go.
+            if world.claim(for: actor.team)?.contains(GridPoint(containing: actor.feet)) == true {
+                points += GameConfig.Score.killInTheirBase
+            }
+
+            world.award(points, to: attacker)
+        }
+
         actor.health = 0
         actor.respawnTimer = GameConfig.Player.respawnDelay
 

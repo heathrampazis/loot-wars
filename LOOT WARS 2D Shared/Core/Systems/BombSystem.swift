@@ -102,9 +102,15 @@ enum BombSystem {
         for dCol in -reach...reach {
             for dRow in -reach...reach {
                 let tile = GridPoint(col: centre.col + dCol, row: centre.row + dRow)
-                guard world.map[tile].blockOwner != nil else { continue }
+                guard let owner = world.map[tile].blockOwner else { continue }
                 guard (tile.center - bomb.position).length <= radius else { continue }
                 world.setTile(.floor, at: tile)
+
+                // Only for somebody else's. Blowing up your own wall is a way of
+                // opening a door, not an achievement.
+                if owner != bomb.team {
+                    world.award(GameConfig.Score.wallDestroyed, to: bomb.team)
+                }
             }
         }
 
@@ -118,7 +124,7 @@ enum BombSystem {
             // rather than a death sentence.
             let share = 1 - (distance / radius)
             let hurt = Int((Double(GameConfig.Bomb.damage) * share).rounded())
-            CombatSystem.damage(id, amount: max(1, hurt), in: world)
+            CombatSystem.damage(id, amount: max(1, hurt), from: bomb.team, in: world)
         }
 
         world.recordBlast(at: bomb.position)

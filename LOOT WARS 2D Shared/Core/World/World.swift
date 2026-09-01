@@ -74,6 +74,30 @@ final class World {
     /// exactly, bots included.
     var rng: SeededRandom
 
+    /// What each team has scored. The leaderboard reads this and nothing else.
+    private(set) var scores: [TeamID: Int] = [:]
+
+    func score(for team: TeamID) -> Int { scores[team] ?? 0 }
+
+    /// Adds to a team's score.
+    ///
+    /// Called from wherever the thing actually happened, which is why there is no
+    /// ScoreSystem. One that ran afterwards would have to work out what had occurred
+    /// by comparing states, and would get it wrong the first time two of them
+    /// happened in the same tick.
+    func award(_ points: Int, to team: TeamID) {
+        guard points != 0 else { return }
+        scores[team, default: 0] += points
+    }
+
+    /// Teams best first, ties broken by id so two teams on the same score never
+    /// swap places from frame to frame.
+    var standings: [(team: TeamID, score: Int)] {
+        TeamID.all
+            .map { (team: $0, score: score(for: $0)) }
+            .sorted { $0.score == $1.score ? $0.team.raw < $1.team.raw : $0.score > $1.score }
+    }
+
     /// How far the camera can see from the player, in tiles, on each axis.
     ///
     /// Set by the renderer, which is the only thing that knows the screen size, and

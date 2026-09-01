@@ -75,6 +75,7 @@ enum ChestSystem {
         // only, because a player's chest is theirs to fill.
         if actor.ai != nil { stock(chest, in: world) }
 
+        world.award(GameConfig.Score.chestPlaced, to: actor.team)
         return true
     }
 
@@ -202,6 +203,12 @@ enum ChestSystem {
         guard actor.canAcquire(stack.type),
               chest.contents.consume(at: slot) != nil else { return }
         _ = actor.acquire(stack.type)
+
+        // Scored per item, and only when it is not yours. Taking your own things
+        // back out of your own chest is not an achievement.
+        if chest.owner != actor.team {
+            world.award(GameConfig.Score.itemStolen, to: actor.team)
+        }
 
         world.actors[id] = actor
 

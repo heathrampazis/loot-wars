@@ -15,4 +15,9 @@ struct TeamID: Hashable {
     }
 
     static let count = 8
+
+    /// Every team, in a fixed order. For anything that has to show all of them - a
+    /// leaderboard, say - without reaching into a dictionary whose order is not
+    /// stable between runs.
+    static let all: [TeamID] = (0..<count).map(TeamID.init)
 }

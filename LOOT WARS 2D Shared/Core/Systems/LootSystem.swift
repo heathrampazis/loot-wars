@@ -37,6 +37,7 @@ enum LootSystem {
                 guard let box = world.reachableLootbox(for: actor) else { break }
 
                 world.removeLootbox(box.id)
+                world.award(GameConfig.Score.lootboxOpened, to: actor.team)
                 world.spawnGroundItem(LootTable.roll(bombs: world.bombsAllowed,
                                                     using: &world.rng),
                                       at: box.position)
@@ -101,7 +102,7 @@ enum LootSystem {
 
     /// Returns false when the actor has no use for it, and the pickup stays put.
     /// Walking over something and having it vanish is worse than leaving it.
-    private static func take(_ pickup: Pickup, by actor: inout Actor) -> Bool {
+    private static func take(_ pickup: Pickup, by actor: inout Actor, in world: World) -> Bool {
         switch pickup {
         case .item(let type):
             // Worn if it beats what is on, bagged if it does not - and that rule
@@ -111,6 +112,7 @@ enum LootSystem {
 
         case .token(let value):
             actor.tokens += value
+            world.award(GameConfig.Score.tokenCollected * value, to: actor.team)
             return true
         }
     }
@@ -132,7 +134,7 @@ enum LootSystem {
                 // against. No separate pickup radius to drift out of step with it.
                 guard reach.contains(item.position) else { continue }
 
-                if take(item.pickup, by: &actor) {
+                if take(item.pickup, by: &actor, in: world) {
                     collected.append(item.id)
                 }
             }
