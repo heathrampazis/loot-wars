@@ -1011,6 +1011,22 @@ enum AIBrain {
             return .arcade
         }
 
+        // Then furniture, and before any gear. A bot in a Legendary standing in an
+        // empty base is a bot nobody has any reason to visit - and it is the
+        // visiting that this whole game is built round.
+        //
+        // Bought only once the wall is SHUT, which is the timing that makes this
+        // work rather than just spending tokens. A chest cannot be placed in an
+        // open base, so one bought early is carried around for minutes waiting for
+        // the wall, and lost to the first death that happens in the meantime.
+        // Bought at the moment it can be put down, it is put down.
+        if !world.baseIsBreached(actor.team),
+           world.chestCount(ownedBy: actor.team) < GameConfig.AI.chestsWanted,
+           actor.inventory.firstSlot(holding: .chest) == nil,
+           ShopSystem.canBuy(.chest, actor: actor, in: world) {
+            return .chest
+        }
+
         return upgradeToBuy(actor: actor, in: world)
     }
 

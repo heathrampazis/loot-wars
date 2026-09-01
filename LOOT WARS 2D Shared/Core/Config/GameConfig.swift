@@ -576,6 +576,20 @@ enum GameConfig {
         /// standing next to it, because the pull scales distance rather than
         /// replacing it.
         ///
+        /// How many chests a bot wants standing in its base.
+        ///
+        /// Bots buy these now, and the measurement is why. Left to the crates, a
+        /// chest is one drop in eleven and has to survive a full bag, every death
+        /// between finding it and the wall closing, and the wall closing at all -
+        /// modelled over 200,000 matches that put a chest in a base 42% of the
+        /// time and left 58% of bases with NOTHING in them to raid. A base worth
+        /// breaking into is the entire reason bases exist, so it cannot be left to
+        /// a one-in-eleven drop.
+        ///
+        /// Two, not more. A base is a place worth two visits; a base with five
+        /// chests in it is a warehouse, and raiding stops being a raid.
+        static let chestsWanted = 2
+
         /// What a raider thinks a base is worth, and what the walk costs.
         ///
         /// Raids used to be chosen by NEARNESS alone - the closest reachable chest
@@ -832,7 +846,10 @@ enum GameConfig {
         /// of healing plus most of a bomb - six crates or so, for a bomb spent, a
         /// wall breached and a walk into somebody's base under fire. Raise
         /// stockCount before the weights if raids feel thin; it is the blunter dial.
-        static let stockCount: ClosedRange<Int> = 2...3
+        /// Three or four, up from two or three. A chest is the reason to cross the
+        /// map and break a wall, and two items was a thin return on a bomb, a
+        /// breach and a walk under fire.
+        static let stockCount: ClosedRange<Int> = 3...4
 
         /// The wait after a raid, specifically.
         ///
@@ -850,43 +867,56 @@ enum GameConfig {
         /// stripped chest is back to a useful two items after about a minute.
         static let restockInterval: Double = 28
 
-        /// The most a chest will refill itself to. Below what a fresh one holds, so
-        /// the first raid on a base is always the best one.
-        static let restockCeiling = 2
+        /// The most a chest will refill itself to. Still under what a fresh one
+        /// holds, so the first raid on a base is always the best one.
+        static let restockCeiling = 3
 
         /// What a chest holds, and it MOVES with the match.
         ///
         /// One table meant a chest raided in the last minute paid out the same
-        /// opening-minute Commons as one raided in the first, so by the end the
-        /// only things worth crossing the map for were the ones nobody had to
-        /// break a wall to get. Raiding got less rewarding exactly as it got
-        /// harder, which is backwards.
+        /// opening-minute Commons as one raided in the first, so raiding got less
+        /// rewarding exactly as it got harder. Four bands now, and only the GEAR
+        /// rows differ between them.
         ///
-        /// Three bands, and only the GEAR rows differ between them. The supply rows
-        /// are identical in all three on purpose: healing throughput per chest is a
-        /// number solved several times over in LootTable, and a band that quietly
-        /// carried more bandages would undo it. Gear holds 30 of the 130 weight in
-        /// every band too, so a chest is worth breaking into exactly as often as it
-        /// was - what changes is what you find when you do.
+        /// Two rungs per band, and the LOW one moves up with the high one. That is
+        /// the difference from the first attempt at this: leaving a Common in the
+        /// late table meant a raid you had planned, bombed your way into and
+        /// carried out under fire could still hand you a helmet worth nothing.
+        /// Every rung on offer is now a rung worth the walk at the time it is
+        /// offered.
         ///
-        /// The ceiling stops at Legendary. Mythical and Cosmic stay behind the
-        /// token ladder, because the point of the top two rungs is that they are
-        /// climbed rather than found.
+        /// The top band reaches Mythical, which the crates never do and the earlier
+        /// bands never do. Cosmic stays behind the token ladder - the very top rung
+        /// should be climbed rather than found - but the second-best helmet in the
+        /// game being the prize for a late raid is exactly the reward the closing
+        /// minutes were missing.
+        ///
+        /// Healing is up: the medkit row nearly doubled and the bomb row gave way
+        /// for it. A chest item is worth 35% of a health bar now against 32%, and
+        /// with three or four items in a fresh chest rather than two or three, a
+        /// raid is worth appreciably more than the bomb that opened it. Gear holds
+        /// 34 of 138 in every band - a quarter, as before - so chests are worth
+        /// breaking into exactly as often as they were, and worth more when you do.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 60), (.medkit, 12), (.bomb, 28),
-                (.helmet(.common), 10), (.helmet(.rare), 5),
-                (.blaster(.two),   10), (.blaster(.three), 5)
+                (.bandage, 58), (.medkit, 20), (.bomb, 26),
+                (.helmet(.common), 11), (.helmet(.rare), 6),
+                (.blaster(.two),   11), (.blaster(.three), 6)
             ]),
-            (0.40, [
-                (.bandage, 60), (.medkit, 12), (.bomb, 28),
-                (.helmet(.rare), 10), (.helmet(.epic), 5),
-                (.blaster(.three), 10), (.blaster(.four), 5)
+            (0.35, [
+                (.bandage, 58), (.medkit, 20), (.bomb, 26),
+                (.helmet(.rare), 11), (.helmet(.epic), 6),
+                (.blaster(.three), 11), (.blaster(.four), 6)
             ]),
-            (0.70, [
-                (.bandage, 60), (.medkit, 12), (.bomb, 28),
-                (.helmet(.epic), 9), (.helmet(.legendary), 6),
-                (.blaster(.four), 9), (.blaster(.five), 6)
+            (0.65, [
+                (.bandage, 58), (.medkit, 20), (.bomb, 26),
+                (.helmet(.epic), 11), (.helmet(.legendary), 6),
+                (.blaster(.four), 11), (.blaster(.five), 6)
+            ]),
+            (0.85, [
+                (.bandage, 58), (.medkit, 20), (.bomb, 26),
+                (.helmet(.legendary), 11), (.helmet(.mythical), 6),
+                (.blaster(.five), 11), (.blaster(.six), 6)
             ])
         ]
 

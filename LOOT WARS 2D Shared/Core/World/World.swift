@@ -548,6 +548,11 @@ final class World {
         nextBuildTile(for: team) != nil
     }
 
+    /// How many chests this team has standing.
+    func chestCount(ownedBy team: TeamID) -> Int {
+        chests.values.filter { $0.owner == team }.count
+    }
+
     /// Enemy chests, for anyone deciding what is worth raiding.
     func chests(notOwnedBy team: TeamID) -> [Chest] {
         chests.values.filter { $0.owner != team }
