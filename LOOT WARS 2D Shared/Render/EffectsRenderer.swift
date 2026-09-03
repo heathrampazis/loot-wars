@@ -53,7 +53,11 @@ final class EffectsRenderer {
             }
 
             if let previous = lastHealth[id], previous != Int.max {
-                if actor.health > previous { lift(at: actor.position) }
+                if actor.health > previous {
+                    lift(at: actor.position,
+                         share: Double(actor.health - previous)
+                              / Double(max(1, actor.maxHealth)))
+                }
                 if actor.health < previous {
                     knock(at: actor.position, hurt: previous - actor.health)
                 }
@@ -148,11 +152,17 @@ final class EffectsRenderer {
 
     // MARK: - Patching up
 
-    /// Motes rising off somebody who has just healed.
-    private func lift(at position: Vec2) {
+    /// Motes rising off somebody who has just healed, as many as the heal was big.
+    ///
+    /// Two for a portion of health handed back for standing at home, six for a
+    /// medkit. Before this the two looked identical, so a quiet minute in your own
+    /// base threw up the same fountain as being pulled back from the brink - twelve
+    /// times over.
+    private func lift(at position: Vec2, share: Double) {
         let origin = GridGeometry.point(for: position)
+        let count = max(2, min(6, Int((share * 12).rounded())))
 
-        for index in 0..<6 {
+        for index in 0..<count {
             let mote = SKShapeNode(circleOfRadius: CGFloat.random(in: 1.6...3.2))
             mote.fillColor = RenderPalette.placementValid
             mote.strokeColor = .clear

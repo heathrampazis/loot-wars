@@ -136,7 +136,10 @@ final class ActorRenderer {
             // for something the renderer can simply notice.
             if actor.isAlive, nodes.lastHealth != Int.max {
                 if actor.health < nodes.lastHealth { hurt(nodes) }
-                if actor.health > nodes.lastHealth { healed(nodes) }
+                if actor.health > nodes.lastHealth {
+                    healed(nodes, share: Double(actor.health - nodes.lastHealth)
+                                       / Double(max(1, actor.maxHealth)))
+                }
             }
             nodes.lastHealth = actor.health
 
@@ -313,18 +316,29 @@ final class ActorRenderer {
         ]), withKey: "react")
     }
 
-    /// Patched up: a green wash and a lift.
+    /// Patched up: a green wash and a lift, SIZED to what was actually healed.
     ///
     /// Deliberately the opposite shape to the flinch. A hit squashes down and
     /// snaps back; a heal stretches up and settles - so the two are told apart by
     /// the movement, before anybody has read the colour or the health bar.
-    private func healed(_ nodes: ActorNodes) {
+    ///
+    /// The proportion matters because there are two kinds of heal now. A bandage is
+    /// half a bar and deserves the whole performance; a portion handed back for
+    /// standing at home is a twelfth of one, and given the same treatment it turned
+    /// a quiet minute in your own base into a strobe. Small heals get the wash and
+    /// nothing else.
+    private func healed(_ nodes: ActorNodes, share: Double) {
+        let slight = share < 0.15
+
         nodes.sprite.removeAction(forKey: "hit")
         nodes.sprite.run(.sequence([
             .colorize(with: RenderPalette.placementValid,
-                      colorBlendFactor: 0.7, duration: 0.08),
-            .colorize(withColorBlendFactor: 0, duration: 0.32)
+                      colorBlendFactor: slight ? 0.4 : 0.7,
+                      duration: slight ? 0.14 : 0.08),
+            .colorize(withColorBlendFactor: 0, duration: slight ? 0.4 : 0.32)
         ]), withKey: "hit")
+
+        guard !slight else { return }
 
         nodes.figure.removeAction(forKey: "react")
         nodes.figure.run(.sequence([

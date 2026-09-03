@@ -337,16 +337,26 @@ enum GameConfig {
         /// never this.
         static let baseHealth = 100
 
-        /// How fast health comes back while you are standing on your own ground,
-        /// as a share of your maximum per second, and how long after being shot it
-        /// starts.
+        /// Health coming back while you stand on your own ground: how big each
+        /// portion is, how long between them, and how long after being shot it
+        /// starts at all.
         ///
-        /// Slow on purpose: a full bar from empty takes about twenty-eight seconds,
-        /// so home is a place to recover BETWEEN fights rather than a way to win
-        /// one, and a bandage is still four times faster than walking back. The
-        /// delay is what stops it ticking during a fight on your own doorstep,
-        /// where a defender who heals mid-firefight is a defender nobody can kill.
-        static let recoveryRate: Double = 0.036
+        /// PORTIONS rather than a trickle, and that is a rendering decision as much
+        /// as a design one. A point of health every few frames is arithmetically
+        /// identical to a portion every two seconds, but the screen reacts to a
+        /// heal - a wash of green, a lift, motes coming off - and at sixty ticks a
+        /// second the same actor is being re-announced constantly. Standing in your
+        /// own base looked like being repeatedly zapped. Twelve deliberate pulses
+        /// read as recovering; seven hundred tiny ones read as a fault.
+        ///
+        /// The pace is unchanged and still slow: eight per cent of your bar every
+        /// two seconds is a full bar in twenty-five, so home is where you recover
+        /// BETWEEN fights rather than a way to win one, and a bandage is still six
+        /// times faster than walking back. The delay is what stops it ticking
+        /// during a fight on your doorstep, where a defender who heals mid-firefight
+        /// is a defender nobody can kill at home.
+        static let recoveryPortion: Double = 0.08
+        static let recoveryTick: Double = 2.0
         static let recoveryDelay: Double = 4
 
         /// Seconds spent dead before respawning at your own claim.

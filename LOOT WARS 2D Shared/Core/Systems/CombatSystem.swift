@@ -35,20 +35,29 @@ enum CombatSystem {
     /// so it never ticks during a fight on your doorstep - a defender who heals
     /// mid-firefight is a defender nobody can ever kill at home.
     private static func recover(_ actor: inout Actor, in world: World, dt: Double) {
-        guard actor.isAlive, actor.health < actor.maxHealth else { return }
-        guard actor.secondsSinceHit >= GameConfig.Player.recoveryDelay else { return }
-        guard world.claim(for: actor.team)?
-            .contains(GridPoint(containing: actor.feet)) == true else { return }
+        let athome = actor.isAlive
+            && actor.health < actor.maxHealth
+            && actor.secondsSinceHit >= GameConfig.Player.recoveryDelay
+            && world.claim(for: actor.team)?
+                .contains(GridPoint(containing: actor.feet)) == true
 
-        // Carried as a fraction so the tick is smooth at any frame rate and the
-        // remainder is not thrown away between ticks - at a couple of health a
-        // second, rounding each tick to a whole point would heal nobody.
-        actor.recovery += Double(actor.maxHealth) * GameConfig.Player.recoveryRate * dt
+        // Anything that disqualifies you puts the clock back to the top, so walking
+        // out and back in does not bank a portion, and being shot at home does not
+        // hand you one the instant the shooting stops.
+        guard athome else {
+            actor.recoveryTimer = GameConfig.Player.recoveryTick
+            return
+        }
 
-        let whole = Int(actor.recovery)
-        guard whole > 0 else { return }
-        actor.recovery -= Double(whole)
-        actor.health = min(actor.maxHealth, actor.health + whole)
+        actor.recoveryTimer -= dt
+        guard actor.recoveryTimer <= 0 else { return }
+        actor.recoveryTimer = GameConfig.Player.recoveryTick
+
+        // A whole portion at once - see GameConfig.Player.recoveryPortion for why
+        // this is deliberately lumpy rather than smooth.
+        let portion = max(1, Int((Double(actor.maxHealth)
+                                  * GameConfig.Player.recoveryPortion).rounded()))
+        actor.health = min(actor.maxHealth, actor.health + portion)
     }
 
     /// - Parameter attacker: WHO did it, for the scoreboard and the purse.

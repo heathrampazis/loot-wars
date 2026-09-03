@@ -52,9 +52,10 @@ struct Actor {
 
     var ammo: Int = GameConfig.Blaster.magazineSize
 
-    /// Fractional health banked by standing at home - see CombatSystem.recover.
-    /// Kept so a slow trickle is not lost to rounding on every tick.
-    var recovery: Double = 0
+    /// Counts down to the next portion of health handed back at home - see
+    /// CombatSystem.recover. Reset whenever you stop qualifying, so the first
+    /// portion always arrives a full interval after you get there.
+    var recoveryTimer: Double = GameConfig.Player.recoveryTick
 
     var inventory = Inventory()
 
