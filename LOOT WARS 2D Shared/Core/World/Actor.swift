@@ -52,6 +52,10 @@ struct Actor {
 
     var ammo: Int = GameConfig.Blaster.magazineSize
 
+    /// Fractional health banked by standing at home - see CombatSystem.recover.
+    /// Kept so a slow trickle is not lost to rounding on every tick.
+    var recovery: Double = 0
+
     var inventory = Inventory()
 
     /// Currency. Worth nothing yet - the shop is what will give it meaning - but

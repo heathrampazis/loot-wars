@@ -65,30 +65,76 @@ enum MovementSystem {
     /// one function taking a Box rather than two that happen to agree.
     private static func resolveStructures(_ actor: inout Actor, in world: World) {
         for crate in world.lootboxes.values {
-            push(&actor, outOf: crate.hitbox)
+            push(&actor, outOf: crate.hitbox, in: world)
         }
         for arcade in world.arcades.values {
-            push(&actor, outOf: arcade.hitbox)
+            push(&actor, outOf: arcade.hitbox, in: world)
         }
         for chest in world.chests.values {
-            push(&actor, outOf: chest.hitbox)
+            push(&actor, outOf: chest.hitbox, in: world)
         }
     }
 
     /// Box against box: find how deeply the two overlap on each axis and push back
     /// out along the shallower one, which is the side the actor came in from.
-    private static func push(_ actor: inout Actor, outOf solid: Box) {
+    ///
+    /// The push is CHECKED against the walls before it is applied, and that check is
+    /// the fix for getting stuck on a chest. The figure is 1.72 tiles tall and a
+    /// chest is 0.7, so a chest standing a tile from the wall of a small base leaves
+    /// a gap the figure does not fit in - and the two resolvers then fought each
+    /// other, one shoving out of the chest into the wall and the other shoving back
+    /// out of the wall into the chest, sixty times a second. From the outside that
+    /// is a player who has simply stopped moving.
+    ///
+    /// So each axis is tried in turn - the shallow one first, because that is the
+    /// side you came in from - and the first that does not land in a wall wins. If
+    /// NEITHER does, nothing is applied: the actor is genuinely wedged, and letting
+    /// them stand in the chest for a moment and walk out under their own steam is
+    /// far better than pinning them between two solids until the match ends.
+    private static func push(_ actor: inout Actor, outOf solid: Box, in world: World) {
         let actorBox = actor.hitbox
         guard actorBox.intersects(solid) else { return }
 
         let overlapX = min(actorBox.upper.x, solid.upper.x) - max(actorBox.lower.x, solid.lower.x)
         let overlapY = min(actorBox.upper.y, solid.upper.y) - max(actorBox.lower.y, solid.lower.y)
 
-        if overlapX < overlapY {
-            actor.position.x += actor.position.x < solid.centre.x ? -overlapX : overlapX
-        } else {
-            actor.position.y += actor.position.y < solid.centre.y ? -overlapY : overlapY
+        let sideways = Vec2(x: actor.position.x
+                            + (actor.position.x < solid.centre.x ? -overlapX : overlapX),
+                            y: actor.position.y)
+        let upright = Vec2(x: actor.position.x,
+                           y: actor.position.y
+                           + (actor.position.y < solid.centre.y ? -overlapY : overlapY))
+
+        for spot in (overlapX < overlapY ? [sideways, upright] : [upright, sideways])
+        where !overlapsWall(at: spot, for: actor.team, in: world.map) {
+            actor.position = spot
+            return
         }
+    }
+
+    /// Whether an actor standing here would be inside something solid.
+    ///
+    /// The same test `resolve` uses, asked of a hypothetical position rather than
+    /// of the actor's own - so the two can never disagree about what a wall is.
+    private static func overlapsWall(at position: Vec2,
+                                     for team: TeamID,
+                                     in map: TileMap) -> Bool {
+        let halfWidth = GameConfig.Player.halfWidth
+        let halfDepth = GameConfig.Player.halfDepth
+
+        let minCol = Int(floor(position.x - halfWidth))
+        let maxCol = Int(floor(position.x + halfWidth))
+        let minRow = Int(floor(position.y - halfDepth))
+        let maxRow = Int(floor(position.y + halfDepth))
+
+        for col in minCol...maxCol {
+            for row in minRow...maxRow where
+                map.blocksMovement(at: GridPoint(col: col, row: row), for: team) {
+                return true
+            }
+        }
+
+        return false
     }
 
     private enum Axis {

@@ -573,10 +573,34 @@ final class World {
     /// Teams that have been breached since they last sealed. See above.
     private var sealPending: Set<TeamID> = []
 
-    /// Called when a wall tile is destroyed, so the repair is worth paying for.
+    /// When each team may start laying walls again after being breached.
+    private var repairAllowedAt: [TeamID: Double] = [:]
+
+    /// Called when a wall tile is destroyed, so the repair is worth paying for -
+    /// and so the raider gets long enough to actually raid.
     func recordBreach(of team: TeamID) {
+        // The buffer applies to anybody who has been bombed, sealed base or not.
+        // Being walled in by somebody finishing their base around you is the same
+        // experience as being walled in by a repair.
+        repairAllowedAt[team] = elapsed + GameConfig.Build.raidGrace
+
         guard haveSealed.contains(team) else { return }
         sealPending.insert(team)
+    }
+
+    /// Whether this team may lay walls right now.
+    ///
+    /// False for a few seconds after somebody blows a hole in their base. A raid is
+    /// a round trip - through the wall, into the chest, back out - and a hole that
+    /// closes behind you turns the best part of the game into being trapped in
+    /// somebody's cellar until they get bored of shooting you.
+    ///
+    /// It costs the owner very little: their machine's bank is halved while the
+    /// hole is open, so the seconds are not free, and they can still fight for the
+    /// place. What they cannot do is answer a raid with masonry.
+    func canBuild(_ team: TeamID) -> Bool {
+        guard let until = repairAllowedAt[team] else { return true }
+        return elapsed >= until
     }
 
     /// Whether this team's wall has a hole in it.

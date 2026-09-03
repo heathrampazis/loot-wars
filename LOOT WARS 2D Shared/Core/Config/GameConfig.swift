@@ -337,6 +337,18 @@ enum GameConfig {
         /// never this.
         static let baseHealth = 100
 
+        /// How fast health comes back while you are standing on your own ground,
+        /// as a share of your maximum per second, and how long after being shot it
+        /// starts.
+        ///
+        /// Slow on purpose: a full bar from empty takes about twenty-eight seconds,
+        /// so home is a place to recover BETWEEN fights rather than a way to win
+        /// one, and a bandage is still four times faster than walking back. The
+        /// delay is what stops it ticking during a fight on your own doorstep,
+        /// where a defender who heals mid-firefight is a defender nobody can kill.
+        static let recoveryRate: Double = 0.036
+        static let recoveryDelay: Double = 4
+
         /// Seconds spent dead before respawning at your own claim.
         static let respawnDelay: Double = 3.0
 
@@ -501,7 +513,13 @@ enum GameConfig {
         /// twelve, which would have made the cheat the main source and the crates
         /// decoration. At sixty its ceiling is eight and its realistic contribution
         /// is a good deal less, because it only ever fires on an empty pocket.
-        static let bombSupplyInterval: Double = 60
+        /// Down from 60. Raiding is the best thing in this game and the thing
+        /// least likely to happen, and the reason is banal: a bot with no bomb
+        /// cannot raid, and bots spend bombs on walls faster than crates hand them
+        /// out. This is the supply line for the whole activity, so it is the dial
+        /// that moves it - about a third more bombs across a match, which is about
+        /// a third more raids.
+        static let bombSupplyInterval: Double = 42
 
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
@@ -736,7 +754,18 @@ enum GameConfig {
         /// comfortable level it beats building almost permanently, because with
         /// crates everywhere there is always one worth a detour, and bases never
         /// get built.
-        static let emergencyHealingStock = 60
+        /// Lowered from 60, which was two bandages or a medkit.
+        ///
+        /// This number does double duty - it is also the bar a bot has to clear
+        /// before it will set out to rob somebody - and at 60 it was quietly the
+        /// biggest brake on raiding: a bot with a single bandage was judged too
+        /// poorly supplied to cross the map, which is most bots for most of a
+        /// match. At 40 one bandage is enough to go with.
+        ///
+        /// Both uses move together on purpose. The bar being the SAME number is
+        /// what keeps the two branches from wanting the bot in opposite directions:
+        /// anything that fails the raid test wanted supplies anyway.
+        static let emergencyHealingStock = 40
 
         /// How far a bot will detour for an item lying on the ground, in tiles.
         /// Shorter than the crate range - a dropped item is worth a few steps, not
@@ -823,6 +852,19 @@ enum GameConfig {
         /// of should look urgent, and the sooner it is shut the sooner there is
         /// something in it worth coming back for.
         static let repairInterval: Double = 0.18
+
+        /// How long after being bombed before a team may lay walls again.
+        ///
+        /// A raid is a round trip - through the wall, into the chest, back out -
+        /// and at repair speeds a hole could close while the raider was still
+        /// reading the chest, which turns the best part of the game into being
+        /// trapped in somebody's cellar. Twelve seconds is about two trips to a
+        /// chest and back at walking pace.
+        ///
+        /// It is not free for the raider either: twelve seconds is also plenty of
+        /// time for the owner to come home, and the owner is not prevented from
+        /// defending - only from answering a raid with masonry.
+        static let raidGrace: Double = 12
 
         /// Walls laid per trip while patching a breach.
         ///

@@ -17,8 +17,38 @@ enum CombatSystem {
         for id in Array(world.actors.keys) {
             guard var actor = world.actors[id] else { continue }
             actor.secondsSinceHit += dt
+            recover(&actor, in: world, dt: dt)
             world.actors[id] = actor
         }
+    }
+
+    /// Health coming back, slowly, to somebody standing on their own ground.
+    ///
+    /// The third reason to have a base, after the chest and the machine, and the
+    /// one that costs nothing to understand: home is where you get better. It is
+    /// deliberately slow - a full bar takes most of half a minute - so it is a
+    /// reason to go home between fights rather than a way to win one, and a
+    /// bandage is still much faster than walking.
+    ///
+    /// Two conditions, and both matter. Inside your OWN claim, so it cannot be
+    /// used by whoever is standing in your base robbing you. And only after a lull,
+    /// so it never ticks during a fight on your doorstep - a defender who heals
+    /// mid-firefight is a defender nobody can ever kill at home.
+    private static func recover(_ actor: inout Actor, in world: World, dt: Double) {
+        guard actor.isAlive, actor.health < actor.maxHealth else { return }
+        guard actor.secondsSinceHit >= GameConfig.Player.recoveryDelay else { return }
+        guard world.claim(for: actor.team)?
+            .contains(GridPoint(containing: actor.feet)) == true else { return }
+
+        // Carried as a fraction so the tick is smooth at any frame rate and the
+        // remainder is not thrown away between ticks - at a couple of health a
+        // second, rounding each tick to a whole point would heal nobody.
+        actor.recovery += Double(actor.maxHealth) * GameConfig.Player.recoveryRate * dt
+
+        let whole = Int(actor.recovery)
+        guard whole > 0 else { return }
+        actor.recovery -= Double(whole)
+        actor.health = min(actor.maxHealth, actor.health + whole)
     }
 
     /// - Parameter attacker: WHO did it, for the scoreboard and the purse.

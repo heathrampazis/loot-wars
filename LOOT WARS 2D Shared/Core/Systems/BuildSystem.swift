@@ -43,6 +43,11 @@ enum BuildSystem {
     }
 
     static func canPlace(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
+        // Not for a few seconds after being bombed - see World.canBuild. The one
+        // rule in this file that is about somebody ELSE: a raider needs the hole to
+        // still be there on the way out.
+        guard world.canBuild(actor.team) else { return false }
+
         guard isBuildableTile(point, for: actor.team, in: world) else { return false }
 
         // You build your base from inside it. Measured from the feet, so it is
