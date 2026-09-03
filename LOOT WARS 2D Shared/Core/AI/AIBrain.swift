@@ -1000,6 +1000,17 @@ enum AIBrain {
     /// whistle, with the buying happening in the second half - late enough to be a
     /// difficulty curve rather than a head start.
     private static func purchaseToMake(actor: Actor, in world: World) -> ItemType? {
+        // Past a point, everything goes on gear.
+        //
+        // Furniture is an INVESTMENT - a machine pays itself back over minutes, a
+        // chest is a place other people come to raid - and an investment made with
+        // ninety seconds on the clock is just tokens that never became anything. A
+        // bot buying its second chest in the closing minute is a bot choosing to be
+        // easy to kill, which is most of what "too easy" was.
+        guard world.matchProgress < GameConfig.AI.investsUntil else {
+            return upgradeToBuy(actor: actor, in: world)
+        }
+
         // A machine first, and before any gear. It is the only thing on the shelf
         // that pays for itself: bought early it earns back more than it cost, which
         // then buys the gear. A bot that spends its first tokens on a helmet has

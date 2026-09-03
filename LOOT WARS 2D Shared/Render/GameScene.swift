@@ -169,6 +169,10 @@ final class GameScene: SKScene {
         return type
     }
 
+    /// How far into a match the drop hint will still offer itself. The opening
+    /// third, and no later.
+    private static let hintWindow: Double = 0.35
+
     /// How near an enemy has to be, and how recently you have been shot, for the
     /// screen to stop trying to teach you anything.
     private static let hintCombatRange: Double = 11
@@ -577,6 +581,11 @@ final class GameScene: SKScene {
             hint.hide()
             return
         }
+
+        // Early only. A lesson has a shelf life: somebody four minutes into a match
+        // has either worked the gesture out or settled into playing without it, and
+        // a tip arriving then is not teaching, it is interrupting.
+        guard world.matchProgress < GameScene.hintWindow else { return }
 
         guard stepped, !hasDropped, dropHintsLeft > 0, !hint.isShowing else { return }
         dropHintsLeft -= 1

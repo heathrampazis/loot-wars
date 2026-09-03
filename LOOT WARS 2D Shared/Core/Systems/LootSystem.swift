@@ -40,6 +40,7 @@ enum LootSystem {
                 world.award(GameConfig.Score.lootboxOpened, to: actor.team)
                 world.awardTokens(GameConfig.Tokens.perLootbox, to: id)
                 world.spawnGroundItem(LootTable.roll(bombs: world.bombsAllowed,
+                                                    at: world.matchProgress,
                                                     using: &world.rng),
                                       at: box.position)
                 break   // one box per tick, however many times it was asked

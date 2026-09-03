@@ -522,8 +522,21 @@ enum GameConfig {
         /// engagements fall from 100% to 79% overall, 62% early on when nobody has
         /// anything worth taking, and 95% late when everyone does. Late being high
         /// is correct - by then a fight IS the game.
-        static let worthChasingGear = 3
-        static let worthChasingAtRange = 6
+        /// Lowered from 3 and 6 to 2 and 5, which is a smaller step than it looks.
+        ///
+        /// Modelled across 150,000 encounters, those two numbers move the share of
+        /// sightings that become fights from 45% to 60%, and the sharper aim below
+        /// takes the share of shots that land from 45% to 54%. Multiplied, the
+        /// pressure a player is under goes from 0.20 to 0.33 - two thirds more -
+        /// which is a large enough change in one pass that going further on either
+        /// dial at the same time would have been guessing. 2 and 4 was the first
+        /// draft and put it at 0.35; the difference is not worth the risk of
+        /// overshooting into unfair, and the dial is right here if it is not enough.
+        ///
+        /// A bot still walks away from a naked spawn across the map. It just comes
+        /// for anybody carrying anything.
+        static let worthChasingGear = 2
+        static let worthChasingAtRange = 5
 
 
 
@@ -548,7 +561,15 @@ enum GameConfig {
         /// uncertain by about one body width wherever it is standing - which is
         /// what 0.12 radians used to work out at, at the range fights used to
         /// happen at.
-        static let aimSpread: Double = 1.0
+        /// Down from 1.0, and the arithmetic is worth stating because this is the
+        /// single number that decides how hard the game is. The noise is uniform
+        /// across the spread and the target is 0.9 tiles wide, so an aim-limited
+        /// hit rate is 0.45 / spread: 45% at 1.0, and 54% at 0.83. A fifth more of
+        /// their shots landing is what "too easy" was asking for, and it is a fifth
+        /// rather than a half because doubling a bot's accuracy does not make a
+        /// game harder, it makes it unfair - the player still has to be able to
+        /// cross open ground.
+        static let aimSpread: Double = 0.83
 
         /// Chance, at each change of mind, that a bot reverses the way it is
         /// circling. Never reversing reads as a machine on rails; reversing every
@@ -556,7 +577,10 @@ enum GameConfig {
         static let strafeFlipChance: Double = 0.35
 
         /// How long a bot takes to react to an enemy it has just noticed.
-        static let reactionDelay: ClosedRange<Double> = 0.25...0.5
+        /// Quicker off the mark, by about a fifth. Enough that walking round a
+        /// corner into somebody is no longer a free first shot, not so quick that
+        /// they stop feeling like people.
+        static let reactionDelay: ClosedRange<Double> = 0.2...0.4
 
         /// Below this share of its health, a bot breaks off and runs for home -
         /// but only while an enemy is actually near. Once it is safe it gets back
@@ -644,6 +668,12 @@ enum GameConfig {
         /// Two, not more. A base is a place worth two visits; a base with five
         /// chests in it is a warehouse, and raiding stops being a raid.
         static let chestsWanted = 2
+
+        /// How far into a match a bot will still spend on furniture rather than on
+        /// gear. Past this everything goes on the ladder - see
+        /// AIBrain.purchaseToMake for why an investment made this late is just
+        /// tokens that never became anything.
+        static let investsUntil: Double = 0.60
 
         /// What a raider thinks a base is worth, and what the walk costs.
         ///

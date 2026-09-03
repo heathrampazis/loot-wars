@@ -44,30 +44,83 @@
 
 enum LootTable {
 
-    private static let table: [(pickup: Pickup, weight: Int)] = [
-        (.item(.bandage), 88),
-        (.item(.medkit),  22),
-        (.item(.bomb),    38),
-        (.item(.chest),   26),
+    /// What a crate holds, and it MOVES with the match.
+    ///
+    /// One table meant a crate in the last minute paid out the same Commons and
+    /// Blaster 2s as a crate in the first, and by then those are litter: you are
+    /// wearing an Epic, the thing on the ground is worth nothing, and opening
+    /// crates - which is most of what anybody does between fights - stops paying.
+    ///
+    /// Three bands. The rule they follow is not "better loot later", which would
+    /// undo the ladder; it is "nothing WORTHLESS later". The floor comes up so what
+    /// you find is at least usable, the frequency of gear comes DOWN, and the
+    /// weight goes to healing.
+    ///
+    /// The ladder stays the shop's. Late crates can hand out an Epic or a Blaster 4
+    /// at about one crate in twenty, which is a moment rather than a supply -
+    /// Legendary, Mythical and Cosmic are still bought and never found.
+    ///
+    /// Healing per crate deliberately RISES, 24% of a health bar to 27% to 36%,
+    /// and this is the one number in this file that has been held constant through
+    /// five previous rewrites, so breaking it on purpose deserves its reason: late
+    /// fights are between people with more health and much better blasters, and a
+    /// crate that cannot meaningfully patch you up is a crate that does not matter
+    /// at the exact point in a match where being alive matters most.
+    ///
+    /// Bombs go the other way: one crate in six early, one in nine late. Early is
+    /// when nobody has a wall worth blowing open yet and a bomb is what starts the
+    /// raiding; late everybody has three and the map does not need more.
+    private static let bands: [(from: Double, rows: [(pickup: Pickup, weight: Int)])] = [
+        (0.00, [
+            (.item(.bandage), 88),
+            (.item(.medkit),  22),
+            (.item(.bomb),    46),
+            (.item(.chest),   26),
 
-        // Stops at Rare. Everything above it is bought, not found - see
-        // GameConfig.Shop. A crate that can hand you a Cosmic makes the whole
-        // upgrade ladder a lottery you either win in the first minute or do not.
-        (.item(.helmet(.common)),    28),
-        (.item(.helmet(.uncommon)),  19),
-        (.item(.helmet(.rare)),      12),
+            (.item(.helmet(.common)),    26),
+            (.item(.helmet(.uncommon)),  18),
+            (.item(.helmet(.rare)),      11),
+            (.item(.blaster(.two)),      24),
+            (.item(.blaster(.three)),    14)
+        ]),
+        (0.35, [
+            (.item(.bandage), 88),
+            (.item(.medkit),  24),
+            (.item(.bomb),    38),
+            (.item(.chest),   26),
 
-        // No starter blasters: everybody already has one, so dropping them would
-        // only be a way of finding nothing.
-        (.item(.blaster(.two)),   26),
-        (.item(.blaster(.three)), 16)
+            // The Common and the Blaster 2 are gone: by now everybody has better,
+            // so those rows were rolls that produced nothing.
+            (.item(.helmet(.uncommon)),  22),
+            (.item(.helmet(.rare)),      20),
+            (.item(.blaster(.three)),    26),
+            (.item(.blaster(.four)),     12)
+        ]),
+        (0.70, [
+            (.item(.bandage), 96),
+            (.item(.medkit),  34),
+            (.item(.bomb),    26),
+            (.item(.chest),   22),
+
+            (.item(.helmet(.rare)),      20),
+            (.item(.helmet(.epic)),      10),
+            (.item(.blaster(.four)),     16),
+            (.item(.blaster(.five)),      6)
+        ])
     ]
 
-    /// - Parameter bombs: false during the opening grace period, when the bomb row
-    ///   is dropped and the rest of the table is renormalised around it. Everything
-    ///   else simply becomes correspondingly likelier, which is what should happen -
-    ///   a crate still gives you something.
-    static func roll(bombs: Bool, using rng: inout SeededRandom) -> Pickup {
+    private static func table(at progress: Double) -> [(pickup: Pickup, weight: Int)] {
+        bands.last { progress >= $0.from }?.rows ?? bands[0].rows
+    }
+
+    /// - Parameters:
+    ///   - bombs: false during the opening grace period, when the bomb row is
+    ///     dropped and the rest of the table is renormalised around it. Everything
+    ///     else simply becomes correspondingly likelier, which is what should
+    ///     happen - a crate still gives you something.
+    ///   - progress: how far the match has run, which picks the band above.
+    static func roll(bombs: Bool, at progress: Double, using rng: inout SeededRandom) -> Pickup {
+        let table = table(at: progress)
         let rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
 
         let total = rows.reduce(0) { $0 + $1.weight }
