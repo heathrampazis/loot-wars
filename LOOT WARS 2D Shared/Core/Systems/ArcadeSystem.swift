@@ -94,6 +94,8 @@ enum ArcadeSystem {
     /// It is also precisely what a raid takes: breach somebody and their bank halves
     /// until they repair it.
     private static func bank(for arcade: Arcade, in world: World) -> Int {
+        if arcade.isJackpot { return GameConfig.Arcade.jackpotBank }
+
         guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
             return GameConfig.Arcade.maxUncollected
         }
@@ -130,10 +132,44 @@ enum ArcadeSystem {
     /// The map's own machines never qualify: they stand in the open, they belong to
     /// nobody, and being the risky way to earn is their whole job.
     private static func interval(for arcade: Arcade, in world: World) -> Double {
+        if arcade.isJackpot {
+            return GameConfig.Arcade.emitInterval * GameConfig.Arcade.jackpotRate
+        }
+
         guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
             return GameConfig.Arcade.emitInterval
         }
         return GameConfig.Arcade.emitInterval * GameConfig.Arcade.sealedInterval
+    }
+
+    /// Starts and ends jackpots on the map's own machines.
+    ///
+    /// Rolled from the world's generator in the same fixed order as everything else
+    /// here, so a seed still replays exactly - a jackpot is worth a dozen tokens to
+    /// whoever is nearest, which is more than enough to send two runs of the same
+    /// match in different directions.
+    private static func rollJackpot(_ arcade: inout Arcade, in world: World, dt: Double) {
+        guard arcade.owner == nil else { return }
+
+        if arcade.jackpotRemaining > 0 {
+            arcade.jackpotRemaining = max(0, arcade.jackpotRemaining - dt)
+            return
+        }
+
+        arcade.jackpotCheck -= dt
+        guard arcade.jackpotCheck <= 0 else { return }
+
+        arcade.jackpotCheck = GameConfig.Arcade.jackpotInterval
+
+        guard Double.random(in: 0..<1, using: &world.rng)
+                < GameConfig.Arcade.jackpotChance else { return }
+
+        arcade.jackpotRemaining = GameConfig.Arcade.jackpotDuration
+
+        // Paid out at once rather than waiting for the next interval, so there is
+        // something on the ground saying so from the moment it starts.
+        arcade.emitTimer = 0
+        world.record(.jackpot(at: arcade.centre))
     }
 
     private static func emit(_ world: World, dt: Double) {
@@ -142,6 +178,8 @@ enum ArcadeSystem {
         // runs, so the obvious loop would quietly break seeded replays.
         for id in world.arcades.keys.sorted(by: { $0.raw < $1.raw }) {
             guard var arcade = world.arcades[id] else { continue }
+
+            rollJackpot(&arcade, in: world, dt: dt)
 
             // The timer runs down and then STAYS down. A machine that is blocked or
             // already full is ready the instant that stops being true, rather than
@@ -159,7 +197,18 @@ enum ArcadeSystem {
                 continue
             }
 
-            world.spawnGroundItem(.token(GameConfig.Arcade.tokenValue), at: spot,
+            // One payout in fifteen is golden. Rolled per token rather than per
+            // machine, so a jackpot - a dozen payouts in eight seconds - is also
+            // where most golden ones turn up, without either rule having to know
+            // the other exists.
+            let golden = Double.random(in: 0..<1, using: &world.rng)
+                < GameConfig.Arcade.goldenChance
+
+            let value = golden
+                ? GameConfig.Arcade.goldenValue
+                : GameConfig.Arcade.tokenValue
+
+            world.spawnGroundItem(.token(value), at: spot,
                                   lifetime: lifetime(for: arcade, in: world))
             arcade.emitTimer = interval(for: arcade, in: world)
             world.arcades[id] = arcade

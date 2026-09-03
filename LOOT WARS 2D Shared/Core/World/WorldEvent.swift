@@ -39,6 +39,14 @@ enum WorldEvent {
     /// looks like fog rolling in where one that bursts looks like something landed.
     case gas(at: Vec2)
 
+    /// A machine on the map has started paying out properly.
+    ///
+    /// Announced because the START is the interesting instant, and the state only
+    /// says that a jackpot is happening: by the time anybody looks, the difference
+    /// between "this began a moment ago" and "this has six seconds left" is gone,
+    /// and only one of those is worth interrupting somebody for.
+    case jackpot(at: Vec2)
+
     /// Somebody bought something.
     case purchase(ItemType, by: ActorID)
 

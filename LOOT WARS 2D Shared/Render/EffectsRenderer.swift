@@ -239,6 +239,58 @@ final class EffectsRenderer {
         }
     }
 
+    // MARK: - Jackpots
+
+    /// A burst of gold rising off a machine that has just started paying out.
+    ///
+    /// Loud on purpose, and the only thing in this game that is. Everything else
+    /// that flashes is telling you about something already happening to you - a
+    /// hit, a heal, a sale - where this is an INVITATION, thrown up over a machine
+    /// that might be forty tiles away, and it has to survive being seen at the edge
+    /// of vision by somebody busy doing something else.
+    ///
+    /// It rises rather than scattering. Sparks fly out and settle; a fountain goes
+    /// up and keeps going, which is the shape of a thing that is still happening
+    /// rather than a thing that happened.
+    func jackpot(at position: Vec2) {
+        let origin = GridGeometry.point(for: position)
+
+        for index in 0..<14 {
+            let star = SKSpriteNode(texture: ImpactArt.star)
+            let side = GridGeometry.length(ofTiles: Double.random(in: 0.3...0.5))
+
+            star.size = CGSize(width: side, height: side)
+            star.color = RenderPalette.colour(of: .mythical)
+            star.colorBlendFactor = 0.55
+            star.zPosition = 14
+            star.position = CGPoint(x: origin.x + CGFloat.random(in: -26...26),
+                                    y: origin.y + CGFloat.random(in: -10...10))
+
+            node.addChild(star)
+
+            star.setScale(0.4)
+            star.run(.sequence([
+                .wait(forDuration: Double(index) * 0.035),
+                .group([
+                    .moveBy(x: CGFloat.random(in: -18...18),
+                            y: CGFloat.random(in: 60...110),
+                            duration: 0.75),
+                    .rotate(byAngle: CGFloat.random(in: -2...2), duration: 0.75),
+                    .sequence([
+                        .scale(to: 1.1, duration: 0.2),
+                        .wait(forDuration: 0.2),
+                        .scale(to: 0.5, duration: 0.35)
+                    ]),
+                    .sequence([
+                        .wait(forDuration: 0.35),
+                        .fadeOut(withDuration: 0.4)
+                    ])
+                ]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     // MARK: - Gas arriving
 
     /// The puff a stink bomb makes on landing.

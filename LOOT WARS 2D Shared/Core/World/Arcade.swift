@@ -36,6 +36,19 @@ struct Arcade {
     /// one map do not pay out in lockstep.
     var emitTimer: Double
 
+    /// Seconds left of a jackpot, or zero.
+    ///
+    /// Only the map's own machines ever have one. A jackpot is a reason to LEAVE
+    /// your base and cross open ground at speed, which is precisely what a machine
+    /// standing safely behind your own walls should never be handing out - the one
+    /// in your base already pays you for staying home.
+    var jackpotRemaining: Double = 0
+
+    /// Counts down to the next roll for one.
+    var jackpotCheck: Double = GameConfig.Arcade.jackpotInterval
+
+    var isJackpot: Bool { jackpotRemaining > 0 }
+
     static var width: Int { GameConfig.Arcade.footprintWidth }
     static var height: Int { GameConfig.Arcade.footprintHeight }
 

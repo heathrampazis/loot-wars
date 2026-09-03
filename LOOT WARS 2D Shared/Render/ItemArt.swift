@@ -83,7 +83,12 @@ enum ItemArt {
         case .item(.arcade):     return "Arcade"
         case .item(.helmet(let tier)):  return tier.name
         case .item(.blaster(let tier)): return tier.assetName
-        case .token:             return "Token"
+        // A golden token is the same pickup carrying a bigger number - Core has no
+        // second kind of token and does not need one, because the VALUE is the
+        // whole difference. This is the one place that difference has to be
+        // visible, and it is a picture, which is exactly what this file is for.
+        case .token(let value):
+            return value >= GameConfig.Arcade.goldenValue ? "GoldenToken" : "Token"
         }
     }
 }

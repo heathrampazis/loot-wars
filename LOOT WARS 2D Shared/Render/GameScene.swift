@@ -657,6 +657,9 @@ final class GameScene: SKScene {
             case .blast(let position):
                 bombRenderer.flash(at: position)
 
+            case .jackpot(let position):
+                effectsRenderer.jackpot(at: position)
+
             case .gas(let position):
                 // The cloud itself is drawn from the world every frame; this is the
                 // burst that says it arrived, which state alone cannot show.

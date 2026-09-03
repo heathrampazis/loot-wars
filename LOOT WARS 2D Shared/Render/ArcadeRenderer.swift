@@ -57,9 +57,18 @@ final class ArcadeRenderer {
 
         for (id, machine) in world.arcades {
             defer { lastTimers[id] = machine.emitTimer }
-            guard let previous = lastTimers[id], machine.emitTimer > previous,
-                  let sprite = nodesByArcade[id] else { continue }
-            payOut(sprite)
+            guard let sprite = nodesByArcade[id] else { continue }
+
+            // A machine mid-jackpot flashes gold and will not stop until it is
+            // over. Driven off the state rather than started by the event, so a
+            // machine that was already going when you walked into view is visibly
+            // going - the event only says when to CELEBRATE, and arriving late to
+            // a jackpot should still look like arriving at a jackpot.
+            setJackpot(machine.isJackpot, on: sprite)
+
+            if let previous = lastTimers[id], machine.emitTimer > previous {
+                payOut(sprite)
+            }
         }
 
         for (id, sprite) in Array(nodesByArcade) where world.arcades[id] == nil {
@@ -89,6 +98,25 @@ final class ArcadeRenderer {
             .group([.scaleX(to: 1, y: 1, duration: 0.22),
                     .colorize(withColorBlendFactor: 0, duration: 0.22)])
         ]), withKey: "paid")
+    }
+
+    /// Puts a machine into its jackpot colours, or takes it out of them.
+    private func setJackpot(_ on: Bool, on sprite: SKSpriteNode) {
+        let running = sprite.action(forKey: "jackpot") != nil
+        guard on != running else { return }
+
+        guard on else {
+            sprite.removeAction(forKey: "jackpot")
+            sprite.run(.colorize(withColorBlendFactor: 0, duration: 0.3))
+            return
+        }
+
+        sprite.color = RenderPalette.colour(of: .mythical)
+
+        sprite.run(.repeatForever(.sequence([
+            .colorize(withColorBlendFactor: 0.75, duration: 0.18),
+            .colorize(withColorBlendFactor: 0.15, duration: 0.18)
+        ])), withKey: "jackpot")
     }
 
     private func make(_ machine: Arcade) {

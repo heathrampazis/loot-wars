@@ -72,8 +72,26 @@ final class GroundItemRenderer {
         // the crate is grey or gold - which is the difference between a detour and
         // a sprint.
         //
-        // Tokens are exempt. They are money rather than loot, they arrive four at a
-        // time, and a puddle of light under each would turn a machine into a disco.
+        // A golden token gets one, and ordinary tokens do not. Money is not loot
+        // and a puddle of light under every coin would turn a machine into a disco -
+        // but ten tokens lying on the grass is worth crossing a map for, and the
+        // only way to know that from across one is for it to be lit.
+        if case .token(let value) = item.pickup,
+           value >= GameConfig.Arcade.goldenValue {
+            let glow = SKSpriteNode(texture: GlowArt.pool)
+            glow.size = CGSize(width: box * 2.1, height: box * 2.1)
+            glow.color = RenderPalette.colour(of: .mythical)
+            glow.colorBlendFactor = 1
+            glow.alpha = 0.85
+            glow.zPosition = -1
+            sprite.addChild(glow)
+
+            glow.run(.repeatForever(.sequence([
+                .group([.fadeAlpha(to: 0.5, duration: 0.7), .scale(to: 0.85, duration: 0.7)]),
+                .group([.fadeAlpha(to: 0.85, duration: 0.7), .scale(to: 1.0, duration: 0.7)])
+            ])))
+        }
+
         if case .item(let type) = item.pickup {
             let glow = SKSpriteNode(texture: GlowArt.pool)
             glow.size = CGSize(width: box * 1.5, height: box * 1.5)

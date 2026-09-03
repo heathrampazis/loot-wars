@@ -1297,6 +1297,44 @@ enum GameConfig {
 
         static let tokenValue = 1
 
+        /// A golden token, and how often one comes out instead of an ordinary one.
+        ///
+        /// Ten tokens is most of a rung of the ladder from a single pickup, which
+        /// is why it is one payout in fifteen rather than one in three: the point
+        /// is the moment you see it lying there and change your route, and a
+        /// windfall that arrives on schedule is just a bigger number on the counter.
+        static let goldenValue = 10
+        static let goldenChance = 0.065
+
+        /// A jackpot: how long one lasts, how often each map machine rolls for one,
+        /// and the chance it takes.
+        ///
+        /// Only the map's machines, and that asymmetry is the design. The machine
+        /// in your base pays you for staying home; a jackpot is the opposite offer -
+        /// drop what you are doing, cross open ground, and stand in the middle of
+        /// the map next to a thing that is loudly announcing itself. Two ways to
+        /// earn that want opposite behaviour out of you is worth more than either
+        /// of them being slightly better.
+        ///
+        /// Rolled every twenty seconds by each of five machines at one in ten, so
+        /// the map runs about seven or eight jackpots across a match - roughly one
+        /// somewhere every forty seconds, which is often enough to be worth
+        /// watching for and rare enough to be worth running to.
+        static let jackpotDuration: Double = 8
+        static let jackpotInterval: Double = 20
+        static let jackpotChance = 0.10
+
+        /// What a jackpot does to the two numbers that decide a machine's output.
+        ///
+        /// BOTH, and this is the lesson the sealed-base bank taught the hard way:
+        /// the cap binds, not the rate. A machine that paid four times as fast but
+        /// still stopped at four uncollected would produce exactly four tokens and
+        /// a lot of waiting, which is not a jackpot, it is the same machine with
+        /// impatience. Lifting the ceiling with the rate is what turns it into a
+        /// pile worth sprinting for.
+        static let jackpotRate = 0.22
+        static let jackpotBank = 12
+
         /// How many of its own tokens a machine will let pile up before it stops.
         ///
         /// This is the anti-camping valve, and it is the only reason standing at a
