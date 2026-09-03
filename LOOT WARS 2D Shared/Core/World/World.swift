@@ -747,7 +747,12 @@ final class World {
 
     // MARK: - Gas
 
-    private(set) var gasClouds: [GasCloudID: GasCloud] = [:]
+    /// Not private(set), unlike the ground items just above, and the difference is
+    /// which half of the work happens outside this file. Ground items are only ever
+    /// added and removed, so the helpers can own the storage - but a cloud is TICKED
+    /// by GasSystem, which thins it and hands out doses and writes it back, the same
+    /// way ArcadeSystem writes back a machine's payout clock.
+    var gasClouds: [GasCloudID: GasCloud] = [:]
     private var nextGasID = 0
 
     @discardableResult
