@@ -40,8 +40,16 @@ final class ActorRenderer {
     /// four and a half shots a second leaves the gun visibly settling between
     /// rounds rather than sitting permanently shoved back.
     private static let recoilDecay: Double = 6
-    private static let recoilKick: Double = 0.16      // tiles, back along the barrel
-    private static let recoilLift: Double = 0.30      // radians, muzzle rising
+    private static let recoilKick: Double = 0.10      // tiles, back along the barrel
+    private static let recoilLift: Double = 0.17      // radians, muzzle rising
+
+    /// Both dialled back by about a third from the first version. The timing was
+    /// right and the amplitude was not: at 0.16 and 17 degrees a held trigger read
+    /// as the figure struggling with the weapon rather than firing it, and on a
+    /// blaster drawn about a tile long, a kick you can measure is a kick that is
+    /// too big. What the eye needs is that SOMETHING moved on every shot, which
+    /// three and a half points of travel and ten degrees of lift deliver without
+    /// the gun appearing to fight back.
     private static let walkBob: Double = 0.075      // tiles
     private static let walkLean: Double = 0.045     // radians
 
@@ -364,8 +372,8 @@ final class ActorRenderer {
 
         // Driven by the same number as the kick, so the flash cannot outlive the
         // shot that made it.
-        muzzle.alpha = CGFloat(recoil * 0.9)
-        muzzle.setScale(CGFloat(0.7 + recoil * 0.5))
+        muzzle.alpha = CGFloat(recoil * 0.75)
+        muzzle.setScale(CGFloat(0.62 + recoil * 0.38))
     }
 
     /// Took a hit: a flinch, and a moment of shadow.
