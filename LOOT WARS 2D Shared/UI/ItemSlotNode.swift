@@ -45,6 +45,16 @@ final class ItemSlotNode: SKNode {
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
+    /// What the shop would pay for this, shown only while the shop is open.
+    ///
+    /// On the slot rather than on a shelf, because these are YOUR things: the row
+    /// you already read to know what you are carrying becomes the row you sell
+    /// from, and there is nothing new to find. Opposite corner from the count, so
+    /// a stack of three bandages worth one token each says both without either
+    /// number sitting on the other.
+    private let priceTag = SKNode()
+    private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
+
     /// Local origin is the centre of the slot.
     init(side: CGFloat) {
         self.side = side
@@ -90,6 +100,36 @@ final class ItemSlotNode: SKNode {
         count.verticalAlignmentMode = .center
         count.zPosition = 1
         badge.addChild(count)
+
+        priceTag.position = CGPoint(x: side / 2 - inset - radius * 0.2,
+                                    y: -side / 2 + inset)
+        priceTag.zPosition = 2
+        priceTag.isHidden = true
+        addChild(priceTag)
+
+        let pill = SKShapeNode(path: CGPath(
+            roundedRect: CGRect(x: -radius * 1.9, y: -radius,
+                                width: radius * 3.8, height: radius * 2),
+            cornerWidth: radius, cornerHeight: radius, transform: nil))
+        pill.fillColor = RenderPalette.hudPanel
+        pill.strokeColor = .black
+        pill.lineWidth = side * 0.03
+        priceTag.addChild(pill)
+
+        let token = SKSpriteNode(texture: ItemArt.texture(for: .token(1)))
+        token.size = ItemArt.size(of: ItemArt.texture(for: .token(1)),
+                                  fittingInto: radius * 1.5)
+        token.position = CGPoint(x: -radius * 0.85, y: 0)
+        token.zPosition = 1
+        priceTag.addChild(token)
+
+        price.fontSize = radius * 1.15
+        price.fontColor = .white
+        price.horizontalAlignmentMode = .center
+        price.verticalAlignmentMode = .center
+        price.position = CGPoint(x: radius * 0.55, y: 0)
+        price.zPosition = 1
+        priceTag.addChild(price)
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -155,12 +195,24 @@ final class ItemSlotNode: SKNode {
         run(.scale(to: restingScale, duration: 0.12), withKey: "scale")
     }
 
+    /// Shows or hides what the shop would pay for this slot.
+    func setPrice(_ tokens: Int?) {
+        guard let tokens, tokens > 0 else {
+            priceTag.isHidden = true
+            return
+        }
+
+        priceTag.isHidden = false
+        price.text = "\(tokens)"
+    }
+
     /// - Parameter dimmed: the item is there but cannot be used right now. Drawn
     ///   faint rather than hidden, so you can still see what you are carrying.
     func show(_ stack: ItemStack?, dimmed: Bool = false) {
         guard let stack else {
             icon.isHidden = true
             badge.isHidden = true
+            priceTag.isHidden = true
 
             // An empty slot is a hole in the bar, not an item of no value.
             glow.isHidden = true

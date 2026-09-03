@@ -22,18 +22,18 @@ import SpriteKit
 
 final class ShopPanelNode: SKNode {
 
-    /// Bigger cards, and a panel measured to fit on the smallest phone it will
-    /// ever run on. Landscape on an SE is 568 x 320 points: the panel comes out
-    /// 450 x 204, and with the tab strip above and the back button below the whole
-    /// thing stands 286 tall - which leaves about seventeen points of air top and
-    /// bottom. That is the constraint every number here is up against.
-    private static let cardSize = CGSize(width: 200, height: 168)
+    /// Cards, and a panel measured against the smallest phone this runs on with
+    /// the HOTBAR now sharing the screen.
+    ///
+    /// That is the new constraint and it is a tight one. Landscape on an SE is
+    /// 568 x 320, and the bar takes the bottom 82 of it, so the shop has 238 to
+    /// live in. The panel is 186 tall, the tab strip adds 30, and the way out is a
+    /// close button in the panel's own corner rather than a pill hanging 50 points
+    /// underneath it - which is where the missing 50 came from. 216 in 238.
+    private static let cardSize = CGSize(width: 200, height: 150)
     private static let cardGap: CGFloat = 14
     private static let padding: CGFloat = 18
-    /// Narrower since SELL joined them. Four tabs at 108 plus their gaps is 450,
-    /// which with the padding is 486 - and 486 fits on a phone 568 points wide,
-    /// where four at the old 134 would have been 590 and hung off both ends.
-    private static let tabSize = CGSize(width: 108, height: 34)
+    private static let tabSize = CGSize(width: 128, height: 34)
     private static let tabGap: CGFloat = 6
 
     /// The most cards a tab can show in one row, read off the catalogue rather than
@@ -76,20 +76,14 @@ final class ShopPanelNode: SKNode {
     private let panel = SKShapeNode()
     private let back = SKNode()
 
-    /// The SELL tab: your own four slots, with what the shop would give for each.
+    /// The way out, now a round button in the panel's own top-right corner rather
+    /// than a pill hanging underneath it.
     ///
-    /// Slots rather than cards, and that is not just to save room. These are YOUR
-    /// things, and they should look the way your things look everywhere else in the
-    /// game - same square, same rarity glow, same count badge - so the tab reads as
-    /// your bag with prices on it rather than as a shelf that happens to contain
-    /// what you own.
-    private var sellSlots: [ItemSlotNode] = []
-    private var sellPrices: [SKLabelNode] = []
-    private let sellRow = SKNode()
-    private var tabs: [(holder: SKNode, shape: SKShapeNode, label: SKLabelNode)] = []
-    private var cards: [Card] = []
-
-    private static let backSize = CGSize(width: 104, height: 40)
+    /// Moved because the hotbar came back on screen and something had to give up
+    /// fifty points of height - and of everything on this panel, a BACK label is
+    /// the part that was least carrying its weight: tapping anywhere off the panel
+    /// already closes the shop, so this is the second way out, not the only one.
+    private static let backSize = CGSize(width: 38, height: 38)
 
     private(set) var isOpen = false
     private var selectedTab = 0
@@ -117,7 +111,6 @@ final class ShopPanelNode: SKNode {
         addChild(panel)
 
         buildTabs(above: size)
-        buildSellRow()
         for column in 0..<ShopPanelNode.columns {
             cards.append(makeCard(at: column))
         }
@@ -266,52 +259,32 @@ final class ShopPanelNode: SKNode {
                     price: price, pill: pill, token: token, flash: flash, type: nil)
     }
 
-    /// Four slots across the middle of the panel, each with a price under it.
-    private func buildSellRow() {
-        let side: CGFloat = 66
-        let gap: CGFloat = 18
-        let count = CGFloat(Inventory.slotCount)
-        let spread = side * count + gap * (count - 1)
-
-        sellRow.isHidden = true
-        addChild(sellRow)
-
-        for index in 0..<Inventory.slotCount {
-            let slot = ItemSlotNode(side: side)
-            slot.position = CGPoint(x: -spread / 2 + side / 2
-                                    + CGFloat(index) * (side + gap),
-                                    y: 14)
-            sellRow.addChild(slot)
-            sellSlots.append(slot)
-
-            let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
-            price.fontSize = 15
-            price.fontColor = .white
-            price.verticalAlignmentMode = .center
-            price.position = CGPoint(x: slot.position.x, y: -34)
-            sellRow.addChild(price)
-            sellPrices.append(price)
-        }
-    }
-
     private func buildBackButton(below size: CGSize) {
         let box = ShopPanelNode.backSize
-        back.position = CGPoint(x: 0, y: -size.height / 2 - box.height / 2 - 10)
+        back.position = CGPoint(x: size.width / 2 - box.width / 2 - 10,
+                                y: size.height / 2 - box.height / 2 - 10)
 
-        let pill = SKShapeNode(path: CGPath(
-            roundedRect: CGRect(x: -box.width / 2, y: -box.height / 2,
-                                width: box.width, height: box.height),
-            cornerWidth: box.height / 2, cornerHeight: box.height / 2, transform: nil))
-        pill.fillColor = RenderPalette.hudPanel
-        pill.strokeColor = .clear
-        back.addChild(pill)
+        let disc = SKShapeNode(circleOfRadius: box.width / 2)
+        disc.fillColor = SKColor(white: 0, alpha: 0.4)
+        disc.strokeColor = SKColor(white: 1, alpha: 0.3)
+        disc.lineWidth = 1.5
+        back.addChild(disc)
 
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        label.text = "BACK"
-        label.fontSize = 16
-        label.fontColor = .white
-        label.verticalAlignmentMode = .center
-        back.addChild(label)
+        // Two strokes rather than a glyph texture: a cross is four points and a
+        // font would have to be picked for it.
+        let cross = SKShapeNode(path: {
+            let path = CGMutablePath()
+            let arm = box.width * 0.24
+            path.move(to: CGPoint(x: -arm, y: -arm))
+            path.addLine(to: CGPoint(x: arm, y: arm))
+            path.move(to: CGPoint(x: -arm, y: arm))
+            path.addLine(to: CGPoint(x: arm, y: -arm))
+            return path
+        }())
+        cross.strokeColor = .white
+        cross.lineWidth = 3
+        cross.lineCap = .round
+        back.addChild(cross)
 
         addChild(back)
     }
@@ -334,6 +307,9 @@ final class ShopPanelNode: SKNode {
     func isBackButton(atLocalPoint point: CGPoint) -> Bool {
         let box = ShopPanelNode.backSize
         let local = CGPoint(x: point.x - back.position.x, y: point.y - back.position.y)
+
+        // A generous margin round a small target, which is the whole reason a
+        // 38-point button is allowed to be this small: the hit box is 66.
         return abs(local.x) <= box.width / 2 + 14 && abs(local.y) <= box.height / 2 + 14
     }
 
@@ -351,7 +327,6 @@ final class ShopPanelNode: SKNode {
         let tab = ShopPanelNode.tabSize
 
         if abs(point.x) <= size.width / 2, abs(point.y) <= size.height / 2 { return true }
-        if isBackButton(atLocalPoint: point) { return true }
 
         let strip = size.height / 2 - 4
         return abs(point.x) <= size.width / 2
@@ -365,18 +340,6 @@ final class ShopPanelNode: SKNode {
             let local = CGPoint(x: point.x - entry.holder.position.x,
                                 y: point.y - entry.holder.position.y)
             if abs(local.x) <= tab.width / 2 && abs(local.y) <= tab.height / 2 { return index }
-        }
-        return nil
-    }
-
-    /// Which bag slot a tap landed on, on the SELL tab, or nil.
-    func sellSlotIndex(atLocalPoint point: CGPoint) -> Int? {
-        guard !sellRow.isHidden else { return nil }
-
-        for (index, slot) in sellSlots.enumerated() {
-            let local = CGPoint(x: point.x - slot.position.x,
-                                y: point.y - slot.position.y)
-            if abs(local.x) <= 40 && abs(local.y) <= 44 { return index }
         }
         return nil
     }
@@ -469,48 +432,13 @@ final class ShopPanelNode: SKNode {
         // from Core rather than straight out of the config.
         let items = ShopSystem.offers(on: selectedTab, for: player)
 
-        // What the sell tab is offering back, which is the bag rather than a shelf.
-        let selling = ShopSystem.sellOffers(for: player)
-
         // Redraw only when the tab, your purse, your gear or your bag changes - the
-        // things that can alter what this panel should say. The bag goes in by slot
-        // AND by count, because taking one bandage off a stack of three changes
-        // nothing else in this list and still has to redraw the badge.
-        let fingerprint = [selectedTab, player.tokens, items.count, selling.count]
+        // things that can alter what this panel should say.
+        let fingerprint = [selectedTab, player.tokens, items.count]
             + items.map { $0.price }
             + items.map { ShopSystem.isSoldOut($0.type, actor: player, in: world) ? 1 : 0 }
-            + selling.map { $0.slot }
-            + selling.map { $0.stack.count }
-            + selling.map { $0.price }
         guard fingerprint != lastDrawn else { return }
         lastDrawn = fingerprint
-
-        // The sell tab and the shelves are two different drawings of the same
-        // panel, so exactly one of them is ever on screen.
-        let sellingTab: Bool
-        if case .bag = GameConfig.Shop.tabs[selectedTab].stock { sellingTab = true }
-        else { sellingTab = false }
-
-        sellRow.isHidden = !sellingTab
-
-        if sellingTab {
-            for (index, slot) in sellSlots.enumerated() {
-                let offer = selling.first { $0.slot == index }
-                slot.show(offer?.stack)
-                sellPrices[index].text = offer.map { "+\($0.price)" } ?? ""
-                sellPrices[index].fontColor = RenderPalette.countBadge
-            }
-
-            // Written back through the index rather than through a loop variable:
-            // Card is a struct, so `for var card in cards` mutates a copy and the
-            // type would stay set in the array - invisible today, because the
-            // hidden holder also filters it out of hit testing, and exactly the
-            // kind of thing that stops being invisible later.
-            for index in cards.indices {
-                cards[index].holder.isHidden = true
-                cards[index].type = nil
-            }
-        }
 
         for (index, entry) in tabs.enumerated() {
             let active = index == selectedTab
@@ -519,8 +447,6 @@ final class ShopPanelNode: SKNode {
                 : SKColor(white: 0, alpha: 0.34)
             entry.label.alpha = active ? 1 : 0.7
         }
-
-        guard !sellingTab else { return }
 
         for (index, var card) in cards.enumerated() {
             guard index < items.count else {

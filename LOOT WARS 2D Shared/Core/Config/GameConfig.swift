@@ -144,8 +144,6 @@ enum GameConfig {
         enum Stock {
             case shelf([Item])
             case upgrades
-            /// Not stock at all: what YOU are carrying, offered back to the shop.
-            case bag
         }
 
         struct Tab {
@@ -197,8 +195,7 @@ enum GameConfig {
             Tab(name: "BUILDING", stock: .shelf([
                 Item(type: .chest,  price: 14),
                 Item(type: .arcade, price: 24)
-            ])),
-            Tab(name: "SELL", stock: .bag)
+            ]))
         ]
 
         /// The most cards any one tab shows, which is what the panel is sized for.
@@ -211,9 +208,6 @@ enum GameConfig {
                 case .shelf(let items): return items.count
                 // A helmet rung and a blaster rung, and never more than that.
                 case .upgrades: return 2
-                // Drawn as a row of bag slots rather than as cards, so it asks for
-                // no card columns at all - see ShopPanelNode.
-                case .bag: return 0
                 }
             }.max() ?? 1
         }
@@ -253,17 +247,20 @@ enum GameConfig {
 
         /// What the shop pays for something you sell back, as a share of its price.
         ///
-        /// A third. The margin is what stops the shop being a laundry - at anything
-        /// near full price you could buy a bomb, change your mind, sell it back, and
-        /// every price in here would stop meaning anything.
+        /// A fifth, down from a third, and the reason is that a third was an
+        /// income. Selling is the only source of tokens the bots do not have, and
+        /// it is the one that needs no travel, no risk and no decision - just a
+        /// crate opened and a tab tapped. At a third, a match's worth of clearing
+        /// out came to about a quarter of everything else earned put together, in
+        /// a game whose difficulty complaint is that the player has it too easy.
         ///
-        /// It exists because of a specific complaint, which is worth recording: the
-        /// bag is four slots, crates hand out gear whether or not you can use it,
-        /// and the only thing to do with a spare Common once you are wearing an Epic
-        /// was hold an item down and throw it on the grass. Turning it into a token
-        /// or two is not much money - a spare Rare is worth 2 - but it is the
-        /// difference between litter and a small consolation.
-        static let sellShare: Double = 0.33
+        /// At a fifth a spare Rare pays 1, a spare Epic 2 and a Legendary 4, which
+        /// is what this was always meant to be: not money, but the difference
+        /// between litter and a small consolation. The margin also stops the shop
+        /// being a laundry - at anything near full price you could buy a bomb,
+        /// think better of it, sell it back, and every price in here would stop
+        /// meaning anything.
+        static let sellShare: Double = 0.20
 
         /// What it costs to step UP to each tier.
         ///

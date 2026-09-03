@@ -27,6 +27,17 @@ final class HotbarNode: SKNode {
         return CGSize(width: count * slotSize + (count - 1) * gap, height: slotSize)
     }
 
+    /// While the shop is open the bar stops being what you carry and becomes what
+    /// you can sell: every slot wears the shop's offer for it, and a tap sells
+    /// rather than selects.
+    ///
+    /// The bar itself rather than a tab inside the shop, which is what this
+    /// replaced. A tab meant a fourth heading, a second row of slots drawn to look
+    /// like the first, and a panel that had run out of width to hold them. The bar
+    /// is already on screen, already shows exactly these four things, and the
+    /// player already knows what it is.
+    private(set) var selling = false
+
     private var slots: [ItemSlotNode] = []
     private var heldSlot: Int?
     private var lastInventory: Inventory?
@@ -89,6 +100,13 @@ final class HotbarNode: SKNode {
         }
     }
 
+    /// Turns the bar into a sell counter, or back into a bar.
+    func setSelling(_ selling: Bool) {
+        guard selling != self.selling else { return }
+        self.selling = selling
+        lastInventory = nil      // force the prices on or off
+    }
+
     func update(with world: World) {
         guard let player = world.localPlayer else { return }
 
@@ -104,7 +122,16 @@ final class HotbarNode: SKNode {
         lastUsable = usable
 
         for (index, stack) in player.inventory.slots.enumerated() {
-            slots[index].show(stack, dimmed: !usable[index])
+            // Nothing is greyed while selling. A bandage at full health cannot be
+            // USED, which is exactly why you might want to sell it, and a faint
+            // slot would be the screen discouraging the one action it is offering.
+            slots[index].show(stack, dimmed: selling ? false : !usable[index])
+
+            if selling, let stack {
+                slots[index].setPrice(ShopSystem.sellPrice(of: stack.type))
+            } else {
+                slots[index].setPrice(nil)
+            }
         }
     }
 }

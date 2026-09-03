@@ -418,6 +418,14 @@ final class GameScene: SKScene {
         let hotbarTop = hotbar.position.y + HotbarNode.size.height / 2
         chestPanel.position = CGPoint(x: 0, y: (hudBottom + hotbarTop) / 2)
 
+        // Sat directly on top of the hotbar rather than centred on the screen,
+        // because the bar is part of the shop now - it is the sell counter. On the
+        // smallest phone this leaves the panel 238 points to live in and it takes
+        // 216 of them, which is why the way out is a corner button rather than a
+        // pill hanging underneath.
+        shopPanel.position = CGPoint(
+            x: 0, y: hotbarTop + 12 + ShopPanelNode.panelSize.height / 2)
+
         // Hung under the health panel, left edges flush with it. It is a reading
         // of your purse as much as an offer, so it belongs with the other numbers
         // about you rather than out among the controls - and the top-left corner is
@@ -510,7 +518,8 @@ final class GameScene: SKScene {
            world.localPlayer?.inventory.stack(at: slot) == nil {
             selectedSlot = nil
         }
-        hotbar.setSelected(selectedSlot)
+        hotbar.setSelected(shopPanel.isOpen ? nil : selectedSlot)
+        hotbar.setSelling(shopPanel.isOpen)
 
         updateRightControl(with: world)
         updateItemButton(with: world)
@@ -691,7 +700,12 @@ final class GameScene: SKScene {
             aimStick.end()
             openButton.isHidden = true
             shopButton.isHidden = shopPanel.isOpen
-            hotbar.isHidden = shopPanel.isOpen
+
+            // The bar stays up for BOTH panels now, and means something different
+            // under each: with a chest open it is what you can store, with the shop
+            // open it is what you can sell. In each case it is the row you already
+            // read to know what you are carrying.
+            hotbar.isHidden = false
             return
         }
 
@@ -1137,6 +1151,15 @@ extension GameScene {
     /// card out from that same answer, so it never asks for something that will be
     /// refused, and could not charge you if it did.
     private func handleShopTouch(_ touch: UITouch) {
+        // The bar first, because it is off the panel and would otherwise be read as
+        // a tap outside and close the shop. With the shop open a tap on your own
+        // slot sells what is in it - see HotbarNode.selling for why the bar is the
+        // sell counter rather than a fourth tab inside the panel.
+        if let slot = hotbar.slotIndex(atLocalPoint: touch.location(in: hotbar)) {
+            queuedCommands.append(.sellItem(slot: slot))
+            return
+        }
+
         let point = touch.location(in: shopPanel)
 
         // Anywhere off the panel shuts it, the same way tapping off a menu does
@@ -1154,13 +1177,6 @@ extension GameScene {
 
         if let tab = shopPanel.tabIndex(atLocalPoint: point) {
             shopPanel.selectTab(tab)
-            return
-        }
-
-        // Your own bag, on the SELL tab. Checked before the shelf, since the two
-        // never share a screen and the sell row sits where the cards would be.
-        if let slot = shopPanel.sellSlotIndex(atLocalPoint: point) {
-            queuedCommands.append(.sellItem(slot: slot))
             return
         }
 

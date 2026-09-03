@@ -70,10 +70,6 @@ enum ShopSystem {
         case .shelf(let items):
             return items
 
-        // Nothing is for sale on the sell tab. What it shows comes from the bag -
-        // see sellOffers - and the panel asks for that separately.
-        case .bag:
-            return []
 
         case .upgrades:
             var offers: [GameConfig.Shop.Item] = []
