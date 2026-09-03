@@ -93,44 +93,67 @@ enum ShopSystem {
     /// Whether this actor could buy this right now. The purchase itself asks this,
     /// and so does the tap, so nothing is ever charged for something it cannot have.
     static func canBuy(_ type: ItemType, actor: Actor, in world: World) -> Bool {
-        // Room in the bag is the only part the shop does not SHOW - see
-        // looksBuyable, which is everything below this line.
-        looksBuyable(type, actor: actor, in: world) && actor.canAcquire(type)
+        guard actor.isAlive, let price = price(of: type) else { return false }
+        guard actor.tokens >= price, actor.canAcquire(type) else { return false }
+        return !isSoldOut(type, actor: actor, in: world)
     }
 
-    /// What the shop draws as available.
+    /// The one refusal the SHOP itself makes, as opposed to the ones you make.
     ///
-    /// Everything canBuy asks except whether the bag has room, and the split is
-    /// deliberate. A greyed card should mean something about the SHOP - you cannot
-    /// afford it, or you already have the one machine you are allowed - and those
-    /// stay true while you look at them. A full bag is neither: it is a thing about
-    /// you, it changes the moment you use a bandage, and greying half the shelf out
-    /// for it made the shop look shut.
+    /// This is the only thing that greys a card out, and the list is deliberately
+    /// one item long. Everything else that can stop a purchase - the price, a bag
+    /// with no room in it - is a fact about YOU, changes minute to minute, and
+    /// greying the shelf out for it had the shop looking permanently shut. A
+    /// machine you already own is different in kind: the shop will not sell you a
+    /// second one however rich you get, and saying so on the card is the only way
+    /// you would ever know.
     ///
-    /// This does cost the old guarantee that a card drawn bright is a card the
-    /// simulation will sell. The tap pays for that instead: it asks canBuy, and a
-    /// refusal shakes the card rather than silently doing nothing.
-    static func looksBuyable(_ type: ItemType, actor: Actor, in world: World) -> Bool {
-        guard actor.isAlive, let price = price(of: type) else { return false }
-        guard actor.tokens >= price else { return false }
+    /// The tap covers the rest. It asks canBuy, and a refusal shakes the card
+    /// rather than the command quietly going nowhere.
+    static func isSoldOut(_ type: ItemType, actor: Actor, in world: World) -> Bool {
+        guard type == .arcade else { return false }
 
-        // One machine to a base, and the shop will not sell you a second you could
-        // never put down - counting the one in your bag as well as the one already
-        // standing, or you could buy a spare and be twenty-four tokens out of pocket
-        // for a thing with nowhere to go.
-        if type == .arcade {
-            guard !world.hasArcade(actor.team),
-                  actor.inventory.firstSlot(holding: .arcade) == nil else { return false }
+        // One machine to a base, counting the one in your bag as well as the one
+        // already standing, or you could buy a spare and be twenty-four tokens out
+        // of pocket for a thing with nowhere to go.
+        if world.hasArcade(actor.team) { return true }
+        if actor.inventory.firstSlot(holding: .arcade) != nil { return true }
 
-            // And not one your walls have no room for. A machine needs a clear
-            // 2 x 3 inside the base, and about one base in seven is a small enough
-            // rectangle that a chest already leaves it without one. Refusing the
-            // sale is the only honest answer: the alternative is taking
-            // twenty-four tokens for something the map will never let you stand up.
-            return world.nextArcadeOrigin(for: actor.team, near: actor.position) != nil
+        // And not one your walls have no room for. A machine needs a clear 2 x 3
+        // inside the base, and about one base in seven is a small enough rectangle
+        // that a chest already leaves it without one.
+        return world.nextArcadeOrigin(for: actor.team, near: actor.position) == nil
+    }
+
+    /// The one thing worth offering out of the blue, or nil.
+    ///
+    /// What the quick-buy prompt shows, and it is deliberately ONE thing: a prompt
+    /// that appears unasked has to be answerable at a glance, and three choices is
+    /// a shop, which is what the shop is for.
+    ///
+    /// Patching up comes first when you are hurt, because a bandage you can afford
+    /// while bleeding is worth more than a rung you could climb later. Otherwise it
+    /// is the cheaper of the two gear offers - the same rule the bots buy on, so
+    /// the prompt is never suggesting something a bot would consider a mistake.
+    static func quickOffer(for actor: Actor, in world: World) -> GameConfig.Shop.Item? {
+        guard actor.isAlive else { return nil }
+
+        if actor.health < actor.maxHealth {
+            let healing = GameConfig.Shop.tabs
+                .flatMap { tab -> [GameConfig.Shop.Item] in
+                    if case .shelf(let items) = tab.stock { return items }
+                    return []
+                }
+                .filter { $0.type.isHealing && canBuy($0.type, actor: actor, in: world) }
+
+            // The biggest one affordable, not the cheapest: this fires when you are
+            // already hurt, and it is offering to fix that.
+            if let best = healing.max(by: { $0.price < $1.price }) { return best }
         }
 
-        return true
+        return upgradeOffers(for: actor)
+            .filter { canBuy($0.type, actor: actor, in: world) }
+            .min { $0.price < $1.price }
     }
 
     private static func buy(_ type: ItemType, by id: ActorID, in world: World) {

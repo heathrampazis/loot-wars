@@ -122,6 +122,23 @@ final class ActionButtonNode: SKNode {
         return true
     }
 
+    /// A small wave, for a button nobody has pressed.
+    ///
+    /// Rotation and scale only, never position: the scene's layout owns where a
+    /// button sits, and an interrupted move would leave it parked somewhere the
+    /// layout would not put it back from until the next size change.
+    func nudge() {
+        removeAction(forKey: "nudge")
+        zRotation = 0
+        setScale(1)
+
+        run(.sequence([
+            .group([.scale(to: 1.14, duration: 0.11), .rotate(toAngle: -0.10, duration: 0.11)]),
+            .rotate(toAngle: 0.10, duration: 0.14),
+            .group([.scale(to: 1.0, duration: 0.12), .rotate(toAngle: 0, duration: 0.12)])
+        ]), withKey: "nudge")
+    }
+
     func end() {
         isPressed = false
         setScale(1.0)

@@ -164,18 +164,46 @@ enum GameConfig {
         /// cheap, not that the climb was - and the climb is where the best kit in
         /// the game comes from, so making it steeper would work against the very
         /// thing the late game is supposed to show off.
+        /// GEAR first, because it is the tab you came for: the ladder is the only
+        /// thing in here you cannot find lying on the map, and it is what the
+        /// tokens are ultimately for.
+        ///
+        /// No bombs. A bomb was the odd one out on a shelf otherwise made of things
+        /// you keep - and being both cheap and the way into somebody's base, it
+        /// turned the shop into a raid vending machine. Bombs come out of crates
+        /// and chests, where finding one is a reason to go and use it.
         static let tabs: [Tab] = [
+            Tab(name: "GEAR", stock: .upgrades),
             Tab(name: "HEALING", stock: .shelf([
                 Item(type: .bandage, price: 6),
                 Item(type: .medkit,  price: 15)
             ])),
             Tab(name: "BUILDING", stock: .shelf([
-                Item(type: .bomb,   price: 11),
                 Item(type: .chest,  price: 14),
                 Item(type: .arcade, price: 24)
-            ])),
-            Tab(name: "GEAR", stock: .upgrades)
+            ]))
         ]
+
+        /// The most cards any one tab shows, which is what the panel is sized for.
+        ///
+        /// Read off the catalogue rather than written down, so adding a third thing
+        /// to a tab widens the shop instead of quietly hiding it.
+        static var widestTab: Int {
+            tabs.map { tab in
+                switch tab.stock {
+                case .shelf(let items): return items.count
+                // A helmet rung and a blaster rung, and never more than that.
+                case .upgrades: return 2
+                }
+            }.max() ?? 1
+        }
+
+        /// How long the quick-buy prompt stays up before getting out of the way.
+        static let quickBuySeconds: Double = 6
+
+        /// How often the shop button nudges itself while you can afford something
+        /// and have not been in. Long enough not to nag.
+        static let nudgeInterval: Double = 14
 
         /// What it costs to step UP to each tier.
         ///

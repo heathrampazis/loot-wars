@@ -46,6 +46,27 @@ enum ItemArt {
         return CGSize(width: art.width * scale, height: art.height * scale)
     }
 
+    /// What to call it on screen.
+    ///
+    /// Here rather than on the panels because there are two of them now - the shop
+    /// and the quick-buy prompt - and a second copy of this switch is a second
+    /// place to forget an item when one is added.
+    ///
+    /// Gear is named by the TIER rather than by the slot: on the gear tab the tier
+    /// is the whole offer, and "Helmet" twice would say nothing about which rung
+    /// you are being sold.
+    static func name(for type: ItemType) -> String {
+        switch type {
+        case .bandage: return "Bandage"
+        case .medkit:  return "Medkit"
+        case .bomb:    return "Bomb"
+        case .chest:   return "Chest"
+        case .arcade:  return "Arcade"
+        case .helmet(let tier):  return tier.name
+        case .blaster(let tier): return "Blaster \(tier.rawValue)"
+        }
+    }
+
     private static func assetName(for pickup: Pickup) -> String {
         switch pickup {
         case .item(.bandage):    return "Bandage"

@@ -10,35 +10,46 @@
 //  today that means one tab, because a BUILDING tab with nothing behind it would be
 //  a promise the shop cannot keep.
 //
-//  A card greys out when the SHOP is the obstacle - you cannot afford it, or you
-//  already have the one machine you are allowed - and that answer comes from
-//  ShopSystem.looksBuyable. A bag with no room in it greys nothing: it is a fact
-//  about you rather than about the shelf, it stops being true the moment you use a
-//  bandage, and it had the healing tab looking permanently shut. The tap asks the
-//  stricter question and shakes the card when the answer is no.
+//  Exactly one thing greys a card out: a machine you already own, which the shop
+//  will not sell you a second of however rich you get. Nothing else does - not the
+//  price, not a full bag - because those are facts about YOU, they change minute to
+//  minute, and greying the shelf out for them had the shop looking permanently
+//  shut. The tap carries the rest: it asks ShopSystem.canBuy and shakes the card
+//  when the answer is no. See ShopSystem.isSoldOut.
 //
 
 import SpriteKit
 
 final class ShopPanelNode: SKNode {
 
-    private static let cardSize = CGSize(width: 140, height: 152)
+    /// Bigger cards, and a panel measured to fit on the smallest phone it will
+    /// ever run on. Landscape on an SE is 568 x 320 points: the panel comes out
+    /// 450 x 204, and with the tab strip above and the back button below the whole
+    /// thing stands 286 tall - which leaves about seventeen points of air top and
+    /// bottom. That is the constraint every number here is up against.
+    private static let cardSize = CGSize(width: 200, height: 168)
     private static let cardGap: CGFloat = 14
-    private static let padding: CGFloat = 16
-    private static let tabSize = CGSize(width: 118, height: 32)
+    private static let padding: CGFloat = 18
+    private static let tabSize = CGSize(width: 134, height: 34)
     private static let tabGap: CGFloat = 6
 
-    /// The most cards a tab can show in one row.
-    ///
-    /// Three, since BUILDING sells a bomb, a chest and a machine. The panel is
-    /// always sized for three and the cards it does have are CENTRED in it, so the
-    /// two-card tabs do not sit lopsided against the left edge of a wider panel.
-    private static let columns = 3
+    /// The most cards a tab can show in one row, read off the catalogue rather than
+    /// written down here - so a third thing added to a tab widens the shop instead
+    /// of quietly not being drawn. Cards are CENTRED as a group, so a tab with
+    /// fewer than the maximum does not sit lopsided against the left edge.
+    private static var columns: Int { GameConfig.Shop.widestTab }
 
+    /// Wide enough for the cards OR the row of tabs, whichever needs more. The tabs
+    /// sit on top of the panel and would hang off the end of a panel sized only for
+    /// two cards - which is exactly what happened when the bomb came off the
+    /// building shelf and the widest tab went from three items to two.
     static var panelSize: CGSize {
-        CGSize(width: padding * 2 + cardSize.width * CGFloat(columns)
-                      + cardGap * CGFloat(columns - 1),
-               height: padding * 2 + cardSize.height)
+        let cards = cardSize.width * CGFloat(columns) + cardGap * CGFloat(columns - 1)
+        let tabs = tabSize.width * CGFloat(GameConfig.Shop.tabs.count)
+                 + tabGap * CGFloat(GameConfig.Shop.tabs.count - 1)
+
+        return CGSize(width: padding * 2 + max(cards, tabs),
+                      height: padding * 2 + cardSize.height)
     }
 
     private struct Card {
@@ -184,11 +195,10 @@ final class ShopPanelNode: SKNode {
         holder.addChild(name)
 
         let tile = SKShapeNode(path: CGPath(
-            roundedRect: CGRect(x: -27, y: -27, width: 54, height: 54),
-            cornerWidth: 12, cornerHeight: 12, transform: nil))
+            roundedRect: CGRect(x: -32, y: -32, width: 64, height: 64),
+            cornerWidth: 14, cornerHeight: 14, transform: nil))
         tile.fillColor = SKColor(white: 1, alpha: 0.14)
-        tile.strokeColor = .black
-        tile.lineWidth = 3
+        tile.strokeColor = .clear
         tile.position = CGPoint(x: 0, y: 8)
         holder.addChild(tile)
 
@@ -231,7 +241,7 @@ final class ShopPanelNode: SKNode {
 
     private func buildBackButton(below size: CGSize) {
         let box = ShopPanelNode.backSize
-        back.position = CGPoint(x: 0, y: -size.height / 2 - box.height / 2 - 12)
+        back.position = CGPoint(x: 0, y: -size.height / 2 - box.height / 2 - 10)
 
         let pill = SKShapeNode(path: CGPath(
             roundedRect: CGRect(x: -box.width / 2, y: -box.height / 2,
@@ -270,6 +280,27 @@ final class ShopPanelNode: SKNode {
         let box = ShopPanelNode.backSize
         let local = CGPoint(x: point.x - back.position.x, y: point.y - back.position.y)
         return abs(local.x) <= box.width / 2 + 14 && abs(local.y) <= box.height / 2 + 14
+    }
+
+    /// Whether a point in this node's own space is on the shop at all.
+    ///
+    /// Everything the panel owns: the card area, the strip of tabs sitting on top
+    /// of it and the back button hanging below. A tap anywhere else is a tap
+    /// outside, and closes the shop.
+    ///
+    /// The tab STRIP rather than the tabs themselves, deliberately. The six points
+    /// of gap between two tabs is somewhere a thumb lands often, and a gap that
+    /// shut the whole shop would feel like the panel had a hole in it.
+    func contains(localPoint point: CGPoint) -> Bool {
+        let size = ShopPanelNode.panelSize
+        let tab = ShopPanelNode.tabSize
+
+        if abs(point.x) <= size.width / 2, abs(point.y) <= size.height / 2 { return true }
+        if isBackButton(atLocalPoint: point) { return true }
+
+        let strip = size.height / 2 - 4
+        return abs(point.x) <= size.width / 2
+            && point.y >= strip && point.y <= strip + tab.height
     }
 
     func tabIndex(atLocalPoint point: CGPoint) -> Int? {
@@ -375,7 +406,7 @@ final class ShopPanelNode: SKNode {
         // things that can alter what this panel should say.
         let fingerprint = [selectedTab, player.tokens, items.count]
             + items.map { $0.price }
-            + items.map { ShopSystem.looksBuyable($0.type, actor: player, in: world) ? 1 : 0 }
+            + items.map { ShopSystem.isSoldOut($0.type, actor: player, in: world) ? 1 : 0 }
         guard fingerprint != lastDrawn else { return }
         lastDrawn = fingerprint
 
@@ -401,34 +432,18 @@ final class ShopPanelNode: SKNode {
             card.holder.position = CGPoint(
                 x: ShopPanelNode.centreX(of: index, outOf: items.count), y: 0)
             card.type = item.type
-            card.name.text = ShopPanelNode.name(of: item.type)
+            card.name.text = ItemArt.name(for: item.type)
             card.icon.texture = texture
-            card.icon.size = ItemArt.size(of: texture, fittingInto: 40)
+            card.icon.size = ItemArt.size(of: texture, fittingInto: 48)
             card.price.text = "\(item.price)"
 
-            // Faint when the SHOP is the obstacle - the price, or the one machine
-            // you are allowed. A bag with no room in it does not grey anything out
-            // any more; see ShopSystem.looksBuyable for why those are different
-            // kinds of no.
-            let available = ShopSystem.looksBuyable(item.type, actor: player, in: world)
-            card.holder.alpha = available ? 1.0 : 0.45
+            // Faint only for the one machine you already own. Nothing else greys -
+            // see ShopSystem.isSoldOut for why the price and a full bag are a
+            // different kind of no, and belong to the tap rather than the card.
+            let soldOut = ShopSystem.isSoldOut(item.type, actor: player, in: world)
+            card.holder.alpha = soldOut ? 0.45 : 1.0
 
             cards[index] = card
-        }
-    }
-
-    private static func name(of type: ItemType) -> String {
-        switch type {
-        case .bandage: return "Bandage"
-        case .medkit:  return "Medkit"
-        case .bomb:    return "Bomb"
-        case .chest:   return "Chest"
-        case .arcade:  return "Arcade"
-        // Named by the TIER rather than by the slot, because on the gear tab the
-        // tier is the whole offer - "Helmet" twice would say nothing about which
-        // rung you are being sold.
-        case .helmet(let tier):  return tier.name
-        case .blaster(let tier): return "Blaster \(tier.rawValue)"
         }
     }
 }

@@ -93,17 +93,24 @@ final class GameScene: SKScene {
     /// the only gap that is clear on every size. Under the HUD, which was the
     /// obvious spot, it lands inside the move stick's grab radius on anything
     /// smaller than a Pro Max.
-    private static let shopButtonRadius: CGFloat = 26
+    private static let shopButtonRadius: CGFloat = 34
 
     private let shopButton = ActionButtonNode(glyph: Glyphs.shoppingBag,
-                                              radius: shopButtonRadius, grabRadius: 34,
+                                              radius: shopButtonRadius, grabRadius: 42,
                                               shape: .roundedSquare,
                                               fill: RenderPalette.hudPanel,
-                                              // 0.73 of the plate. The reference
-                                              // draws it at 0.6, which left more air
-                                              // round it than the button wanted.
-                                              glyphSize: 38)
+                                              // 0.73 of the plate, kept as the
+                                              // button grew. The reference draws it
+                                              // at 0.6, which left more air round it
+                                              // than the button wanted.
+                                              glyphSize: 50)
     private let shopPanel = ShopPanelNode()
+
+    /// One offer, unprompted, for a few seconds - see QuickBuyNode.
+    private let quickBuy = QuickBuyNode()
+
+    /// When the shop button next waves at somebody who has not been in.
+    private var nextNudge: TimeInterval = 0
     private let results = ResultsNode()
     private let hotbar = HotbarNode()
     private let chestPanel = ChestPanelNode()
@@ -251,6 +258,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(matchTimer)
         cameraController.node.addChild(shopButton)
         cameraController.node.addChild(shopPanel)
+        cameraController.node.addChild(quickBuy)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -376,6 +384,13 @@ final class GameScene: SKScene {
         let hudBottom = hud.position.y - HUDNode.size.height
         let hotbarTop = hotbar.position.y + HotbarNode.size.height / 2
         chestPanel.position = CGPoint(x: 0, y: (hudBottom + hotbarTop) / 2)
+
+        // Sat on the hotbar, centred, where a thumb already is. It lands inside the
+        // move stick's grab circle on a small phone, which is why touchesBegan
+        // offers it BEFORE the stick - the same trade the item button makes, and
+        // for the same reason: a small target that is only up for six seconds
+        // beats a large forgiving one that is always there.
+        quickBuy.position = CGPoint(x: 0, y: hotbarTop + 14 + QuickBuyNode.size.height / 2)
     }
 
     // MARK: - Loop
@@ -455,9 +470,36 @@ final class GameScene: SKScene {
         updateRightControl(with: world)
         updateItemButton(with: world)
         updatePlacementGhost(with: world)
+        updateQuickBuy(with: world)
         reportPurchases(from: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
+        }
+    }
+
+    /// Offers the one thing worth offering, and waves at the shop button.
+    ///
+    /// Both hang off the same question - ShopSystem.quickOffer - so the prompt and
+    /// the nudge can never disagree about whether there is anything to buy. The
+    /// prompt appears on a CHANGE and goes by itself; the button waves on a timer,
+    /// and only while the shop is shut and something is affordable, so neither is
+    /// on screen often enough to become wallpaper.
+    private func updateQuickBuy(with world: World) {
+        guard !world.isOver,
+              !shopPanel.isOpen,
+              chestPanel.openChest == nil,
+              let player = world.localPlayer else {
+            quickBuy.dismiss()
+            return
+        }
+
+        let offer = ShopSystem.quickOffer(for: player, in: world)
+        quickBuy.update(with: offer)
+
+        guard offer != nil else { return }
+        if lastUpdateTime >= nextNudge {
+            nextNudge = lastUpdateTime + GameConfig.Shop.nudgeInterval
+            shopButton.nudge()
         }
     }
 
@@ -696,6 +738,21 @@ extension GameScene {
         }
 
         for touch in touches {
+            // BEFORE the move stick, which otherwise swallows it: the prompt sits
+            // on the hotbar, and on a small phone that is inside the stick's grab
+            // circle. Same trade the item button makes against the aim stick - a
+            // small target that is only there for a few seconds beats a large
+            // forgiving one that is always there, and the stick loses nothing.
+            if quickBuy.isPressed(atLocalPoint: touch.location(in: quickBuy)),
+               let type = quickBuy.offer {
+                if let player = world.localPlayer,
+                   ShopSystem.canBuy(type, actor: player, in: world) {
+                    queuedCommands.append(.buyItem(type))
+                }
+                quickBuy.take()
+                continue
+            }
+
             // Order matters. The two sticks get first refusal, then the hotbar and
             // the contextual button, and only what is left over counts as a tap on
             // the map - otherwise healing or opening would also try to lay a block.
@@ -972,6 +1029,14 @@ extension GameScene {
     /// refused, and could not charge you if it did.
     private func handleShopTouch(_ touch: UITouch) {
         let point = touch.location(in: shopPanel)
+
+        // Anywhere off the panel shuts it, the same way tapping off a menu does
+        // everywhere else. The BACK button stays - it is the obvious way out, and
+        // the one somebody looks for before they think to try the background.
+        guard shopPanel.contains(localPoint: point) else {
+            shopPanel.close()
+            return
+        }
 
         if shopPanel.isBackButton(atLocalPoint: point) {
             shopPanel.close()
