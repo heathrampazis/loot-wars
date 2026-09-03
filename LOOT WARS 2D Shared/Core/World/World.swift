@@ -90,6 +90,10 @@ final class World {
     /// An opened crate, waiting to come back in the same spot.
     private struct PendingLootbox {
         let tile: GridPoint
+        /// A rare crate comes back rare. The spot is what was rare, not the box -
+        /// otherwise the good crates would quietly disappear over a match as each
+        /// one was opened and replaced with an ordinary one.
+        let rare: Bool
         var timer: Double
     }
 
@@ -272,6 +276,7 @@ final class World {
         // Crates come back. Without that, seven bots strip the map bare within a
         // minute and there is nothing left to play around.
         pendingLootboxes.append(PendingLootbox(tile: crate.tile,
+                                               rare: crate.rare,
                                                timer: GameConfig.Loot.respawnDelay))
     }
 
@@ -290,7 +295,9 @@ final class World {
 
             // Crates are solid, so one appearing under somebody would shove them
             // out of the way. Wait for them to move on instead.
-            let crate = Lootbox(id: LootboxID(nextLootboxID), tile: pending.tile)
+            let crate = Lootbox(id: LootboxID(nextLootboxID),
+                                tile: pending.tile,
+                                rare: pending.rare)
             if actors.values.contains(where: { $0.isAlive && $0.hitbox.intersects(crate.hitbox) }) {
                 pending.timer = 1
                 stillWaiting.append(pending)
@@ -675,6 +682,34 @@ final class World {
                                      pickup: pickup,
                                      position: position,
                                      timeRemaining: lifetime ?? pickup.groundLifetime)
+    }
+
+    /// Flings a drop clear of a point.
+    ///
+    /// Lives here rather than in a system because two of them want it - a kill
+    /// scattering gear, and a rare crate paying out twice - and because it draws
+    /// from the world's generator, which means the alternative was two copies both
+    /// consuming randomness and neither knowing about the other.
+    ///
+    /// Without it, two things dropped at once land on precisely the same point and
+    /// only the top one is visible; the second looks like it was never dropped.
+    func scatteredSpot(near position: Vec2) -> Vec2 {
+        // Bounds hoisted out rather than written inline: a range operator wrapped
+        // onto a new line parses as the PREFIX form (...x) instead of the infix
+        // one, and the error it produces points nowhere near the cause.
+        let nearest = GameConfig.Drops.scatterRadius * 0.4
+        let furthest = GameConfig.Drops.scatterRadius
+
+        for _ in 0..<GameConfig.Drops.scatterAttempts {
+            let angle = Double.random(in: 0..<(2 * Double.pi), using: &rng)
+            let distance = Double.random(in: nearest...furthest, using: &rng)
+
+            let spot = position + Vec2.fromAngle(angle) * distance
+            if isClearForDrop(spot) { return spot }
+        }
+
+        // Hemmed in on every side: better stacked than stuck in a wall.
+        return position
     }
 
     func removeGroundItem(_ id: GroundItemID) {

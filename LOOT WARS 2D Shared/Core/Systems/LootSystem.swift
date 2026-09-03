@@ -37,12 +37,30 @@ enum LootSystem {
                 guard let box = world.reachableLootbox(for: actor) else { break }
 
                 world.removeLootbox(box.id)
-                world.award(GameConfig.Score.lootboxOpened, to: actor.team)
-                world.awardTokens(GameConfig.Tokens.perLootbox, to: id)
+
+                let rare = box.rare
+                world.award(rare ? GameConfig.Score.rareLootboxOpened
+                                 : GameConfig.Score.lootboxOpened, to: actor.team)
+                world.awardTokens(rare ? GameConfig.Tokens.perRareLootbox
+                                       : GameConfig.Tokens.perLootbox, to: id)
+
+                // Two things out of a rare one, and only the FIRST is upgraded.
+                // Two upgraded rolls would make a rare crate better than a raid,
+                // and raiding somebody's base has to stay the best thing you can
+                // do with a minute. One good item and one ordinary one is a crate
+                // worth crossing the map for and not worth camping.
                 world.spawnGroundItem(LootTable.roll(bombs: world.bombsAllowed,
-                                                    at: world.matchProgress,
-                                                    using: &world.rng),
+                                                     at: world.matchProgress,
+                                                     rare: rare,
+                                                     using: &world.rng),
                                       at: box.position)
+
+                if rare {
+                    world.spawnGroundItem(LootTable.roll(bombs: world.bombsAllowed,
+                                                         at: world.matchProgress,
+                                                         using: &world.rng),
+                                          at: world.scatteredSpot(near: box.position))
+                }
                 break   // one box per tick, however many times it was asked
             }
         }

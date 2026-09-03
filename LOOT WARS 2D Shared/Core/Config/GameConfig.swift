@@ -51,6 +51,11 @@ enum GameConfig {
 
         static let lootboxOpened = 10
 
+        /// A rare crate, which is worth choosing over an ordinary one when both are
+        /// in sight - but not worth a match spent hunting them. The gear inside is
+        /// the actual prize.
+        static let rareLootboxOpened = 25
+
         /// Per wall. Small on purpose: forty of them is a base, not a strategy.
         static let wallPlaced = 2
 
@@ -105,6 +110,9 @@ enum GameConfig {
         /// one source that needs no decision at all - at two a crate it out-earned
         /// both of the others put together.
         static let perLootbox = 1
+
+        /// A rare one is worth going out of your way for, and this is part of why.
+        static let perRareLootbox = 4
     }
 
     /// What tokens buy.
@@ -986,6 +994,14 @@ enum GameConfig {
 
     enum Loot {
         /// Lootboxes scattered across the map.
+        /// Share of crates on the map that are the good ones.
+        ///
+        /// One in six. Few enough that spotting one is an event and that most of
+        /// what you open is ordinary; common enough that there is usually one worth
+        /// walking towards somewhere on your half of the map. Rolled per crate
+        /// rather than counted out, so no two maps hold quite the same number.
+        static let rareShare: Double = 0.17
+
         static let lootboxCount = 42
 
         /// Minimum distance between two lootboxes, in tiles, so they do not cluster.

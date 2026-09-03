@@ -281,7 +281,11 @@ extension MapFactory {
             }
             if tooClose { continue }
 
-            placed.append(Lootbox(id: LootboxID(placed.count), tile: tile))
+            // Rolled per crate rather than counted out, so the map does not always
+            // hold exactly the same number of good ones - and drawn from the
+            // world's own generator, so a seed still replays exactly.
+            let rare = Double.random(in: 0..<1, using: &rng) < GameConfig.Loot.rareShare
+            placed.append(Lootbox(id: LootboxID(placed.count), tile: tile, rare: rare))
         }
 
         return placed

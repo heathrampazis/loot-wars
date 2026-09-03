@@ -119,7 +119,44 @@ enum LootTable {
     ///     else simply becomes correspondingly likelier, which is what should
     ///     happen - a crate still gives you something.
     ///   - progress: how far the match has run, which picks the band above.
-    static func roll(bombs: Bool, at progress: Double, using rng: inout SeededRandom) -> Pickup {
+    /// The good crates.
+    ///
+    /// A rare crate does not roll a different table - it rolls the SAME band and
+    /// then, if what came out was gear, hands you the rung above it. That is the
+    /// whole mechanism, and it is worth doing this way rather than writing three
+    /// more tables: the healing, the bombs and the chests stay exactly as common,
+    /// so the bands keep their balance and a rare crate is unambiguously about the
+    /// gear. It also cannot hand out something the ladder does not have, and it
+    /// tracks the bands automatically as they move through the match - late, when
+    /// the band already offers an Epic, a rare crate is where a Legendary comes
+    /// from, and that is the only place one is ever found.
+    private static func upgraded(_ pickup: Pickup) -> Pickup {
+        switch pickup {
+        case .item(.helmet(let tier)):
+            let next = HelmetTier.allCases.first { $0 > tier } ?? tier
+            return .item(.helmet(next))
+        case .item(.blaster(let tier)):
+            let next = BlasterTier.allCases.first { $0 > tier } ?? tier
+            return .item(.blaster(next))
+        default:
+            // Not gear. A rare crate holding a bandage would be a let-down, so it
+            // pays out a second one instead - see LootSystem, which asks for two
+            // rolls out of a rare crate and gets exactly one upgrade attempt.
+            return pickup
+        }
+    }
+
+    static func roll(bombs: Bool,
+                     at progress: Double,
+                     rare: Bool = false,
+                     using rng: inout SeededRandom) -> Pickup {
+        let rolled = plain(bombs: bombs, at: progress, using: &rng)
+        return rare ? upgraded(rolled) : rolled
+    }
+
+    private static func plain(bombs: Bool,
+                              at progress: Double,
+                              using rng: inout SeededRandom) -> Pickup {
         let table = table(at: progress)
         let rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
 

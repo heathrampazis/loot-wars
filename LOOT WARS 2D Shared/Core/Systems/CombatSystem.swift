@@ -219,30 +219,7 @@ enum CombatSystem {
 
     private static func drop(_ pickup: Pickup, chance: Double, at position: Vec2, in world: World) {
         guard chance > 0, Double.random(in: 0..<1, using: &world.rng) < chance else { return }
-        world.spawnGroundItem(pickup, at: scatteredSpot(near: position, in: world))
+        world.spawnGroundItem(pickup, at: world.scatteredSpot(near: position))
     }
 
-    /// Flings a drop clear of where its owner fell.
-    ///
-    /// Without this a helmet and a blaster from the same kill land on precisely the
-    /// same point and only the top one is visible - the second looks like it was
-    /// never dropped at all.
-    private static func scatteredSpot(near position: Vec2, in world: World) -> Vec2 {
-        // Bounds hoisted out rather than written inline: a range operator wrapped
-        // onto a new line parses as the PREFIX form (...x) instead of the infix
-        // one, and the error it produces points nowhere near the cause.
-        let nearest = GameConfig.Drops.scatterRadius * 0.4
-        let furthest = GameConfig.Drops.scatterRadius
-
-        for _ in 0..<GameConfig.Drops.scatterAttempts {
-            let angle = Double.random(in: 0..<(2 * Double.pi), using: &world.rng)
-            let distance = Double.random(in: nearest...furthest, using: &world.rng)
-
-            let spot = position + Vec2.fromAngle(angle) * distance
-            if world.isClearForDrop(spot) { return spot }
-        }
-
-        // Hemmed in on every side: better stacked than stuck in a wall.
-        return position
-    }
 }
