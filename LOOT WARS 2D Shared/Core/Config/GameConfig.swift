@@ -1299,12 +1299,16 @@ enum GameConfig {
 
         /// A golden token, and how often one comes out instead of an ordinary one.
         ///
-        /// Ten tokens is most of a rung of the ladder from a single pickup, which
-        /// is why it is one payout in fifteen rather than one in three: the point
-        /// is the moment you see it lying there and change your route, and a
-        /// windfall that arrives on schedule is just a bigger number on the counter.
+        /// Ten tokens is most of a rung of the ladder from a single pickup, so the
+        /// point of it is the moment you see one lying there and change your route -
+        /// and a windfall that arrives on schedule is just a bigger number on the
+        /// counter.
+        ///
+        /// One payout in ten, up from one in fifteen. Still uncommon enough to be
+        /// worth turning for; common enough that a player who works the machines
+        /// across a match sees several rather than hearing about them.
         static let goldenValue = 10
-        static let goldenChance = 0.065
+        static let goldenChance = 0.10
 
         /// A jackpot: how long one lasts, how often each map machine rolls for one,
         /// and the chance it takes.
@@ -1316,13 +1320,17 @@ enum GameConfig {
         /// earn that want opposite behaviour out of you is worth more than either
         /// of them being slightly better.
         ///
-        /// Rolled every twenty seconds by each of five machines at one in ten, so
-        /// the map runs about seven or eight jackpots across a match - roughly one
-        /// somewhere every forty seconds, which is often enough to be worth
-        /// watching for and rare enough to be worth running to.
+        /// Rolled every twenty seconds by each of five machines, at just under one
+        /// in seven. That runs about ten jackpots across a match - one somewhere
+        /// every half minute or so, up from every forty seconds.
+        ///
+        /// The ceiling on this is not fairness, it is meaning: with five machines
+        /// and a jackpot lasting eight seconds, pushing much past this starts to
+        /// leave one running somewhere at all times, and a thing that is always
+        /// happening is not an event, it is the weather.
         static let jackpotDuration: Double = 8
         static let jackpotInterval: Double = 20
-        static let jackpotChance = 0.10
+        static let jackpotChance = 0.145
 
         /// What a jackpot does to the two numbers that decide a machine's output.
         ///
