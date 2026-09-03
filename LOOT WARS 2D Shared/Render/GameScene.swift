@@ -452,6 +452,7 @@ final class GameScene: SKScene {
         guard world != nil else { return }
 
         if lastUpdateTime == 0 { lastUpdateTime = currentTime }
+        frameDelta = min(0.25, currentTime - lastUpdateTime)
         accumulator += currentTime - lastUpdateTime
         lastUpdateTime = currentTime
 
@@ -483,6 +484,11 @@ final class GameScene: SKScene {
         syncRenderers()
     }
 
+    /// How long the last frame took, for the renderers that decay a value rather
+    /// than animating one - see ActorRenderer's recoil, which cannot use an action
+    /// because the thing it moves is rewritten every frame.
+    private var frameDelta: TimeInterval = 1.0 / 60
+
     private func syncRenderers() {
         // Blocks only get rebuilt when a tile actually changed.
         if world.mapRevision != drawnMapRevision {
@@ -497,7 +503,7 @@ final class GameScene: SKScene {
         groundItemRenderer.sync(with: world)
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world)
-        actorRenderer.sync(with: world)
+        actorRenderer.sync(with: world, dt: frameDelta)
         hud.update(with: world)
         repositionLeaderboardIfNeeded()
         leaderboard.update(with: world)
@@ -1224,8 +1230,18 @@ extension GameScene {
             return
         }
 
-        // Anything else is ignored rather than closing the panel. A stray thumb on
-        // the map should not throw you out of a chest you are halfway through.
+        // And anywhere else shuts it, the way the shop does.
+        //
+        // This used to be ignored on the grounds that a stray thumb should not
+        // throw you out of a chest you are halfway through - which was the right
+        // instinct and the wrong conclusion. The two panels behaving differently
+        // is worse than either behaviour: having learned that tapping the map
+        // closes the shop, you try it on a chest and nothing happens, so you go
+        // looking for the button you had stopped needing. And the cost of being
+        // wrong here is one tap to reopen, since the chest is standing right there.
+        if !chestPanel.contains(localPoint: touch.location(in: chestPanel)) {
+            chestPanel.close()
+        }
     }
 
     /// Asks for a block. Whether one appears is BuildSystem's call, not the

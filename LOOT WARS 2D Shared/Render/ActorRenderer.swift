@@ -33,6 +33,15 @@ final class ActorRenderer {
     /// grass down on the same beat - the foot planting and the grass moving are
     /// the same event seen twice, and two stride constants would drift apart.
     static let walkStride: Double = 1.05
+
+    /// How fast a shot works its way out of the weapon, and how far it moves it.
+    ///
+    /// Six per second means the kick is over in about 160 milliseconds, which at
+    /// four and a half shots a second leaves the gun visibly settling between
+    /// rounds rather than sitting permanently shoved back.
+    private static let recoilDecay: Double = 6
+    private static let recoilKick: Double = 0.16      // tiles, back along the barrel
+    private static let recoilLift: Double = 0.30      // radians, muzzle rising
     private static let walkBob: Double = 0.075      // tiles
     private static let walkLean: Double = 0.045     // radians
 
@@ -69,6 +78,23 @@ final class ActorRenderer {
         var walkPhase: Double = 0
         var lastPosition: Vec2?
 
+        /// The muzzle flash, hung at the end of the barrel.
+        let muzzle = SKSpriteNode(texture: GlowArt.pool)
+
+        /// How much of a shot is still working through the weapon, 1 down to 0.
+        ///
+        /// A NUMBER that decays rather than an SKAction, because the weapon's
+        /// position and rotation are rewritten every frame by hold() - an action
+        /// animating either would be overwritten before it drew once. This gets
+        /// folded into hold's own arithmetic instead, which is the only way the two
+        /// can both have an opinion about where the gun is.
+        var recoil: Double = 0
+
+        /// Used to notice a shot: the cooldown is set to its full value the moment
+        /// one goes off, so a cooldown that has gone UP is a trigger that was just
+        /// pulled. Nothing has to be announced.
+        var lastShotCooldown: Double = 0
+
         init(sprite: SKSpriteNode,
              healthFill: SKShapeNode,
              blaster: SKSpriteNode,
@@ -84,7 +110,7 @@ final class ActorRenderer {
     private var textureCache: [HelmetTier: SKTexture] = [:]
     private var blasterCache: [BlasterTier: SKTexture] = [:]
 
-    func sync(with world: World) {
+    func sync(with world: World, dt: TimeInterval) {
         for (id, actor) in world.actors {
             let nodes = nodesByActor[id] ?? makeNodes(for: actor)
 
@@ -158,7 +184,19 @@ final class ActorRenderer {
                 nodes.blaster.texture = blasterTexture(for: actor.blaster)
             }
 
-            hold(nodes.blaster, aiming: actor.aim, facingLeft: actor.facesLeft)
+            // A cooldown that jumped up is a shot just fired.
+            if actor.shootCooldown > nodes.lastShotCooldown { nodes.recoil = 1 }
+            nodes.lastShotCooldown = actor.shootCooldown
+
+            // Decays towards nothing at a fixed rate per second rather than per
+            // frame, so the kick is the same length on any device.
+            nodes.recoil = max(0, nodes.recoil - dt * ActorRenderer.recoilDecay)
+
+            hold(nodes.blaster,
+                 muzzle: nodes.muzzle,
+                 aiming: actor.aim,
+                 facingLeft: actor.facesLeft,
+                 recoil: nodes.recoil)
 
             setHealth(Double(actor.health) / Double(actor.maxHealth), on: nodes)
         }
@@ -233,9 +271,21 @@ final class ActorRenderer {
         // of movement: the root is where the actor IS, the body is the walk, the
         // figure is whatever just happened to it, and the sprite is which way it is
         // facing. Collapsing any two of those means one overwriting the other.
+        // Warm rather than white: a white flash on a pale green map is the same
+        // mistake the hit blink made, and read as a highlight rather than as fire.
+        nodes.muzzle.size = CGSize(
+            width: GridGeometry.length(ofTiles: 0.55),
+            height: GridGeometry.length(ofTiles: 0.55)
+        )
+        nodes.muzzle.color = SKColor(red: 1, green: 0.82, blue: 0.32, alpha: 1)
+        nodes.muzzle.colorBlendFactor = 1
+        nodes.muzzle.alpha = 0
+        nodes.muzzle.zPosition = 2
+
         nodes.figure.addChild(sprite)
         nodes.body.addChild(nodes.figure)
         nodes.body.addChild(blaster)
+        nodes.body.addChild(nodes.muzzle)
         nodes.root.addChild(nodes.body)
         nodes.root.addChild(bar)
         if let goalLabel { nodes.root.addChild(goalLabel) }
@@ -258,8 +308,18 @@ final class ActorRenderer {
     /// Which way the figure faces comes from Actor.facesLeft, which already
     /// resolves it: walking sets it, aiming overrides it. So the weapon follows
     /// your feet until you pull the trigger and then follows your aim.
-    private func hold(_ blaster: SKSpriteNode, aiming direction: Vec2, facingLeft: Bool) {
-        let reach = GridGeometry.length(ofTiles: GameConfig.Blaster.holdDistance)
+    private func hold(_ blaster: SKSpriteNode,
+                      muzzle: SKSpriteNode,
+                      aiming direction: Vec2,
+                      facingLeft: Bool,
+                      recoil: Double) {
+        // Shoved back along its own barrel, not down the screen: a weapon pointed
+        // up and to the left should kick down and to the right, and the only line
+        // that is true on is the one it is aiming along.
+        let kicked = GameConfig.Blaster.holdDistance
+            - recoil * ActorRenderer.recoilKick
+
+        let reach = GridGeometry.length(ofTiles: kicked)
 
         // The grip stays put on the body; the weapon pivots around it, the way a
         // hand does.
@@ -277,8 +337,35 @@ final class ActorRenderer {
         while tilt < -.pi { tilt += 2 * .pi }
 
         let limit = CGFloat(GameConfig.Blaster.maxTilt)
-        blaster.zRotation = max(-limit, min(limit, tilt))
+
+        // And flicked up, which is the half of a recoil the eye actually reads -
+        // a barrel that rises and settles says "fired" from across the map, where
+        // a couple of points of travel says nothing at that size.
+        let flick = CGFloat(recoil * ActorRenderer.recoilLift)
+        blaster.zRotation = max(-limit, min(limit, tilt)) + flick
         blaster.xScale = facingLeft ? -1 : 1
+
+        // The flash rides at the end of the barrel, worked out from the angle the
+        // weapon is actually DRAWN at - the clamped tilt - rather than from the
+        // node's own rotation. A mirrored node's rotation reads backwards, and
+        // undoing that here would be the second place in this file that has to
+        // know the trick. Facing simply negates both components, because pointing
+        // left is the same angle plus pi.
+        let drawn = Double(max(-limit, min(limit, tilt)))
+        let sign: Double = facingLeft ? -1 : 1
+        let barrel = GameConfig.Blaster.holdDistance + 0.45
+
+        muzzle.position = CGPoint(
+            x: GridGeometry.length(ofTiles: sign * cos(drawn) * barrel),
+            y: GridGeometry.length(
+                ofTiles: GameConfig.Blaster.holdHeight + sign * sin(drawn) * barrel
+            )
+        )
+
+        // Driven by the same number as the kick, so the flash cannot outlive the
+        // shot that made it.
+        muzzle.alpha = CGFloat(recoil * 0.9)
+        muzzle.setScale(CGFloat(0.7 + recoil * 0.5))
     }
 
     /// Took a hit: a flinch, and a moment of shadow.

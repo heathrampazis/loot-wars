@@ -149,6 +149,18 @@ final class ChestPanelNode: SKNode {
         return nil
     }
 
+    /// Whether a point in this node's own space is on the chest at all.
+    ///
+    /// The panel and the button above it, and nothing else. What counts as OUTSIDE
+    /// is everything this does not claim - see GameScene, which closes the chest on
+    /// a tap out there, exactly as the shop does.
+    func contains(localPoint point: CGPoint) -> Bool {
+        let box = ChestPanelNode.size
+
+        if abs(point.x) <= box.width / 2, abs(point.y) <= box.height / 2 { return true }
+        return isBackButton(atLocalPoint: point)
+    }
+
     func isBackButton(atLocalPoint point: CGPoint) -> Bool {
         let box = ChestPanelNode.backSize
         let local = CGPoint(x: point.x - back.position.x, y: point.y - back.position.y)
