@@ -88,7 +88,11 @@ enum RenderPalette {
     // black is invisible on a lawn.
     private static let rarities: [SKColor] = [
         rgb(0xC2, 0xC9, 0xCE),   // common - pale steel
-        rgb(0x5B, 0xE8, 0x4C),   // uncommon - green
+        // Muted on purpose. A saturated green is the brightest thing on a map made
+        // of grass and reads as "look at this", which is the opposite of what the
+        // second rung is for - uncommon should look like something you would pick
+        // up and not think about again.
+        rgb(0x8E, 0xC2, 0x76),   // uncommon - sage
         rgb(0x46, 0xB1, 0xFF),   // rare - blue
         rgb(0xB9, 0x6B, 0xFF),   // epic - purple
         rgb(0xFF, 0x9C, 0x2B),   // legendary - orange

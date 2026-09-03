@@ -34,32 +34,46 @@ enum Rarity: Int, Comparable {
 
 extension ItemType {
 
+    /// The gear ladders sit one rung LOWER than their names suggest, and that is
+    /// deliberate. There are eight helmet tiers and six colours, so something has to
+    /// give, and the honest place to give is the top: an Epic is a good helmet you
+    /// will own several of in a match, and painting it the same purple a game
+    /// normally reserves for its second-best item oversells it. Shifted down, blue
+    /// means Epic, purple means Legendary, orange means Mythical, and gold is
+    /// Cosmic and nothing else - the one thing on the ladder you cannot find, only
+    /// buy, and most matches nobody has.
+    ///
+    /// The supplies are judged by what it takes to get one and what it does. A
+    /// bandage and a chest are things you trip over; a medkit is a whole health bar
+    /// in one press; a machine is the most expensive thing anybody buys.
     var rarity: Rarity {
         switch self {
         case .bandage: return .common
+        case .chest:   return .common
         case .bomb:    return .uncommon
-        case .chest:   return .uncommon
-        case .medkit:  return .rare
+        case .medkit:  return .uncommon
         case .arcade:  return .epic
 
         case .helmet(let tier):
             switch tier {
-            case .none, .common:    return .common
-            case .uncommon:         return .uncommon
-            case .rare:             return .rare
-            case .epic:             return .epic
-            case .legendary:        return .legendary
-            case .mythical, .cosmic: return .mythical
+            case .none, .common, .uncommon: return .common
+            case .rare:      return .uncommon
+            case .epic:      return .rare
+            case .legendary: return .epic
+            case .mythical:  return .legendary
+            case .cosmic:    return .mythical
             }
 
+        // Paired with the helmets rung for rung, the same way the loot tables pair
+        // them - a Blaster 4 turns up alongside an Epic, so they wear the same
+        // colour and a glance at somebody tells you both.
         case .blaster(let tier):
             switch tier {
-            case .one:   return .common
-            case .two:   return .uncommon
-            case .three: return .rare
-            case .four:  return .epic
-            case .five:  return .legendary
-            case .six:   return .mythical
+            case .one, .two: return .common
+            case .three:     return .uncommon
+            case .four:      return .rare
+            case .five:      return .epic
+            case .six:       return .legendary
             }
         }
     }
