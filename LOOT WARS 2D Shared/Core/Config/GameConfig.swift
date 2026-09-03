@@ -694,6 +694,20 @@ enum GameConfig {
         /// that walking past happens.
         static let raidRange: Double = 18
 
+        /// How often a bot gets the itch to go and rob somebody.
+        ///
+        /// The counterpart to Build.urgeInterval, and pitched against it. Building
+        /// comes round every six to ten seconds and takes a trip home; raiding
+        /// comes round every thirty-five to sixty and takes a trip across the map.
+        /// Over a five-minute match that is five or six raid attempts per bot, or
+        /// forty-odd on a map of eight - where before it was whatever happened to
+        /// fall through the gaps between building, stashing and looting, which
+        /// measured close to none.
+        ///
+        /// Spent on the ATTEMPT rather than on success, so a bot that cannot reach
+        /// anybody does not re-ask every tick for the rest of the match.
+        static let raidUrgeInterval: ClosedRange<Double> = 35...60
+
         /// How far a bot will travel for an enemy chest it could get at.
         ///
         /// Longer than raidRange, because this one is worth the walk: a chest with
@@ -994,6 +1008,15 @@ enum GameConfig {
 
     enum Loot {
         /// Lootboxes scattered across the map.
+        /// How much likelier a bomb is inside a rare crate.
+        ///
+        /// Bombs are the supply line for raiding and were rationed by one row in a
+        /// table shared with the bandages. This makes the good crates the place
+        /// they come from, which also fixes the other half of the problem - a rare
+        /// crate that rolled a bandage was a let-down whatever colour it had been
+        /// glowing. At two and a half, a rare crate is about a third bombs.
+        static let rareBombBoost: Double = 2.5
+
         /// Share of crates on the map that are the good ones.
         ///
         /// One in six. Few enough that spotting one is an event and that most of

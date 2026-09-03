@@ -28,6 +28,7 @@ enum AIBrain {
         state.goalAge += dt
         state.lootCooldown = max(0, state.lootCooldown - dt)
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
+        state.raidUrgeTimer = max(0, state.raidUrgeTimer - dt)
         state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
 
@@ -256,6 +257,15 @@ enum AIBrain {
             state.blocksLeftToLay = Int.random(in: armful, using: &world.rng)
         }
 
+        // A raid has been taken on: the urge is spent, whether or not it ends in
+        // a chest being emptied. Resetting on the ATTEMPT rather than on success is
+        // what stops a bot that cannot reach anybody from trying every single tick
+        // for the rest of the match.
+        if case .robChest = wanted, !state.goal.isRob {
+            state.raidUrgeTimer = Double.random(in: GameConfig.AI.raidUrgeInterval,
+                                                using: &world.rng)
+        }
+
         if wanted != state.goal {
             // Only a NEW fight costs a reaction - a bot already shooting at someone
             // does not freeze up again every time it re-picks the same target.
@@ -365,6 +375,23 @@ enum AIBrain {
         if state.baseWasComplete, world.baseIsBreached(actor.team),
            let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
+        }
+
+        // The raid urge, and this is the highest anything voluntary sits.
+        //
+        // Above the build commitment on purpose - see AIState.raidUrgeTimer. Every
+        // previous attempt at "more raiding" made the targets richer or the bots
+        // keener and changed almost nothing, because the problem was never that a
+        // bot did not want to rob somebody. It was that by the time the question
+        // was asked it had already committed to an armful of walls, and finishing
+        // that set another timer, and the cycle closed over the top of raiding.
+        //
+        // Only when it has what a raid needs, which chestWorthRobbing already
+        // knows: supplies to travel on, a way in, and something at the far end
+        // worth taking. When it does, it goes now rather than after the wall.
+        if state.raidUrgeTimer <= 0,
+           let chest = chestWorthRobbing(for: actor, in: world) {
+            return .robChest(chest.id)
         }
 
         // A trip home is a commitment.

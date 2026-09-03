@@ -74,7 +74,7 @@ enum LootTable {
         (0.00, [
             (.item(.bandage), 88),
             (.item(.medkit),  22),
-            (.item(.bomb),    46),
+            (.item(.bomb),    58),
             (.item(.chest),   26),
 
             (.item(.helmet(.common)),    26),
@@ -86,7 +86,7 @@ enum LootTable {
         (0.35, [
             (.item(.bandage), 88),
             (.item(.medkit),  24),
-            (.item(.bomb),    38),
+            (.item(.bomb),    50),
             (.item(.chest),   26),
 
             // The Common and the Blaster 2 are gone: by now everybody has better,
@@ -99,7 +99,7 @@ enum LootTable {
         (0.70, [
             (.item(.bandage), 96),
             (.item(.medkit),  34),
-            (.item(.bomb),    26),
+            (.item(.bomb),    38),
             (.item(.chest),   22),
 
             (.item(.helmet(.rare)),      20),
@@ -150,15 +150,34 @@ enum LootTable {
                      at progress: Double,
                      rare: Bool = false,
                      using rng: inout SeededRandom) -> Pickup {
-        let rolled = plain(bombs: bombs, at: progress, using: &rng)
+        let rolled = plain(bombs: bombs, at: progress, rare: rare, using: &rng)
         return rare ? upgraded(rolled) : rolled
     }
 
     private static func plain(bombs: Bool,
                               at progress: Double,
+                              rare: Bool,
                               using rng: inout SeededRandom) -> Pickup {
         let table = table(at: progress)
-        let rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
+        var rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
+
+        // A rare crate is where bombs come from.
+        //
+        // Two things needed the same fix. Bombs were the supply line for the whole
+        // raiding half of the game and were rationed by a single row in a table
+        // shared with bandages; and a rare crate that rolled a bandage was a
+        // let-down whatever colour it had been glowing. Weighting the bomb row up
+        // inside a rare crate answers both at once: the good crate reliably holds
+        // either the good gear it promised or the thing you open somebody's wall
+        // with, and both of those are worth walking to.
+        if rare {
+            rows = rows.map { row in
+                row.pickup == .item(.bomb)
+                    ? (pickup: row.pickup,
+                       weight: Int(Double(row.weight) * GameConfig.Loot.rareBombBoost))
+                    : row
+            }
+        }
 
         let total = rows.reduce(0) { $0 + $1.weight }
         var pick = Int.random(in: 0..<total, using: &rng)

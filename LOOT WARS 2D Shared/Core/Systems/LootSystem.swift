@@ -44,23 +44,16 @@ enum LootSystem {
                 world.awardTokens(rare ? GameConfig.Tokens.perRareLootbox
                                        : GameConfig.Tokens.perLootbox, to: id)
 
-                // Two things out of a rare one, and only the FIRST is upgraded.
-                // Two upgraded rolls would make a rare crate better than a raid,
-                // and raiding somebody's base has to stay the best thing you can
-                // do with a minute. One good item and one ordinary one is a crate
-                // worth crossing the map for and not worth camping.
+                // ONE item, rare or not. A rare crate is a better roll, not a
+                // bigger pile: two things out of it made it briefly better than
+                // raiding somebody, and raiding has to stay the best thing you can
+                // do with a minute. It is also the difference between a crate you
+                // cross the map for and a crate you camp.
                 world.spawnGroundItem(LootTable.roll(bombs: world.bombsAllowed,
                                                      at: world.matchProgress,
                                                      rare: rare,
                                                      using: &world.rng),
                                       at: box.position)
-
-                if rare {
-                    world.spawnGroundItem(LootTable.roll(bombs: world.bombsAllowed,
-                                                         at: world.matchProgress,
-                                                         using: &world.rng),
-                                          at: world.scatteredSpot(near: box.position))
-                }
                 break   // one box per tick, however many times it was asked
             }
         }

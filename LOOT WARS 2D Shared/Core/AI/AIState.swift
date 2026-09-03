@@ -73,6 +73,22 @@ struct AIState {
     /// Counts down to the next urge to go home and add to the base.
     var buildUrgeTimer: Double = 0
 
+    /// Counts down to wanting to go and rob somebody.
+    ///
+    /// The mirror of the build urge, and it exists for the same reason that one
+    /// does. Raiding kept coming out rare no matter how attractive the targets were
+    /// made, and the reason was never appetite - it was the queue. Robbing sat
+    /// below building, and building renews itself: a trip home takes an armful of
+    /// walls, the armful is a commitment, finishing it sets a fresh urge timer, and
+    /// somewhere in there the bot looted a crate and started again. A thing that is
+    /// always fourth in line never happens.
+    ///
+    /// So raiding gets a clock of its own. When it comes round, robbing jumps the
+    /// queue - above building and stashing, still below fighting for your life and
+    /// below patching a hole in your own wall, because those are emergencies and
+    /// this is an errand.
+    var raidUrgeTimer: Double = 0
+
     /// Walls left to lay on this trip home.
     var blocksLeftToLay: Int = 0
 
