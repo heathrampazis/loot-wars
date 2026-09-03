@@ -4,18 +4,17 @@
 //
 //  Clouds of gas standing on the map.
 //
-//  Drawn as ONE shape whose outline is the union of several overlapping circles,
-//  and that construction is the whole difference between this and the first
-//  version. Translucent sprites laid over each other double up where they overlap,
-//  so a cloud built from three of them is a pale wash with darker patches in it -
-//  which reads as a gradient painted on the ground rather than as an object. A
-//  union is a single silhouette: one flat fill at one alpha, one hard edge round
+//  Drawn as ONE closed shape, and that is the whole difference between this and
+//  the first version. Translucent sprites laid over each other double up where
+//  they overlap, so a cloud built from three of them is a pale wash with darker
+//  patches in it - which reads as a gradient painted on the ground rather than as
+//  an object. One silhouette means one flat fill at one alpha, one hard edge round
 //  the outside, and no seams anywhere inside it.
 //
-//  The lobes then TURN, at their own speeds, and the path is rebuilt from them
-//  about a dozen times a second. That is what makes it look alive rather than
-//  stamped: the outline rolls slowly, bulges where a lobe swings out, and pulls in
-//  behind it, all without the cloud moving off the ground it is holding.
+//  The outline is a radius that rises and falls as it sweeps the circle, and the
+//  waves that drive it MOVE - so the shape is rebuilt about a dozen times a second
+//  and rolls slowly, bulging on one side and pulling in behind, without the cloud
+//  drifting off the ground it is holding.
 //
 //  Density comes from the simulation, so what you see and what hurts you cannot
 //  drift apart - see GasCloud.density, which GasSystem gates its damage on.
@@ -30,11 +29,10 @@ final class GasRenderer {
     /// How many circles make up the silhouette, how often it is rebuilt, and how
     /// fast the lobes travel round.
     ///
-    /// Twelve rebuilds a second rather than sixty: a union of six circles is not
-    /// free, and the eye cannot tell the difference on something moving this
-    /// slowly - where it certainly can tell the difference between a shape that
-    /// moves and one that does not.
-    private static let lobes = 6
+    /// Twelve rebuilds a second rather than sixty. Fourteen samples and a pair of
+    /// sines is not free, and the eye cannot tell the difference on something
+    /// moving this slowly - where it certainly can tell the difference between a
+    /// shape that moves and one that does not.
     private static let rebuildInterval: Double = 0.08
     private static let churn: Double = 0.55
 
@@ -116,40 +114,57 @@ final class GasRenderer {
         nodesByCloud[cloud.id] = nodes
     }
 
-    /// The silhouette: a body circle with lobes riding round its edge, unioned into
-    /// one path so nothing overlaps anything.
+    /// The silhouette: one closed curve whose radius wobbles as it goes round.
+    ///
+    /// Sampled in polar coordinates rather than assembled out of circles, and the
+    /// reason is the deployment target - CGPath.union arrived in iOS 16 and this
+    /// ships to 15.6. It turned out to be the better drawing anyway. A union of
+    /// discs has circular arcs everywhere you look, which reads as bubbles stuck
+    /// together; a radius that rises and falls as it sweeps gives lobes that are
+    /// wider at the base and pinched between, which is what gas actually looks like.
+    ///
+    /// Two waves of different frequencies, moving at different speeds. One would
+    /// give a shape with obvious symmetry that visibly repeats; two that do not
+    /// divide into each other never come back to the same silhouette.
+    ///
+    /// Smoothed by curving THROUGH the midpoints of the samples and using each
+    /// sample as a control point. Joining the samples directly would show every
+    /// corner, and at fourteen samples a polygon is exactly what it would look
+    /// like.
     private static func outline(of cloud: GasCloud, phase: Double) -> CGPath {
-        let radius = GridGeometry.length(ofTiles: cloud.radius)
+        let radius = Double(GridGeometry.length(ofTiles: cloud.radius))
+        let samples = 14
 
-        var path = CGPath(
-            ellipseIn: CGRect(x: -radius * 0.62, y: -radius * 0.62,
-                              width: radius * 1.24, height: radius * 1.24),
-            transform: nil
-        )
+        var points: [CGPoint] = []
+        points.reserveCapacity(samples)
 
-        for index in 0..<lobes {
-            let spacing = 2 * Double.pi / Double(lobes)
+        for index in 0..<samples {
+            let angle = 2 * Double.pi * Double(index) / Double(samples)
 
-            // Each lobe travels at a slightly different speed, so the outline never
-            // repeats a shape it has already been - six circles turning in lockstep
-            // would just be one circle wobbling.
-            let angle = Double(index) * spacing + phase * (0.7 + Double(index % 3) * 0.22)
+            let wobble = 0.84
+                + 0.13 * sin(angle * 3 + phase * 1.15)
+                + 0.09 * sin(angle * 5 - phase * 0.73)
 
-            let reach = radius * CGFloat(0.52 + 0.06 * sin(phase * 1.4 + Double(index)))
-            let lobe = radius * CGFloat(0.46 + 0.08 * sin(phase * 1.9 + Double(index) * 2.1))
-
-            let centre = CGPoint(x: CGFloat(cos(angle)) * reach,
-                                 y: CGFloat(sin(angle)) * reach)
-
-            path = path.union(
-                CGPath(
-                    ellipseIn: CGRect(x: centre.x - lobe, y: centre.y - lobe,
-                                      width: lobe * 2, height: lobe * 2),
-                    transform: nil
-                )
+            points.append(
+                CGPoint(x: cos(angle) * radius * wobble,
+                        y: sin(angle) * radius * wobble)
             )
         }
 
+        func midpoint(_ a: CGPoint, _ b: CGPoint) -> CGPoint {
+            CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+        }
+
+        let path = CGMutablePath()
+        path.move(to: midpoint(points[samples - 1], points[0]))
+
+        for index in 0..<samples {
+            let current = points[index]
+            let next = points[(index + 1) % samples]
+            path.addQuadCurve(to: midpoint(current, next), control: current)
+        }
+
+        path.closeSubpath()
         return path
     }
 }
