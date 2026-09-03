@@ -393,9 +393,12 @@ final class ShopPanelNode: SKNode {
             )
         )
 
-        // Recoloured on every redraw - see update - so this is only the shape.
+        // The FILL is recoloured on every redraw - see update. The outline is
+        // black and stays black: green on green and red on red was an outline
+        // doing nothing, and against the panel a dark edge is what gives a small
+        // bright shape its shape.
         pill.fillColor = RenderPalette.affordable
-        pill.strokeColor = RenderPalette.affordable
+        pill.strokeColor = .black
         pill.lineWidth = 3
 
         holder.addChild(pill)
@@ -638,13 +641,21 @@ final class ShopPanelNode: SKNode {
     /// refused stays dark. Nothing here decides whether the purchase happened -
     /// it is told.
 
-    func confirm() {
+    /// The sale went through.
+    ///
+    /// - Parameter destination: where the thing you bought should appear to go, in
+    ///   this panel's own coordinates. The scene passes the hotbar's position,
+    ///   because that is where your things live and the whole point of the flight
+    ///   is to say WHERE IT WENT - a card that merely flashes tells you a purchase
+    ///   happened and leaves you to find the result yourself.
+    func confirm(flyingTo destination: CGPoint) {
         guard let index = lastPressed,
               cards.indices.contains(index) else {
             return
         }
 
         let card = cards[index]
+        deliver(card, to: destination)
 
         card.holder.removeAction(forKey: "bought")
         card.holder.setScale(1)
@@ -668,6 +679,56 @@ final class ShopPanelNode: SKNode {
         )
 
         lastPressed = nil
+    }
+
+    /// Throws a copy of the item from its card down to the bag.
+    ///
+    /// A copy rather than the icon itself: the card behind it is still a shop card
+    /// and is about to be redrawn with the next rung on it, so the thing that flies
+    /// has to be something nobody else owns.
+    ///
+    /// Arced rather than moved in a straight line. A straight line between two
+    /// points on a screen reads as a UI element being repositioned; a curve reads
+    /// as an object being thrown, and the difference is most of why this feels like
+    /// a purchase rather than a layout change.
+    private func deliver(_ card: Card, to destination: CGPoint) {
+        guard let texture = card.icon.texture else { return }
+
+        let parcel = SKSpriteNode(texture: texture)
+        parcel.size = card.icon.size
+        parcel.position = CGPoint(
+            x: card.holder.position.x + card.icon.position.x,
+            y: card.holder.position.y + card.icon.position.y
+        )
+        parcel.zPosition = 50
+        addChild(parcel)
+
+        let path = CGMutablePath()
+        path.move(to: parcel.position)
+
+        // Up and over: the peak sits above BOTH ends, so the parcel leaves the card
+        // rising rather than sliding sideways out of it.
+        path.addQuadCurve(
+            to: destination,
+            control: CGPoint(
+                x: (parcel.position.x + destination.x) / 2,
+                y: max(parcel.position.y, destination.y) + 70
+            )
+        )
+
+        parcel.run(
+            .sequence([
+                .group([
+                    .follow(path, asOffset: false, orientToPath: false, duration: 0.42),
+                    .scale(to: 0.45, duration: 0.42),
+                    .sequence([
+                        .wait(forDuration: 0.26),
+                        .fadeOut(withDuration: 0.16)
+                    ])
+                ]),
+                .removeFromParent()
+            ])
+        )
     }
 
     func selectTab(_ index: Int) {
@@ -820,8 +881,7 @@ final class ShopPanelNode: SKNode {
                 ? RenderPalette.affordable
                 : RenderPalette.unaffordable
 
-            card.pill.fillColor = colour.withAlphaComponent(0.9)
-            card.pill.strokeColor = colour
+            card.pill.fillColor = colour
 
             cards[index] = card
         }

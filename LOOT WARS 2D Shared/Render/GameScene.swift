@@ -619,7 +619,15 @@ final class GameScene: SKScene {
                 bombRenderer.flash(at: position)
 
             case .purchase(_, let buyer):
-                if buyer == world.localPlayerID { shopPanel.confirm() }
+                guard buyer == world.localPlayerID else { break }
+
+                // Where the thing you just bought should appear to land: your own
+                // bar, converted into the panel's coordinates, because the panel is
+                // what animates it. The scene is the only thing that knows where
+                // both of those are.
+                shopPanel.confirm(
+                    flyingTo: shopPanel.convert(.zero, from: hotbar)
+                )
 
             case .kill(_, let killer, let position, let points, _):
                 effectsRenderer.mark(killAt: position,
