@@ -707,7 +707,7 @@ enum GameConfig {
         /// some. Standing in a cloud overrides the heading entirely; seeing one
         /// coming only bends it, so a bot skirts a cloud rather than abandoning
         /// wherever it was going.
-        static let gasLookAhead: Double = 2.5
+        static let gasLookAhead: Double = 3.5
         static let gasSwerve: Double = 0.6
 
         /// How close a bot has to be to somebody's claim before raiding it even
@@ -954,9 +954,20 @@ enum GameConfig {
     /// making two tiles unusable: a doorway, the gap you were about to break
     /// through, or the ground under somebody who has nowhere good to go.
     enum Stink {
-        /// How far the cloud reaches, in tiles. Wider than a blast, because a blast
-        /// is an instant and a cloud is a place.
-        static let radius: Double = 2.2
+        /// How far the cloud reaches, in tiles.
+        ///
+        /// 2.9, up from 2.2, which is six tiles across.
+        ///
+        /// The size was only half of why the first one felt small - it was drawn as
+        /// a soft gradient, and a shape with no edge reads smaller than it is - but
+        /// only half. At six tiles it covers a doorway and the ground either side,
+        /// which is the least that "taking ground" can mean.
+        ///
+        /// Not larger, and the number that decides it is the BASE: a claim is nine
+        /// tiles across, so this closes two thirds of the width of somebody's home.
+        /// A cloud that swallowed a whole base would not be a way of taking ground,
+        /// it would be a way of ending a match from outside the walls.
+        static let radius: Double = 2.9
 
         /// Seconds it stands for, and how long it takes to billow out and to thin
         /// away at the end. A cloud that arrived and vanished instantly would be a

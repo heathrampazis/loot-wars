@@ -534,7 +534,7 @@ final class GameScene: SKScene {
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
         updateHint(with: world)
-        gasRenderer.sync(with: world)
+        gasRenderer.sync(with: world, dt: frameDelta)
         effectsRenderer.sync(with: world)
         dispatch(world.takeEvents(), in: world)
         if let player = world.localPlayer {

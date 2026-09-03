@@ -4,15 +4,21 @@
 //
 //  Clouds of gas standing on the map.
 //
-//  Drawn as three overlapping blobs rather than one circle, and that is the whole
-//  trick: a single disc reads as a coloured zone painted on the ground - a rule
-//  being displayed - where three offset blobs of different sizes, each turning at
-//  its own speed, read as something with volume that happens to be there.
+//  Drawn as ONE shape whose outline is the union of several overlapping circles,
+//  and that construction is the whole difference between this and the first
+//  version. Translucent sprites laid over each other double up where they overlap,
+//  so a cloud built from three of them is a pale wash with darker patches in it -
+//  which reads as a gradient painted on the ground rather than as an object. A
+//  union is a single silhouette: one flat fill at one alpha, one hard edge round
+//  the outside, and no seams anywhere inside it.
 //
-//  Density comes from the simulation rather than from an animation, so what you see
-//  and what hurts you cannot drift apart: the cloud billows up as it spreads, sits
-//  thick while it bites, and thins out as it expires, all off the one number in
-//  GasCloud.density that GasSystem also gates its damage on.
+//  The lobes then TURN, at their own speeds, and the path is rebuilt from them
+//  about a dozen times a second. That is what makes it look alive rather than
+//  stamped: the outline rolls slowly, bulges where a lobe swings out, and pulls in
+//  behind it, all without the cloud moving off the ground it is holding.
+//
+//  Density comes from the simulation, so what you see and what hurts you cannot
+//  drift apart - see GasCloud.density, which GasSystem gates its damage on.
 //
 
 import SpriteKit
@@ -21,18 +27,30 @@ final class GasRenderer {
 
     let node = SKNode()
 
-    private final class CloudNodes {
-        let root = SKNode()
-        let blobs: [SKSpriteNode]
+    /// How many circles make up the silhouette, how often it is rebuilt, and how
+    /// fast the lobes travel round.
+    ///
+    /// Twelve rebuilds a second rather than sixty: a union of six circles is not
+    /// free, and the eye cannot tell the difference on something moving this
+    /// slowly - where it certainly can tell the difference between a shape that
+    /// moves and one that does not.
+    private static let lobes = 6
+    private static let rebuildInterval: Double = 0.08
+    private static let churn: Double = 0.55
 
-        init(blobs: [SKSpriteNode]) {
-            self.blobs = blobs
+    private final class CloudNodes {
+        let shape = SKShapeNode()
+        var sinceRebuild: Double = 0
+        var phase: Double
+
+        init(phase: Double) {
+            self.phase = phase
         }
     }
 
     private var nodesByCloud: [GasCloudID: CloudNodes] = [:]
 
-    func sync(with world: World) {
+    func sync(with world: World, dt: TimeInterval) {
         for (id, cloud) in world.gasClouds where nodesByCloud[id] == nil {
             make(cloud)
         }
@@ -40,63 +58,98 @@ final class GasRenderer {
         for (id, nodes) in Array(nodesByCloud) where world.gasClouds[id] == nil {
             nodesByCloud[id] = nil
 
-            // Thins away rather than blinking out. The simulation has already
-            // stopped it hurting anybody by this point - the last second and a half
-            // of a cloud's life is below the biting density - so this is the tail
-            // of something that has already stopped mattering.
-            nodes.root.run(.sequence([
+            // Thins away rather than blinking out. It stopped hurting anybody a
+            // second and a half ago - the tail of a cloud's life is below the
+            // biting density - so this is the last of something that has already
+            // stopped mattering.
+            nodes.shape.run(.sequence([
                 .group([
                     .fadeOut(withDuration: 0.5),
-                    .scale(to: 1.25, duration: 0.5)
+                    .scale(to: 1.3, duration: 0.5)
                 ]),
                 .removeFromParent()
             ]))
         }
 
-        for (id, cloud) in world.gasClouds {
-            guard let nodes = nodesByCloud[id] else { continue }
-            nodes.root.alpha = CGFloat(cloud.density) * 0.72
-            nodes.root.setScale(CGFloat(0.55 + cloud.density * 0.45))
+        for id in world.gasClouds.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let cloud = world.gasClouds[id], let nodes = nodesByCloud[id] else { continue }
+
+            nodes.phase += dt * GasRenderer.churn
+            nodes.sinceRebuild += dt
+
+            if nodes.sinceRebuild >= GasRenderer.rebuildInterval {
+                nodes.sinceRebuild = 0
+                nodes.shape.path = GasRenderer.outline(of: cloud, phase: nodes.phase)
+            }
+
+            // Billows out as it spreads and thins as it goes, both off the one
+            // number the damage is gated on.
+            nodes.shape.alpha = CGFloat(cloud.density)
+            nodes.shape.setScale(CGFloat(0.62 + cloud.density * 0.38))
         }
     }
 
     private func make(_ cloud: GasCloud) {
-        let nodes = CloudNodes(blobs: [])
-        let side = GridGeometry.length(ofTiles: cloud.radius * 2)
+        // Seeded off the cloud's own id, so two clouds on screen are not the same
+        // drawing twice - and so a given cloud looks the same on every run of a
+        // seed, which a random start would quietly break.
+        let nodes = CloudNodes(phase: Double(cloud.id.raw) * 1.7)
 
-        nodes.root.position = GridGeometry.point(for: cloud.centre)
+        nodes.shape.path = GasRenderer.outline(of: cloud, phase: nodes.phase)
+        nodes.shape.position = GridGeometry.point(for: cloud.centre)
 
-        // Above the ground and the loot, below the actors - so somebody standing in
+        // Opaque fill at a fixed alpha rather than a soft edge: you can see the
+        // ground through it, but the boundary is a line rather than a fade, which
+        // is what makes "in it" and "out of it" a thing you can judge at a glance
+        // while somebody is shooting at you.
+        nodes.shape.fillColor = RenderPalette.gas.withAlphaComponent(0.72)
+        nodes.shape.strokeColor = RenderPalette.gasEdge
+        nodes.shape.lineWidth = 3
+        nodes.shape.isAntialiased = true
+
+        // Above the ground and the loot, below the actors - somebody standing in
         // gas is standing IN it rather than behind it.
-        nodes.root.zPosition = 6
-        nodes.root.alpha = 0
-        node.addChild(nodes.root)
+        nodes.shape.zPosition = 6
+        nodes.shape.alpha = 0
 
-        let offsets: [(CGFloat, CGFloat, CGFloat)] = [
-            (0, 0, 1.0),
-            (-side * 0.16, side * 0.10, 0.78),
-            (side * 0.15, -side * 0.09, 0.70)
-        ]
+        node.addChild(nodes.shape)
+        nodesByCloud[cloud.id] = nodes
+    }
 
-        for (index, offset) in offsets.enumerated() {
-            let blob = SKSpriteNode(texture: GlowArt.pool)
-            blob.size = CGSize(width: side * offset.2, height: side * offset.2)
-            blob.position = CGPoint(x: offset.0, y: offset.1)
-            blob.color = RenderPalette.gas
-            blob.colorBlendFactor = 1
-            blob.alpha = 0.75
-            nodes.root.addChild(blob)
+    /// The silhouette: a body circle with lobes riding round its edge, unioned into
+    /// one path so nothing overlaps anything.
+    private static func outline(of cloud: GasCloud, phase: Double) -> CGPath {
+        let radius = GridGeometry.length(ofTiles: cloud.radius)
 
-            // Each turning at its own speed and in its own direction, which is what
-            // stops three circles reading as one circle with a texture on it.
-            let spin = 5.0 + Double(index) * 2.5
-            let way: CGFloat = index % 2 == 0 ? 1 : -1
+        var path = CGPath(
+            ellipseIn: CGRect(x: -radius * 0.62, y: -radius * 0.62,
+                              width: radius * 1.24, height: radius * 1.24),
+            transform: nil
+        )
 
-            blob.run(.repeatForever(
-                .rotate(byAngle: way * .pi * 2, duration: spin)
-            ))
+        for index in 0..<lobes {
+            let spacing = 2 * Double.pi / Double(lobes)
+
+            // Each lobe travels at a slightly different speed, so the outline never
+            // repeats a shape it has already been - six circles turning in lockstep
+            // would just be one circle wobbling.
+            let angle = Double(index) * spacing + phase * (0.7 + Double(index % 3) * 0.22)
+
+            let reach = radius * CGFloat(0.52 + 0.06 * sin(phase * 1.4 + Double(index)))
+            let lobe = radius * CGFloat(0.46 + 0.08 * sin(phase * 1.9 + Double(index) * 2.1))
+
+            let centre = CGPoint(x: CGFloat(cos(angle)) * reach,
+                                 y: CGFloat(sin(angle)) * reach)
+
+            path = path.union(
+                CGPath(
+                    ellipseIn: CGRect(x: centre.x - lobe, y: centre.y - lobe,
+                                      width: lobe * 2, height: lobe * 2),
+                    transform: nil
+                )
+            )
         }
 
-        nodesByCloud[cloud.id] = nodes
+        return path
     }
 }

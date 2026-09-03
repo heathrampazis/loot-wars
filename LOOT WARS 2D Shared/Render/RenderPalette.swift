@@ -109,6 +109,12 @@ enum RenderPalette {
     /// into.
     static let gas = rgb(0xA8, 0xD8, 0x3A)
 
+    /// And the line round it. A cloud with an edge is a cloud you can stand just
+    /// outside of on purpose; one that fades out is a cloud you find out you were
+    /// in. Darker than the fill rather than black, so it reads as the thick part of
+    /// the same gas rather than as an outline drawn on top of it.
+    static let gasEdge = rgb(0x6F, 0x9E, 0x1E)
+
     /// The colour of yes, and the colour of no, for anything you press.
     ///
     /// One pair, used by the sell button, the shop's price pills and the buy
