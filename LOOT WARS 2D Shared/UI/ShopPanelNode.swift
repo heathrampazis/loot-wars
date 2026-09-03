@@ -126,6 +126,15 @@ final class ShopPanelNode: SKNode {
 
     private var lastPressed: Int?
 
+    /// A deal waiting for the next redraw, and how long to hold it first.
+    ///
+    /// Set by open and by selectTab, spent by update. It cannot fire from either of
+    /// those directly: dealing animates each card from just below its HOME, and the
+    /// home is whatever the redraw is about to put it at - two tabs have different
+    /// card counts, so a deal started before the layout slides every card to where
+    /// the last tab's cards used to be.
+    private var pendingDeal: TimeInterval?
+
     override init() {
         super.init()
 
@@ -462,7 +471,7 @@ final class ShopPanelNode: SKNode {
             withKey: "curtain"
         )
 
-        dealCards(from: 0.06)
+        pendingDeal = 0.06
     }
 
     func close() {
@@ -676,7 +685,7 @@ final class ShopPanelNode: SKNode {
         // off here rather than there keeps the animation tied to the DECISION
         // rather than to the redraw, and the redraw fires for other reasons too:
         // buying something must not re-deal the whole tab.
-        dealCards(from: 0)
+        pendingDeal = 0
     }
 
     /// Slides the visible cards in, one just after another.
@@ -685,18 +694,23 @@ final class ShopPanelNode: SKNode {
     /// they read as a hand being dealt - which is exactly what a tab change is -
     /// where simultaneous movement reads as the panel twitching.
     private func dealCards(from delay: TimeInterval) {
-        for (index, card) in cards.enumerated() {
+        for (index, card) in cards.enumerated() where !card.holder.isHidden {
             card.holder.removeAction(forKey: "deal")
-            card.holder.alpha = 0
 
+            // Faded back to where the redraw wanted it rather than to 1: a machine
+            // you already own is drawn faint, and should still be faint when it
+            // lands.
+            let settled = card.holder.alpha
             let home = card.holder.position
+
+            card.holder.alpha = 0
             card.holder.position = CGPoint(x: home.x, y: home.y - 14)
 
             card.holder.run(
                 .sequence([
                     .wait(forDuration: delay + Double(index) * 0.03),
                     .group([
-                        .fadeIn(withDuration: 0.12),
+                        .fadeAlpha(to: settled, duration: 0.12),
                         .move(to: home, duration: 0.14)
                     ])
                 ]),
