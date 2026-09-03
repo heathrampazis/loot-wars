@@ -17,15 +17,24 @@ final class BombRenderer {
     let node = SKNode()
 
     private var nodesByBomb: [BombID: SKSpriteNode] = [:]
-    private lazy var texture: SKTexture = {
-        let texture = SKTexture(imageNamed: "Bomb")
+
+    /// One texture per kind. Both are drawn by this renderer because both FLY the
+    /// same way - it is only what happens when they stop that differs - but they
+    /// are different objects and have to look it: a stink bomb that tumbles through
+    /// the air wearing a blast bomb's art tells the person it is heading towards
+    /// exactly the wrong thing about what to do next.
+    private lazy var blastTexture: SKTexture = Self.load("Bomb")
+    private lazy var stinkTexture: SKTexture = Self.load("StinkBomb")
+
+    private static func load(_ name: String) -> SKTexture {
+        let texture = SKTexture(imageNamed: name)
         texture.usesMipmaps = true
         return texture
-    }()
+    }
 
     func sync(with world: World) {
         for bomb in world.bombs {
-            let sprite = nodesByBomb[bomb.id] ?? makeNode(for: bomb.id)
+            let sprite = nodesByBomb[bomb.id] ?? makeNode(for: bomb)
             sprite.position = GridGeometry.point(for: bomb.position)
         }
 
@@ -37,17 +46,20 @@ final class BombRenderer {
 
     }
 
-    private func makeNode(for id: BombID) -> SKSpriteNode {
+    private func makeNode(for bomb: Bomb) -> SKSpriteNode {
         let side = GridGeometry.length(ofTiles: GameConfig.Bomb.spriteSize)
-        let sprite = SKSpriteNode(texture: texture,
-                                  size: CGSize(width: side, height: side))
+
+        let sprite = SKSpriteNode(
+            texture: bomb.kind == .stink ? stinkTexture : blastTexture,
+            size: CGSize(width: side, height: side)
+        )
         sprite.zPosition = 9    // over walls and shots, under actors
 
         // Tumbling reads as thrown rather than fired.
         sprite.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 0.9)))
 
         node.addChild(sprite)
-        nodesByBomb[id] = sprite
+        nodesByBomb[bomb.id] = sprite
         return sprite
     }
 

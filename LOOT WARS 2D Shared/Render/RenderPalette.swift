@@ -107,13 +107,19 @@ enum RenderPalette {
     /// is already made of clean greens - a cloud in the same family as the grass
     /// would read as terrain, and this has to read as something you do not walk
     /// into.
-    static let gas = rgb(0xA8, 0xD8, 0x3A)
-
-    /// And the line round it. A cloud with an edge is a cloud you can stand just
-    /// outside of on purpose; one that fades out is a cloud you find out you were
-    /// in. Darker than the fill rather than black, so it reads as the thick part of
-    /// the same gas rather than as an outline drawn on top of it.
-    static let gasEdge = rgb(0x6F, 0x9E, 0x1E)
+    /// A pale spring green, lighter than the grass rather than more saturated
+    /// than it.
+    ///
+    /// The first attempt was a sickly yellow-green picked to contrast with the
+    /// map - which is the obvious way to make a hazard stand out and the wrong one
+    /// here. At the opacity a cloud needs, a saturated colour reads as a hole
+    /// punched in the level; a lighter version of what is already underneath reads
+    /// as something lying ON the level, which is what it is.
+    ///
+    /// It does not need an outline either. An edge was doing the job the fill was
+    /// too thin to do, and now that the fill is nearly solid the silhouette draws
+    /// itself.
+    static let gas = rgb(0xB4, 0xE3, 0x92)
 
     /// The colour of yes, and the colour of no, for anything you press.
     ///

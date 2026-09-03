@@ -100,9 +100,8 @@ final class GasRenderer {
         // ground through it, but the boundary is a line rather than a fade, which
         // is what makes "in it" and "out of it" a thing you can judge at a glance
         // while somebody is shooting at you.
-        nodes.shape.fillColor = RenderPalette.gas.withAlphaComponent(0.72)
-        nodes.shape.strokeColor = RenderPalette.gasEdge
-        nodes.shape.lineWidth = 3
+        nodes.shape.fillColor = RenderPalette.gas.withAlphaComponent(0.93)
+        nodes.shape.strokeColor = .clear
         nodes.shape.isAntialiased = true
 
         // Above the ground and the loot, below the actors - somebody standing in
