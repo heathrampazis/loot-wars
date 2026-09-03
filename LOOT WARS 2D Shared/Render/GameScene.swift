@@ -40,6 +40,7 @@ final class GameScene: SKScene {
     private let bombRenderer = BombRenderer()
     private let projectileRenderer = ProjectileRenderer()
     private let actorRenderer = ActorRenderer()
+    private let effectsRenderer = EffectsRenderer()
     private let placementGhost = PlacementGhost()
     private let cameraController = CameraController()
 
@@ -115,6 +116,19 @@ final class GameScene: SKScene {
     private let hotbar = HotbarNode()
     private let chestPanel = ChestPanelNode()
     private let respawnBanner = RespawnBanner()
+
+    /// A red edge that pulses when YOU are hit.
+    ///
+    /// The figure already flinches, and on a phone that is a thumbnail-sized
+    /// flinch in the middle of a fight you are busy aiming through. This is the
+    /// same information at the size of the screen, and only for your own damage -
+    /// everybody else's is a thing you watch, yours is a thing that is happening
+    /// to you.
+    private let hitEdge = SKShapeNode()
+
+    /// Your health last frame, so the edge knows a hit happened. Noticed rather
+    /// than announced, like everything else that two frames of the world can say.
+    private var lastLocalHealth = Int.max
 
     /// The hotbar slot picked out, waiting to be acted on.
     ///
@@ -241,6 +255,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(bombRenderer.node)
         worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
+        worldLayer.addChild(effectsRenderer.node)
         worldLayer.addChild(placementGhost.node)
         addChild(worldLayer)
 
@@ -263,6 +278,12 @@ final class GameScene: SKScene {
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
         cameraController.node.addChild(respawnBanner)
+
+        hitEdge.fillColor = .clear
+        hitEdge.strokeColor = RenderPalette.healthBar
+        hitEdge.alpha = 0
+        hitEdge.zPosition = 1200
+        cameraController.node.addChild(hitEdge)
         layOutUI()
 
         syncRenderers()
@@ -353,6 +374,16 @@ final class GameScene: SKScene {
         // those two fit on.
         matchTimer.position = CGPoint(x: 0, y: size.height / 2 - inset)
         results.layOut(for: size)
+
+        // Inset by half its own line width, so the stroke lands ON the edge of the
+        // screen rather than half of it falling outside and being thrown away.
+        let edge: CGFloat = 26
+        hitEdge.lineWidth = edge
+        hitEdge.path = CGPath(roundedRect: CGRect(x: -size.width / 2 + edge / 2,
+                                                  y: -size.height / 2 + edge / 2,
+                                                  width: size.width - edge,
+                                                  height: size.height - edge),
+                              cornerWidth: 40, cornerHeight: 40, transform: nil)
 
         // Tucked against the right-hand edge of the HUD, top-aligned with it.
         //
@@ -476,7 +507,9 @@ final class GameScene: SKScene {
         updateItemButton(with: world)
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
-        reportPurchases(from: world)
+        effectsRenderer.sync(with: world)
+        reportLocalDamage(in: world)
+        dispatch(world.takeEvents(), in: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
         }
@@ -508,18 +541,46 @@ final class GameScene: SKScene {
         }
     }
 
-    /// Tells the shop when one of its cards actually sold.
+    /// Takes everything the world announced this frame and hands it to whoever
+    /// draws it.
     ///
-    /// Drained every frame rather than only while the panel is open, or a bot's
-    /// spending would pile up behind a closed shop and all arrive at once the next
-    /// time you opened it. Everybody else's purchases are read and discarded here;
-    /// only yours has anything to show for it.
+    /// ONE drain, in one place. Every kind of event has to be taken off the world
+    /// every frame whether or not anything is currently listening - a sale made
+    /// behind a closed shop, an explosion off the edge of the screen - or they pile
+    /// up and arrive together the next time somebody looks. One loop that always
+    /// runs cannot forget; three renderers that each drain their own kind can.
     ///
-    /// Note the money side needs nothing: the token counter animates on any change
-    /// it sees, so the price leaving your purse is already accounted for.
-    private func reportPurchases(from world: World) {
-        let mine = world.takePurchases().contains { $0.actor == world.localPlayerID }
-        if mine { shopPanel.confirm() }
+    /// Note what is NOT here: the money. The token counter animates on any change
+    /// it sees, so the price leaving your purse is already drawn.
+    private func dispatch(_ events: [WorldEvent], in world: World) {
+        for event in events {
+            switch event {
+            case .blast(let position):
+                bombRenderer.flash(at: position)
+
+            case .purchase(_, let buyer):
+                if buyer == world.localPlayerID { shopPanel.confirm() }
+
+            case .kill(_, let killer, let position, let points, _):
+                effectsRenderer.mark(killAt: position,
+                                     points: points,
+                                     mine: killer == world.localPlayerID)
+            }
+        }
+    }
+
+    /// Your own damage, at the size of the screen.
+    private func reportLocalDamage(in world: World) {
+        guard let player = world.localPlayer else { return }
+
+        defer { lastLocalHealth = player.health }
+        guard lastLocalHealth != Int.max,
+              player.health < lastLocalHealth,
+              player.isAlive else { return }
+
+        hitEdge.removeAllActions()
+        hitEdge.alpha = 0.55
+        hitEdge.run(.fadeAlpha(to: 0, duration: 0.34))
     }
 
     /// Keeps the placement outline honest.

@@ -149,6 +149,6 @@ enum BombSystem {
             CombatSystem.damage(id, amount: max(1, hurt), from: bomb.owner, in: world)
         }
 
-        world.recordBlast(at: bomb.position)
+        world.record(.blast(at: bomb.position))
     }
 }

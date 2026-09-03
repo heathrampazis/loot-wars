@@ -52,6 +52,12 @@ enum CombatSystem {
     }
 
     private static func kill(_ actor: inout Actor, by attacker: ActorID?, in world: World) {
+        // What it paid, kept so the screen can say so. Both are worked out below
+        // from things that are about to be thrown away - the victim's gear is
+        // stripped a few lines further down, and they are moved home to respawn -
+        // which is exactly why a kill has to be announced rather than noticed.
+        var earned = (points: 0, tokens: 0)
+
         // Nobody is paid for a team killing itself, and nobody is paid when there is
         // no killer to speak of.
         if let attacker, let killer = world.actors[attacker], killer.team != actor.team {
@@ -60,8 +66,9 @@ enum CombatSystem {
             // Blaster 6 are not the same job, and used to pay the same.
             let worth = actor.gearWorth
 
-            world.awardTokens(GameConfig.Tokens.perKill
-                              + worth * GameConfig.Tokens.perTierKilled, to: attacker)
+            earned.tokens = GameConfig.Tokens.perKill
+                + worth * GameConfig.Tokens.perTierKilled
+            world.awardTokens(earned.tokens, to: attacker)
 
             var points = GameConfig.Score.kill + worth * GameConfig.Score.killPerTier
 
@@ -72,8 +79,12 @@ enum CombatSystem {
                 points += GameConfig.Score.killInTheirBase
             }
 
+            earned.points = points
             world.award(points, to: killer.team)
         }
+
+        world.record(.kill(victim: actor.id, by: attacker, at: actor.position,
+                           points: earned.points, tokens: earned.tokens))
 
         actor.health = 0
         actor.respawnTimer = GameConfig.Player.respawnDelay

@@ -27,8 +27,29 @@ final class ActorRenderer {
     private static let barOutlineInTiles: Double = 0.075
     private static let barGapInTiles: Double = 0.08
 
+    /// How far you walk per step, in tiles, and how high the figure rises on one.
+    ///
+    /// The stride is shared with EffectsRenderer, which puts a tuft of disturbed
+    /// grass down on the same beat - the foot planting and the grass moving are
+    /// the same event seen twice, and two stride constants would drift apart.
+    static let walkStride: Double = 1.05
+    private static let walkBob: Double = 0.075      // tiles
+    private static let walkLean: Double = 0.045     // radians
+
     private final class ActorNodes {
         let root = SKNode()
+
+        /// Carries the walk. Written every frame, which is exactly why it is its
+        /// own node: the bob would otherwise have to share yScale and zRotation
+        /// with the flinch and the heal, and a value rewritten sixty times a second
+        /// cannot also be animated by an action - the action simply loses.
+        let body = SKNode()
+
+        /// The flinch and the heal act HERE, for the same reason: the sprite's own
+        /// xScale is the mirror, rewritten every frame from which way the actor
+        /// faces, so a scale action on the sprite is overwritten before it is seen.
+        let figure = SKNode()
+
         let sprite: SKSpriteNode
         let healthFill: SKShapeNode
         let blaster: SKSpriteNode
@@ -37,8 +58,16 @@ final class ActorRenderer {
         /// So the figure can be re-dressed the moment its helmet changes.
         var lastHelmet: HelmetTier?
         var lastBlaster: BlasterTier?
-        /// Used only to notice a drop, which is what triggers the hit flash.
+        /// Used to notice a change either way: down is a hit, up is a heal. The
+        /// renderer works both out for itself rather than being told - see
+        /// WorldEvent for where that line is drawn.
         var lastHealth: Int = Int.max
+
+        /// Where the walk cycle has got to, advanced by DISTANCE rather than by
+        /// time, so a figure that is being shoved along a wall does not moonwalk
+        /// and a stationary one does not jog on the spot.
+        var walkPhase: Double = 0
+        var lastPosition: Vec2?
 
         init(sprite: SKSpriteNode,
              healthFill: SKShapeNode,
@@ -78,10 +107,36 @@ final class ActorRenderer {
             // passing straight through someone.
             nodes.root.alpha = actor.invulnerability > 0 ? 0.55 : 1.0
 
-            // A drop in health is the hit. No event system needed for something the
-            // renderer can simply notice.
-            if actor.health < nodes.lastHealth, actor.isAlive {
-                flash(nodes.sprite)
+            // The walk. Distance covered since the last frame turns the cycle, so
+            // the bob is tied to the ground rather than to the clock: stop and it
+            // settles, get pushed and it still reads as being moved rather than as
+            // walking. Only the vertical half of the cycle is used - abs of the
+            // sine - so the figure rises on every step instead of every other one.
+            let moved = nodes.lastPosition.map { (actor.position - $0).length } ?? 0
+            nodes.lastPosition = actor.position
+
+            // A teleport is not a walk - see EffectsRenderer, which draws the same
+            // conclusion for the grass. At full speed a frame covers about six
+            // hundredths of a tile, so anything past a stride is a respawn.
+            if moved < ActorRenderer.walkStride {
+                nodes.walkPhase += moved * .pi / ActorRenderer.walkStride
+            }
+
+            let hop = abs(sin(nodes.walkPhase))
+            nodes.body.position.y = GridGeometry.length(
+                ofTiles: hop * ActorRenderer.walkBob)
+
+            // And a lean, which is what stops the hop reading as a hiccup. It
+            // leans INTO the direction of travel, so it flips with the figure.
+            nodes.body.zRotation = sin(nodes.walkPhase * 0.5)
+                * ActorRenderer.walkLean
+                * (actor.facesLeft ? 1 : -1)
+
+            // A drop in health is the hit, a rise is a heal. No event system needed
+            // for something the renderer can simply notice.
+            if actor.isAlive, nodes.lastHealth != Int.max {
+                if actor.health < nodes.lastHealth { hurt(nodes) }
+                if actor.health > nodes.lastHealth { healed(nodes) }
             }
             nodes.lastHealth = actor.health
 
@@ -171,8 +226,14 @@ final class ActorRenderer {
                                healthFill: fill,
                                blaster: blaster,
                                goalLabel: goalLabel)
-        nodes.root.addChild(sprite)
-        nodes.root.addChild(blaster)
+        // root -> body -> figure -> sprite, and each layer owns exactly one kind
+        // of movement: the root is where the actor IS, the body is the walk, the
+        // figure is whatever just happened to it, and the sprite is which way it is
+        // facing. Collapsing any two of those means one overwriting the other.
+        nodes.figure.addChild(sprite)
+        nodes.body.addChild(nodes.figure)
+        nodes.body.addChild(blaster)
+        nodes.root.addChild(nodes.body)
         nodes.root.addChild(bar)
         if let goalLabel { nodes.root.addChild(goalLabel) }
 
@@ -217,14 +278,50 @@ final class ActorRenderer {
         blaster.xScale = facingLeft ? -1 : 1
     }
 
-    /// A quick white blink. Keyed, so rapid hits restart it rather than stacking up
-    /// into a permanently white actor.
-    private func flash(_ sprite: SKSpriteNode) {
-        sprite.removeAction(forKey: "hit")
-        sprite.run(.sequence([
+    /// Took a hit: a white blink and a flinch.
+    ///
+    /// The blink alone was doing the job of saying damage happened, and doing it
+    /// invisibly at a distance - one frame of white on a figure the size of a
+    /// thumbnail. The flinch is what makes it read: the figure recoils, squashes
+    /// and comes back, which is movement rather than colour and survives being
+    /// looked at out of the corner of an eye.
+    ///
+    /// Both keyed, so a burst of hits restarts them rather than stacking up into a
+    /// permanently white actor standing permanently sideways.
+    private func hurt(_ nodes: ActorNodes) {
+        nodes.sprite.removeAction(forKey: "hit")
+        nodes.sprite.run(.sequence([
             .colorize(with: .white, colorBlendFactor: 0.85, duration: 0.04),
             .colorize(withColorBlendFactor: 0, duration: 0.14)
         ]), withKey: "hit")
+
+        nodes.figure.removeAction(forKey: "react")
+        nodes.figure.run(.sequence([
+            .group([.scaleX(to: 1.12, y: 0.88, duration: 0.05),
+                    .rotate(toAngle: 0.10, duration: 0.05)]),
+            .group([.scaleX(to: 1, y: 1, duration: 0.16),
+                    .rotate(toAngle: 0, duration: 0.16)])
+        ]), withKey: "react")
+    }
+
+    /// Patched up: a green wash and a lift.
+    ///
+    /// Deliberately the opposite shape to the flinch. A hit squashes down and
+    /// snaps back; a heal stretches up and settles - so the two are told apart by
+    /// the movement, before anybody has read the colour or the health bar.
+    private func healed(_ nodes: ActorNodes) {
+        nodes.sprite.removeAction(forKey: "hit")
+        nodes.sprite.run(.sequence([
+            .colorize(with: RenderPalette.placementValid,
+                      colorBlendFactor: 0.7, duration: 0.08),
+            .colorize(withColorBlendFactor: 0, duration: 0.32)
+        ]), withKey: "hit")
+
+        nodes.figure.removeAction(forKey: "react")
+        nodes.figure.run(.sequence([
+            .scaleX(to: 0.92, y: 1.12, duration: 0.09),
+            .scaleX(to: 1, y: 1, duration: 0.22)
+        ]), withKey: "react")
     }
 
     private func setHealth(_ fraction: Double, on nodes: ActorNodes) {

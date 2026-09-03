@@ -35,9 +35,6 @@ final class BombRenderer {
             sprite.removeFromParent()
         }
 
-        for blast in world.takeBlasts() {
-            flash(at: blast)
-        }
     }
 
     private func makeNode(for id: BombID) -> SKSpriteNode {
@@ -77,7 +74,11 @@ final class BombRenderer {
     /// That is deliberate - this is decoration, run after the simulation has
     /// already decided everything, and drawing must never be able to disturb a
     /// seeded match.
-    private func flash(at position: Vec2) {
+    /// Called by the scene when it drains a blast out of the world's events. It
+    /// used to drain them itself, which was fine while blasts were the only thing
+    /// being announced - now that kills and sales come the same way, one drain in
+    /// one place beats three that all have to remember to run every frame.
+    func flash(at position: Vec2) {
         let origin = GridGeometry.point(for: position)
         let radius = GridGeometry.length(ofTiles: GameConfig.Bomb.blastRadius)
 

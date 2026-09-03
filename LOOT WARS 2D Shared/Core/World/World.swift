@@ -70,10 +70,8 @@ final class World {
 
     /// Where bombs went off this tick. Drained by the renderer, which is the only
     /// thing that cares - the simulation has already applied the damage.
-    private(set) var recentBlasts: [Vec2] = []
-
-    /// Sales made since the screen last looked. See recordPurchase.
-    private var recentPurchases: [(actor: ActorID, item: ItemType)] = []
+    /// What has happened since the screen last looked. See WorldEvent.
+    private var recentEvents: [WorldEvent] = []
 
     /// An array rather than a dictionary, because machines never come or go during
     /// a match - and a fixed order is what keeps their payouts deterministic.
@@ -640,37 +638,21 @@ final class World {
         bombs.append(bomb)
     }
 
-    func recordBlast(at position: Vec2) {
-        recentBlasts.append(position)
+    func record(_ event: WorldEvent) {
+        recentEvents.append(event)
     }
 
-    /// Something was bought. Recorded so the screen can say so.
+    /// Hands the events over and forgets them.
     ///
-    /// The same shape as a blast, and for the same reason: the simulation states
-    /// what happened and the UI decides what that looks like. The alternative -
-    /// the shop panel watching the purse for a dip and inferring a sale - would
-    /// invent a purchase out of any other way of losing tokens, and would miss
-    /// every one that changes nothing in the bag, which is every gear upgrade.
-    func recordPurchase(_ item: ItemType, by id: ActorID) {
-        recentPurchases.append((actor: id, item: item))
-    }
-
-    /// Hands the purchases over and forgets them. Drained every frame whether or
-    /// not the shop is open, or a sale made behind a closed panel would queue up
-    /// and arrive all at once the next time it opened.
-    func takePurchases() -> [(actor: ActorID, item: ItemType)] {
-        let purchases = recentPurchases
-        recentPurchases.removeAll()
-        return purchases
-    }
-
-    /// Hands the blasts over and forgets them. Called once a frame by the renderer,
-    /// not once a tick - the fixed step can run several times between frames, and
-    /// every one of those explosions still deserves to be seen.
-    func takeBlasts() -> [Vec2] {
-        let blasts = recentBlasts
-        recentBlasts.removeAll()
-        return blasts
+    /// Drained once a frame by the scene, not once a TICK: the fixed step can run
+    /// several times between two frames, and every explosion in there still
+    /// deserves to be seen. Drained whether or not anything is listening for a
+    /// particular kind, too, or a sale made behind a closed shop would pile up and
+    /// arrive all at once the next time it opened.
+    func takeEvents() -> [WorldEvent] {
+        let events = recentEvents
+        recentEvents.removeAll()
+        return events
     }
 
     func setTile(_ tile: TileType, at point: GridPoint) {
