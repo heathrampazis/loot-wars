@@ -261,7 +261,6 @@ final class GameScene: SKScene {
         worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
         worldLayer.addChild(effectsRenderer.node)
-        worldLayer.addChild(hint)
         worldLayer.addChild(placementGhost.node)
         addChild(worldLayer)
 
@@ -280,6 +279,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(shopButton)
         cameraController.node.addChild(shopPanel)
         cameraController.node.addChild(quickBuy)
+        cameraController.node.addChild(hint)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -418,6 +418,12 @@ final class GameScene: SKScene {
             x: hud.position.x + QuickBuyNode.size.width / 2,
             y: hudBottom - 10 - QuickBuyNode.size.height / 2)
 
+        // The strip directly under the health panel, centred: the one band of
+        // screen nothing else occupies mid-match. Measured off the HUD rather than
+        // off the top edge, so it follows the panel if that ever changes height -
+        // which it just did, when the ammo bar came out.
+        hint.position = CGPoint(x: 0, y: hudBottom - 18)
+
     }
 
     // MARK: - Loop
@@ -555,12 +561,6 @@ final class GameScene: SKScene {
             hint.hide()
             return
         }
-
-        // Carried by the player rather than pinned to the screen, so it follows
-        // them and stays where the eye already is. Above the health bar over their
-        // head, which is the one bit of space nothing else uses.
-        hint.position = GridGeometry.point(
-            for: Vec2(x: player.position.x, y: player.position.y + 1.35))
 
         // Retired only once it has actually run its course. Cut short by somebody
         // rounding a corner, it comes back at the next quiet moment - see

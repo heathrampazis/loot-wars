@@ -2,8 +2,7 @@
 //  HintNode.swift
 //  Loot Wars
 //
-//  A line of text that floats over the player, teaches one gesture, and then goes
-//  away for good.
+//  A line of text that teaches one gesture and then goes away for good.
 //
 //  Holding a hotbar slot drops the item, and holding a wall takes it down. Both are
 //  good gestures and neither is discoverable: nothing on the screen suggests that
@@ -20,9 +19,19 @@
 //   3. It stops for good the moment the player performs the gesture, and it only
 //      ever offers itself once a match either way.
 //
-//  It rides over the player rather than sitting on the glass with the HUD. A hint
-//  about the thing you are carrying belongs on the person carrying it, where the
-//  eye already is, rather than in a corner competing with the score.
+//  WHERE it sits took three goes and the reasoning is worth keeping.
+//
+//  Above the hotbar was wrong: that is where a thumb is, so the hint arrived under
+//  the hand it was talking about. Over the player's own head was worse - it looked
+//  janky, and the reason is that the player is the one thing on screen that never
+//  holds still. A message pinned to a moving figure inherits the walk cycle, the
+//  camera follow and every collision with a health bar, a token and whatever is
+//  standing behind them.
+//
+//  A message is a message. It goes on the glass, it does not move, and it sits in
+//  the strip directly under the health panel - the one band of screen nothing else
+//  uses while a match is running. Centred, so it reads as an announcement rather
+//  than as a label belonging to whatever it happens to be next to.
 //
 //  Deliberately not a tutorial system. One line, no queue, no ordering, no state
 //  that outlives the match - if a second hint is ever wanted it can have its own
@@ -64,16 +73,15 @@ final class HintNode: SKNode {
         label.verticalAlignmentMode = .center
         addChild(label)
 
-        // Barely there. It is standing on top of the game rather than beside it,
-        // so it has to be readable against grass without becoming a sign nailed to
-        // the player's head - just enough shade under the words to hold them.
-        plate.fillColor = SKColor(white: 0, alpha: 0.38)
+        // Enough plate to be read over grass, not so much that it reads as a
+        // permanent part of the furniture: this is the only thing on the screen
+        // that is here to be dismissed.
+        plate.fillColor = RenderPalette.hudPanel
         plate.strokeColor = .clear
         plate.zPosition = -1
         addChild(plate)
 
-        // Above the actors it floats over, below anything on the glass.
-        zPosition = 20
+        zPosition = 1050
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -105,6 +113,7 @@ final class HintNode: SKNode {
         // A nudge downwards on the way in, towards the thing it is talking about.
         run(.sequence([
             .group([.fadeIn(withDuration: 0.16), .scale(to: 1, duration: 0.16)]),
+            // Held long enough to be read twice by somebody who is also playing.
             .wait(forDuration: seconds),
             .fadeOut(withDuration: 0.3),
             .hide(),
