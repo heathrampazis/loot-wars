@@ -31,6 +31,7 @@ final class QuickBuyNode: SKNode {
     static let size = CGSize(width: 104, height: 44)
 
     private let plate = SKShapeNode()
+    private let glow = SKSpriteNode(texture: GlowArt.pool)
     private let icon = SKSpriteNode()
     private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let token = SKSpriteNode()
@@ -65,6 +66,15 @@ final class QuickBuyNode: SKNode {
         plate.strokeColor = RenderPalette.placementValid
         plate.lineWidth = 2
         addChild(plate)
+
+        // Behind the artwork, like everywhere else loot is drawn. The plate's own
+        // outline goes on meaning "you can afford this", which is a different fact
+        // and deserves its own colour.
+        glow.size = CGSize(width: 46, height: 46)
+        glow.colorBlendFactor = 1
+        glow.alpha = 0.7
+        glow.position = CGPoint(x: -box.width / 2 + 26, y: 0)
+        addChild(glow)
 
         icon.position = CGPoint(x: -box.width / 2 + 26, y: 0)
         icon.zPosition = 1
@@ -141,9 +151,7 @@ final class QuickBuyNode: SKNode {
         offer = item.type
         live = true
 
-        // Rimmed in the item's rarity, which is the only label a chip this small
-        // has room for.
-        plate.strokeColor = RenderPalette.colour(of: item.type.rarity)
+        glow.color = RenderPalette.colour(of: item.type.rarity)
 
         let texture = ItemArt.texture(for: item.type)
         icon.texture = texture
