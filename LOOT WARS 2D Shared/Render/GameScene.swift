@@ -33,7 +33,6 @@ final class GameScene: SKScene {
     private let claimRenderer = ClaimRenderer()
     private let treeRenderer = TreeRenderer()
     private let blockRenderer = BlockRenderer()
-    private let wallDamageRenderer = WallDamageRenderer()
     private let arcadeRenderer = ArcadeRenderer()
     private let lootboxRenderer = LootboxRenderer()
     private let chestRenderer = ChestRenderer()
@@ -270,7 +269,6 @@ final class GameScene: SKScene {
         worldLayer.addChild(claimRenderer.node)
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
-        worldLayer.addChild(wallDamageRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
         worldLayer.addChild(lootboxRenderer.node)
         worldLayer.addChild(chestRenderer.node)
@@ -504,7 +502,6 @@ final class GameScene: SKScene {
         }
 
         blockRenderer.sync(with: world)
-        wallDamageRenderer.sync(with: world)
         lootboxRenderer.sync(with: world)
         chestRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
@@ -1244,33 +1241,19 @@ extension GameScene {
             return
         }
 
-        if let offer = shopPanel.item(atLocalPoint: point) {
-            // Asked HERE as well as by the simulation, because a card does not grey
-            // out for everything that can refuse it - a bag with no room, a purse
-            // that is short - so a tap can be refused by something the shop never
-            // showed you. Same answer either way; this one just gets to say no out
-            // loud rather than the command quietly going nowhere.
-            guard let player = world.localPlayer else { return }
-
-            if let type = offer.item {
-                guard ShopSystem.canBuy(type, actor: player, in: world) else {
-                    shopPanel.refuse()
-                    return
-                }
-
-                queuedCommands.append(.buyItem(type))
+        if let item = shopPanel.item(atLocalPoint: point) {
+            // Asked HERE as well as by the simulation, because the card no longer
+            // greys out for a bag with no room in it - so a tap can now be refused
+            // by something the shop never showed you. Same answer either way; this
+            // one just gets to say no out loud instead of the command quietly
+            // going nowhere.
+            guard let player = world.localPlayer,
+                  ShopSystem.canBuy(item, actor: player, in: world) else {
+                shopPanel.refuse()
                 return
             }
 
-            if let upgrade = offer.upgrade {
-                guard ShopSystem.canBuy(upgrade, actor: player, in: world) else {
-                    shopPanel.refuse()
-                    return
-                }
-
-                queuedCommands.append(.buyUpgrade(upgrade))
-            }
-
+            queuedCommands.append(.buyItem(item))
             return
         }
     }

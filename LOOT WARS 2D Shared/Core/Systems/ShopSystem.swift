@@ -15,43 +15,6 @@
 
 enum ShopSystem {
 
-    /// One card on a shelf.
-    ///
-    /// Introduced when the shop started selling UPGRADES, which are not items: they
-    /// have no slot, no stack and no owner beyond the team. Rather than bending
-    /// ItemType into covering them - which would have put "and also this is not a
-    /// thing you can carry" into every switch over items in the project - a card
-    /// says what KIND of purchase it is and the two paths part company here, in the
-    /// one file that is about buying.
-    struct Offer {
-        enum Kind {
-            case item(ItemType)
-            case upgrade(Upgrade)
-        }
-
-        let kind: Kind
-        let price: Int
-
-        /// The tier being sold, for an upgrade, and nil for an item.
-        ///
-        /// A number rather than a formatted name, because a name is a picture of a
-        /// thing and Core does not draw. ItemType has never said what it is called
-        /// either - the shop panel asks ItemArt, which is where every other
-        /// question about how something looks already goes.
-        let tier: Int?
-
-        var item: ItemType? {
-            if case .item(let type) = kind { return type }
-            return nil
-        }
-
-        var upgrade: Upgrade? {
-            if case .upgrade(let which) = kind { return which }
-            return nil
-        }
-    }
-
-
     static func update(_ world: World, commands: [ActorID: [Command]]) {
         for (id, list) in commands {
             for command in list {
@@ -60,7 +23,6 @@ enum ShopSystem {
                 // purse and the bag.
                 switch command {
                 case .buyItem(let type): buy(type, by: id, in: world)
-                case .buyUpgrade(let which): buy(which, by: id, in: world)
                 case .sellItem(let slot): sell(from: slot, by: id, in: world)
                 default: break
                 }
@@ -86,14 +48,14 @@ enum ShopSystem {
     }
 
     /// The gear tab's offers, without the caller needing to know which tab that is.
-    static func upgradeOffers(for actor: Actor, in world: World) -> [Offer] {
+    static func upgradeOffers(for actor: Actor) -> [GameConfig.Shop.Item] {
         // Every gear tab's offer, gathered - there are two of them now, one per
         // ladder, and the callers that want "what could this actor climb next"
         // want both. The bots buy the cheaper of them and the quick prompt offers
         // the same, so neither had to learn that the shop was reorganised.
-        GameConfig.Shop.tabs.indices.flatMap { index -> [Offer] in
+        GameConfig.Shop.tabs.indices.flatMap { index -> [GameConfig.Shop.Item] in
             guard case .upgrades = GameConfig.Shop.tabs[index].stock else { return [] }
-            return offers(on: index, for: actor, in: world)
+            return offers(on: index, for: actor)
         }
     }
 
@@ -103,41 +65,28 @@ enum ShopSystem {
     /// step up from whatever you are wearing, so the cards change as you climb and
     /// nobody is shown four tiers they cannot reach yet. Empty once you are wearing
     /// the best there is.
-    static func offers(on tab: Int, for actor: Actor, in world: World) -> [Offer] {
+    static func offers(on tab: Int, for actor: Actor) -> [GameConfig.Shop.Item] {
         guard GameConfig.Shop.tabs.indices.contains(tab) else { return [] }
 
         switch GameConfig.Shop.tabs[tab].stock {
         case .shelf(let items):
-            return items.map { Offer(kind: .item($0.type), price: $0.price, tier: nil) }
+            return items
+
 
         case .upgrades:
-            var offers: [Offer] = []
+            var offers: [GameConfig.Shop.Item] = []
 
             if let next = nextTier(above: actor.helmet, in: HelmetTier.allCases),
                let price = GameConfig.Shop.helmetPrices[next] {
-                offers.append(Offer(kind: .item(.helmet(next)), price: price, tier: nil))
+                offers.append(.init(type: .helmet(next), price: price))
             }
 
             if let next = nextTier(above: actor.blaster, in: BlasterTier.allCases),
                let price = GameConfig.Shop.blasterPrices[next] {
-                offers.append(Offer(kind: .item(.blaster(next)), price: price, tier: nil))
+                offers.append(.init(type: .blaster(next), price: price))
             }
 
             return offers
-
-        case .improvements:
-            // Carrying the tier you would be BUYING rather than the one you have,
-            // because a card is an offer and not a status line: the II on it is
-            // what you get for the price printed underneath.
-            return Upgrade.allCases.compactMap { upgrade in
-                guard let price = price(of: upgrade, for: actor.team, in: world) else {
-                    return nil
-                }
-
-                return Offer(kind: .upgrade(upgrade),
-                             price: price,
-                             tier: world.tier(of: upgrade, for: actor.team) + 1)
-            }
         }
     }
 
@@ -227,42 +176,6 @@ enum ShopSystem {
         world.actors[id] = actor
     }
 
-    /// What the next tier of something costs, or nil when it is finished.
-    static func price(of upgrade: Upgrade, for team: TeamID, in world: World) -> Int? {
-        let tier = world.tier(of: upgrade, for: team)
-        guard tier < Upgrade.maxTier else { return nil }
-
-        switch upgrade {
-        case .walls:  return GameConfig.Upgrades.wallPrices[tier]
-        case .arcade: return GameConfig.Upgrades.arcadePrices[tier]
-        }
-    }
-
-    /// Whether this actor could buy the next tier right now.
-    ///
-    /// A machine upgrade needs a machine. Selling somebody a faster payout on a
-    /// cabinet they do not own would be taking twelve tokens for a number in a
-    /// table - and since machines are found rather than bought now, plenty of teams
-    /// never have one.
-    static func canBuy(_ upgrade: Upgrade, actor: Actor, in world: World) -> Bool {
-        guard actor.isAlive,
-              let price = price(of: upgrade, for: actor.team, in: world),
-              actor.tokens >= price else { return false }
-
-        if upgrade == .arcade { return world.hasArcade(actor.team) }
-        return true
-    }
-
-    private static func buy(_ upgrade: Upgrade, by id: ActorID, in world: World) {
-        guard var actor = world.actors[id],
-              canBuy(upgrade, actor: actor, in: world),
-              let price = price(of: upgrade, for: actor.team, in: world) else { return }
-
-        actor.tokens -= price
-        world.actors[id] = actor
-        world.raiseTier(of: upgrade, for: actor.team)
-    }
-
     /// The one thing worth offering out of the blue, or nil.
     ///
     /// What the quick-buy prompt shows, and it is deliberately ONE thing: a prompt
@@ -277,34 +190,26 @@ enum ShopSystem {
     ///
     /// The gear offer is the cheaper of the two rungs - the same rule the bots buy
     /// on, so the prompt never suggests something a bot would call a mistake.
-    static func quickOffer(for actor: Actor, in world: World) -> Offer? {
+    static func quickOffer(for actor: Actor, in world: World) -> GameConfig.Shop.Item? {
         guard actor.isAlive else { return nil }
 
         // Only when it is actually going badly - see GameConfig.Shop.quickHealBelow
         // for why a scratch is not enough to spend this prompt on.
         if Double(actor.health) < Double(actor.maxHealth) * GameConfig.Shop.quickHealBelow {
             let healing = GameConfig.Shop.tabs
-                .flatMap { tab -> [Offer] in
-                    guard case .shelf(let items) = tab.stock else { return [] }
-                    return items.map {
-                        Offer(kind: .item($0.type), price: $0.price, tier: nil)
-                    }
+                .flatMap { tab -> [GameConfig.Shop.Item] in
+                    if case .shelf(let items) = tab.stock { return items }
+                    return []
                 }
-                .filter {
-                    guard let type = $0.item else { return false }
-                    return type.isHealing && canBuy(type, actor: actor, in: world)
-                }
+                .filter { $0.type.isHealing && canBuy($0.type, actor: actor, in: world) }
 
             // The biggest one affordable, not the cheapest: this fires when you are
             // already hurt, and it is offering to fix that.
             if let best = healing.max(by: { $0.price < $1.price }) { return best }
         }
 
-        return upgradeOffers(for: actor, in: world)
-            .filter {
-                guard let type = $0.item else { return false }
-                return canBuy(type, actor: actor, in: world)
-            }
+        return upgradeOffers(for: actor)
+            .filter { canBuy($0.type, actor: actor, in: world) }
             .min { $0.price < $1.price }
     }
 

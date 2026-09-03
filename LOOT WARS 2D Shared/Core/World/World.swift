@@ -745,71 +745,6 @@ final class World {
         projectiles.append(projectile)
     }
 
-    // MARK: - Upgrades
-
-    /// What each team has bought for its base, by upgrade, nought to three.
-    ///
-    /// On the TEAM rather than on the actor, which is the whole point of an
-    /// upgrade: it is bought once and survives every death its owner has for the
-    /// rest of the match. A helmet is a thing you are wearing; a wall is a thing
-    /// that is true of your base.
-    private var upgrades: [TeamID: [Upgrade: Int]] = [:]
-
-    func tier(of upgrade: Upgrade, for team: TeamID) -> Int {
-        upgrades[team]?[upgrade] ?? 0
-    }
-
-    func raiseTier(of upgrade: Upgrade, for team: TeamID) {
-        let next = min(Upgrade.maxTier, tier(of: upgrade, for: team) + 1)
-        upgrades[team, default: [:]][upgrade] = next
-    }
-
-    // MARK: - Wall damage
-
-    /// How much of a wall tile has been knocked out, for tiles that have taken a
-    /// hit and not yet fallen.
-    ///
-    /// Kept beside the map rather than inside TileType, and that is deliberate: a
-    /// tile's type is what it IS, and every part of the game that asks whether
-    /// something is a wall - movement, line of sight, building, the renderer's
-    /// rebuild check - would have had to learn to ignore a number it does not care
-    /// about. A dictionary of the few damaged tiles costs nothing and is empty
-    /// almost always.
-    private(set) var wallDamage: [GridPoint: Int] = [:]
-
-    /// How many hits this team's walls take before they come down.
-    func wallLayers(for team: TeamID) -> Int {
-        1 + tier(of: .walls, for: team)
-    }
-
-    /// Knocks a piece out of a wall. Returns true if that was the last of it.
-    func damageWall(at point: GridPoint, by amount: Int) -> Bool {
-        guard let owner = map[point].blockOwner else { return false }
-
-        let taken = (wallDamage[point] ?? 0) + amount
-
-        guard taken < wallLayers(for: owner) else {
-            wallDamage[point] = nil
-            setTile(.floor, at: point)
-            return true
-        }
-
-        wallDamage[point] = taken
-
-        // The map itself has not changed, but the picture of it has - the renderer
-        // draws damage from this and rebuilds on the revision, so a wall that is
-        // cracked but standing still has to count as a change.
-        mapRevision += 1
-        return false
-    }
-
-    /// A wall that has been rebuilt is a whole wall again.
-    func clearWallDamage(at point: GridPoint) {
-        guard wallDamage[point] != nil else { return }
-        wallDamage[point] = nil
-        mapRevision += 1
-    }
-
     // MARK: - Gas
 
     /// Not private(set), unlike the ground items just above, and the difference is
@@ -943,7 +878,7 @@ final class World {
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
                      .placeChest, .placeArcade, .storeItem, .takeItem,
-                     .dropItem, .buyItem, .buyUpgrade, .sellItem:
+                     .dropItem, .buyItem, .sellItem:
                     break   // other systems' business, not movement's
                 }
             }

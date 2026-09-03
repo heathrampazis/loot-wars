@@ -136,17 +136,10 @@ enum ArcadeSystem {
             return GameConfig.Arcade.emitInterval * GameConfig.Arcade.jackpotRate
         }
 
-        guard let owner = arcade.owner else { return GameConfig.Arcade.emitInterval }
-
-        // An upgraded machine is faster wherever it stands, and a shut wall is
-        // faster again on top of that. Two multipliers rather than one table,
-        // because they are answers to two different questions - how good is the
-        // machine, and is anybody able to walk up to it.
-        let tuned = GameConfig.Arcade.emitInterval
-            * GameConfig.Upgrades.arcadeRate[world.tier(of: .arcade, for: owner)]
-
-        guard !world.baseIsBreached(owner) else { return tuned }
-        return tuned * GameConfig.Arcade.sealedInterval
+        guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
+            return GameConfig.Arcade.emitInterval
+        }
+        return GameConfig.Arcade.emitInterval * GameConfig.Arcade.sealedInterval
     }
 
     /// Starts and ends jackpots on the map's own machines.
@@ -208,16 +201,8 @@ enum ArcadeSystem {
             // machine, so a jackpot - a dozen payouts in eight seconds - is also
             // where most golden ones turn up, without either rule having to know
             // the other exists.
-            // An upgraded machine gilds more of what it pays. Applied to the
-            // chance rather than to the value, so a golden token is always worth
-            // the same ten wherever it came from - two different golden tokens
-            // would be a second thing to learn for no reason.
-            let gild = arcade.owner.map {
-                GameConfig.Upgrades.arcadeGolden[world.tier(of: .arcade, for: $0)]
-            } ?? 1
-
             let golden = Double.random(in: 0..<1, using: &world.rng)
-                < GameConfig.Arcade.goldenChance * gild
+                < GameConfig.Arcade.goldenChance
 
             let value = golden
                 ? GameConfig.Arcade.goldenValue

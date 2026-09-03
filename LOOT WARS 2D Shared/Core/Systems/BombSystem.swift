@@ -136,22 +136,11 @@ enum BombSystem {
                 let tile = GridPoint(col: centre.col + dCol, row: centre.row + dRow)
                 guard let owner = world.map[tile].blockOwner else { continue }
                 guard (tile.center - bomb.position).length <= radius else { continue }
+                world.setTile(.floor, at: tile)
 
-                // A direct hit does more than a graze, and that is what keeps an
-                // upgraded base raidable. A blast covers about three wall tiles, so
-                // without this a raider would have to spread the same damage across
-                // all of them and could never concentrate it - and a wall taking
-                // four blasts to open is not a fortification, it is a closed door.
-                let square = GridPoint(containing: bomb.position)
-                let force = tile == square
-                    ? GameConfig.Bomb.wallDamage
-                    : GameConfig.Bomb.grazeDamage
-
-                let fell = world.damageWall(at: tile, by: force)
-
-                // Only for somebody else's, and only when it actually comes down.
-                // Cracking a wall is progress, not an achievement.
-                if owner != bomb.team, fell {
+                // Only for somebody else's. Blowing up your own wall is a way of
+                // opening a door, not an achievement.
+                if owner != bomb.team {
                     world.award(GameConfig.Score.wallDestroyed, to: bomb.team)
 
                     // And the hole is now theirs to fix, which is worth something

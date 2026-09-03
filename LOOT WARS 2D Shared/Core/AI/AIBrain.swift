@@ -1072,16 +1072,10 @@ enum AIBrain {
     }
 
     private static func upgradeToBuy(actor: Actor, in world: World) -> ItemType? {
-        // Gear only. The BASE tab exists now - tougher walls, a better machine -
-        // and the bots deliberately do not shop there: every token a bot spends on
-        // its own walls is a token not spent on the ladder, and a map of eight
-        // fortified bases is a map where the best thing in this game stops
-        // happening. The upgrades are an option the player has and the bots do not,
-        // which is a fair trade for eight against one.
-        ShopSystem.upgradeOffers(for: actor, in: world)
-            .compactMap { $0.item }
-            .filter { worthBuying($0) && ShopSystem.canBuy($0, actor: actor, in: world) }
-            .min { (ShopSystem.price(of: $0) ?? 0) < (ShopSystem.price(of: $1) ?? 0) }
+        ShopSystem.upgradeOffers(for: actor)
+            .filter { worthBuying($0.type) && ShopSystem.canBuy($0.type, actor: actor, in: world) }
+            .min { $0.price < $1.price }?
+            .type
     }
 
     /// Whether this is a rung the shop is the only way to reach.
