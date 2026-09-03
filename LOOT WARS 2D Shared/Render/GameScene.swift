@@ -110,6 +110,19 @@ final class GameScene: SKScene {
     /// One offer, unprompted, for a few seconds - see QuickBuyNode.
     private let quickBuy = QuickBuyNode()
 
+    /// Teaches the one gesture nothing on screen suggests: hold a slot to drop it.
+    private let hint = HintNode()
+
+    /// How many more times the drop hint may volunteer itself, and whether it has
+    /// been made redundant.
+    ///
+    /// Somebody who has dropped something knows how to drop something, so the
+    /// first successful drop retires the hint for the rest of the match. Until
+    /// then it gets three showings - enough to be noticed, few enough that
+    /// somebody who is ignoring it on purpose is left alone.
+    private var dropHintsLeft = 3
+    private var hasDropped = false
+
     /// When the shop button next waves at somebody who has not been in.
     private var nextNudge: TimeInterval = 0
     private let results = ResultsNode()
@@ -262,6 +275,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(shopButton)
         cameraController.node.addChild(shopPanel)
         cameraController.node.addChild(quickBuy)
+        cameraController.node.addChild(hint)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -399,6 +413,10 @@ final class GameScene: SKScene {
         quickBuy.position = CGPoint(
             x: hud.position.x + QuickBuyNode.size.width / 2,
             y: hudBottom - 10 - QuickBuyNode.size.height / 2)
+
+        // Directly over the hotbar, which is what it is talking about. Close enough
+        // that the eye travels from the words to the slots without being asked to.
+        hint.position = CGPoint(x: 0, y: hotbarTop + 22)
     }
 
     // MARK: - Loop
@@ -604,6 +622,7 @@ final class GameScene: SKScene {
         // gone until walking back to the chest forced a different value through,
         // which is exactly how the bug presented.
         if chestPanel.openChest != nil || shopPanel.isOpen {
+            hint.hide()
             moveStick.isHidden = true
             moveStick.end()
             aimStick.isHidden = true
@@ -991,6 +1010,10 @@ extension GameScene {
         case .hotbar(let slot):
             queuedCommands.append(.dropItem(slot: slot))
             hotbar.endHold()
+
+            // Somebody who has dropped something knows how to drop something.
+            hasDropped = true
+            hint.hide()
         }
     }
 
@@ -1043,6 +1066,24 @@ extension GameScene {
         }
 
         selectedSlot = (selectedSlot == slot) ? nil : slot
+        if selectedSlot != nil { offerDropHint() }
+    }
+
+    /// Says how to drop something, at a moment somebody might want to.
+    ///
+    /// Picking a slot out is the moment: it is the one time a player is thinking
+    /// about a particular item rather than about the map. A FULL bag is the other,
+    /// and it ignores the three-showing budget - somebody standing over loot they
+    /// cannot pick up has a problem this sentence solves, and telling them once
+    /// more is worth more than the tidiness of a quota.
+    private func offerDropHint() {
+        guard !hasDropped, !shopPanel.isOpen, chestPanel.openChest == nil else { return }
+
+        let full = world.localPlayer?.inventory.isFull == true
+        guard full || dropHintsLeft > 0 else { return }
+        if !full { dropHintsLeft -= 1 }
+
+        hint.show(full ? "BAG FULL - HOLD AN ITEM TO DROP IT" : "HOLD AN ITEM TO DROP IT")
     }
 
     /// Taps while the shop is open: a tab, a card, or done.
