@@ -77,6 +77,28 @@ enum RenderPalette {
     static let countBadge = rgb(0xFF, 0x51, 0x7B)
     static let ammoBar   = rgb(0x3E, 0xA1, 0x80)
 
+    // Loot rarity. The convention rather than an invention - grey, green, blue,
+    // purple, orange, gold have meant the same thing in every game with loot in it
+    // for fifteen years, and a player who has seen a purple item knows it beats a
+    // green one without being told.
+    //
+    // Pitched bright enough to read at hotbar size against a dark slot AND on grass
+    // as a glow under a dropped item, which is why the greens and blues are lifted
+    // off their usual values: the map is already green, and a green that works on
+    // black is invisible on a lawn.
+    private static let rarities: [SKColor] = [
+        rgb(0xC2, 0xC9, 0xCE),   // common - pale steel
+        rgb(0x5B, 0xE8, 0x4C),   // uncommon - green
+        rgb(0x46, 0xB1, 0xFF),   // rare - blue
+        rgb(0xB9, 0x6B, 0xFF),   // epic - purple
+        rgb(0xFF, 0x9C, 0x2B),   // legendary - orange
+        rgb(0xFF, 0xD6, 0x3A)    // mythical - gold
+    ]
+
+    static func colour(of rarity: Rarity) -> SKColor {
+        rarities[min(rarity.rawValue, rarities.count - 1)]
+    }
+
     // Placement preview. Green while a footprint would take, red while it would
     // not - the only two colours nobody has to be taught.
     static let placementValid   = rgb(0x6E, 0xF0, 0x6E)

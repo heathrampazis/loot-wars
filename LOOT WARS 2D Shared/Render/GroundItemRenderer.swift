@@ -66,6 +66,38 @@ final class GroundItemRenderer {
         sprite.position = GridGeometry.point(for: item.position)
         sprite.zPosition = 4
 
+        // A pool of light under it, the colour of what it is. This is the whole
+        // rarity indicator on the map: at the size an item is drawn you cannot read
+        // a border, but you can see from across a base whether the thing lying by
+        // the crate is grey or gold - which is the difference between a detour and
+        // a sprint.
+        //
+        // Tokens are exempt. They are money rather than loot, they arrive four at a
+        // time, and a puddle of light under each would turn a machine into a disco.
+        if case .item(let type) = item.pickup {
+            let glow = SKSpriteNode(texture: GlowArt.pool)
+            glow.size = CGSize(width: box * 1.5, height: box * 1.5)
+            glow.color = RenderPalette.colour(of: type.rarity)
+            glow.colorBlendFactor = 1
+            glow.alpha = 0.85
+            glow.zPosition = -1
+            sprite.addChild(glow)
+
+            // A slow breath, so it reads as something glowing rather than as a
+            // sticker printed on the grass. Offset per item by its own id, or
+            // twenty items would pulse in unison like a warning light.
+            let phase = Double(item.id.raw % 7) * 0.14
+            glow.run(.sequence([
+                .wait(forDuration: phase),
+                .repeatForever(.sequence([
+                    .group([.fadeAlpha(to: 0.55, duration: 0.9),
+                            .scale(to: 0.88, duration: 0.9)]),
+                    .group([.fadeAlpha(to: 0.85, duration: 0.9),
+                            .scale(to: 1.0, duration: 0.9)])
+                ]))
+            ]))
+        }
+
         let bob: CGFloat = 4
         sprite.run(.repeatForever(.sequence([
             .moveBy(x: 0, y: bob, duration: 0.6),

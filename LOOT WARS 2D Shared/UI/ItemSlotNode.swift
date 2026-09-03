@@ -29,6 +29,10 @@ final class ItemSlotNode: SKNode {
 
     private let side: CGFloat
     private var selected = false
+
+    /// The slot's own plate, recoloured to the rarity of whatever is in it.
+    private let panel: SKShapeNode
+
     private let icon = SKSpriteNode()
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -36,13 +40,18 @@ final class ItemSlotNode: SKNode {
     /// Local origin is the centre of the slot.
     init(side: CGFloat) {
         self.side = side
+
+        // Built before super.init, because it is a constant stored property and
+        // Swift wants every one of those settled before the superclass runs. It is
+        // only decorated and parented afterwards, where self exists.
+        panel = SKShapeNode(rect: CGRect(x: -side / 2, y: -side / 2,
+                                         width: side, height: side),
+                            cornerRadius: side * 0.182)
         super.init()
 
-        let panel = SKShapeNode(rect: CGRect(x: -side / 2, y: -side / 2,
-                                             width: side, height: side),
-                                cornerRadius: side * 0.182)
         panel.fillColor = RenderPalette.hotbarSlot
         panel.strokeColor = .clear
+        panel.lineWidth = side * 0.045
         addChild(panel)
 
         icon.zPosition = 1
@@ -121,8 +130,21 @@ final class ItemSlotNode: SKNode {
         guard let stack else {
             icon.isHidden = true
             badge.isHidden = true
+
+            // An empty slot is a hole in the bar, not an item of no value.
+            panel.fillColor = RenderPalette.hotbarSlot
+            panel.strokeColor = .clear
             return
         }
+
+        // The rarity, said twice over: a wash of the colour through the plate and
+        // the same colour round the edge. Twice because one alone fails somewhere -
+        // a fill this faint is hard to judge against grass showing through the
+        // slot, and an outline alone is four points of colour on a screen held at
+        // arm's length. Together they read at a glance, which is the entire job.
+        let colour = RenderPalette.colour(of: stack.type.rarity)
+        panel.fillColor = colour.withAlphaComponent(dimmed ? 0.16 : 0.30)
+        panel.strokeColor = colour.withAlphaComponent(dimmed ? 0.35 : 0.85)
 
         let texture = ItemArt.texture(for: stack.type)
         icon.texture = texture

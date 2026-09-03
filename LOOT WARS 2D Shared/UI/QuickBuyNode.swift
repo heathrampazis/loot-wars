@@ -141,6 +141,10 @@ final class QuickBuyNode: SKNode {
         offer = item.type
         live = true
 
+        // Rimmed in the item's rarity, which is the only label a chip this small
+        // has room for.
+        plate.strokeColor = RenderPalette.colour(of: item.type.rarity)
+
         let texture = ItemArt.texture(for: item.type)
         icon.texture = texture
         icon.size = ItemArt.size(of: texture, fittingInto: 34)

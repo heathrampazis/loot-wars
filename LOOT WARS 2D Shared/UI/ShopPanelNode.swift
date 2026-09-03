@@ -54,6 +54,8 @@ final class ShopPanelNode: SKNode {
 
     private struct Card {
         let holder: SKNode
+        /// The square behind the item, washed with its rarity.
+        let tile: SKShapeNode
         let icon: SKSpriteNode
         let name: SKLabelNode
         let price: SKLabelNode
@@ -200,6 +202,7 @@ final class ShopPanelNode: SKNode {
             cornerWidth: 14, cornerHeight: 14, transform: nil))
         tile.fillColor = SKColor(white: 1, alpha: 0.14)
         tile.strokeColor = .clear
+        tile.lineWidth = 2.5
         tile.position = CGPoint(x: 0, y: 8)
         holder.addChild(tile)
 
@@ -236,7 +239,7 @@ final class ShopPanelNode: SKNode {
         token.zPosition = 1
         holder.addChild(token)
 
-        return Card(holder: holder, icon: icon, name: name,
+        return Card(holder: holder, tile: tile, icon: icon, name: name,
                     price: price, pill: pill, token: token, flash: flash, type: nil)
     }
 
@@ -436,6 +439,13 @@ final class ShopPanelNode: SKNode {
             card.name.text = ItemArt.name(for: item.type)
             card.icon.texture = texture
             card.icon.size = ItemArt.size(of: texture, fittingInto: 48)
+
+            // The same rarity wash the bag uses, so a Rare in the shop and a Rare
+            // in your hotbar are recognisably the same thing before you have read
+            // either label.
+            let rarity = RenderPalette.colour(of: item.type.rarity)
+            card.tile.fillColor = rarity.withAlphaComponent(0.22)
+            card.tile.strokeColor = rarity.withAlphaComponent(0.8)
             card.price.text = "\(item.price)"
 
             // Faint only for the one machine you already own. Nothing else greys -
