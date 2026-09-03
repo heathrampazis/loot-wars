@@ -456,7 +456,7 @@ final class ShopPanelNode: SKNode {
             pill: pill,
             token: token,
             flash: flash,
-            type: nil
+            offer: nil
         )
     }
 
@@ -587,6 +587,19 @@ final class ShopPanelNode: SKNode {
 
         guard offer.upgrade == .arcade else { return true }
         return world.hasArcade(player.team)
+    }
+
+    /// What a card is called.
+    ///
+    /// Here rather than in Core, along with every other question about how a thing
+    /// looks or reads. An upgrade is named for the tier it would sell you - Walls
+    /// II is what you get, not what you have - and an item asks ItemArt, which is
+    /// already the one place that knows a Blaster 4 is called a Blaster.
+    private static func label(of offer: ShopSystem.Offer) -> String {
+        if let type = offer.item { return ItemArt.name(for: type) }
+        guard let upgrade = offer.upgrade else { return "" }
+
+        return "\(upgrade.name) \(GameConfig.Shop.numeral(offer.tier ?? 1))"
     }
 
     /// The picture on a card.
@@ -849,7 +862,8 @@ final class ShopPanelNode: SKNode {
         ]
 
         for item in items {
-            fingerprint.append(item.name.hashValue)
+            fingerprint.append(item.item?.hashValue ?? item.upgrade?.hashValue ?? 0)
+            fingerprint.append(item.tier ?? -1)
             fingerprint.append(item.price)
             fingerprint.append(available(item, for: player, in: world) ? 1 : 0)
         }
@@ -890,7 +904,7 @@ final class ShopPanelNode: SKNode {
             )
 
             card.offer = item
-            card.name.text = item.name
+            card.name.text = ShopPanelNode.label(of: item)
 
             let texture = ShopPanelNode.picture(of: item)
             card.icon.texture = texture

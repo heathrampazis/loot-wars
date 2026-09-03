@@ -31,7 +31,14 @@ enum ShopSystem {
 
         let kind: Kind
         let price: Int
-        let name: String
+
+        /// The tier being sold, for an upgrade, and nil for an item.
+        ///
+        /// A number rather than a formatted name, because a name is a picture of a
+        /// thing and Core does not draw. ItemType has never said what it is called
+        /// either - the shop panel asks ItemArt, which is where every other
+        /// question about how something looks already goes.
+        let tier: Int?
 
         var item: ItemType? {
             if case .item(let type) = kind { return type }
@@ -101,38 +108,35 @@ enum ShopSystem {
 
         switch GameConfig.Shop.tabs[tab].stock {
         case .shelf(let items):
-            return items.map {
-                Offer(kind: .item($0.type), price: $0.price, name: ItemArt.name(for: $0.type))
-            }
+            return items.map { Offer(kind: .item($0.type), price: $0.price, tier: nil) }
 
         case .upgrades:
             var offers: [Offer] = []
 
             if let next = nextTier(above: actor.helmet, in: HelmetTier.allCases),
                let price = GameConfig.Shop.helmetPrices[next] {
-                offers.append(Offer(kind: .item(.helmet(next)), price: price, name: "Helmet"))
+                offers.append(Offer(kind: .item(.helmet(next)), price: price, tier: nil))
             }
 
             if let next = nextTier(above: actor.blaster, in: BlasterTier.allCases),
                let price = GameConfig.Shop.blasterPrices[next] {
-                offers.append(Offer(kind: .item(.blaster(next)), price: price, name: "Blaster"))
+                offers.append(Offer(kind: .item(.blaster(next)), price: price, tier: nil))
             }
 
             return offers
 
         case .improvements:
-            // Named with the tier you would be BUYING rather than the one you have,
-            // because a card is an offer and not a status line: "Walls II" is what
-            // you get for the price printed underneath it.
+            // Carrying the tier you would be BUYING rather than the one you have,
+            // because a card is an offer and not a status line: the II on it is
+            // what you get for the price printed underneath.
             return Upgrade.allCases.compactMap { upgrade in
                 guard let price = price(of: upgrade, for: actor.team, in: world) else {
                     return nil
                 }
 
-                let tier = world.tier(of: upgrade, for: actor.team) + 1
                 return Offer(kind: .upgrade(upgrade),
                              price: price,
-                             name: "\(upgrade.name) \(GameConfig.Shop.numeral(tier))")
+                             tier: world.tier(of: upgrade, for: actor.team) + 1)
             }
         }
     }
@@ -283,9 +287,7 @@ enum ShopSystem {
                 .flatMap { tab -> [Offer] in
                     guard case .shelf(let items) = tab.stock else { return [] }
                     return items.map {
-                        Offer(kind: .item($0.type),
-                              price: $0.price,
-                              name: ItemArt.name(for: $0.type))
+                        Offer(kind: .item($0.type), price: $0.price, tier: nil)
                     }
                 }
                 .filter {
