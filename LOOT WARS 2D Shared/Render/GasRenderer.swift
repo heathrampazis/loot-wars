@@ -4,12 +4,19 @@
 //
 //  Clouds of gas standing on the map.
 //
-//  Drawn as ONE closed shape, and that is the whole difference between this and
-//  the first version. Translucent sprites laid over each other double up where
-//  they overlap, so a cloud built from three of them is a pale wash with darker
-//  patches in it - which reads as a gradient painted on the ground rather than as
-//  an object. One silhouette means one flat fill at one alpha, one hard edge round
-//  the outside, and no seams anywhere inside it.
+//  Drawn as two closed shapes: a body, and a smaller one drifting inside it.
+//
+//  The first version was three translucent sprites with soft edges, which double
+//  up where they overlap - a pale wash with darker lens-shaped patches wherever
+//  two happened to cross, reading as a gradient painted on the ground rather than
+//  as an object. The second was one flat silhouette, which fixed the patchiness by
+//  removing every trace of depth, and at the opacity it needed it hid the map.
+//
+//  Two concentric shapes, both thin, is the answer to both: 0.42 at the edge and
+//  about 0.6 through the middle, so the ground reads through it everywhere and it
+//  is still visibly thicker in the centre. The overlap is deliberate and always in
+//  the same place, which is what separates this from the accident the first
+//  version was making.
 //
 //  The outline is a radius that rises and falls as it sweeps the circle, and the
 //  waves that drive it MOVE - so the shape is rebuilt about a dozen times a second
@@ -37,7 +44,21 @@ final class GasRenderer {
     private static let churn: Double = 0.55
 
     private final class CloudNodes {
+        /// The body of the cloud, and a smaller one drifting inside it.
+        ///
+        /// Two rather than one, and both thin. A single fill at any alpha is a
+        /// sheet of colour - see-through or not, it has no depth to it - where two
+        /// gives a cloud that is denser through the middle than at its edges, which
+        /// is the thing that actually reads as gas.
+        ///
+        /// This is not the mistake the first version made. That was three equal
+        /// blobs of soft gradient overlapping at random, which produced darker
+        /// lens-shaped patches wherever two happened to cross. These are
+        /// concentric and deliberate: thin at the edge, thicker in the middle,
+        /// every time.
         let shape = SKShapeNode()
+        let core = SKShapeNode()
+
         var sinceRebuild: Double = 0
         var phase: Double
 
@@ -77,7 +98,16 @@ final class GasRenderer {
 
             if nodes.sinceRebuild >= GasRenderer.rebuildInterval {
                 nodes.sinceRebuild = 0
-                nodes.shape.path = GasRenderer.outline(of: cloud, phase: nodes.phase)
+
+                nodes.shape.path = GasRenderer.outline(
+                    of: cloud, phase: nodes.phase, scale: 1
+                )
+
+                // The inner one runs on a different phase, so it drifts about
+                // inside the body rather than sitting in it like a target.
+                nodes.core.path = GasRenderer.outline(
+                    of: cloud, phase: nodes.phase * 1.35 + 2.2, scale: 0.62
+                )
             }
 
             // Billows out as it spreads and thins as it goes, both off the one
@@ -93,16 +123,28 @@ final class GasRenderer {
         // seed, which a random start would quietly break.
         let nodes = CloudNodes(phase: Double(cloud.id.raw) * 1.7)
 
-        nodes.shape.path = GasRenderer.outline(of: cloud, phase: nodes.phase)
+        nodes.shape.path = GasRenderer.outline(of: cloud, phase: nodes.phase, scale: 1)
         nodes.shape.position = GridGeometry.point(for: cloud.centre)
 
         // Opaque fill at a fixed alpha rather than a soft edge: you can see the
         // ground through it, but the boundary is a line rather than a fade, which
         // is what makes "in it" and "out of it" a thing you can judge at a glance
         // while somebody is shooting at you.
-        nodes.shape.fillColor = RenderPalette.gas.withAlphaComponent(0.93)
+        // Thin enough to see the ground through, which is what makes it gas rather
+        // than paint: 0.42 at the edges and about 0.6 through the middle where the
+        // core lies over it. Solid was the last version's mistake in the other
+        // direction - it hid the map, and a hazard you cannot see the floor through
+        // stops being a place and becomes an obstacle.
+        nodes.shape.fillColor = RenderPalette.gas.withAlphaComponent(0.42)
         nodes.shape.strokeColor = .clear
         nodes.shape.isAntialiased = true
+
+        nodes.core.path = GasRenderer.outline(of: cloud, phase: nodes.phase, scale: 0.62)
+        nodes.core.fillColor = RenderPalette.gas.withAlphaComponent(0.30)
+        nodes.core.strokeColor = .clear
+        nodes.core.isAntialiased = true
+        nodes.core.zPosition = 1
+        nodes.shape.addChild(nodes.core)
 
         // Above the ground and the loot, below the actors - somebody standing in
         // gas is standing IN it rather than behind it.
@@ -130,8 +172,10 @@ final class GasRenderer {
     /// sample as a control point. Joining the samples directly would show every
     /// corner, and at fourteen samples a polygon is exactly what it would look
     /// like.
-    private static func outline(of cloud: GasCloud, phase: Double) -> CGPath {
-        let radius = Double(GridGeometry.length(ofTiles: cloud.radius))
+    private static func outline(of cloud: GasCloud,
+                                phase: Double,
+                                scale: Double) -> CGPath {
+        let radius = Double(GridGeometry.length(ofTiles: cloud.radius)) * scale
         let samples = 14
 
         var points: [CGPoint] = []
