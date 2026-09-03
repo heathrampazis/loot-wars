@@ -28,7 +28,9 @@ final class QuickBuyNode: SKNode {
 
     private let plate = SKShapeNode()
     private let icon = SKSpriteNode()
-    private let name = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    /// Called `title` rather than `name`: SKNode already has a `name`, and it is a
+    /// String - a stored property of a different type cannot share the spelling.
+    private let title = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let token = SKSpriteNode()
 
@@ -67,12 +69,12 @@ final class QuickBuyNode: SKNode {
         icon.zPosition = 1
         addChild(icon)
 
-        name.fontSize = 15
-        name.fontColor = .white
-        name.horizontalAlignmentMode = .left
-        name.verticalAlignmentMode = .center
-        name.position = CGPoint(x: -box.width / 2 + 52, y: 0)
-        addChild(name)
+        title.fontSize = 15
+        title.fontColor = .white
+        title.horizontalAlignmentMode = .left
+        title.verticalAlignmentMode = .center
+        title.position = CGPoint(x: -box.width / 2 + 52, y: 0)
+        addChild(title)
 
         price.fontSize = 16
         price.fontColor = .white
@@ -148,7 +150,7 @@ final class QuickBuyNode: SKNode {
         let texture = ItemArt.texture(for: item.type)
         icon.texture = texture
         icon.size = ItemArt.size(of: texture, fittingInto: 30)
-        name.text = ItemArt.name(for: item.type)
+        title.text = ItemArt.name(for: item.type)
         price.text = "\(item.price)"
 
         removeAction(forKey: "life")

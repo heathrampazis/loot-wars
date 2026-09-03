@@ -148,6 +148,7 @@ final class ShopPanelNode: SKNode {
             label.fontColor = .white
             label.verticalAlignmentMode = .center
             label.position = CGPoint(x: 0, y: 1)
+
             holder.addChild(label)
 
             tabs.append((holder, shape, label))
