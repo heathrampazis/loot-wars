@@ -18,8 +18,14 @@ enum ShopSystem {
     static func update(_ world: World, commands: [ActorID: [Command]]) {
         for (id, list) in commands {
             for command in list {
-                guard case .buyItem(let type) = command else { continue }
-                buy(type, by: id, in: world)
+                // Re-read per command inside buy and sell: two taps can land in the
+                // same tick, and the second has to see what the first did to the
+                // purse and the bag.
+                switch command {
+                case .buyItem(let type): buy(type, by: id, in: world)
+                case .sellItem(let slot): sell(from: slot, by: id, in: world)
+                default: break
+                }
             }
         }
     }
@@ -63,6 +69,11 @@ enum ShopSystem {
         switch GameConfig.Shop.tabs[tab].stock {
         case .shelf(let items):
             return items
+
+        // Nothing is for sale on the sell tab. What it shows comes from the bag -
+        // see sellOffers - and the panel asks for that separately.
+        case .bag:
+            return []
 
         case .upgrades:
             var offers: [GameConfig.Shop.Item] = []
@@ -123,6 +134,48 @@ enum ShopSystem {
         // inside the base, and about one base in seven is a small enough rectangle
         // that a chest already leaves it without one.
         return world.nextArcadeOrigin(for: actor.team, near: actor.position) == nil
+    }
+
+    /// What the shop pays for something out of your bag.
+    ///
+    /// A third of what it sells for, floored at one token. The margin is not
+    /// meanness, it is what stops the shop being a laundry: at anything near full
+    /// price you could buy a bomb, decide against it and sell it back, and the
+    /// prices of everything else would stop meaning anything.
+    ///
+    /// Everything has a price, including things nobody would call junk. Deciding
+    /// FOR the player which of their items are rubbish is the sort of rule that is
+    /// right ninety per cent of the time and infuriating the rest - a spare Rare is
+    /// junk to somebody wearing an Epic and a lifeline to somebody who just
+    /// respawned. The shop makes an offer; you decide.
+    static func sellPrice(of type: ItemType) -> Int {
+        // A bomb is not on the shelf any more, so it has no price to take a share
+        // of - but it is still a thing you can be carrying four of with a wall
+        // nowhere in sight, which is exactly the situation this feature is for.
+        guard let price = price(of: type) ?? GameConfig.Shop.offShelf[type] else { return 0 }
+        return max(1, Int((Double(price) * GameConfig.Shop.sellShare).rounded(.down)))
+    }
+
+    /// Everything this actor is carrying, with what the shop would give for it.
+    ///
+    /// Indexed by slot, because that is what a sale names - two slots can hold the
+    /// same item and only one of them should shrink.
+    static func sellOffers(for actor: Actor) -> [(slot: Int, stack: ItemStack, price: Int)] {
+        (0..<Inventory.slotCount).compactMap { slot in
+            guard let stack = actor.inventory.stack(at: slot) else { return nil }
+            return (slot: slot, stack: stack, price: sellPrice(of: stack.type))
+        }
+    }
+
+    private static func sell(from slot: Int, by id: ActorID, in world: World) {
+        guard var actor = world.actors[id], actor.isAlive,
+              let stack = actor.inventory.stack(at: slot) else { return }
+
+        let paid = sellPrice(of: stack.type)
+        guard paid > 0, actor.inventory.consume(at: slot) != nil else { return }
+
+        actor.tokens += paid
+        world.actors[id] = actor
     }
 
     /// The one thing worth offering out of the blue, or nil.

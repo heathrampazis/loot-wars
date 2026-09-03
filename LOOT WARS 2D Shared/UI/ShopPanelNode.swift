@@ -30,7 +30,10 @@ final class ShopPanelNode: SKNode {
     private static let cardSize = CGSize(width: 200, height: 168)
     private static let cardGap: CGFloat = 14
     private static let padding: CGFloat = 18
-    private static let tabSize = CGSize(width: 134, height: 34)
+    /// Narrower since SELL joined them. Four tabs at 108 plus their gaps is 450,
+    /// which with the padding is 486 - and 486 fits on a phone 568 points wide,
+    /// where four at the old 134 would have been 590 and hung off both ends.
+    private static let tabSize = CGSize(width: 108, height: 34)
     private static let tabGap: CGFloat = 6
 
     /// The most cards a tab can show in one row, read off the catalogue rather than
@@ -72,6 +75,17 @@ final class ShopPanelNode: SKNode {
 
     private let panel = SKShapeNode()
     private let back = SKNode()
+
+    /// The SELL tab: your own four slots, with what the shop would give for each.
+    ///
+    /// Slots rather than cards, and that is not just to save room. These are YOUR
+    /// things, and they should look the way your things look everywhere else in the
+    /// game - same square, same rarity glow, same count badge - so the tab reads as
+    /// your bag with prices on it rather than as a shelf that happens to contain
+    /// what you own.
+    private var sellSlots: [ItemSlotNode] = []
+    private var sellPrices: [SKLabelNode] = []
+    private let sellRow = SKNode()
     private var tabs: [(holder: SKNode, shape: SKShapeNode, label: SKLabelNode)] = []
     private var cards: [Card] = []
 
@@ -103,6 +117,7 @@ final class ShopPanelNode: SKNode {
         addChild(panel)
 
         buildTabs(above: size)
+        buildSellRow()
         for column in 0..<ShopPanelNode.columns {
             cards.append(makeCard(at: column))
         }
@@ -251,6 +266,34 @@ final class ShopPanelNode: SKNode {
                     price: price, pill: pill, token: token, flash: flash, type: nil)
     }
 
+    /// Four slots across the middle of the panel, each with a price under it.
+    private func buildSellRow() {
+        let side: CGFloat = 66
+        let gap: CGFloat = 18
+        let count = CGFloat(Inventory.slotCount)
+        let spread = side * count + gap * (count - 1)
+
+        sellRow.isHidden = true
+        addChild(sellRow)
+
+        for index in 0..<Inventory.slotCount {
+            let slot = ItemSlotNode(side: side)
+            slot.position = CGPoint(x: -spread / 2 + side / 2
+                                    + CGFloat(index) * (side + gap),
+                                    y: 14)
+            sellRow.addChild(slot)
+            sellSlots.append(slot)
+
+            let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            price.fontSize = 15
+            price.fontColor = .white
+            price.verticalAlignmentMode = .center
+            price.position = CGPoint(x: slot.position.x, y: -34)
+            sellRow.addChild(price)
+            sellPrices.append(price)
+        }
+    }
+
     private func buildBackButton(below size: CGSize) {
         let box = ShopPanelNode.backSize
         back.position = CGPoint(x: 0, y: -size.height / 2 - box.height / 2 - 10)
@@ -322,6 +365,18 @@ final class ShopPanelNode: SKNode {
             let local = CGPoint(x: point.x - entry.holder.position.x,
                                 y: point.y - entry.holder.position.y)
             if abs(local.x) <= tab.width / 2 && abs(local.y) <= tab.height / 2 { return index }
+        }
+        return nil
+    }
+
+    /// Which bag slot a tap landed on, on the SELL tab, or nil.
+    func sellSlotIndex(atLocalPoint point: CGPoint) -> Int? {
+        guard !sellRow.isHidden else { return nil }
+
+        for (index, slot) in sellSlots.enumerated() {
+            let local = CGPoint(x: point.x - slot.position.x,
+                                y: point.y - slot.position.y)
+            if abs(local.x) <= 40 && abs(local.y) <= 44 { return index }
         }
         return nil
     }
@@ -414,13 +469,48 @@ final class ShopPanelNode: SKNode {
         // from Core rather than straight out of the config.
         let items = ShopSystem.offers(on: selectedTab, for: player)
 
+        // What the sell tab is offering back, which is the bag rather than a shelf.
+        let selling = ShopSystem.sellOffers(for: player)
+
         // Redraw only when the tab, your purse, your gear or your bag changes - the
-        // things that can alter what this panel should say.
-        let fingerprint = [selectedTab, player.tokens, items.count]
+        // things that can alter what this panel should say. The bag goes in by slot
+        // AND by count, because taking one bandage off a stack of three changes
+        // nothing else in this list and still has to redraw the badge.
+        let fingerprint = [selectedTab, player.tokens, items.count, selling.count]
             + items.map { $0.price }
             + items.map { ShopSystem.isSoldOut($0.type, actor: player, in: world) ? 1 : 0 }
+            + selling.map { $0.slot }
+            + selling.map { $0.stack.count }
+            + selling.map { $0.price }
         guard fingerprint != lastDrawn else { return }
         lastDrawn = fingerprint
+
+        // The sell tab and the shelves are two different drawings of the same
+        // panel, so exactly one of them is ever on screen.
+        let sellingTab: Bool
+        if case .bag = GameConfig.Shop.tabs[selectedTab].stock { sellingTab = true }
+        else { sellingTab = false }
+
+        sellRow.isHidden = !sellingTab
+
+        if sellingTab {
+            for (index, slot) in sellSlots.enumerated() {
+                let offer = selling.first { $0.slot == index }
+                slot.show(offer?.stack)
+                sellPrices[index].text = offer.map { "+\($0.price)" } ?? ""
+                sellPrices[index].fontColor = RenderPalette.countBadge
+            }
+
+            // Written back through the index rather than through a loop variable:
+            // Card is a struct, so `for var card in cards` mutates a copy and the
+            // type would stay set in the array - invisible today, because the
+            // hidden holder also filters it out of hit testing, and exactly the
+            // kind of thing that stops being invisible later.
+            for index in cards.indices {
+                cards[index].holder.isHidden = true
+                cards[index].type = nil
+            }
+        }
 
         for (index, entry) in tabs.enumerated() {
             let active = index == selectedTab
@@ -429,6 +519,8 @@ final class ShopPanelNode: SKNode {
                 : SKColor(white: 0, alpha: 0.34)
             entry.label.alpha = active ? 1 : 0.7
         }
+
+        guard !sellingTab else { return }
 
         for (index, var card) in cards.enumerated() {
             guard index < items.count else {

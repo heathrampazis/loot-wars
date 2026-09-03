@@ -161,21 +161,31 @@ enum LootTable {
         let table = table(at: progress)
         var rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
 
-        // A rare crate is where bombs come from.
+        // A rare crate cannot hand you a bandage.
         //
-        // Two things needed the same fix. Bombs were the supply line for the whole
-        // raiding half of the game and were rationed by a single row in a table
-        // shared with bandages; and a rare crate that rolled a bandage was a
-        // let-down whatever colour it had been glowing. Weighting the bomb row up
-        // inside a rare crate answers both at once: the good crate reliably holds
-        // either the good gear it promised or the thing you open somebody's wall
-        // with, and both of those are worth walking to.
+        // This is what makes opening one worth the walk. The bandage and the chest
+        // rows come out entirely - they are the two things you trip over anywhere
+        // on the map, and finding one inside something that had been glowing at you
+        // from forty tiles away is the single most deflating thing this game can
+        // do. What is left is gear, which the upgrade below then bumps a rung, a
+        // medkit, and bombs nudged up a little further, because bombs are the
+        // supply line for raiding and were rationed by one row in a table shared
+        // with the supplies.
+        //
+        // So a rare crate is about half gear, a third bombs and the rest medkits.
+        // There is nothing in it you would throw away, which is the entire point of
+        // it having its own artwork.
         if rare {
-            rows = rows.map { row in
-                row.pickup == .item(.bomb)
-                    ? (pickup: row.pickup,
-                       weight: Int(Double(row.weight) * GameConfig.Loot.rareBombBoost))
-                    : row
+            rows = rows.compactMap { row in
+                switch row.pickup {
+                case .item(.bandage), .item(.chest):
+                    return nil
+                case .item(.bomb):
+                    return (pickup: row.pickup,
+                            weight: Int(Double(row.weight) * GameConfig.Loot.rareBombBoost))
+                default:
+                    return row
+                }
             }
         }
 

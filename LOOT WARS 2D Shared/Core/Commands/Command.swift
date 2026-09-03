@@ -44,6 +44,14 @@ enum Command {
     /// input never sends a price, or it could send the wrong one.
     case buyItem(ItemType)
 
+    /// Sell what is in this bag slot, at the shop.
+    ///
+    /// By SLOT rather than by item, unlike buying. Buying names a thing you want
+    /// and the shop finds it; selling names a thing you have, and two slots can
+    /// hold the same type - if this named the item, selling one of two stacks of
+    /// bandages would be ambiguous about which one shrank.
+    case sellItem(slot: Int)
+
     /// Stand a carried arcade machine up on this tile. Two wide and three high, so
     /// the tile is its bottom-left corner.
     case placeArcade(GridPoint)

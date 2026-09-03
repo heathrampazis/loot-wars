@@ -1157,6 +1157,13 @@ extension GameScene {
             return
         }
 
+        // Your own bag, on the SELL tab. Checked before the shelf, since the two
+        // never share a screen and the sell row sits where the cards would be.
+        if let slot = shopPanel.sellSlotIndex(atLocalPoint: point) {
+            queuedCommands.append(.sellItem(slot: slot))
+            return
+        }
+
         if let item = shopPanel.item(atLocalPoint: point) {
             // Asked HERE as well as by the simulation, because the card no longer
             // greys out for a bag with no room in it - so a tap can now be refused

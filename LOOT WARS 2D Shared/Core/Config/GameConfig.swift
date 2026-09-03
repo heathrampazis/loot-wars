@@ -144,6 +144,8 @@ enum GameConfig {
         enum Stock {
             case shelf([Item])
             case upgrades
+            /// Not stock at all: what YOU are carrying, offered back to the shop.
+            case bag
         }
 
         struct Tab {
@@ -195,7 +197,8 @@ enum GameConfig {
             Tab(name: "BUILDING", stock: .shelf([
                 Item(type: .chest,  price: 14),
                 Item(type: .arcade, price: 24)
-            ]))
+            ])),
+            Tab(name: "SELL", stock: .bag)
         ]
 
         /// The most cards any one tab shows, which is what the panel is sized for.
@@ -208,6 +211,9 @@ enum GameConfig {
                 case .shelf(let items): return items.count
                 // A helmet rung and a blaster rung, and never more than that.
                 case .upgrades: return 2
+                // Drawn as a row of bag slots rather than as cards, so it asks for
+                // no card columns at all - see ShopPanelNode.
+                case .bag: return 0
                 }
             }.max() ?? 1
         }
@@ -236,6 +242,28 @@ enum GameConfig {
         /// How often the shop button nudges itself while you can afford something
         /// and have not been in. Long enough not to nag.
         static let nudgeInterval: Double = 14
+
+        /// What things NOT on the shelf are notionally worth, for selling back.
+        ///
+        /// One entry, and it is the bomb: it came off the shelf because being able
+        /// to buy the way into somebody's base turned the shop into a raid vending
+        /// machine, but you can still end up carrying four with no wall in sight.
+        /// Priced at what it used to cost.
+        static let offShelf: [ItemType: Int] = [.bomb: 11]
+
+        /// What the shop pays for something you sell back, as a share of its price.
+        ///
+        /// A third. The margin is what stops the shop being a laundry - at anything
+        /// near full price you could buy a bomb, change your mind, sell it back, and
+        /// every price in here would stop meaning anything.
+        ///
+        /// It exists because of a specific complaint, which is worth recording: the
+        /// bag is four slots, crates hand out gear whether or not you can use it,
+        /// and the only thing to do with a spare Common once you are wearing an Epic
+        /// was hold an item down and throw it on the grass. Turning it into a token
+        /// or two is not much money - a spare Rare is worth 2 - but it is the
+        /// difference between litter and a small consolation.
+        static let sellShare: Double = 0.33
 
         /// What it costs to step UP to each tier.
         ///
@@ -1008,22 +1036,26 @@ enum GameConfig {
 
     enum Loot {
         /// Lootboxes scattered across the map.
-        /// How much likelier a bomb is inside a rare crate.
+        /// How much likelier a bomb is inside a rare crate, on top of the bandage
+        /// and chest rows having been removed from it entirely.
         ///
-        /// Bombs are the supply line for raiding and were rationed by one row in a
-        /// table shared with the bandages. This makes the good crates the place
-        /// they come from, which also fixes the other half of the problem - a rare
-        /// crate that rolled a bandage was a let-down whatever colour it had been
-        /// glowing. At two and a half, a rare crate is about a third bombs.
-        static let rareBombBoost: Double = 2.5
+        /// A gentle nudge rather than the two and a half it started at, and the
+        /// difference is arithmetic: with the filler rows gone, everything left is
+        /// already far likelier than it was, and 2.5 on top made a rare crate 55%
+        /// bombs - a jackpot that mostly pays out ammunition. At 1.15 it comes out
+        /// around half gear, a third bombs and the rest medkits, which is a crate
+        /// with nothing in it you would throw away and gear as the usual answer.
+        static let rareBombBoost: Double = 1.15
 
         /// Share of crates on the map that are the good ones.
         ///
-        /// One in six. Few enough that spotting one is an event and that most of
-        /// what you open is ordinary; common enough that there is usually one worth
-        /// walking towards somewhere on your half of the map. Rolled per crate
-        /// rather than counted out, so no two maps hold quite the same number.
-        static let rareShare: Double = 0.17
+        /// One in fourteen. At one in six they were everywhere, and a thing you see
+        /// constantly is not rare however it is drawn - the glow stopped meaning
+        /// anything within a minute. At this share a map of thirty crates holds two
+        /// or three, which is few enough that spotting one is a decision about where
+        /// to go next. Rolled per crate rather than counted out, so no two maps hold
+        /// the same number.
+        static let rareShare: Double = 0.07
 
         static let lootboxCount = 42
 
