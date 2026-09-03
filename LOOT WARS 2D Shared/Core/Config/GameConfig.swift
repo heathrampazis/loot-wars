@@ -1304,11 +1304,12 @@ enum GameConfig {
         /// and a windfall that arrives on schedule is just a bigger number on the
         /// counter.
         ///
-        /// One payout in ten, up from one in fifteen. Still uncommon enough to be
-        /// worth turning for; common enough that a player who works the machines
-        /// across a match sees several rather than hearing about them.
+        /// One payout in twelve or so, which is the third value this has had and
+        /// the one between the other two. One in fifteen was a thing you heard
+        /// about; one in ten was often enough that a golden token stopped being a
+        /// find and became part of the rate.
         static let goldenValue = 10
-        static let goldenChance = 0.10
+        static let goldenChance = 0.08
 
         /// A jackpot: how long one lasts, how often each map machine rolls for one,
         /// and the chance it takes.
@@ -1320,17 +1321,18 @@ enum GameConfig {
         /// earn that want opposite behaviour out of you is worth more than either
         /// of them being slightly better.
         ///
-        /// Rolled every twenty seconds by each of five machines, at just under one
-        /// in seven. That runs about ten jackpots across a match - one somewhere
-        /// every half minute or so, up from every forty seconds.
+        /// Rolled every twenty seconds by each of five machines at one in eight.
+        /// Nine jackpots across a match, one somewhere every thirty-three seconds,
+        /// and a jackpot running somewhere about a quarter of the time.
         ///
-        /// The ceiling on this is not fairness, it is meaning: with five machines
-        /// and a jackpot lasting eight seconds, pushing much past this starts to
-        /// leave one running somewhere at all times, and a thing that is always
-        /// happening is not an event, it is the weather.
+        /// That last figure is the one to tune against, and it is not about
+        /// fairness but about meaning: with five machines and an eight second
+        /// jackpot, much past a quarter leaves one going at all times, and a thing
+        /// that is always happening stops being an event and becomes the weather.
+        /// At 29% it was starting to feel like the weather.
         static let jackpotDuration: Double = 8
         static let jackpotInterval: Double = 20
-        static let jackpotChance = 0.145
+        static let jackpotChance = 0.12
 
         /// What a jackpot does to the two numbers that decide a machine's output.
         ///
