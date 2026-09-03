@@ -55,7 +55,7 @@ final class EffectsRenderer {
             if let previous = lastHealth[id], previous != Int.max {
                 if actor.health > previous { lift(at: actor.position) }
                 if actor.health < previous {
-                    spray(at: actor.position, hurt: previous - actor.health)
+                    knock(at: actor.position, hurt: previous - actor.health)
                 }
             }
         }
@@ -174,41 +174,55 @@ final class EffectsRenderer {
 
     // MARK: - Being hit
 
-    /// Red thrown off somebody who has just been shot.
+    /// Stars knocked off somebody who has just been shot.
     ///
-    /// This replaced tinting the whole figure red, which was the obvious thing and
-    /// looked wrong: recolouring a character says something about the CHARACTER -
-    /// poisoned, burning, on the wrong team - where a hit is something that happens
-    /// at a point on them and is over. Bits coming off is the same information
-    /// without a claim about what they are.
+    /// This is the third thing tried here and the first that is about the HIT
+    /// rather than about the person. Tinting the figure white read as a highlight;
+    /// tinting it red read as a claim about the character - poisoned, burning, on
+    /// the other team - and a spray of red bits, while perfectly clear, is blood in
+    /// a game about children raiding each other's forts. A knock throwing off
+    /// sparks is the cartoon convention every player already knows, says impact
+    /// without saying injury, and is bright yellow on a green map rather than
+    /// competing with the health bars for the colour red.
     ///
-    /// Sized by the damage, so a graze and a point-blank hit do not look alike -
-    /// three motes up to nine, which is about the range between a spent shot at
-    /// the rim of a blast and a Blaster 6 at arm's length.
-    private func spray(at position: Vec2, hurt: Int) {
+    /// Sized by the damage - two stars up to seven, which is about the range
+    /// between a spent shot at the rim of a blast and a Blaster 6 at arm's length -
+    /// so a graze and a hammering do not look alike.
+    private func knock(at position: Vec2, hurt: Int) {
         let origin = GridGeometry.point(for: position)
-        let count = min(9, 3 + hurt / 8)
+        let count = min(7, 2 + hurt / 9)
 
-        for _ in 0..<count {
-            let bit = SKShapeNode(circleOfRadius: CGFloat.random(in: 1.4...3.0))
-            bit.fillColor = RenderPalette.placementBlocked
-            bit.strokeColor = .clear
-            bit.zPosition = 12
-            bit.position = CGPoint(x: origin.x + CGFloat.random(in: -6...6),
-                                   y: origin.y + CGFloat.random(in: -4...10))
-            node.addChild(bit)
+        for index in 0..<count {
+            let star = SKSpriteNode(texture: ImpactArt.star)
+            let side = GridGeometry.length(ofTiles: Double.random(in: 0.28...0.44))
+            star.size = CGSize(width: side, height: side)
+            star.zPosition = 12
+            star.position = CGPoint(x: origin.x + CGFloat.random(in: -5...5),
+                                    y: origin.y + CGFloat.random(in: -4...10))
 
-            // Out and up, then down: thrown off rather than drifting away, which is
-            // what tells this apart at a glance from the motes that rise on a heal.
-            let out = CGFloat.random(in: -26...26)
-            let up = CGFloat.random(in: 10...26)
+            // Fanned round the whole circle rather than thrown at random, so a
+            // burst reads as a single impact rather than as several small ones.
+            let angle = (Double(index) / Double(count)) * 2 * .pi
+                + Double.random(in: -0.4...0.4)
+            let reach = CGFloat.random(in: 14...30)
 
-            bit.run(.sequence([
+            node.addChild(star)
+
+            star.setScale(0.4)
+            star.zRotation = CGFloat.random(in: 0...(.pi / 2))
+
+            // Out fast and gone: a spark that lingers stops being a spark. The
+            // stars grow as they leave and then shrink out, which is what sells
+            // them as a flash rather than as objects flying away.
+            star.run(.sequence([
                 .group([
-                    .sequence([.moveBy(x: out * 0.6, y: up, duration: 0.14),
-                               .moveBy(x: out * 0.4, y: -up * 1.4, duration: 0.26)]),
-                    .sequence([.wait(forDuration: 0.16),
-                               .fadeOut(withDuration: 0.24)])
+                    .moveBy(x: cos(angle) * Double(reach),
+                            y: sin(angle) * Double(reach), duration: 0.26),
+                    .rotate(byAngle: CGFloat.random(in: -1.2...1.2), duration: 0.26),
+                    .sequence([.scale(to: 1.15, duration: 0.09),
+                               .scale(to: 0.5, duration: 0.17)]),
+                    .sequence([.wait(forDuration: 0.12),
+                               .fadeOut(withDuration: 0.14)])
                 ]),
                 .removeFromParent()
             ]))

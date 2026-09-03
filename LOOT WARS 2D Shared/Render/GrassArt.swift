@@ -4,14 +4,17 @@
 //
 //  The grass, drawn in code, in the map's own colours.
 //
-//  Two shapes for two jobs. The TUFT is soft and round-tipped, and it is what gets
-//  left behind a footfall - a bit of ground that has been stepped on and is
-//  settling back. The SPIKES are sharper and wider, and they ride at somebody's
-//  feet while they move: growth being pushed through rather than growth recovering.
+//  One shape: a soft, round-tipped tuft, left behind a footfall - a bit of ground
+//  that has been stepped on and is settling back.
 //
-//  Both are built out of the two floor greens and the terrain green, which is what
-//  the map itself is painted with, so neither reads as a sprite sitting ON the
-//  ground - they read as the ground doing something.
+//  Built out of the two floor greens and the terrain green, which is what the map
+//  itself is painted with, so it does not read as a sprite sitting ON the ground -
+//  it reads as the ground doing something.
+//
+//  A second, spikier drawing rode at the actor's ankles for one commit and looked
+//  wrong - too much like a costume and not enough like the map. The `spiky` branch
+//  below is what drew it, kept because the shape was fine and only the placement
+//  was the mistake; the version that used it is at cbcac97.
 //
 
 import SpriteKit
@@ -24,14 +27,6 @@ enum GrassArt {
                                       blades: [(-11, -9, 20, 4.5),
                                                (0, 1, 26, 5.0),
                                                (11, 10, 19, 4.5)])
-
-    /// Five sharper blades over a wider base, worn at the feet while walking.
-    static let spikes: SKTexture = make(size: CGSize(width: 76, height: 30), spiky: true,
-                                        blades: [(-28, -7, 15, 5.0),
-                                                 (-15, -4, 22, 5.5),
-                                                 (0, 0, 26, 6.0),
-                                                 (15, 4, 21, 5.5),
-                                                 (28, 8, 14, 5.0)])
 
     private static func make(size: CGSize,
                              spiky: Bool,

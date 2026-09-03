@@ -51,15 +51,6 @@ final class ActorRenderer {
         let figure = SKNode()
 
         let sprite: SKSpriteNode
-
-        /// Grass worn at the feet while moving.
-        ///
-        /// A child of the ROOT rather than of the body, deliberately: the body
-        /// carries the bob, and grass that hopped along with the figure would be
-        /// grass the figure was carrying rather than grass it was walking through.
-        /// This stays on the ground and the figure moves against it.
-        let grass = SKSpriteNode(texture: GrassArt.spikes)
-
         let healthFill: SKShapeNode
         let blaster: SKSpriteNode
         let goalLabel: SKLabelNode?
@@ -134,28 +125,6 @@ final class ActorRenderer {
             let hop = abs(sin(nodes.walkPhase))
             nodes.body.position.y = GridGeometry.length(
                 ofTiles: hop * ActorRenderer.walkBob)
-
-            // The grass at the feet, pushed through rather than trodden on.
-            //
-            // Eased towards a target every frame instead of being animated: the
-            // walk is re-evaluated sixty times a second from distance covered, and
-            // an action would be fighting a value that has already moved on. It
-            // also means a figure that stops mid-stride settles rather than
-            // snapping, for nothing.
-            // Bounded at both ends: too little is standing still, too much is a
-            // respawn, and grass appearing for two frames at a spawn point is the
-            // same tell the footfall trail already guards against.
-            let walking = moved > 0.004 && moved < ActorRenderer.walkStride
-            let wanted: CGFloat = walking ? 1 : 0
-            nodes.grass.alpha += (wanted - nodes.grass.alpha) * 0.22
-
-            if nodes.grass.alpha > 0.01 {
-                // Swept side to side on the step, and squashed down as the foot
-                // lands - the blades bending under somebody rather than waving.
-                nodes.grass.zRotation = CGFloat(sin(nodes.walkPhase * 0.5) * 0.14)
-                nodes.grass.yScale = CGFloat(1 - hop * 0.18)
-                nodes.grass.xScale = CGFloat(1 + hop * 0.10)
-            }
 
             // And a lean, which is what stops the hop reading as a hiccup. It
             // leans INTO the direction of travel, so it flips with the figure.
@@ -261,25 +230,10 @@ final class ActorRenderer {
         // of movement: the root is where the actor IS, the body is the walk, the
         // figure is whatever just happened to it, and the sprite is which way it is
         // facing. Collapsing any two of those means one overwriting the other.
-        // Sized against the figure: a shade wider than the shoulders, and low, so
-        // it sits about the ankles. Anchored above its own bottom edge so the roots
-        // are buried and only the blades show.
-        nodes.grass.size = CGSize(
-            width: GridGeometry.length(ofTiles: GameConfig.Player.halfWidth * 2.6),
-            height: GridGeometry.length(ofTiles: 0.34))
-        nodes.grass.anchorPoint = CGPoint(x: 0.5, y: 0.30)
-        nodes.grass.alpha = 0
-
-        // In FRONT of the figure, which is the whole illusion: blades crossing the
-        // ankles read as being walked through, blades behind them read as scenery
-        // that happens to be nearby.
-        nodes.grass.zPosition = 0.5
-
         nodes.figure.addChild(sprite)
         nodes.body.addChild(nodes.figure)
         nodes.body.addChild(blaster)
         nodes.root.addChild(nodes.body)
-        nodes.root.addChild(nodes.grass)
         nodes.root.addChild(bar)
         if let goalLabel { nodes.root.addChild(goalLabel) }
 
