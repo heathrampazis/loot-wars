@@ -551,6 +551,19 @@ final class World {
         chests.values.filter { $0.owner == team }.count
     }
 
+    /// Whether somebody from another team is alive and this close.
+    ///
+    /// A blunt distance test rather than the bots' line-of-sight one, and on
+    /// purpose: this answers "is now a bad moment", which wants to be true a little
+    /// too often rather than a little too rarely. Something that is deciding
+    /// whether to interrupt the player should err towards not.
+    func enemyNear(_ actor: Actor, within reach: Double) -> Bool {
+        actors.values.contains {
+            $0.isAlive && $0.team != actor.team
+                && ($0.position - actor.position).length <= reach
+        }
+    }
+
     /// Enemy chests, for anyone deciding what is worth raiding.
     func chests(notOwnedBy team: TeamID) -> [Chest] {
         chests.values.filter { $0.owner != team }

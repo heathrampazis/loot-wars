@@ -113,15 +113,14 @@ final class GameScene: SKScene {
     /// Teaches the one gesture nothing on screen suggests: hold a slot to drop it.
     private let hint = HintNode()
 
-    /// How many more times the drop hint may volunteer itself, and whether it has
-    /// been made redundant.
+    /// Whether the drop hint has had its one turn.
     ///
-    /// Somebody who has dropped something knows how to drop something, so the
-    /// first successful drop retires the hint for the rest of the match. Until
-    /// then it gets three showings - enough to be noticed, few enough that
-    /// somebody who is ignoring it on purpose is left alone.
-    private var dropHintsLeft = 3
+    /// Once a match, at the single moment it is useful, and never again - either
+    /// because it has been shown or because the player has dropped something and
+    /// therefore knows. Two flags rather than one because they retire it for
+    /// different reasons and both are worth being able to read.
     private var hasDropped = false
+    private var shownDropHint = false
 
     /// When the shop button next waves at somebody who has not been in.
     private var nextNudge: TimeInterval = 0
@@ -161,6 +160,11 @@ final class GameScene: SKScene {
               type.use == .mapTap else { return nil }
         return type
     }
+
+    /// How near an enemy has to be, and how recently you have been shot, for the
+    /// screen to stop trying to teach you anything.
+    private static let hintCombatRange: Double = 11
+    private static let hintCombatQuiet: Double = 4
 
     /// How long a finger must stay put to become a hold rather than a tap.
     ///
@@ -257,6 +261,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
         worldLayer.addChild(effectsRenderer.node)
+        worldLayer.addChild(hint)
         worldLayer.addChild(placementGhost.node)
         addChild(worldLayer)
 
@@ -275,7 +280,6 @@ final class GameScene: SKScene {
         cameraController.node.addChild(shopButton)
         cameraController.node.addChild(shopPanel)
         cameraController.node.addChild(quickBuy)
-        cameraController.node.addChild(hint)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -414,9 +418,6 @@ final class GameScene: SKScene {
             x: hud.position.x + QuickBuyNode.size.width / 2,
             y: hudBottom - 10 - QuickBuyNode.size.height / 2)
 
-        // Directly over the hotbar, which is what it is talking about. Close enough
-        // that the eye travels from the words to the slots without being asked to.
-        hint.position = CGPoint(x: 0, y: hotbarTop + 22)
     }
 
     // MARK: - Loop
@@ -497,6 +498,7 @@ final class GameScene: SKScene {
         updateItemButton(with: world)
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
+        updateHint(with: world)
         effectsRenderer.sync(with: world)
         dispatch(world.takeEvents(), in: world)
         if let player = world.localPlayer {
@@ -528,6 +530,47 @@ final class GameScene: SKScene {
             nextNudge = lastUpdateTime + GameConfig.Shop.nudgeInterval
             shopButton.nudge()
         }
+    }
+
+    /// Floats the drop hint over the player, at the one moment it is worth saying.
+    ///
+    /// A full bag is that moment and the only one. It is when the gesture stops
+    /// being a convenience and starts being the answer to a problem the player can
+    /// see for themselves - they are standing on loot and nothing is happening.
+    ///
+    /// And it clears out the instant anybody is close enough to fight. A sentence
+    /// floating over your own head while somebody shoots at you is worse than
+    /// never having been told, and this is the one thing on screen with no claim
+    /// on that attention.
+    private func updateHint(with world: World) {
+        guard let player = world.localPlayer, player.isAlive, !world.isOver else {
+            hint.hide()
+            return
+        }
+
+        let fighting = player.secondsSinceHit < GameScene.hintCombatQuiet
+            || world.enemyNear(player, within: GameScene.hintCombatRange)
+
+        guard !fighting, !shopPanel.isOpen, chestPanel.openChest == nil else {
+            hint.hide()
+            return
+        }
+
+        // Carried by the player rather than pinned to the screen, so it follows
+        // them and stays where the eye already is. Above the health bar over their
+        // head, which is the one bit of space nothing else uses.
+        hint.position = GridGeometry.point(
+            for: Vec2(x: player.position.x, y: player.position.y + 1.35))
+
+        // Retired only once it has actually run its course. Cut short by somebody
+        // rounding a corner, it comes back at the next quiet moment - see
+        // HintNode.completed for why being shown and being read are different.
+        if hint.completed { shownDropHint = true }
+
+        guard !hasDropped, !shownDropHint, !hint.isShowing,
+              player.inventory.isFull else { return }
+
+        hint.show("HOLD AN ITEM TO DROP IT")
     }
 
     /// Takes everything the world announced this frame and hands it to whoever
@@ -1066,24 +1109,6 @@ extension GameScene {
         }
 
         selectedSlot = (selectedSlot == slot) ? nil : slot
-        if selectedSlot != nil { offerDropHint() }
-    }
-
-    /// Says how to drop something, at a moment somebody might want to.
-    ///
-    /// Picking a slot out is the moment: it is the one time a player is thinking
-    /// about a particular item rather than about the map. A FULL bag is the other,
-    /// and it ignores the three-showing budget - somebody standing over loot they
-    /// cannot pick up has a problem this sentence solves, and telling them once
-    /// more is worth more than the tidiness of a quota.
-    private func offerDropHint() {
-        guard !hasDropped, !shopPanel.isOpen, chestPanel.openChest == nil else { return }
-
-        let full = world.localPlayer?.inventory.isFull == true
-        guard full || dropHintsLeft > 0 else { return }
-        if !full { dropHintsLeft -= 1 }
-
-        hint.show(full ? "BAG FULL - HOLD AN ITEM TO DROP IT" : "HOLD AN ITEM TO DROP IT")
     }
 
     /// Taps while the shop is open: a tab, a card, or done.

@@ -2,7 +2,8 @@
 //  HintNode.swift
 //  Loot Wars
 //
-//  A line of text that teaches one gesture and then goes away for good.
+//  A line of text that floats over the player, teaches one gesture, and then goes
+//  away for good.
 //
 //  Holding a hotbar slot drops the item, and holding a wall takes it down. Both are
 //  good gestures and neither is discoverable: nothing on the screen suggests that
@@ -11,11 +12,17 @@
 //
 //  The rules this follows are the ones that stop a tutorial becoming nagging:
 //
-//   1. It appears at a moment the gesture is RELEVANT - a slot picked out, a bag
-//      with no room in it - not at the start of a match with everything else.
-//   2. It goes away by itself.
-//   3. It stops for good the moment the player performs the gesture. Somebody who
-//      has dropped something knows how to drop something.
+//   1. It appears at the ONE moment the gesture solves a problem the player
+//      actually has: a bag with no room left in it. Not at the start of a match,
+//      not every time a slot is picked out.
+//   2. It goes away by itself, and it goes away IMMEDIATELY if anybody is near
+//      enough to fight - a lesson during a firefight is worse than no lesson.
+//   3. It stops for good the moment the player performs the gesture, and it only
+//      ever offers itself once a match either way.
+//
+//  It rides over the player rather than sitting on the glass with the HUD. A hint
+//  about the thing you are carrying belongs on the person carrying it, where the
+//  eye already is, rather than in a corner competing with the score.
 //
 //  Deliberately not a tutorial system. One line, no queue, no ordering, no state
 //  that outlives the match - if a second hint is ever wanted it can have its own
@@ -26,8 +33,8 @@ import SpriteKit
 
 final class HintNode: SKNode {
 
-    private static let height: CGFloat = 30
-    private static let padding: CGFloat = 14
+    private static let height: CGFloat = 26
+    private static let padding: CGFloat = 12
 
     private let plate = SKShapeNode()
     private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -36,21 +43,37 @@ final class HintNode: SKNode {
     /// up leaves it alone rather than restarting the animation under the player.
     private var showing: String?
 
+    /// Up right now.
+    var isShowing: Bool { showing != nil }
+
+    /// Ran its full course rather than being cut short.
+    ///
+    /// The distinction is the whole reason a hint gets only one turn: a lesson that
+    /// was yanked off screen after a fifth of a second because somebody rounded the
+    /// corner was never READ, and retiring it on the strength of having technically
+    /// been shown would be the most annoying possible outcome - the one time it
+    /// appears is the one time nobody sees it.
+    private(set) var completed = false
+
     override init() {
         super.init()
-        zPosition = 1050
         isHidden = true
 
-        label.fontSize = 13
-        label.fontColor = .white
+        label.fontSize = 12
+        label.fontColor = SKColor(white: 1, alpha: 0.92)
         label.verticalAlignmentMode = .center
         addChild(label)
 
-        plate.fillColor = RenderPalette.hudPanel
-        plate.strokeColor = SKColor(white: 1, alpha: 0.25)
-        plate.lineWidth = 1.5
+        // Barely there. It is standing on top of the game rather than beside it,
+        // so it has to be readable against grass without becoming a sign nailed to
+        // the player's head - just enough shade under the words to hold them.
+        plate.fillColor = SKColor(white: 0, alpha: 0.38)
+        plate.strokeColor = .clear
         plate.zPosition = -1
         addChild(plate)
+
+        // Above the actors it floats over, below anything on the glass.
+        zPosition = 20
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -85,7 +108,10 @@ final class HintNode: SKNode {
             .wait(forDuration: seconds),
             .fadeOut(withDuration: 0.3),
             .hide(),
-            .run { [weak self] in self?.showing = nil }
+            .run { [weak self] in
+                self?.showing = nil
+                self?.completed = true
+            }
         ]), withKey: "hint")
     }
 
