@@ -19,10 +19,17 @@ final class HUDNode: SKNode {
     private static let padding: CGFloat = 8
     private static let rowSpacing: CGFloat = 6
 
+    /// Measured from the rows it actually has, so switching the ammo bar off in
+    /// GameConfig shortens the panel rather than leaving a hole where it was.
     static var size: CGSize {
-        CGSize(width: padding * 2 + StatBarNode.totalWidth,
-               height: padding * 2 + StatBarNode.barHeight * 2
-                     + StatCounterNode.height + rowSpacing * 2)
+        let bars = GameConfig.Blaster.usesAmmo ? 2 : 1
+        let rows = bars + 1     // and the token counter
+
+        return CGSize(width: padding * 2 + StatBarNode.totalWidth,
+                      height: padding * 2
+                            + StatBarNode.barHeight * CGFloat(bars)
+                            + StatCounterNode.height
+                            + rowSpacing * CGFloat(rows - 1))
     }
 
     private let health = StatBarNode(iconNamed: "HealthIcon",
@@ -47,16 +54,16 @@ final class HUDNode: SKNode {
         // counter first came out three points inside the ammo bar.
         var edge = -HUDNode.padding
 
-        for (row, height) in [(health, StatBarNode.barHeight),
-                              (ammo, StatBarNode.barHeight),
-                              (tokens, StatCounterNode.height)] as [(SKNode, CGFloat)] {
+        var rows: [(SKNode, CGFloat)] = [(health, StatBarNode.barHeight)]
+        if GameConfig.Blaster.usesAmmo { rows.append((ammo, StatBarNode.barHeight)) }
+        rows.append((tokens, StatCounterNode.height))
+
+        for (row, height) in rows {
             row.position = CGPoint(x: HUDNode.padding, y: edge - height / 2)
             edge -= height + HUDNode.rowSpacing
         }
 
-        addChild(health)
-        addChild(ammo)
-        addChild(tokens)
+        for (row, _) in rows { addChild(row) }
 
         zPosition = 1000
     }
@@ -69,7 +76,9 @@ final class HUDNode: SKNode {
         guard let player = world.localPlayer else { return }
 
         health.setFraction(Double(player.health) / Double(player.maxHealth))
-        ammo.setFraction(Double(player.ammo) / Double(GameConfig.Blaster.magazineSize))
+        if GameConfig.Blaster.usesAmmo {
+            ammo.setFraction(Double(player.ammo) / Double(GameConfig.Blaster.magazineSize))
+        }
         tokens.setValue(player.tokens)
     }
 }

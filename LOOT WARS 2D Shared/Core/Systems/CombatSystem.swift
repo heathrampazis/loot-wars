@@ -92,23 +92,48 @@ enum CombatSystem {
         // Stop dead rather than sliding on with whatever was last pressed.
         actor.moveInput = .zero
 
-        // Gear is always LOST on death - what is random is only whether it lands
-        // on the ground for somebody else.
+        // Death costs you RUNGS, not everything you own.
         //
-        // This is what makes a well-equipped actor worth hunting rather than just
-        // worth avoiding: killing someone in a Legendary is how you get one. The
-        // chance keeps it a gamble rather than a transaction, and it rises with
-        // tier, so the good stuff is the stuff worth chasing.
-        drop(.item(.helmet(actor.helmet)), chance: actor.helmet.dropChance,
-             at: actor.position, in: world)
-        actor.helmet = .none
+        // It used to strip the lot, which sounds like the harshest and therefore
+        // fairest rule and is neither. The gear ladder takes most of a match to
+        // climb, so a single death in the last minute did not set you back, it took
+        // you out of the match: bare-headed with a starter blaster against people
+        // three tiers up, and no time left to climb again. The closing minutes were
+        // decided by who had most recently died.
+        //
+        // Two helmet rungs and one blaster rung. Enough to be a real loss - a
+        // Legendary comes back an Epic, and being killed twice in a row genuinely
+        // hurts - without ending anyone's match, and it stacks correctly with the
+        // respawn floor, which catches whatever is left at the bottom.
+        //
+        // What DROPS is the rung you lost, at the odds that rung has always
+        // carried. That is what keeps a well-equipped actor worth hunting rather
+        // than merely worth avoiding: killing somebody in a Legendary is still how
+        // you get one. The chance keeps it a gamble rather than a transaction, and
+        // it rises with tier, so the good stuff is still the stuff worth chasing.
+        // How much a death costs eases as the clock runs down - see
+        // GameConfig.Drops.rungsLost.
+        let cost = GameConfig.Drops.rungsLost(at: world.matchProgress)
+
+        let hadHelmet = actor.helmet
+        actor.helmet = HelmetTier(rawValue: max(0, hadHelmet.rawValue - cost.helmet)) ?? .none
+
+        if hadHelmet != actor.helmet {
+            drop(.item(.helmet(hadHelmet)), chance: hadHelmet.dropChance,
+                 at: actor.position, in: world)
+        }
 
         // A starter blaster never drops - everybody already has one, so scattering
-        // them would only be a way of finding nothing.
-        drop(.item(.blaster(actor.blaster)), chance: actor.blaster.dropChance,
-             at: actor.position, in: world)
+        // them would only be a way of finding nothing. dropChance answers that.
+        let hadBlaster = actor.blaster
+        actor.blaster = BlasterTier(rawValue: max(BlasterTier.starting.rawValue,
+                                                  hadBlaster.rawValue - cost.blaster))
+            ?? .starting
 
-        actor.blaster = .starting
+        if hadBlaster != actor.blaster {
+            drop(.item(.blaster(hadBlaster)), chance: hadBlaster.dropChance,
+                 at: actor.position, in: world)
+        }
 
         // The bag goes with the body.
         //
@@ -133,7 +158,19 @@ enum CombatSystem {
             case .blaster(let tier):
                 drop(.item(.blaster(tier)), chance: tier.dropChance,
                      at: actor.position, in: world)
-            case .bandage, .medkit, .bomb, .chest, .arcade:
+            // Supplies scatter, sometimes. Not the whole stack - one item off it,
+            // at even odds - which is the difference between restocking off a body
+            // and getting a consolation prize from one.
+            //
+            // This is the one thing worth having from a fight you won badly. You
+            // spend bandages winning a fight; without this you walked away from it
+            // poorer than you arrived however well you shot, which made winning a
+            // fight something to avoid doing twice.
+            case .bandage, .medkit:
+                drop(.item(stack.type), chance: GameConfig.Drops.healingChance,
+                     at: actor.position, in: world)
+
+            case .bomb, .chest, .arcade:
                 break
             }
         }

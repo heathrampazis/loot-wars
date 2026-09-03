@@ -35,7 +35,12 @@ enum ItemType: Hashable {
     var maxStack: Int {
         switch self {
         case .bandage: return 4
-        case .medkit:  return 2
+        // Three, up from two. A slot of bandages was two full health bars and a
+        // slot of medkits was also two, so the expensive one bought you nothing
+        // per pocket - and pockets, not tokens, are what you actually run out of
+        // mid-raid. Three makes the medkit the thing you carry when you have one
+        // slot left to give.
+        case .medkit:  return 3
         case .bomb:    return 3
         case .chest:   return 2
         // One apiece. Two tiers of the same gear are different item types anyway,

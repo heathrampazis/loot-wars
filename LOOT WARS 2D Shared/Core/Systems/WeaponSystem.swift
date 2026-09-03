@@ -70,12 +70,16 @@ enum WeaponSystem {
             actor.facesLeft = aim.x < 0
         }
 
-        guard actor.shootCooldown <= 0, actor.ammo > 0 else {
+        // The rate limit always applies - it is what makes a Blaster 6 different
+        // from a Blaster 1. Running dry does not, unless GameConfig turns it back
+        // on; see Blaster.usesAmmo for why it is off.
+        guard actor.shootCooldown <= 0,
+              !GameConfig.Blaster.usesAmmo || actor.ammo > 0 else {
             world.actors[id] = actor
             return
         }
 
-        actor.ammo -= 1
+        if GameConfig.Blaster.usesAmmo { actor.ammo -= 1 }
         actor.shootCooldown = 1.0 / GameConfig.Blaster.fireRate
         // Firing pushes the refill back out to the full delay.
         actor.rechargeTimer = GameConfig.Blaster.rechargeDelay

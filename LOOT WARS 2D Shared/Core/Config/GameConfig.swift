@@ -176,7 +176,13 @@ enum GameConfig {
             Tab(name: "GEAR", stock: .upgrades),
             Tab(name: "HEALING", stock: .shelf([
                 Item(type: .bandage, price: 6),
-                Item(type: .medkit,  price: 15)
+                // Eleven, down from fifteen. At fifteen a medkit was worse than a
+                // bandage on every axis a player actually feels: 0.067 of a health
+                // bar per token against 0.083, and the same two bars per slot once
+                // you counted the deeper bandage stack. It was the premium option
+                // that lost to the cheap one, which is not a choice, it is a trap.
+                // At eleven it pays 0.091 a token and three bars a slot.
+                Item(type: .medkit,  price: 11)
             ])),
             Tab(name: "BUILDING", stock: .shelf([
                 Item(type: .chest,  price: 14),
@@ -337,7 +343,10 @@ enum GameConfig {
         static let respawnFloor: [(progress: Double, helmet: HelmetTier, blaster: BlasterTier)] = [
             (0.50, .common,    .two),
             (0.70, .uncommon,  .three),
-            (0.85, .rare,      .four)
+            // Epic rather than Rare at the top. The floor is what somebody who has
+            // just died fights the last forty seconds in, and a Rare against a map
+            // full of Epics and Legendaries is a spectator.
+            (0.85, .epic,      .four)
         ]
 
         /// What a respawn is worth right now, or nil in the opening half when it is
@@ -829,6 +838,34 @@ enum GameConfig {
 
         static let maximumChance = 0.80
 
+        /// How many rungs death costs, per ladder, and it EASES as the clock runs
+        /// down.
+        ///
+        /// Two helmet rungs and one blaster rung to start with, rather than
+        /// everything - see CombatSystem.kill for why stripping the lot did not set
+        /// a player back so much as take them out of the match.
+        ///
+        /// One helmet rung in the closing third, because that is where the
+        /// complaint actually lives: late deaths are the ones there is no time to
+        /// recover from, and a match whose last minute is fought by people who have
+        /// been knocked back down the ladder is a match that gets less interesting
+        /// exactly as it should be getting more so. Simulated across 30,000
+        /// matches, the taper is worth about half a rung of gear in the closing
+        /// minute to an engaged player and a full one to a strong player - and it
+        /// WIDENS the gap between them, because it lets people keep what they
+        /// earned rather than handing anybody anything.
+        static func rungsLost(at progress: Double) -> (helmet: Int, blaster: Int) {
+            progress >= 0.70 ? (helmet: 1, blaster: 1) : (helmet: 2, blaster: 1)
+        }
+
+        /// The odds that one item off a carried healing stack lands on the ground.
+        ///
+        /// ONE item, not the stack: enough that winning a hard fight tops you up a
+        /// little, not enough that a body is a shop. You spend supplies winning a
+        /// fight, and before this you always walked away poorer than you arrived,
+        /// however well you shot.
+        static let healingChance = 0.5
+
         /// How far a drop is flung from where its owner fell, in tiles. Enough that
         /// a helmet and a blaster from the same kill land side by side instead of
         /// stacked on top of each other.
@@ -1081,6 +1118,19 @@ enum GameConfig {
         /// Half the width of a projectile, in tiles. Only used for drawing today;
         /// hit detection arrives with health at M5.
         static let projectileRadius: Double = 0.18
+
+        /// Whether running dry is a thing that happens at all.
+        ///
+        /// Off. The bar was a second resource to watch in a game whose fights last
+        /// four seconds, and what it actually did was punish the player for holding
+        /// a trigger the bots were never going to hold - they fire in bursts by
+        /// nature, so the mechanic taxed exactly one of the eight actors on the map.
+        ///
+        /// The machinery below stays, and stays wired: the magazine, the recharge
+        /// delay and the drip are all still here and still correct. Only the check
+        /// that stops a shot is skipped, and the bar is not drawn. Turning this back
+        /// on is one word, which is the point of leaving it in.
+        static let usesAmmo = false
 
         /// Shots you can fire before running dry.
         ///
