@@ -51,6 +51,15 @@ final class ActorRenderer {
         let figure = SKNode()
 
         let sprite: SKSpriteNode
+
+        /// Grass worn at the feet while moving.
+        ///
+        /// A child of the ROOT rather than of the body, deliberately: the body
+        /// carries the bob, and grass that hopped along with the figure would be
+        /// grass the figure was carrying rather than grass it was walking through.
+        /// This stays on the ground and the figure moves against it.
+        let grass = SKSpriteNode(texture: GrassArt.spikes)
+
         let healthFill: SKShapeNode
         let blaster: SKSpriteNode
         let goalLabel: SKLabelNode?
@@ -125,6 +134,28 @@ final class ActorRenderer {
             let hop = abs(sin(nodes.walkPhase))
             nodes.body.position.y = GridGeometry.length(
                 ofTiles: hop * ActorRenderer.walkBob)
+
+            // The grass at the feet, pushed through rather than trodden on.
+            //
+            // Eased towards a target every frame instead of being animated: the
+            // walk is re-evaluated sixty times a second from distance covered, and
+            // an action would be fighting a value that has already moved on. It
+            // also means a figure that stops mid-stride settles rather than
+            // snapping, for nothing.
+            // Bounded at both ends: too little is standing still, too much is a
+            // respawn, and grass appearing for two frames at a spawn point is the
+            // same tell the footfall trail already guards against.
+            let walking = moved > 0.004 && moved < ActorRenderer.walkStride
+            let wanted: CGFloat = walking ? 1 : 0
+            nodes.grass.alpha += (wanted - nodes.grass.alpha) * 0.22
+
+            if nodes.grass.alpha > 0.01 {
+                // Swept side to side on the step, and squashed down as the foot
+                // lands - the blades bending under somebody rather than waving.
+                nodes.grass.zRotation = CGFloat(sin(nodes.walkPhase * 0.5) * 0.14)
+                nodes.grass.yScale = CGFloat(1 - hop * 0.18)
+                nodes.grass.xScale = CGFloat(1 + hop * 0.10)
+            }
 
             // And a lean, which is what stops the hop reading as a hiccup. It
             // leans INTO the direction of travel, so it flips with the figure.
@@ -230,10 +261,25 @@ final class ActorRenderer {
         // of movement: the root is where the actor IS, the body is the walk, the
         // figure is whatever just happened to it, and the sprite is which way it is
         // facing. Collapsing any two of those means one overwriting the other.
+        // Sized against the figure: a shade wider than the shoulders, and low, so
+        // it sits about the ankles. Anchored above its own bottom edge so the roots
+        // are buried and only the blades show.
+        nodes.grass.size = CGSize(
+            width: GridGeometry.length(ofTiles: GameConfig.Player.halfWidth * 2.6),
+            height: GridGeometry.length(ofTiles: 0.34))
+        nodes.grass.anchorPoint = CGPoint(x: 0.5, y: 0.30)
+        nodes.grass.alpha = 0
+
+        // In FRONT of the figure, which is the whole illusion: blades crossing the
+        // ankles read as being walked through, blades behind them read as scenery
+        // that happens to be nearby.
+        nodes.grass.zPosition = 0.5
+
         nodes.figure.addChild(sprite)
         nodes.body.addChild(nodes.figure)
         nodes.body.addChild(blaster)
         nodes.root.addChild(nodes.body)
+        nodes.root.addChild(nodes.grass)
         nodes.root.addChild(bar)
         if let goalLabel { nodes.root.addChild(goalLabel) }
 
@@ -278,26 +324,30 @@ final class ActorRenderer {
         blaster.xScale = facingLeft ? -1 : 1
     }
 
-    /// Took a hit: a red blink and a flinch.
+    /// Took a hit: a flinch, and a moment of shadow.
     ///
-    /// Red rather than the white it started as. White is the film convention for
-    /// an impact, and on this map it is also the brightest thing on a pale green
-    /// field - it read as a highlight, or a helmet catching the light, rather than
-    /// as damage. Red is what a health bar is already made of here, so the figure
-    /// and the bar above it say the same thing in the same colour.
+    /// Two colours have been tried on the figure itself and both were wrong for the
+    /// same reason. White read as a highlight - it is the brightest thing on a pale
+    /// green map, so it looked like light catching a helmet. Red read as a claim
+    /// about the character rather than about the moment: recolouring somebody says
+    /// poisoned, or burning, or on the other team, where a hit happens at a point
+    /// on them and is over.
     ///
-    /// The flinch is what makes it carry: the figure recoils, squashes and comes
-    /// back, which is movement rather than colour and survives being seen out of
-    /// the corner of an eye while you are aiming at something else.
+    /// So the figure only DARKENS, briefly and not much, which is what being
+    /// knocked back out of the light would actually look like - and the red is
+    /// thrown off them instead, as bits, by EffectsRenderer.
     ///
-    /// Both keyed, so a burst of hits restarts them rather than stacking up into a
-    /// permanently red actor standing permanently sideways.
+    /// The flinch is what carries it: the figure recoils, squashes and comes back,
+    /// which is movement rather than colour and survives being seen out of the
+    /// corner of an eye while you are aiming at something else.
+    ///
+    /// Keyed, so a burst of hits restarts them rather than stacking up into a
+    /// permanently dark actor standing permanently sideways.
     private func hurt(_ nodes: ActorNodes) {
         nodes.sprite.removeAction(forKey: "hit")
         nodes.sprite.run(.sequence([
-            .colorize(with: RenderPalette.placementBlocked,
-                      colorBlendFactor: 0.9, duration: 0.04),
-            .colorize(withColorBlendFactor: 0, duration: 0.18)
+            .colorize(with: .black, colorBlendFactor: 0.35, duration: 0.04),
+            .colorize(withColorBlendFactor: 0, duration: 0.16)
         ]), withKey: "hit")
 
         nodes.figure.removeAction(forKey: "react")

@@ -52,8 +52,11 @@ final class EffectsRenderer {
                 step(actor, travelling: actor.feet - previous)
             }
 
-            if let previous = lastHealth[id], actor.health > previous {
-                lift(at: actor.position)
+            if let previous = lastHealth[id], previous != Int.max {
+                if actor.health > previous { lift(at: actor.position) }
+                if actor.health < previous {
+                    spray(at: actor.position, hurt: previous - actor.health)
+                }
             }
         }
 
@@ -117,7 +120,7 @@ final class EffectsRenderer {
     }
 
     private func plant(at position: Vec2) {
-        let tuft = SKSpriteNode(texture: EffectsRenderer.grass)
+        let tuft = SKSpriteNode(texture: GrassArt.tuft)
         tuft.size = CGSize(width: GridGeometry.length(ofTiles: 0.42),
                            height: GridGeometry.length(ofTiles: 0.30))
         tuft.position = GridGeometry.point(for: position)
@@ -169,6 +172,49 @@ final class EffectsRenderer {
         }
     }
 
+    // MARK: - Being hit
+
+    /// Red thrown off somebody who has just been shot.
+    ///
+    /// This replaced tinting the whole figure red, which was the obvious thing and
+    /// looked wrong: recolouring a character says something about the CHARACTER -
+    /// poisoned, burning, on the wrong team - where a hit is something that happens
+    /// at a point on them and is over. Bits coming off is the same information
+    /// without a claim about what they are.
+    ///
+    /// Sized by the damage, so a graze and a point-blank hit do not look alike -
+    /// three motes up to nine, which is about the range between a spent shot at
+    /// the rim of a blast and a Blaster 6 at arm's length.
+    private func spray(at position: Vec2, hurt: Int) {
+        let origin = GridGeometry.point(for: position)
+        let count = min(9, 3 + hurt / 8)
+
+        for _ in 0..<count {
+            let bit = SKShapeNode(circleOfRadius: CGFloat.random(in: 1.4...3.0))
+            bit.fillColor = RenderPalette.placementBlocked
+            bit.strokeColor = .clear
+            bit.zPosition = 12
+            bit.position = CGPoint(x: origin.x + CGFloat.random(in: -6...6),
+                                   y: origin.y + CGFloat.random(in: -4...10))
+            node.addChild(bit)
+
+            // Out and up, then down: thrown off rather than drifting away, which is
+            // what tells this apart at a glance from the motes that rise on a heal.
+            let out = CGFloat.random(in: -26...26)
+            let up = CGFloat.random(in: 10...26)
+
+            bit.run(.sequence([
+                .group([
+                    .sequence([.moveBy(x: out * 0.6, y: up, duration: 0.14),
+                               .moveBy(x: out * 0.4, y: -up * 1.4, duration: 0.26)]),
+                    .sequence([.wait(forDuration: 0.16),
+                               .fadeOut(withDuration: 0.24)])
+                ]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     // MARK: - Kills
 
     /// The mark left where somebody went down, and what it paid.
@@ -213,55 +259,4 @@ final class EffectsRenderer {
         ]))
     }
 
-    // MARK: - The grass itself
-
-    /// Three blades, drawn once.
-    ///
-    /// Drawn rather than shipped as art, and in the map's own colours: this has to
-    /// read as the ground being disturbed rather than as a sprite appearing on top
-    /// of it, so it is the darker of the two floor greens with the terrain colour
-    /// underneath - which is what the map is already made of.
-    private static let grass: SKTexture = {
-        let size = CGSize(width: 48, height: 34)
-
-        let format = UIGraphicsImageRendererFormat.default()
-        format.opaque = false
-
-        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
-            let cg = context.cgContext
-            cg.setLineCap(.round)
-
-            // Splayed outwards from a common root, the way a tuft actually grows -
-            // and the outer two lean further, so the shape has a middle.
-            let blades: [(dx: CGFloat, lean: CGFloat, height: CGFloat, width: CGFloat)] = [
-                (-11, -9, 20, 4.5),
-                (0, 1, 26, 5.0),
-                (11, 10, 19, 4.5)
-            ]
-
-            for blade in blades {
-                let root = CGPoint(x: size.width / 2 + blade.dx, y: size.height - 3)
-                let tip = CGPoint(x: root.x + blade.lean, y: root.y - blade.height)
-                let control = CGPoint(x: root.x + blade.lean * 0.2, y: root.y - blade.height * 0.6)
-
-                let path = CGMutablePath()
-                path.move(to: root)
-                path.addQuadCurve(to: tip, control: control)
-
-                cg.setStrokeColor(RenderPalette.terrain.withAlphaComponent(0.75).cgColor)
-                cg.setLineWidth(blade.width)
-                cg.addPath(path)
-                cg.strokePath()
-
-                cg.setStrokeColor(RenderPalette.floorDark.withAlphaComponent(0.9).cgColor)
-                cg.setLineWidth(blade.width * 0.45)
-                cg.addPath(path)
-                cg.strokePath()
-            }
-        }
-
-        let texture = SKTexture(image: image)
-        texture.usesMipmaps = true
-        return texture
-    }()
 }
