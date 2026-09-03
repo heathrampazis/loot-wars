@@ -141,9 +141,20 @@ enum GameConfig {
         /// same for everybody; an upgrade depends on what you are already wearing,
         /// and listing all seven tiers would be seven cards where two will do and a
         /// shop full of things you cannot buy.
+        /// Which ladder a gear tab climbs.
+        ///
+        /// Split into two, because one GEAR tab holding both was one tab doing two
+        /// jobs: it showed a helmet and a blaster side by side and the shopper had
+        /// to work out which of two unrelated things they were being offered. A tab
+        /// each says what it is in its own name and shows one decision.
+        enum Ladder {
+            case helmets
+            case blasters
+        }
+
         enum Stock {
             case shelf([Item])
-            case upgrades
+            case upgrades(Ladder)
         }
 
         struct Tab {
@@ -151,37 +162,26 @@ enum GameConfig {
             let stock: Stock
         }
 
-        /// The shelf, repriced against what the things actually DO rather than
-        /// against each other.
+        /// HELMET, BLASTER, HEALING - and nothing else.
         ///
-        /// A bomb was six. A bomb opens a wall, and blowing up somebody's machine
-        /// pays twenty-five - so six tokens bought a raid that returned nineteen,
-        /// over and over, and the cheapest thing on the shelf was also the most
-        /// decisive. At eleven the raid still profits, which it should, but the
-        /// travel and the risk are now part of the price rather than a formality.
+        /// The gear ladders come first and get a tab each: they are the only things
+        /// in here you cannot find lying on the map, they are what the tokens are
+        /// ultimately for, and each is a single decision - the next rung, or not
+        /// yet.
         ///
-        /// A machine was eighteen. Modelled against how often its owner actually
-        /// walks past it - it stops paying out at three uncollected, so a machine
-        /// earns what you collect rather than what it makes - eighteen paid for
-        /// itself even if you barely visited, and printed money if you hung around
-        /// your own base. At twenty-four it wants both: bought in the first half
-        /// AND worked. Bought late it is a luxury, which is the correct shape for
-        /// the one purchase that pays you back.
+        /// BUILDING is gone. It sold a chest, which crates hand out anyway, and a
+        /// machine, which was the one purchase that paid for itself - and a shop
+        /// that sells you your own income is a shop that decides the match at the
+        /// counter. Machines come out of rare crates now: one or two exist in a
+        /// whole match, whoever finds one has something worth defending, and
+        /// everybody else has something worth raiding.
         ///
-        /// The gear ladder below is untouched. The complaint was that the shelf was
-        /// cheap, not that the climb was - and the climb is where the best kit in
-        /// the game comes from, so making it steeper would work against the very
-        /// thing the late game is supposed to show off.
-        /// GEAR first, because it is the tab you came for: the ladder is the only
-        /// thing in here you cannot find lying on the map, and it is what the
-        /// tokens are ultimately for.
-        ///
-        /// No bombs. A bomb was the odd one out on a shelf otherwise made of things
-        /// you keep - and being both cheap and the way into somebody's base, it
-        /// turned the shop into a raid vending machine. Bombs come out of crates
-        /// and chests, where finding one is a reason to go and use it.
+        /// No bombs either, for the older reason: being both cheap and the way into
+        /// somebody's base, a bomb on a shelf turned the shop into a raid vending
+        /// machine.
         static let tabs: [Tab] = [
-            Tab(name: "GEAR", stock: .upgrades),
+            Tab(name: "HELMET", stock: .upgrades(.helmets)),
+            Tab(name: "BLASTER", stock: .upgrades(.blasters)),
             Tab(name: "HEALING", stock: .shelf([
                 Item(type: .bandage, price: 6),
                 // Eleven, down from fifteen. At fifteen a medkit was worse than a
@@ -191,10 +191,6 @@ enum GameConfig {
                 // that lost to the cheap one, which is not a choice, it is a trap.
                 // At eleven it pays 0.091 a token and three bars a slot.
                 Item(type: .medkit,  price: 11)
-            ])),
-            Tab(name: "BUILDING", stock: .shelf([
-                Item(type: .chest,  price: 14),
-                Item(type: .arcade, price: 24)
             ]))
         ]
 
@@ -207,7 +203,8 @@ enum GameConfig {
                 switch tab.stock {
                 case .shelf(let items): return items.count
                 // A helmet rung and a blaster rung, and never more than that.
-                case .upgrades: return 2
+                // One rung, which is the whole offer: the next one up or nothing.
+                case .upgrades: return 1
                 }
             }.max() ?? 1
         }
@@ -239,11 +236,18 @@ enum GameConfig {
 
         /// What things NOT on the shelf are notionally worth, for selling back.
         ///
-        /// One entry, and it is the bomb: it came off the shelf because being able
-        /// to buy the way into somebody's base turned the shop into a raid vending
-        /// machine, but you can still end up carrying four with no wall in sight.
-        /// Priced at what it used to cost.
-        static let offShelf: [ItemType: Int] = [.bomb: 11]
+        /// Everything that came off the shelf but can still end up in your bag: a
+        /// bomb, a chest, a machine. Priced at what each used to cost.
+        ///
+        /// Without this they are unsellable, which sounds harmless and is not - a
+        /// chest you cannot place because your wall is open, or a machine your base
+        /// has no room for, would sit in one of four slots for the rest of the
+        /// match with no way out but the grass.
+        static let offShelf: [ItemType: Int] = [
+            .bomb: 11,
+            .chest: 14,
+            .arcade: 24
+        ]
 
         /// What the shop pays for something you sell back, as a share of its price.
         ///
@@ -1043,6 +1047,14 @@ enum GameConfig {
         /// around half gear, a third bombs and the rest medkits, which is a crate
         /// with nothing in it you would throw away and gear as the usual answer.
         static let rareBombBoost: Double = 1.15
+
+        /// How heavily a machine sits in a rare crate's table.
+        ///
+        /// Against a rare table that totals around 170, this is roughly one rare
+        /// crate in seven - and rare crates are one in fourteen, so a match sees
+        /// one or two machines in total. That is deliberately scarce: it is the
+        /// most valuable thing anybody can own and it used to be a purchase.
+        static let rareArcadeWeight = 24
 
         /// Share of crates on the map that are the good ones.
         ///

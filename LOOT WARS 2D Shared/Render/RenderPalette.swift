@@ -103,6 +103,15 @@ enum RenderPalette {
         rarities[min(rarity.rawValue, rarities.count - 1)]
     }
 
+    /// The colour of yes, and the colour of no, for anything you press.
+    ///
+    /// One pair, used by the sell button, the shop's price pills and the buy
+    /// outlines alike - so "you can do this" looks the same everywhere it is said,
+    /// which is the only way a colour ever comes to mean anything.
+    static let sellButton = rgb(0x3F, 0xB9, 0x50)
+    static let affordable = rgb(0x4C, 0xC9, 0x5E)
+    static let unaffordable = rgb(0xE0, 0x4B, 0x4B)
+
     // Placement preview. Green while a footprint would take, red while it would
     // not - the only two colours nobody has to be taught.
     static let placementValid   = rgb(0x6E, 0xF0, 0x6E)

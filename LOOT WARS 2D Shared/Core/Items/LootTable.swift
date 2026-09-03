@@ -187,6 +187,16 @@ enum LootTable {
                     return row
                 }
             }
+
+            // And the machine, which is now found and never bought.
+            //
+            // This is the only place one comes from, and the scarcity is the point:
+            // rare crates are one in fourteen, so a whole match turns up one or two
+            // machines between eight teams. Whoever opens that crate has something
+            // worth defending and everybody else has something worth raiding, which
+            // is a better shape than eight bases each with the same appliance in
+            // the corner because the shop sold it to them.
+            rows.append((pickup: .item(.arcade), weight: GameConfig.Loot.rareArcadeWeight))
         }
 
         let total = rows.reduce(0) { $0 + $1.weight }

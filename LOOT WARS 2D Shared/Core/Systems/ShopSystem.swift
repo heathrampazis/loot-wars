@@ -49,12 +49,14 @@ enum ShopSystem {
 
     /// The gear tab's offers, without the caller needing to know which tab that is.
     static func upgradeOffers(for actor: Actor) -> [GameConfig.Shop.Item] {
-        for index in GameConfig.Shop.tabs.indices {
-            if case .upgrades = GameConfig.Shop.tabs[index].stock {
-                return offers(on: index, for: actor)
-            }
+        // Every gear tab's offer, gathered - there are two of them now, one per
+        // ladder, and the callers that want "what could this actor climb next"
+        // want both. The bots buy the cheaper of them and the quick prompt offers
+        // the same, so neither had to learn that the shop was reorganised.
+        GameConfig.Shop.tabs.indices.flatMap { index -> [GameConfig.Shop.Item] in
+            guard case .upgrades = GameConfig.Shop.tabs[index].stock else { return [] }
+            return offers(on: index, for: actor)
         }
-        return []
     }
 
     /// What this actor is being offered on a tab right now.
@@ -71,20 +73,15 @@ enum ShopSystem {
             return items
 
 
-        case .upgrades:
-            var offers: [GameConfig.Shop.Item] = []
+        case .upgrades(.helmets):
+            guard let next = nextTier(above: actor.helmet, in: HelmetTier.allCases),
+                  let price = GameConfig.Shop.helmetPrices[next] else { return [] }
+            return [.init(type: .helmet(next), price: price)]
 
-            if let next = nextTier(above: actor.helmet, in: HelmetTier.allCases),
-               let price = GameConfig.Shop.helmetPrices[next] {
-                offers.append(.init(type: .helmet(next), price: price))
-            }
-
-            if let next = nextTier(above: actor.blaster, in: BlasterTier.allCases),
-               let price = GameConfig.Shop.blasterPrices[next] {
-                offers.append(.init(type: .blaster(next), price: price))
-            }
-
-            return offers
+        case .upgrades(.blasters):
+            guard let next = nextTier(above: actor.blaster, in: BlasterTier.allCases),
+                  let price = GameConfig.Shop.blasterPrices[next] else { return [] }
+            return [.init(type: .blaster(next), price: price)]
         }
     }
 

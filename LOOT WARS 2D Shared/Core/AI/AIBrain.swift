@@ -1038,16 +1038,9 @@ enum AIBrain {
             return upgradeToBuy(actor: actor, in: world)
         }
 
-        // A machine first, and before any gear. It is the only thing on the shelf
-        // that pays for itself: bought early it earns back more than it cost, which
-        // then buys the gear. A bot that spends its first tokens on a helmet has
-        // bought one helmet; a bot that spends them on a machine buys the helmet
-        // later anyway, and keeps the machine.
-        if !world.hasArcade(actor.team),
-           actor.inventory.firstSlot(holding: .arcade) == nil,
-           ShopSystem.canBuy(.arcade, actor: actor, in: world) {
-            return .arcade
-        }
+        // No machine here any more: they are not sold. A bot that finds one in a
+        // rare crate still carries it home and stands it up - see chestSpotWanted,
+        // which prefers a machine over a chest when it happens to be holding both.
 
         // Then furniture, and before any gear. A bot in a Legendary standing in an
         // empty base is a bot nobody has any reason to visit - and it is the

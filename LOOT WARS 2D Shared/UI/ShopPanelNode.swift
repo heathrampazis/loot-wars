@@ -384,8 +384,9 @@ final class ShopPanelNode: SKNode {
             )
         )
 
-        pill.fillColor = RenderPalette.floorLight
-        pill.strokeColor = .black
+        // Recoloured on every redraw - see update - so this is only the shape.
+        pill.fillColor = RenderPalette.affordable
+        pill.strokeColor = RenderPalette.affordable
         pill.lineWidth = 3
 
         holder.addChild(pill)
@@ -397,7 +398,7 @@ final class ShopPanelNode: SKNode {
 
         let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
         price.fontSize = 17
-        price.fontColor = .black
+        price.fontColor = .white
         price.horizontalAlignmentMode = .right
         price.verticalAlignmentMode = .center
         price.position = CGPoint(
@@ -443,12 +444,48 @@ final class ShopPanelNode: SKNode {
         isHidden = false
         lastDrawn = []
         lastPressed = nil
+
+        // Comes up rather than appearing. A panel this size arriving between two
+        // frames reads as a glitch - the eye gets no chance to follow where it came
+        // from, so it has to re-find everything on it. An eighth of a second of
+        // scale and fade is enough to be followed and short enough that nobody
+        // waiting to buy a bandage notices they waited.
+        removeAction(forKey: "curtain")
+        alpha = 0
+        setScale(0.94)
+
+        run(
+            .group([
+                .fadeIn(withDuration: 0.13),
+                .scale(to: 1, duration: 0.15)
+            ]),
+            withKey: "curtain"
+        )
+
+        dealCards(from: 0.06)
     }
 
     func close() {
         isOpen = false
-        isHidden = true
         lastPressed = nil
+
+        // Out faster than in, which is the usual asymmetry: opening is something
+        // you are about to read, closing is something you have finished with.
+        // isHidden is set at the END rather than now, or the fade would have
+        // nothing to fade.
+        removeAction(forKey: "curtain")
+
+        run(
+            .sequence([
+                .group([
+                    .fadeOut(withDuration: 0.09),
+                    .scale(to: 0.96, duration: 0.09)
+                ]),
+                .hide(),
+                .run { [weak self] in self?.setScale(1) }
+            ]),
+            withKey: "curtain"
+        )
     }
 
     // MARK: - Hit testing
@@ -633,6 +670,39 @@ final class ShopPanelNode: SKNode {
         selectedTab = index
         lastDrawn = []
         lastPressed = nil
+
+        // The cards for the new tab are dealt in on the next redraw, which happens
+        // this frame - see update, which is what actually fills them in. Kicking it
+        // off here rather than there keeps the animation tied to the DECISION
+        // rather than to the redraw, and the redraw fires for other reasons too:
+        // buying something must not re-deal the whole tab.
+        dealCards(from: 0)
+    }
+
+    /// Slides the visible cards in, one just after another.
+    ///
+    /// A stagger rather than all at once, and only 30 milliseconds of it. Together
+    /// they read as a hand being dealt - which is exactly what a tab change is -
+    /// where simultaneous movement reads as the panel twitching.
+    private func dealCards(from delay: TimeInterval) {
+        for (index, card) in cards.enumerated() {
+            card.holder.removeAction(forKey: "deal")
+            card.holder.alpha = 0
+
+            let home = card.holder.position
+            card.holder.position = CGPoint(x: home.x, y: home.y - 14)
+
+            card.holder.run(
+                .sequence([
+                    .wait(forDuration: delay + Double(index) * 0.03),
+                    .group([
+                        .fadeIn(withDuration: 0.12),
+                        .move(to: home, duration: 0.14)
+                    ])
+                ]),
+                withKey: "deal"
+            )
+        }
     }
 
     // MARK: - Drawing
@@ -725,7 +795,27 @@ final class ShopPanelNode: SKNode {
 
             card.holder.alpha = soldOut ? 0.45 : 1.0
 
+            // Green when you can have it, red when you cannot afford it - on the
+            // fill AND the outline, which is what the black outline used to be
+            // doing badly. Affordability only: a full bag also refuses a purchase,
+            // but that is a fact about you rather than about the shelf and the card
+            // says nothing about it (see ShopSystem.isSoldOut).
+            let affordable = player.tokens >= item.price
+
+            let colour = affordable
+                ? RenderPalette.affordable
+                : RenderPalette.unaffordable
+
+            card.pill.fillColor = colour.withAlphaComponent(0.9)
+            card.pill.strokeColor = colour
+
             cards[index] = card
+        }
+
+        // Last, so every card is where it belongs before anything moves.
+        if let delay = pendingDeal {
+            pendingDeal = nil
+            dealCards(from: delay)
         }
     }
 }

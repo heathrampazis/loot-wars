@@ -45,14 +45,15 @@ final class ItemSlotNode: SKNode {
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
-    /// What the shop would pay for this, shown only while the shop is open.
+    /// The SELL button, shown only while the shop is open.
     ///
-    /// On the slot rather than on a shelf, because these are YOUR things: the row
-    /// you already read to know what you are carrying becomes the row you sell
-    /// from, and there is nothing new to find. Opposite corner from the count, so
-    /// a stack of three bandages worth one token each says both without either
-    /// number sitting on the other.
-    private let priceTag = SKNode()
+    /// A button rather than a label, and that distinction is the whole of this
+    /// change. A small price in the corner said what a thing was worth; it did not
+    /// say that tapping would sell it, so it read as a caption on a slot rather
+    /// than as an offer. This is a green bar across the foot of the slot with a
+    /// plus, a number and a token on it - the same shape every game uses for a
+    /// thing you press, in the colour everything else in this game uses for yes.
+    private let sellButton = SKNode()
     private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
     /// Local origin is the centre of the slot.
@@ -101,35 +102,50 @@ final class ItemSlotNode: SKNode {
         count.zPosition = 1
         badge.addChild(count)
 
-        priceTag.position = CGPoint(x: side / 2 - inset - radius * 0.2,
-                                    y: -side / 2 + inset)
-        priceTag.zPosition = 2
-        priceTag.isHidden = true
-        addChild(priceTag)
+        // Across the foot of the slot, inside it: below would run off the bottom
+        // of the screen, since the bar already sits on the edge.
+        let buttonHeight = side * 0.30
 
-        let pill = SKShapeNode(path: CGPath(
-            roundedRect: CGRect(x: -radius * 1.9, y: -radius,
-                                width: radius * 3.8, height: radius * 2),
-            cornerWidth: radius, cornerHeight: radius, transform: nil))
-        pill.fillColor = RenderPalette.hudPanel
-        pill.strokeColor = .black
-        pill.lineWidth = side * 0.03
-        priceTag.addChild(pill)
+        sellButton.position = CGPoint(x: 0, y: -side / 2 + buttonHeight / 2 + side * 0.05)
+        sellButton.zPosition = 3
+        sellButton.isHidden = true
+        addChild(sellButton)
 
-        let token = SKSpriteNode(texture: ItemArt.texture(for: .token(1)))
-        token.size = ItemArt.size(of: ItemArt.texture(for: .token(1)),
-                                  fittingInto: radius * 1.5)
-        token.position = CGPoint(x: -radius * 0.85, y: 0)
-        token.zPosition = 1
-        priceTag.addChild(token)
+        let pill = SKShapeNode(
+            path: CGPath(
+                roundedRect: CGRect(
+                    x: -side / 2 + side * 0.08,
+                    y: -buttonHeight / 2,
+                    width: side - side * 0.16,
+                    height: buttonHeight
+                ),
+                cornerWidth: buttonHeight / 2,
+                cornerHeight: buttonHeight / 2,
+                transform: nil
+            )
+        )
 
-        price.fontSize = radius * 1.15
+        pill.fillColor = RenderPalette.sellButton
+        pill.strokeColor = SKColor(white: 1, alpha: 0.55)
+        pill.lineWidth = 1.5
+        sellButton.addChild(pill)
+
+        price.fontSize = buttonHeight * 0.62
         price.fontColor = .white
         price.horizontalAlignmentMode = .center
         price.verticalAlignmentMode = .center
-        price.position = CGPoint(x: radius * 0.55, y: 0)
+        price.position = CGPoint(x: -side * 0.06, y: 0)
         price.zPosition = 1
-        priceTag.addChild(price)
+        sellButton.addChild(price)
+
+        let token = SKSpriteNode(texture: ItemArt.texture(for: .token(1)))
+        token.size = ItemArt.size(
+            of: ItemArt.texture(for: .token(1)),
+            fittingInto: buttonHeight * 0.78
+        )
+        token.position = CGPoint(x: side * 0.16, y: 0)
+        token.zPosition = 1
+        sellButton.addChild(token)
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -195,15 +211,15 @@ final class ItemSlotNode: SKNode {
         run(.scale(to: restingScale, duration: 0.12), withKey: "scale")
     }
 
-    /// Shows or hides what the shop would pay for this slot.
+    /// Shows or hides the sell button, and what it would pay.
     func setPrice(_ tokens: Int?) {
         guard let tokens, tokens > 0 else {
-            priceTag.isHidden = true
+            sellButton.isHidden = true
             return
         }
 
-        priceTag.isHidden = false
-        price.text = "\(tokens)"
+        sellButton.isHidden = false
+        price.text = "+\(tokens)"
     }
 
     /// - Parameter dimmed: the item is there but cannot be used right now. Drawn
@@ -212,7 +228,7 @@ final class ItemSlotNode: SKNode {
         guard let stack else {
             icon.isHidden = true
             badge.isHidden = true
-            priceTag.isHidden = true
+            sellButton.isHidden = true
 
             // An empty slot is a hole in the bar, not an item of no value.
             glow.isHidden = true
