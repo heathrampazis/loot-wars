@@ -11,13 +11,17 @@
 //
 //  The rules this follows are the ones that stop a tutorial becoming nagging:
 //
-//   1. It appears at the ONE moment the gesture solves a problem the player
-//      actually has: a bag with no room left in it. Not at the start of a match,
-//      not every time a slot is picked out.
+//   1. It appears at the ONE moment the gesture solves a problem the player can
+//      see for themselves: they have walked over something and not picked it up.
+//      Not at the start of a match, not every time a slot is picked out, and not
+//      merely because the bag happens to be full - a full bag is only a problem
+//      once it costs you something.
 //   2. It goes away by itself, and it goes away IMMEDIATELY if anybody is near
 //      enough to fight - a lesson during a firefight is worse than no lesson.
-//   3. It stops for good the moment the player performs the gesture, and it only
-//      ever offers itself once a match either way.
+//   3. It stops for good the moment the player performs the gesture, and it gets
+//      two showings a match either way. A budget is simpler than tracking whether
+//      a given showing was actually read, and being interrupted by a fight is
+//      itself rare enough that spending one of the two on it is survivable.
 //
 //  WHERE it sits took three goes and the reasoning is worth keeping.
 //
@@ -55,14 +59,6 @@ final class HintNode: SKNode {
     /// Up right now.
     var isShowing: Bool { showing != nil }
 
-    /// Ran its full course rather than being cut short.
-    ///
-    /// The distinction is the whole reason a hint gets only one turn: a lesson that
-    /// was yanked off screen after a fifth of a second because somebody rounded the
-    /// corner was never READ, and retiring it on the strength of having technically
-    /// been shown would be the most annoying possible outcome - the one time it
-    /// appears is the one time nobody sees it.
-    private(set) var completed = false
 
     override init() {
         super.init()
@@ -88,7 +84,10 @@ final class HintNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func show(_ text: String, seconds: TimeInterval = 3) {
+    /// Up for a second and a half by default, which is twice as long as it takes
+    /// to read five words and no longer. A hint that outstays that is not being
+    /// more helpful, it is being furniture.
+    func show(_ text: String, seconds: TimeInterval = 1.5) {
         guard showing != text || isHidden else { return }
         showing = text
 
@@ -112,15 +111,11 @@ final class HintNode: SKNode {
 
         // A nudge downwards on the way in, towards the thing it is talking about.
         run(.sequence([
-            .group([.fadeIn(withDuration: 0.16), .scale(to: 1, duration: 0.16)]),
-            // Held long enough to be read twice by somebody who is also playing.
+            .group([.fadeIn(withDuration: 0.12), .scale(to: 1, duration: 0.12)]),
             .wait(forDuration: seconds),
-            .fadeOut(withDuration: 0.3),
+            .fadeOut(withDuration: 0.22),
             .hide(),
-            .run { [weak self] in
-                self?.showing = nil
-                self?.completed = true
-            }
+            .run { [weak self] in self?.showing = nil }
         ]), withKey: "hint")
     }
 

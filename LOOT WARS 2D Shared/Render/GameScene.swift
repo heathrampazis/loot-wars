@@ -113,14 +113,22 @@ final class GameScene: SKScene {
     /// Teaches the one gesture nothing on screen suggests: hold a slot to drop it.
     private let hint = HintNode()
 
-    /// Whether the drop hint has had its one turn.
+    /// The drop hint's whole budget for a match.
     ///
-    /// Once a match, at the single moment it is useful, and never again - either
-    /// because it has been shown or because the player has dropped something and
-    /// therefore knows. Two flags rather than one because they retire it for
-    /// different reasons and both are worth being able to read.
+    /// Two showings, spent only on the moment that earns them: walking over
+    /// something and not picking it up. After that it is gone for the rest of the
+    /// match, and one successful drop retires it early - somebody who has dropped
+    /// something knows how to drop something.
+    private var dropHintsLeft = 2
     private var hasDropped = false
-    private var shownDropHint = false
+
+    /// Whether the player was already standing on something they could not take.
+    ///
+    /// The hint fires on the EDGE - the step onto the item - rather than the whole
+    /// time somebody is standing on it. Otherwise walking a line of loot with a
+    /// full bag re-arms the message over and over and it never leaves the screen,
+    /// which is exactly how a two-second hint turns into a permanent one.
+    private var wasBlocked = false
 
     /// When the shop button next waves at somebody who has not been in.
     private var nextNudge: TimeInterval = 0
@@ -550,9 +558,17 @@ final class GameScene: SKScene {
     /// on that attention.
     private func updateHint(with world: World) {
         guard let player = world.localPlayer, player.isAlive, !world.isOver else {
+            wasBlocked = false
             hint.hide()
             return
         }
+
+        // Walked over something and did not pick it up. LootSystem answers this,
+        // not the scene, so the screen can never claim a refusal about an item that
+        // is quietly being collected.
+        let blocked = LootSystem.blockedPickup(for: player, in: world)
+        let stepped = blocked && !wasBlocked
+        wasBlocked = blocked
 
         let fighting = player.secondsSinceHit < GameScene.hintCombatQuiet
             || world.enemyNear(player, within: GameScene.hintCombatRange)
@@ -562,14 +578,8 @@ final class GameScene: SKScene {
             return
         }
 
-        // Retired only once it has actually run its course. Cut short by somebody
-        // rounding a corner, it comes back at the next quiet moment - see
-        // HintNode.completed for why being shown and being read are different.
-        if hint.completed { shownDropHint = true }
-
-        guard !hasDropped, !shownDropHint, !hint.isShowing,
-              player.inventory.isFull else { return }
-
+        guard stepped, !hasDropped, dropHintsLeft > 0, !hint.isShowing else { return }
+        dropHintsLeft -= 1
         hint.show("HOLD AN ITEM TO DROP IT")
     }
 

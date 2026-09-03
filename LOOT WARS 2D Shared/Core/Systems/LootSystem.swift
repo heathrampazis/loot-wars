@@ -134,6 +134,26 @@ enum LootSystem {
         }
     }
 
+    /// Whether this actor is standing on something the sweep below is refusing.
+    ///
+    /// The same two questions the sweep asks, in the same order - the hitbox, then
+    /// whether the item can be taken - so a screen that says "you cannot pick that
+    /// up" can never say it about something that is quietly being picked up.
+    ///
+    /// A token is excluded because a token is never refused: it goes to a counter
+    /// rather than into a pocket, so it cannot be the thing somebody is standing
+    /// over wondering about.
+    static func blockedPickup(for actor: Actor, in world: World) -> Bool {
+        guard actor.isAlive else { return false }
+        let reach = actor.hitbox
+
+        return world.groundItems.values.contains { item in
+            guard reach.contains(item.position) else { return false }
+            guard case .item(let type) = item.pickup else { return false }
+            return !actor.canAcquire(type)
+        }
+    }
+
     private static func sweepUpItems(_ world: World) {
         guard !world.groundItems.isEmpty else { return }
 
