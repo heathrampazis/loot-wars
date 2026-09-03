@@ -47,12 +47,16 @@ final class ItemSlotNode: SKNode {
 
     /// The SELL button, shown only while the shop is open.
     ///
-    /// A button rather than a label, and that distinction is the whole of this
-    /// change. A small price in the corner said what a thing was worth; it did not
-    /// say that tapping would sell it, so it read as a caption on a slot rather
-    /// than as an offer. This is a green bar across the foot of the slot with a
-    /// plus, a number and a token on it - the same shape every game uses for a
-    /// thing you press, in the colour everything else in this game uses for yes.
+    /// A green tab in the top-right corner - opposite the count badge - carrying a
+    /// plus, a number and a token.
+    ///
+    /// Third attempt at this, and the two failures are worth keeping. A plain price
+    /// in the corner said what a thing was worth without ever saying it could be
+    /// sold, so it read as a caption. A green bar across the FOOT of the slot said
+    /// it loudly and covered the bottom third of the item doing it - and an item
+    /// you cannot see is a poor thing to be deciding about. The corner is the only
+    /// place on a 66-point square that is both obvious and empty, and the badge
+    /// already proves it works: nobody has ever failed to notice a stack count.
     private let sellButton = SKNode()
     private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
@@ -102,11 +106,16 @@ final class ItemSlotNode: SKNode {
         count.zPosition = 1
         badge.addChild(count)
 
-        // Across the foot of the slot, inside it: below would run off the bottom
-        // of the screen, since the bar already sits on the edge.
-        let buttonHeight = side * 0.30
+        // Overhangs its corner slightly, which is what stops it reading as part of
+        // the artwork underneath.
+        let tabHeight = side * 0.28
+        let tabWidth = side * 0.66
 
-        sellButton.position = CGPoint(x: 0, y: -side / 2 + buttonHeight / 2 + side * 0.05)
+        sellButton.position = CGPoint(
+            x: side / 2 - tabWidth / 2 + side * 0.04,
+            y: side / 2 - tabHeight / 2 + side * 0.04
+        )
+
         sellButton.zPosition = 3
         sellButton.isHidden = true
         addChild(sellButton)
@@ -114,36 +123,38 @@ final class ItemSlotNode: SKNode {
         let pill = SKShapeNode(
             path: CGPath(
                 roundedRect: CGRect(
-                    x: -side / 2 + side * 0.08,
-                    y: -buttonHeight / 2,
-                    width: side - side * 0.16,
-                    height: buttonHeight
+                    x: -tabWidth / 2,
+                    y: -tabHeight / 2,
+                    width: tabWidth,
+                    height: tabHeight
                 ),
-                cornerWidth: buttonHeight / 2,
-                cornerHeight: buttonHeight / 2,
+                cornerWidth: tabHeight / 2,
+                cornerHeight: tabHeight / 2,
                 transform: nil
             )
         )
 
+        // No outline. A stroke round something this small is most of its width, and
+        // four of them in a row read as a fence rather than as four buttons - the
+        // green is doing the work and does not need help.
         pill.fillColor = RenderPalette.sellButton
-        pill.strokeColor = SKColor(white: 1, alpha: 0.55)
-        pill.lineWidth = 1.5
+        pill.strokeColor = .clear
         sellButton.addChild(pill)
 
-        price.fontSize = buttonHeight * 0.62
+        price.fontSize = tabHeight * 0.66
         price.fontColor = .white
         price.horizontalAlignmentMode = .center
         price.verticalAlignmentMode = .center
-        price.position = CGPoint(x: -side * 0.06, y: 0)
+        price.position = CGPoint(x: -tabWidth * 0.16, y: 0)
         price.zPosition = 1
         sellButton.addChild(price)
 
         let token = SKSpriteNode(texture: ItemArt.texture(for: .token(1)))
         token.size = ItemArt.size(
             of: ItemArt.texture(for: .token(1)),
-            fittingInto: buttonHeight * 0.78
+            fittingInto: tabHeight * 0.8
         )
-        token.position = CGPoint(x: side * 0.16, y: 0)
+        token.position = CGPoint(x: tabWidth * 0.26, y: 0)
         token.zPosition = 1
         sellButton.addChild(token)
     }

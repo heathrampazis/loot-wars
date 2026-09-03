@@ -73,15 +73,20 @@ enum ShopSystem {
             return items
 
 
-        case .upgrades(.helmets):
-            guard let next = nextTier(above: actor.helmet, in: HelmetTier.allCases),
-                  let price = GameConfig.Shop.helmetPrices[next] else { return [] }
-            return [.init(type: .helmet(next), price: price)]
+        case .upgrades:
+            var offers: [GameConfig.Shop.Item] = []
 
-        case .upgrades(.blasters):
-            guard let next = nextTier(above: actor.blaster, in: BlasterTier.allCases),
-                  let price = GameConfig.Shop.blasterPrices[next] else { return [] }
-            return [.init(type: .blaster(next), price: price)]
+            if let next = nextTier(above: actor.helmet, in: HelmetTier.allCases),
+               let price = GameConfig.Shop.helmetPrices[next] {
+                offers.append(.init(type: .helmet(next), price: price))
+            }
+
+            if let next = nextTier(above: actor.blaster, in: BlasterTier.allCases),
+               let price = GameConfig.Shop.blasterPrices[next] {
+                offers.append(.init(type: .blaster(next), price: price))
+            }
+
+            return offers
         }
     }
 

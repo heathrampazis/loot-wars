@@ -141,20 +141,9 @@ enum GameConfig {
         /// same for everybody; an upgrade depends on what you are already wearing,
         /// and listing all seven tiers would be seven cards where two will do and a
         /// shop full of things you cannot buy.
-        /// Which ladder a gear tab climbs.
-        ///
-        /// Split into two, because one GEAR tab holding both was one tab doing two
-        /// jobs: it showed a helmet and a blaster side by side and the shopper had
-        /// to work out which of two unrelated things they were being offered. A tab
-        /// each says what it is in its own name and shows one decision.
-        enum Ladder {
-            case helmets
-            case blasters
-        }
-
         enum Stock {
             case shelf([Item])
-            case upgrades(Ladder)
+            case upgrades
         }
 
         struct Tab {
@@ -162,12 +151,13 @@ enum GameConfig {
             let stock: Stock
         }
 
-        /// HELMET, BLASTER, HEALING - and nothing else.
+        /// GEAR and HEALING, and nothing else.
         ///
-        /// The gear ladders come first and get a tab each: they are the only things
-        /// in here you cannot find lying on the map, they are what the tokens are
-        /// ultimately for, and each is a single decision - the next rung, or not
-        /// yet.
+        /// Both ladders share the gear tab, side by side: two cards, one headed
+        /// Helmet and one headed Blaster, each showing the next rung up. They belong
+        /// together because they are the same decision asked twice - what to spend
+        /// the next handful of tokens on - and splitting them across two tabs made
+        /// you flick between headings to compare two prices.
         ///
         /// BUILDING is gone. It sold a chest, which crates hand out anyway, and a
         /// machine, which was the one purchase that paid for itself - and a shop
@@ -180,8 +170,7 @@ enum GameConfig {
         /// somebody's base, a bomb on a shelf turned the shop into a raid vending
         /// machine.
         static let tabs: [Tab] = [
-            Tab(name: "HELMET", stock: .upgrades(.helmets)),
-            Tab(name: "BLASTER", stock: .upgrades(.blasters)),
+            Tab(name: "GEAR", stock: .upgrades),
             Tab(name: "HEALING", stock: .shelf([
                 Item(type: .bandage, price: 6),
                 // Eleven, down from fifteen. At fifteen a medkit was worse than a
@@ -203,8 +192,8 @@ enum GameConfig {
                 switch tab.stock {
                 case .shelf(let items): return items.count
                 // A helmet rung and a blaster rung, and never more than that.
-                // One rung, which is the whole offer: the next one up or nothing.
-                case .upgrades: return 1
+                // A helmet rung and a blaster rung, and never more than that.
+                case .upgrades: return 2
                 }
             }.max() ?? 1
         }

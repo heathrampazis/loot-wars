@@ -52,9 +52,14 @@ enum ItemArt {
     /// and the quick-buy prompt - and a second copy of this switch is a second
     /// place to forget an item when one is added.
     ///
-    /// Gear is named by the TIER rather than by the slot: on the gear tab the tier
-    /// is the whole offer, and "Helmet" twice would say nothing about which rung
-    /// you are being sold.
+    /// Gear is named by the SLOT - Helmet, Blaster - and not by the tier.
+    ///
+    /// The other way round was tried and reads badly on a shop card: "Common" and
+    /// "Blaster 1" are the names of RUNGS, and a card headed Common tells somebody
+    /// scanning the shelf what quality they are being offered while leaving them to
+    /// work out what the thing actually is. The tier is already said twice over by
+    /// the artwork and the rarity glow behind it, both of which are read faster
+    /// than a word. What the card was missing was the noun.
     static func name(for type: ItemType) -> String {
         switch type {
         case .bandage: return "Bandage"
@@ -62,8 +67,8 @@ enum ItemArt {
         case .bomb:    return "Bomb"
         case .chest:   return "Chest"
         case .arcade:  return "Arcade"
-        case .helmet(let tier):  return tier.name
-        case .blaster(let tier): return "Blaster \(tier.rawValue)"
+        case .helmet:  return "Helmet"
+        case .blaster: return "Blaster"
         }
     }
 
