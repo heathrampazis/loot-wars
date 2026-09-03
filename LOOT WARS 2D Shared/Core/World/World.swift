@@ -536,6 +536,49 @@ final class World {
         baseProgress(for: team) + GameConfig.Build.catchUpGap < bestBaseProgress
     }
 
+    /// Teams whose wall has been finished at least once this match, so the big
+    /// one-off award is paid once and repairs are paid as repairs.
+    private var haveSealed: Set<TeamID> = []
+
+    /// Called when a team's wall goes from having a hole in it to not having one.
+    ///
+    /// The award lives here rather than in BuildSystem because it is about the
+    /// WALL rather than about the brick: the last tile is not special, it is simply
+    /// the one that happened to be laid last, and the same closing can be reached
+    /// by two bots laying different halves. One question, asked in one place, after
+    /// any change to the map.
+    func recordSealIfNeeded(for team: TeamID) {
+        guard !baseIsBreached(team) else { return }
+
+        if haveSealed.contains(team) {
+            // Only after somebody opened it. Without this, laying and removing your
+            // own wall would print points.
+            guard sealPending.contains(team) else { return }
+            sealPending.remove(team)
+            award(GameConfig.Base.resealed, to: team)
+        } else {
+            haveSealed.insert(team)
+            award(GameConfig.Base.sealed, to: team)
+
+            // Paid to whoever is standing in it, which for a bot's base is the bot
+            // that built it and for yours is you.
+            for id in actors.keys.sorted(by: { $0.raw < $1.raw }) {
+                guard let actor = actors[id], actor.team == team else { continue }
+                awardTokens(GameConfig.Base.sealedTokens, to: id)
+                break
+            }
+        }
+    }
+
+    /// Teams that have been breached since they last sealed. See above.
+    private var sealPending: Set<TeamID> = []
+
+    /// Called when a wall tile is destroyed, so the repair is worth paying for.
+    func recordBreach(of team: TeamID) {
+        guard haveSealed.contains(team) else { return }
+        sealPending.insert(team)
+    }
+
     /// Whether this team's wall has a hole in it.
     ///
     /// The same question as "is there anything left to build", which is why an
@@ -598,13 +641,16 @@ final class World {
         return options.randomElement(using: &rng)
     }
 
-    func spawnGroundItem(_ pickup: Pickup, at position: Vec2) {
+    /// - Parameter lifetime: how long it lies there, defaulting to the item's own
+    ///   answer. Overridden for tokens paid out inside a base that is shut - see
+    ///   ArcadeSystem, where the point is that they can safely pile up.
+    func spawnGroundItem(_ pickup: Pickup, at position: Vec2, lifetime: Double? = nil) {
         let id = GroundItemID(nextGroundItemID)
         nextGroundItemID += 1
         groundItems[id] = GroundItem(id: id,
                                      pickup: pickup,
                                      position: position,
-                                     timeRemaining: pickup.groundLifetime)
+                                     timeRemaining: lifetime ?? pickup.groundLifetime)
     }
 
     func removeGroundItem(_ id: GroundItemID) {

@@ -72,6 +72,26 @@ final class GroundItemRenderer {
             .moveBy(x: 0, y: -bob, duration: 0.6)
         ])))
 
+        // Tokens arrive rather than appear.
+        //
+        // A machine pays out every couple of seconds and the coin simply existed,
+        // one frame to the next, a tile away from the cabinet - so the two things
+        // never looked connected, and the payout was easy to miss entirely. It
+        // spins up out of nothing now and settles, which is a fifth of a second of
+        // animation that turns two separate facts into one event.
+        //
+        // Only tokens: a bandage that popped and spun would read as being thrown at
+        // you, and everything else on the ground was dropped rather than issued.
+        if case .token = item.pickup {
+            sprite.setScale(0.1)
+            sprite.zRotation = -0.9
+            sprite.run(.group([
+                .sequence([.scale(to: 1.25, duration: 0.14),
+                           .scale(to: 1.0, duration: 0.12)]),
+                .rotate(toAngle: 0, duration: 0.26)
+            ]))
+        }
+
         node.addChild(sprite)
         nodesByItem[item.id] = sprite
     }

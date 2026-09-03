@@ -83,6 +83,59 @@ enum ArcadeSystem {
 
     // MARK: - Paying out
 
+    /// How many tokens this machine will let pile up before it stops.
+    ///
+    /// The anti-camping valve, and the answer to "why build a base" in one number.
+    /// A machine in the open holds four, so standing at one never beats moving
+    /// between them. A machine behind a wall that is STANDING holds eight, because
+    /// nothing is going to walk off with them - which turns it from a thing you
+    /// babysit into a thing that earns while you are out playing the match.
+    ///
+    /// It is also precisely what a raid takes: breach somebody and their bank halves
+    /// until they repair it.
+    private static func bank(for arcade: Arcade, in world: World) -> Int {
+        guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
+            return GameConfig.Arcade.maxUncollected
+        }
+        return GameConfig.Arcade.sealedUncollected
+    }
+
+    /// How long the tokens it pays out survive on the ground.
+    ///
+    /// Without this the bank above is a fiction. Tokens live ten seconds, which
+    /// is the right number for a machine standing in the open - the pile is a thing
+    /// you catch, not a thing you find - but it means eight of them can never
+    /// coexist: at two seconds a token the first has expired before the fifth
+    /// exists, and a base that banks nothing is a base that pays nothing.
+    ///
+    /// Behind a shut wall they keep for the best part of a minute, which is the
+    /// same argument as the bank itself: nobody is going to wander off with them.
+    /// Not forever, though - leave your own machine alone all match and the oldest
+    /// still rot, so it remains money you have to come home for.
+    private static func lifetime(for arcade: Arcade, in world: World) -> Double {
+        guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
+            return GameConfig.Arcade.tokenLifetime
+        }
+        return GameConfig.Arcade.sealedTokenLifetime
+    }
+
+    /// How long this machine waits between tokens.
+    ///
+    /// Faster behind a wall that is standing, and that multiplier is the answer to
+    /// "why build a base". Not points for laying bricks - nobody plays for those -
+    /// but the machine inside your walls paying half again as fast for as long as
+    /// those walls are shut. It makes the wall an income rather than a chore, and
+    /// makes repairing one the thing that turns the income back on.
+    ///
+    /// The map's own machines never qualify: they stand in the open, they belong to
+    /// nobody, and being the risky way to earn is their whole job.
+    private static func interval(for arcade: Arcade, in world: World) -> Double {
+        guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
+            return GameConfig.Arcade.emitInterval
+        }
+        return GameConfig.Arcade.emitInterval * GameConfig.Arcade.sealedInterval
+    }
+
     private static func emit(_ world: World, dt: Double) {
         // Sorted keys rather than dictionary order: this draws from the world's
         // generator when it picks a tile, and dictionary order is not stable between
@@ -100,14 +153,15 @@ enum ArcadeSystem {
                 continue
             }
 
-            guard world.uncollectedTokens(around: arcade) < GameConfig.Arcade.maxUncollected,
+            guard world.uncollectedTokens(around: arcade) < bank(for: arcade, in: world),
                   let spot = world.freeSpot(around: arcade) else {
                 world.arcades[id] = arcade
                 continue
             }
 
-            world.spawnGroundItem(.token(GameConfig.Arcade.tokenValue), at: spot)
-            arcade.emitTimer = GameConfig.Arcade.emitInterval
+            world.spawnGroundItem(.token(GameConfig.Arcade.tokenValue), at: spot,
+                                  lifetime: lifetime(for: arcade, in: world))
+            arcade.emitTimer = interval(for: arcade, in: world)
             world.arcades[id] = arcade
         }
     }

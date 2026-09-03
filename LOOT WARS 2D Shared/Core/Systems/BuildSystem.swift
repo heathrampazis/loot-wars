@@ -64,6 +64,9 @@ enum BuildSystem {
         guard canPlace(at: point, by: actor, in: world) else { return false }
         world.setTile(.block(owner: actor.team), at: point)
         world.award(GameConfig.Score.wallPlaced, to: actor.team)
+
+        // That may have been the tile that closed it - see World.recordSealIfNeeded.
+        world.recordSealIfNeeded(for: actor.team)
         return true
     }
 

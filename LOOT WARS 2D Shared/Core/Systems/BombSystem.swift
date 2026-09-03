@@ -119,6 +119,10 @@ enum BombSystem {
                 // opening a door, not an achievement.
                 if owner != bomb.team {
                     world.award(GameConfig.Score.wallDestroyed, to: bomb.team)
+
+                    // And the hole is now theirs to fix, which is worth something
+                    // to them when they do - see World.recordBreach.
+                    world.recordBreach(of: owner)
                 }
             }
         }

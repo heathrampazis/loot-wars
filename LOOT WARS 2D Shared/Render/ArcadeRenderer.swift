@@ -17,6 +17,12 @@ final class ArcadeRenderer {
     let node = SKNode()
 
     private var nodesByArcade: [ArcadeID: SKSpriteNode] = [:]
+
+    /// Each machine's payout clock last frame. A clock that has gone UP is a
+    /// machine that has just paid: it counts down to zero, drops a token and resets
+    /// to the full interval, so the reset is visible from the outside without the
+    /// simulation having to announce anything.
+    private var lastTimers: [ArcadeID: Double] = [:]
     private var mapHeight = 0
 
     /// The machine's opaque pixels within its canvas, measured from the artwork:
@@ -49,8 +55,16 @@ final class ArcadeRenderer {
             make(machine)
         }
 
+        for (id, machine) in world.arcades {
+            defer { lastTimers[id] = machine.emitTimer }
+            guard let previous = lastTimers[id], machine.emitTimer > previous,
+                  let sprite = nodesByArcade[id] else { continue }
+            payOut(sprite)
+        }
+
         for (id, sprite) in Array(nodesByArcade) where world.arcades[id] == nil {
             nodesByArcade[id] = nil
+            lastTimers[id] = nil
 
             // Blown apart rather than switched off.
             sprite.run(.sequence([
@@ -59,6 +73,22 @@ final class ArcadeRenderer {
                 .removeFromParent()
             ]))
         }
+    }
+
+    /// A shove and a flash of white, on the beat a token appears.
+    ///
+    /// A machine that pays out silently is a machine you have to remember to walk
+    /// back to. This is the same information as the token itself, given a fifth of
+    /// a second earlier and at the size of the cabinet rather than of a coin - so
+    /// it is visible from across the base, which is the point.
+    private func payOut(_ sprite: SKSpriteNode) {
+        sprite.removeAction(forKey: "paid")
+        sprite.run(.sequence([
+            .group([.scaleX(to: 1.06, y: 0.94, duration: 0.07),
+                    .colorize(with: .white, colorBlendFactor: 0.5, duration: 0.07)]),
+            .group([.scaleX(to: 1, y: 1, duration: 0.22),
+                    .colorize(withColorBlendFactor: 0, duration: 0.22)])
+        ]), withKey: "paid")
     }
 
     private func make(_ machine: Arcade) {

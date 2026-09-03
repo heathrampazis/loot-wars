@@ -260,6 +260,23 @@ enum GameConfig {
         ]
     }
 
+    /// One-off awards for closing your own wall.
+    ///
+    /// The complaint this answers is the one that matters most: there was no reason
+    /// to build. Two points a brick is not a reason - it is worth about a third of
+    /// a kill for a whole base - so roaming and shooting people was simply the
+    /// better game, and the base was a chore between fights.
+    ///
+    /// Sealing pays properly, once. Re-sealing after somebody has blown a hole in
+    /// it pays a third of that, every time, which is the part that makes defending
+    /// a base a thing you do rather than a thing you give up on - and it is capped
+    /// by the fact that somebody has to breach you first for it to be available.
+    enum Base {
+        static let sealed = 60
+        static let sealedTokens = 8
+        static let resealed = 20
+    }
+
     enum Match {
         /// How long a match runs, in seconds.
         static let duration: Double = 300
@@ -1067,10 +1084,34 @@ enum GameConfig {
         static let footprintWidth = 2
         static let footprintHeight = 3
 
+        /// How much clear ground a machine on the MAP needs around it, in tiles.
+        ///
+        /// Two, not one. One ring is where a token lands; two is what makes a
+        /// landed token reachable - a token on the ring with a tree or the map edge
+        /// behind it is one you can see and cannot walk to. Over 3,000 generated
+        /// maps this costs nothing: every map still fits all five.
+        ///
+        /// Machines bought and placed in a base are exempt, and have to be: a base
+        /// is nine tiles across and two rings of clearance inside a wall is not a
+        /// thing that exists.
+        static let clearance = 2
+
         /// Seconds between payouts.
-        /// Down from 6. Machines hold about 2.5 at a time now instead of 1.7,
-        /// which is most of where the extra income came from.
-        static let emitInterval: Double = 4
+        ///
+        /// Down from 4. Together with the sealed-base multiplier below, a machine
+        /// standing behind a finished wall now pays about one token every two
+        /// seconds rather than one every four - which is what turns it from a
+        /// twenty-four token ornament into the reason to own a base.
+        static let emitInterval: Double = 3.2
+
+        /// What a shut wall is worth, as a multiplier on the interval.
+        ///
+        /// Kept, but it is the smaller half of the answer - see sealedUncollected
+        /// below, which is the half that actually pays. A faster interval only
+        /// helps somebody who visits often enough to outpace it, which at two
+        /// seconds a token means every eight seconds or so; anybody playing the
+        /// match rather than guarding a cabinet is limited by the CAP instead.
+        static let sealedInterval: Double = 0.62
 
         static let tokenValue = 1
 
@@ -1079,7 +1120,24 @@ enum GameConfig {
         /// This is the anti-camping valve, and it is the only reason standing at a
         /// machine does not beat moving between them. At three, a machine left
         /// alone is full in eighteen seconds and then pays nothing.
-        static let maxUncollected = 3
+        static let maxUncollected = 4
+
+        /// And how many it will let pile up behind a wall that is standing.
+        ///
+        /// THIS is why you build a base. A machine in the open stops at four,
+        /// because standing at one is not supposed to beat moving between them.
+        /// One behind your own shut wall banks eight, because nothing is going to
+        /// walk off with them - so the wall turns the machine from a thing you have
+        /// to babysit into a thing that earns while you are somewhere else.
+        ///
+        /// Modelled against a match: a machine bought at a minute pays 43 tokens to
+        /// somebody who passes it every 45 seconds, against 16 before. It costs 24.
+        /// That is the difference between an ornament and a reason.
+        ///
+        /// And it is exactly what a raider takes off you: breach the wall and the
+        /// bank drops back to four until it is repaired, which is worth more to
+        /// them than the twenty-five they get for blowing the machine up.
+        static let sealedUncollected = 8
 
         /// How far out from the footprint a token still counts as this machine's,
         /// for the cap above. Just past the ring it drops them on.
@@ -1093,6 +1151,15 @@ enum GameConfig {
         /// under two on the ground and never reaches the cap of three. The despawn
         /// IS the cap now - the pile is a thing you catch, not a thing you find.
         static let tokenLifetime: Double = 10
+
+        /// And how long one lasts inside a base whose wall is standing.
+        ///
+        /// The bank above needs this to mean anything: eight tokens at two seconds
+        /// apart take sixteen to accumulate, so on a ten-second clock the first has
+        /// rotted before the fifth exists and the pile can never form. Forty-five
+        /// seconds is long enough to come home to and short enough that leaving it
+        /// all match still loses you the oldest of them.
+        static let sealedTokenLifetime: Double = 45
 
         /// Minimum gap between two machines, in tiles.
         static let spacing: Double = 16

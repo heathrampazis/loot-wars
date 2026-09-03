@@ -60,6 +60,25 @@ struct Arcade {
             size: Vec2(x: Double(Arcade.width), y: Double(Arcade.height)))
     }
 
+    /// The footprint plus a margin of ground around it.
+    ///
+    /// Used at map generation to demand ROOM. One ring is where a token can land;
+    /// two is what makes a landed token reachable, because a token on the ring with
+    /// a tree or the map edge behind it is a token you can see and cannot walk to.
+    /// Measured over 3,000 generated maps, asking for two costs nothing - every map
+    /// still fits all five machines - and asking for three starts failing.
+    func tiles(within margin: Int) -> [GridPoint] {
+        var area: [GridPoint] = []
+
+        for dx in -margin..<(Arcade.width + margin) {
+            for dy in -margin..<(Arcade.height + margin) {
+                area.append(GridPoint(col: origin.col + dx, row: origin.row + dy))
+            }
+        }
+
+        return area
+    }
+
     /// The ring of tiles immediately around the footprint - where a token can land.
     ///
     /// This is the whole "needs a free space to pay out" rule: a machine hemmed in

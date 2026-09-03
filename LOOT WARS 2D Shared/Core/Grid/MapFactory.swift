@@ -216,8 +216,11 @@ extension MapFactory {
                                 of placed: [Arcade],
                                 trees: [TreePatch],
                                 claims: [TeamID: BaseClaim]) -> Bool {
-        // Standing room and paying-out room, checked together.
-        for tile in candidate.tiles + candidate.surroundingTiles {
+        // Standing room, paying-out room, and room to WALK to what it pays out -
+        // see Arcade.tiles(within:). A token on the ring with a tree behind it is
+        // a token you can see and cannot reach, and that is most of what made the
+        // machines on the map feel stingy.
+        for tile in candidate.tiles(within: GameConfig.Arcade.clearance) {
             guard map.contains(tile), map[tile] == .floor else { return false }
             if trees.contains(where: { $0.overlaps(tile) }) { return false }
         }
