@@ -278,21 +278,26 @@ final class ActorRenderer {
         blaster.xScale = facingLeft ? -1 : 1
     }
 
-    /// Took a hit: a white blink and a flinch.
+    /// Took a hit: a red blink and a flinch.
     ///
-    /// The blink alone was doing the job of saying damage happened, and doing it
-    /// invisibly at a distance - one frame of white on a figure the size of a
-    /// thumbnail. The flinch is what makes it read: the figure recoils, squashes
-    /// and comes back, which is movement rather than colour and survives being
-    /// looked at out of the corner of an eye.
+    /// Red rather than the white it started as. White is the film convention for
+    /// an impact, and on this map it is also the brightest thing on a pale green
+    /// field - it read as a highlight, or a helmet catching the light, rather than
+    /// as damage. Red is what a health bar is already made of here, so the figure
+    /// and the bar above it say the same thing in the same colour.
+    ///
+    /// The flinch is what makes it carry: the figure recoils, squashes and comes
+    /// back, which is movement rather than colour and survives being seen out of
+    /// the corner of an eye while you are aiming at something else.
     ///
     /// Both keyed, so a burst of hits restarts them rather than stacking up into a
-    /// permanently white actor standing permanently sideways.
+    /// permanently red actor standing permanently sideways.
     private func hurt(_ nodes: ActorNodes) {
         nodes.sprite.removeAction(forKey: "hit")
         nodes.sprite.run(.sequence([
-            .colorize(with: .white, colorBlendFactor: 0.85, duration: 0.04),
-            .colorize(withColorBlendFactor: 0, duration: 0.14)
+            .colorize(with: RenderPalette.placementBlocked,
+                      colorBlendFactor: 0.9, duration: 0.04),
+            .colorize(withColorBlendFactor: 0, duration: 0.18)
         ]), withKey: "hit")
 
         nodes.figure.removeAction(forKey: "react")

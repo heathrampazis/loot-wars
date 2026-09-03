@@ -117,18 +117,6 @@ final class GameScene: SKScene {
     private let chestPanel = ChestPanelNode()
     private let respawnBanner = RespawnBanner()
 
-    /// A red edge that pulses when YOU are hit.
-    ///
-    /// The figure already flinches, and on a phone that is a thumbnail-sized
-    /// flinch in the middle of a fight you are busy aiming through. This is the
-    /// same information at the size of the screen, and only for your own damage -
-    /// everybody else's is a thing you watch, yours is a thing that is happening
-    /// to you.
-    private let hitEdge = SKShapeNode()
-
-    /// Your health last frame, so the edge knows a hit happened. Noticed rather
-    /// than announced, like everything else that two frames of the world can say.
-    private var lastLocalHealth = Int.max
 
     /// The hotbar slot picked out, waiting to be acted on.
     ///
@@ -278,12 +266,6 @@ final class GameScene: SKScene {
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
         cameraController.node.addChild(respawnBanner)
-
-        hitEdge.fillColor = .clear
-        hitEdge.strokeColor = RenderPalette.healthBar
-        hitEdge.alpha = 0
-        hitEdge.zPosition = 1200
-        cameraController.node.addChild(hitEdge)
         layOutUI()
 
         syncRenderers()
@@ -374,16 +356,6 @@ final class GameScene: SKScene {
         // those two fit on.
         matchTimer.position = CGPoint(x: 0, y: size.height / 2 - inset)
         results.layOut(for: size)
-
-        // Inset by half its own line width, so the stroke lands ON the edge of the
-        // screen rather than half of it falling outside and being thrown away.
-        let edge: CGFloat = 26
-        hitEdge.lineWidth = edge
-        hitEdge.path = CGPath(roundedRect: CGRect(x: -size.width / 2 + edge / 2,
-                                                  y: -size.height / 2 + edge / 2,
-                                                  width: size.width - edge,
-                                                  height: size.height - edge),
-                              cornerWidth: 40, cornerHeight: 40, transform: nil)
 
         // Tucked against the right-hand edge of the HUD, top-aligned with it.
         //
@@ -508,7 +480,6 @@ final class GameScene: SKScene {
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
         effectsRenderer.sync(with: world)
-        reportLocalDamage(in: world)
         dispatch(world.takeEvents(), in: world)
         if let player = world.localPlayer {
             cameraController.follow(player.position)
@@ -567,20 +538,6 @@ final class GameScene: SKScene {
                                      mine: killer == world.localPlayerID)
             }
         }
-    }
-
-    /// Your own damage, at the size of the screen.
-    private func reportLocalDamage(in world: World) {
-        guard let player = world.localPlayer else { return }
-
-        defer { lastLocalHealth = player.health }
-        guard lastLocalHealth != Int.max,
-              player.health < lastLocalHealth,
-              player.isAlive else { return }
-
-        hitEdge.removeAllActions()
-        hitEdge.alpha = 0.55
-        hitEdge.run(.fadeAlpha(to: 0, duration: 0.34))
     }
 
     /// Keeps the placement outline honest.
