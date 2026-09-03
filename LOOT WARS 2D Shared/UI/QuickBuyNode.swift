@@ -98,7 +98,7 @@ final class QuickBuyNode: SKNode {
     }
 
     /// Called every frame with whatever the shop would offer right now.
-    func update(with item: GameConfig.Shop.Item?) {
+    func update(with item: ShopSystem.Offer?) {
         guard !cooling else { return }
 
         guard let item else {
@@ -109,7 +109,7 @@ final class QuickBuyNode: SKNode {
             return
         }
 
-        guard item.type != offer else { return }
+        guard item.item != offer else { return }
         show(item)
     }
 
@@ -147,13 +147,19 @@ final class QuickBuyNode: SKNode {
         ]), withKey: "cooling")
     }
 
-    private func show(_ item: GameConfig.Shop.Item) {
-        offer = item.type
+    private func show(_ item: ShopSystem.Offer) {
+        // The prompt only ever offers things you can carry - a heal or a rung of
+        // the ladder - so an offer with no item behind it has nothing to draw, and
+        // has to be refused BEFORE anything is set: showing itself with no picture
+        // on it would be worse than not showing at all.
+        guard let type = item.item else { return }
+
+        offer = type
         live = true
 
-        glow.color = RenderPalette.colour(of: item.type.rarity)
+        glow.color = RenderPalette.colour(of: type.rarity)
 
-        let texture = ItemArt.texture(for: item.type)
+        let texture = ItemArt.texture(for: type)
         icon.texture = texture
         icon.size = ItemArt.size(of: texture, fittingInto: 34)
         price.text = "\(item.price)"

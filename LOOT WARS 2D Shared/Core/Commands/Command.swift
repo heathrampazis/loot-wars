@@ -44,6 +44,14 @@ enum Command {
     /// input never sends a price, or it could send the wrong one.
     case buyItem(ItemType)
 
+    /// Buy the next tier of something for your base.
+    ///
+    /// Separate from buyItem rather than folded into it, because an upgrade is not
+    /// an object: nothing arrives in a slot, nothing can be dropped, and the thing
+    /// that changes belongs to the TEAM rather than to the person who paid. A
+    /// command that meant either would have to be unpicked at every step.
+    case buyUpgrade(Upgrade)
+
     /// Sell what is in this bag slot, at the shop.
     ///
     /// By SLOT rather than by item, unlike buying. Buying names a thing you want

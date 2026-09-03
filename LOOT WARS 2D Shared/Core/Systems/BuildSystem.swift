@@ -22,7 +22,7 @@ enum BuildSystem {
                 // about it.
                 case .move, .shoot, .openLootbox, .useItem,
                      .placeChest, .placeArcade, .storeItem, .takeItem,
-                     .dropItem, .buyItem, .sellItem:
+                     .dropItem, .buyItem, .buyUpgrade, .sellItem:
                     break
                 }
             }
@@ -68,6 +68,13 @@ enum BuildSystem {
     static func place(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
         guard canPlace(at: point, by: actor, in: world) else { return false }
         world.setTile(.block(owner: actor.team), at: point)
+
+        // A rebuilt wall is a whole wall. Without this, a tile knocked down to its
+        // last layer and then replaced would come back already cracked, and a base
+        // that has been raided twice would be made of paper for the rest of the
+        // match with nothing on screen explaining why.
+        world.clearWallDamage(at: point)
+
         world.award(GameConfig.Score.wallPlaced, to: actor.team)
 
         // That may have been the tile that closed it - see World.recordSealIfNeeded.

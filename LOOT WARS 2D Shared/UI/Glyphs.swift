@@ -22,6 +22,54 @@ enum Glyphs {
 
     static let clock: SKTexture = makeClock()
 
+    /// Three courses of brick, for the wall upgrade - the one thing the shop sells
+    /// that has no item behind it and therefore no artwork of its own.
+    static let wall: SKTexture = makeWall()
+
+    private static func makeWall() -> SKTexture {
+        let side: CGFloat = 128
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side), format: format
+        ).image { context in
+            let cg = context.cgContext
+
+            let courses = 3
+            let height = side * 0.22
+            let gap = side * 0.05
+            let top = (side - (CGFloat(courses) * height + CGFloat(courses - 1) * gap)) / 2
+
+            for course in 0..<courses {
+                let y = top + CGFloat(course) * (height + gap)
+
+                // Every other course offset by half a brick, which is the only
+                // thing that makes a stack of rectangles read as masonry.
+                let bricks = course % 2 == 0 ? 2 : 3
+                let width = side / CGFloat(bricks)
+
+                for brick in 0..<bricks {
+                    let x = CGFloat(brick) * width + (course % 2 == 0 ? 0 : -width / 2)
+
+                    let rect = CGRect(x: x + gap / 2, y: y,
+                                      width: width - gap, height: height)
+
+                    cg.setFillColor(SKColor(white: 1, alpha: 0.92).cgColor)
+                    cg.addPath(CGPath(roundedRect: rect.intersection(
+                        CGRect(x: 0, y: 0, width: side, height: side)
+                    ), cornerWidth: 4, cornerHeight: 4, transform: nil))
+                    cg.fillPath()
+                }
+            }
+        }
+
+        let texture = SKTexture(image: image)
+        texture.usesMipmaps = true
+        return texture
+    }
+
     /// The shop's bag, traced off the reference: a body that flares outwards
     /// towards the bottom, and a handle looping up out of the top edge.
     ///

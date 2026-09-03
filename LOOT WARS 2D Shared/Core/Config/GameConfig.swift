@@ -144,6 +144,14 @@ enum GameConfig {
         enum Stock {
             case shelf([Item])
             case upgrades
+            /// Things bought for the base rather than for the person - see Upgrade.
+            case improvements
+        }
+
+        /// I, II, III. Tiers are shown as numerals because they are RUNGS rather
+        /// than counts, and "Walls 2" reads like two walls.
+        static func numeral(_ tier: Int) -> String {
+            ["", "I", "II", "III"][min(max(tier, 0), 3)]
         }
 
         struct Tab {
@@ -171,6 +179,7 @@ enum GameConfig {
         /// machine.
         static let tabs: [Tab] = [
             Tab(name: "GEAR", stock: .upgrades),
+            Tab(name: "BASE", stock: .improvements),
             Tab(name: "HEALING", stock: .shelf([
                 Item(type: .bandage, price: 6),
                 // Eleven, down from fifteen. At fifteen a medkit was worse than a
@@ -194,6 +203,8 @@ enum GameConfig {
                 // A helmet rung and a blaster rung, and never more than that.
                 // A helmet rung and a blaster rung, and never more than that.
                 case .upgrades: return 2
+                // Walls and a machine, and never a third.
+                case .improvements: return 2
                 }
             }.max() ?? 1
         }
@@ -945,6 +956,40 @@ enum GameConfig {
         static let blocksWhenBehind: ClosedRange<Int> = 14...20
     }
 
+    /// What tokens buy for your BASE, as opposed to for you.
+    ///
+    /// Indexed by tier, nought to three, so tier zero is always "what you get for
+    /// free" and the tables read as what each rung is worth rather than as what it
+    /// adds. Three rungs and then done: two upgrades that could be bought forever
+    /// would end every match the same way - whoever found the most tokens has the
+    /// best base - where a ceiling means a base gets finished and the tokens go
+    /// back to the ladder.
+    enum Upgrades {
+        /// What each wall tier costs, and what it is worth: hits to knock a tile
+        /// out, which is 1 + tier.
+        ///
+        /// Four hits at the top sounds enormous and is not, because a direct hit
+        /// counts double - see Bomb.wallDamage. A maxed wall is two bombs landed ON
+        /// the same tile, against one for an ordinary one, which is the difference
+        /// between a base you can open in passing and one you have to mean.
+        ///
+        /// Priced steeply on purpose. This competes with the gear ladder for the
+        /// same tokens, and a defence that is cheaper than a helmet is one nobody
+        /// ever has to choose.
+        static let wallPrices = [14, 24, 38]
+
+        /// What each machine tier costs, and what it does: a multiplier on the
+        /// payout interval, and one on the chance of a golden token.
+        ///
+        /// The rate and the gilding move together rather than being two purchases,
+        /// because a machine that paid faster but no better would be the same
+        /// decision twice. At the top it pays every two seconds instead of every
+        /// three and gilds one payout in five.
+        static let arcadePrices = [12, 20, 32]
+        static let arcadeRate = [1.0, 0.85, 0.72, 0.60]
+        static let arcadeGolden = [1.0, 1.4, 1.8, 2.4]
+    }
+
     /// The stink bomb, and what it leaves behind.
     ///
     /// Priced as a way of taking GROUND rather than as a second way of taking
@@ -1019,6 +1064,17 @@ enum GameConfig {
         /// Damage at the centre of the blast, falling to nothing at the edge.
         /// Terrain and trees are untouched - only walls come down.
         static let damage = 45
+
+        /// What a blast does to a WALL, on the tile it landed on and on the rest.
+        ///
+        /// Two and one, and the gap between them is what keeps an upgraded base
+        /// raidable. A blast reaches about three wall tiles; without a direct-hit
+        /// bonus a raider spreads the same damage across all three and can never
+        /// concentrate it, so a maxed wall would take four bombs to open anywhere.
+        /// With it, two bombs on the same tile do it - and the skill of a raid
+        /// becomes putting them in the same place.
+        static let wallDamage = 2
+        static let grazeDamage = 1
 
         /// How big the bomb is drawn, in tiles.
         static let spriteSize: Double = 0.55

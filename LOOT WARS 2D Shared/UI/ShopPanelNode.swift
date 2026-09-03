@@ -34,7 +34,15 @@ final class ShopPanelNode: SKNode {
     private static let cardSize = CGSize(width: 200, height: 150)
     private static let cardGap: CGFloat = 14
     private static let padding: CGFloat = 18
-    private static let tabSize = CGSize(width: 128, height: 34)
+    /// A hundred points wide, because BASE made a fourth tab.
+    ///
+    /// The panel takes whichever is wider, the cards or the tab row, and four at
+    /// the old 128 came to 566 - two points inside the 568 of an SE, which is not a
+    /// margin, it is a coincidence. At 100 the row is 418 and the cards decide the
+    /// width again, which is the right way round: the shelf should size the shop.
+    /// The names all fit because they are all short - GEAR, BASE, HEALING - and if
+    /// a long one is ever added it is this number that has to give.
+    private static let tabSize = CGSize(width: 100, height: 34)
     private static let tabGap: CGFloat = 6
 
     /// The most cards a tab can show in one row, read off the catalogue rather than
@@ -87,7 +95,10 @@ final class ShopPanelNode: SKNode {
         /// purchase, and would wipe the confirmation before it was seen.
         let flash: SKShapeNode
 
-        var type: ItemType?
+        /// What this card is selling, or nil when the column is empty. An OFFER
+        /// rather than an item type, since a card can now be a tier of something
+        /// for your base, which is not a thing you can hold.
+        var offer: ShopSystem.Offer?
     }
 
     private let panel = SKShapeNode()
@@ -561,11 +572,49 @@ final class ShopPanelNode: SKNode {
     }
 
     /// Which item a tap landed on, or nil.
-    func item(atLocalPoint point: CGPoint) -> ItemType? {
+    /// Whether the SHOP is refusing to sell this.
+    ///
+    /// Faint means a machine you already own, an upgrade your base cannot use
+    /// because there is no machine in it, or a tier already at the top. Never the
+    /// price and never a full bag: those are facts about you, they change minute to
+    /// minute, and the tap says no to them instead.
+    private func available(_ offer: ShopSystem.Offer,
+                           for player: Actor,
+                           in world: World) -> Bool {
+        if let type = offer.item {
+            return !ShopSystem.isSoldOut(type, actor: player, in: world)
+        }
+
+        guard offer.upgrade == .arcade else { return true }
+        return world.hasArcade(player.team)
+    }
+
+    /// The picture on a card.
+    private static func picture(of offer: ShopSystem.Offer) -> SKTexture {
+        if let type = offer.item { return ItemArt.texture(for: type) }
+
+        // A wall upgrade borrows a drawn glyph rather than an item's art, because
+        // there is no such item: you cannot carry a wall.
+        return offer.upgrade == .arcade
+            ? ItemArt.texture(for: .arcade)
+            : Glyphs.wall
+    }
+
+    /// And the colour of the pool behind it.
+    private static func tint(of offer: ShopSystem.Offer) -> SKColor {
+        if let type = offer.item { return RenderPalette.colour(of: type.rarity) }
+
+        // Upgrades have no rarity - there is one of each and everybody can buy the
+        // same three - so they all take the same colour rather than borrowing a
+        // scale that would mean nothing here.
+        return RenderPalette.colour(of: .epic)
+    }
+
+    func item(atLocalPoint point: CGPoint) -> ShopSystem.Offer? {
         let card = ShopPanelNode.cardSize
 
         for (index, entry) in cards.enumerated()
-        where entry.type != nil && !entry.holder.isHidden {
+        where entry.offer != nil && !entry.holder.isHidden {
 
             let local = CGPoint(
                 x: point.x - entry.holder.position.x,
@@ -576,7 +625,7 @@ final class ShopPanelNode: SKNode {
                abs(local.y) <= card.height / 2 {
 
                 lastPressed = index
-                return entry.type
+                return entry.offer
             }
         }
 
@@ -787,7 +836,7 @@ final class ShopPanelNode: SKNode {
 
         // The gear tab's cards depend on what you are wearing, so the offers come
         // from Core rather than straight out of the config.
-        let items = ShopSystem.offers(on: selectedTab, for: player)
+        let items = ShopSystem.offers(on: selectedTab, for: player, in: world)
 
         // Redraw when the tab, purse, offer identity, price, or sold-out state changes.
         //
@@ -800,16 +849,9 @@ final class ShopPanelNode: SKNode {
         ]
 
         for item in items {
-            fingerprint.append(item.type.hashValue)
+            fingerprint.append(item.name.hashValue)
             fingerprint.append(item.price)
-
-            let soldOut = ShopSystem.isSoldOut(
-                item.type,
-                actor: player,
-                in: world
-            )
-
-            fingerprint.append(soldOut ? 1 : 0)
+            fingerprint.append(available(item, for: player, in: world) ? 1 : 0)
         }
 
         guard fingerprint != lastDrawn else { return }
@@ -830,13 +872,12 @@ final class ShopPanelNode: SKNode {
         for (index, var card) in cards.enumerated() {
             guard index < items.count else {
                 card.holder.isHidden = true
-                card.type = nil
+                card.offer = nil
                 cards[index] = card
                 continue
             }
 
             let item = items[index]
-            let texture = ItemArt.texture(for: .item(item.type))
 
             card.holder.isHidden = false
 
@@ -848,27 +889,21 @@ final class ShopPanelNode: SKNode {
                 y: 0
             )
 
-            card.type = item.type
-            card.name.text = ItemArt.name(for: item.type)
+            card.offer = item
+            card.name.text = item.name
+
+            let texture = ShopPanelNode.picture(of: item)
             card.icon.texture = texture
             card.icon.size = ItemArt.size(
                 of: texture,
                 fittingInto: 48
             )
 
-            card.glow.color = RenderPalette.colour(
-                of: item.type.rarity
-            )
+            card.glow.color = ShopPanelNode.tint(of: item)
 
             card.price.text = "\(item.price)"
 
-            let soldOut = ShopSystem.isSoldOut(
-                item.type,
-                actor: player,
-                in: world
-            )
-
-            card.holder.alpha = soldOut ? 0.45 : 1.0
+            card.holder.alpha = available(item, for: player, in: world) ? 1.0 : 0.45
 
             // Green when you can have it, red when you cannot afford it - on the
             // fill AND the outline, which is what the black outline used to be
