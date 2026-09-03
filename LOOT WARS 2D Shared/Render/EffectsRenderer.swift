@@ -35,6 +35,17 @@ final class EffectsRenderer {
     private var leftFoot: [ActorID: Bool] = [:]
     private var lastHealth: [ActorID: Int] = [:]
 
+    /// How much was left of somebody's power-up last frame.
+    ///
+    /// Kept so the aura can be emitted on a BEAT rather than every frame, without
+    /// this renderer being handed a clock: the perk's own countdown is a clock, and
+    /// crossing one of its fifths-of-a-second boundaries is one puff of violet.
+    /// Sixty a second would be a solid purple blob with a person somewhere inside.
+    private var lastPerk: [ActorID: Double] = [:]
+
+    /// Seconds between motes coming off somebody running a perk.
+    private static let auraInterval: Double = 0.22
+
     // MARK: - Noticing
 
     func sync(with world: World) {
@@ -50,6 +61,20 @@ final class EffectsRenderer {
 
             if let previous = lastFeet[id] {
                 step(actor, travelling: actor.feet - previous)
+            }
+
+            // Running a power-up, which the world states plainly - so nothing has
+            // to be announced. It also means a bot picking one up gets the same
+            // violet trail the player does, without a line of code saying so.
+            if actor.perk != nil {
+                let previous = lastPerk[id] ?? (actor.perkRemaining + EffectsRenderer.auraInterval)
+                if Int(previous / EffectsRenderer.auraInterval)
+                    != Int(actor.perkRemaining / EffectsRenderer.auraInterval) {
+                    aura(at: actor.position)
+                }
+                lastPerk[id] = actor.perkRemaining
+            } else {
+                lastPerk[id] = nil
             }
 
             if let previous = lastHealth[id], previous != Int.max {
@@ -70,7 +95,78 @@ final class EffectsRenderer {
             sinceStep[id] = nil
             leftFoot[id] = nil
             lastHealth[id] = nil
+            lastPerk[id] = nil
         }
+    }
+
+    // MARK: - Power-ups
+
+    /// The instant a power-up is switched on: a ring closing INTO somebody.
+    ///
+    /// Inwards, which is the opposite of every other ring in this game - a blast
+    /// throws one out, a kill leaves one behind. A perk is the only thing here that
+    /// happens TO the person holding it rather than to everything around them, and
+    /// a shape that gathers rather than spreads says that without a caption.
+    func charge(at position: Vec2) {
+        let origin = GridGeometry.point(for: position)
+        let ring = SKShapeNode(circleOfRadius: GridGeometry.length(ofTiles: 0.95))
+
+        ring.position = origin
+        ring.fillColor = .clear
+        ring.strokeColor = RenderPalette.perkAura
+        ring.lineWidth = 3
+        ring.alpha = 0
+        ring.zPosition = 11
+        ring.blendMode = .add
+        node.addChild(ring)
+
+        ring.run(.sequence([
+            .group([
+                .sequence([.fadeAlpha(to: 0.9, duration: 0.12),
+                           .fadeAlpha(to: 0, duration: 0.28)]),
+                .scale(to: 0.15, duration: 0.4)
+            ]),
+            .removeFromParent()
+        ]))
+
+        // And a handful of motes thrown up at once, so the aura begins as a puff
+        // rather than fading in one speck at a time.
+        for _ in 0..<7 { aura(at: position) }
+    }
+
+    /// One violet mote drifting up off somebody who has a perk running.
+    ///
+    /// Rising and turning, rather than orbiting: an orbit needs a centre held for
+    /// its whole life, and this is drawn on the map rather than parented to the
+    /// figure, so a mote outlives the position it was made at - which is what makes
+    /// a moving player leave a trail and a standing one wear a haze. The same node
+    /// doing both is the reason this is not an emitter attached to the sprite.
+    private func aura(at position: Vec2) {
+        let origin = GridGeometry.point(for: position)
+
+        let mote = SKSpriteNode(texture: EnchantArt.spark)
+        let size = CGFloat.random(in: 5...9)
+
+        mote.size = CGSize(width: size, height: size)
+        mote.color = RenderPalette.perkAura
+        mote.colorBlendFactor = 1
+        mote.blendMode = .add
+        mote.zPosition = 11
+        mote.position = CGPoint(x: origin.x + CGFloat.random(in: -13...13),
+                                y: origin.y + CGFloat.random(in: -16...6))
+        node.addChild(mote)
+
+        mote.run(.sequence([
+            .group([
+                .moveBy(x: CGFloat.random(in: -8...8),
+                        y: CGFloat.random(in: 28...46), duration: 0.8),
+                .rotate(byAngle: CGFloat.random(in: -1.6...1.6), duration: 0.8),
+                .sequence([.scale(to: 1.35, duration: 0.2),
+                           .scale(to: 0.4, duration: 0.6)]),
+                .sequence([.wait(forDuration: 0.3), .fadeOut(withDuration: 0.5)])
+            ]),
+            .removeFromParent()
+        ]))
     }
 
     // MARK: - Footfalls

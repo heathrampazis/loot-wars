@@ -42,6 +42,13 @@ final class ItemSlotNode: SKNode {
     private let glow = SKSpriteNode(texture: GlowArt.pool)
 
     private let icon = SKSpriteNode()
+
+    /// Sparkles, shown only on a power-up. Built once and hidden, rather than made
+    /// and thrown away as the slot's contents change: a hotbar slot is rewritten
+    /// every time anything at all happens to your inventory, and a node built that
+    /// often would restart its own twinkle constantly and never finish one.
+    private let enchant: SKNode
+
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
@@ -63,6 +70,7 @@ final class ItemSlotNode: SKNode {
     /// Local origin is the centre of the slot.
     init(side: CGFloat) {
         self.side = side
+        enchant = EnchantArt.overlay(box: side * 0.85)
 
         // Built before super.init, because it is a constant stored property and
         // Swift wants every one of those settled before the superclass runs. It is
@@ -84,6 +92,10 @@ final class ItemSlotNode: SKNode {
         icon.zPosition = 1
         icon.isHidden = true
         addChild(icon)
+
+        enchant.zPosition = 1.5
+        enchant.isHidden = true
+        addChild(enchant)
 
         let radius = side * 0.174
         let inset = side * 0.076
@@ -238,6 +250,7 @@ final class ItemSlotNode: SKNode {
     func show(_ stack: ItemStack?, dimmed: Bool = false) {
         guard let stack else {
             icon.isHidden = true
+            enchant.isHidden = true
             badge.isHidden = true
             sellButton.isHidden = true
 
@@ -257,6 +270,13 @@ final class ItemSlotNode: SKNode {
         icon.size = ItemArt.size(of: texture, fittingInto: side - side * 0.152)
         icon.isHidden = false
         icon.alpha = dimmed ? 0.35 : 1.0
+
+        // A perk you cannot use right now - because one is already running - still
+        // shows its sparkles, faintly. Hiding them would say the item had changed
+        // into something ordinary, when what has actually happened is that you are
+        // busy being powerful.
+        enchant.isHidden = !stack.type.isEnchanted
+        enchant.alpha = dimmed ? 0.4 : 1.0
 
         // A badge on a single item is noise - it only earns its place once there
         // is more than one.

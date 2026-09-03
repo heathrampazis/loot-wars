@@ -209,6 +209,18 @@ enum CombatSystem {
                 drop(.item(stack.type), chance: GameConfig.Drops.healingChance,
                      at: actor.position, in: world)
 
+            // An unspent power-up drops on the same terms healing does, and for
+            // the same reason: it is the thing worth walking over for. Killing
+            // somebody who was saving one and taking it off them is a better story
+            // than either of you gets from it evaporating - and it is a rung of
+            // pressure on hoarding, which is the mistake a perk invites.
+            //
+            // One that is RUNNING is not in a slot at all. It stops with the
+            // person, because it was never an object.
+            case .perk:
+                drop(.item(stack.type), chance: GameConfig.Drops.healingChance,
+                     at: actor.position, in: world)
+
             case .bomb, .stink, .chest, .arcade:
                 break
             }

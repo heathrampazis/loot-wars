@@ -124,6 +124,13 @@ enum AIBrain {
             commands.append(.useItem(slot: slot))
         }
 
+        // Before reaching for a bandage, because that is the order a player uses
+        // them in: the perk is what you spend when the fight is still on, the
+        // bandage is what you spend when it is over.
+        if let slot = perkToUse(state: state, actor: actor) {
+            commands.append(.useItem(slot: slot))
+        }
+
         if let slot = healToUse(&state, actor: actor) {
             commands.append(.useItem(slot: slot))
             actor.ai = state
@@ -542,7 +549,10 @@ enum AIBrain {
             // gets the same reach a crate does.
             let worthTravelling: Double
             switch item.pickup {
-            case .item(.helmet), .item(.blaster):
+            // A perk travels as far as gear does. It is worth about half a health
+            // bar in the fight it is spent in, which beats anything else that ends
+            // up lying on the grass.
+            case .item(.helmet), .item(.blaster), .item(.perk):
                 worthTravelling = GameConfig.AI.lootSearchRange
             case .item:
                 worthTravelling = GameConfig.AI.itemSearchRange
@@ -1083,7 +1093,7 @@ enum AIBrain {
         switch type {
         case .helmet(let tier):  return tier > GameConfig.AI.buysHelmetsAbove
         case .blaster(let tier): return tier > GameConfig.AI.buysBlastersAbove
-        case .bandage, .medkit, .bomb, .stink, .chest, .arcade: return false
+        case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .perk: return false
         }
     }
 
@@ -1346,6 +1356,34 @@ enum AIBrain {
     ///
     /// Each bot's thresholds are scaled by its own nerve, so seven of them do not
     /// all reach for a bandage on the same frame.
+    /// The power-up worth switching on, if there is one and now is the moment.
+    ///
+    /// Bots get these on exactly the same terms as the player - found in a crate,
+    /// one at a time, refused by Actor.canUse while one is running - and that is
+    /// the whole reason this is eight lines rather than a subsystem. What it has to
+    /// decide is only WHEN, and a regeneration has one obvious when: hurt, and
+    /// still being shot at. Spending it on a scratch in an empty field is the one
+    /// mistake available here, so both halves of that are required.
+    ///
+    /// No cooldown timer of its own. Holding two perks at once is already rare, and
+    /// Actor.canUse will refuse the second while the first runs.
+    private static func perkToUse(state: AIState, actor: Actor) -> Int? {
+        let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
+        guard healthLeft <= GameConfig.AI.perkHealthFraction else { return nil }
+
+        // In it, rather than merely scratched at some point in the past.
+        guard state.goal.isFight
+                || actor.secondsSinceHit < GameConfig.AI.combatRecency else { return nil }
+
+        for (index, slot) in actor.inventory.slots.enumerated() {
+            guard let stack = slot, stack.type.perk != nil,
+                  actor.canUse(slot: index) else { continue }
+            return index
+        }
+
+        return nil
+    }
+
     private static func healToUse(_ state: inout AIState, actor: Actor) -> Int? {
         guard state.healTimer <= 0 else { return nil }
         guard actor.health < actor.maxHealth else { return nil }
@@ -1378,7 +1416,7 @@ enum AIBrain {
         var biggestAmount = 0
 
         for (index, slot) in actor.inventory.slots.enumerated() {
-            guard let stack = slot,
+            guard let stack = slot, stack.type.isHealing,
                   ConsumableSystem.canUse(slot: index, actor: actor) else { continue }
 
             let amount = stack.type.healAmount(of: actor.maxHealth)

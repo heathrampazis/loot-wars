@@ -78,6 +78,17 @@ enum LootTable {
             (.item(.stink),   18),
             (.item(.chest),   26),
 
+            // The power-up.
+            //
+            // Rarer than a medkit and about one crate in thirty, which is the rate
+            // it wants: often enough that you have held one and know what it does,
+            // seldom enough that having one is a decision about when to spend it
+            // rather than a button you press whenever you are scratched. The row
+            // gets heavier as the match runs, because a fourteen-second regeneration
+            // is worth far more in a late fight than an early one, and because the
+            // late bands are where a crate has to be worth opening.
+            (.item(.perk(.regeneration)), 9),
+
             (.item(.helmet(.common)),    26),
             (.item(.helmet(.uncommon)),  18),
             (.item(.helmet(.rare)),      11),
@@ -93,6 +104,8 @@ enum LootTable {
 
             // The Common and the Blaster 2 are gone: by now everybody has better,
             // so those rows were rolls that produced nothing.
+            (.item(.perk(.regeneration)), 11),
+
             (.item(.helmet(.uncommon)),  22),
             (.item(.helmet(.rare)),      20),
             (.item(.blaster(.three)),    26),
@@ -104,6 +117,8 @@ enum LootTable {
             (.item(.bomb),    38),
             (.item(.stink),   14),
             (.item(.chest),   22),
+
+            (.item(.perk(.regeneration)), 13),
 
             (.item(.helmet(.rare)),      20),
             (.item(.helmet(.epic)),      10),

@@ -68,6 +68,7 @@ enum ItemArt {
         case .stink:   return "Stink Bomb"
         case .chest:   return "Chest"
         case .arcade:  return "Arcade"
+        case .perk:    return "Regeneration"
         case .helmet:  return "Helmet"
         case .blaster: return "Blaster"
         }
@@ -81,6 +82,7 @@ enum ItemArt {
         case .item(.stink):      return "StinkBomb"
         case .item(.chest):      return "Chest"
         case .item(.arcade):     return "Arcade"
+        case .item(.perk(.regeneration)): return "RegenerationPerk"
         case .item(.helmet(let tier)):  return tier.name
         case .item(.blaster(let tier)): return tier.assetName
         // A golden token is the same pickup carrying a bigger number - Core has no

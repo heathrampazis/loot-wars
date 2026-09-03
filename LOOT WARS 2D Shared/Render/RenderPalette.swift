@@ -121,6 +121,22 @@ enum RenderPalette {
     /// itself.
     static let gas = rgb(0xB4, 0xE3, 0x92)
 
+    // MARK: - Power-ups
+
+    /// The colour of a perk, wherever one appears: the sheen on the item, the
+    /// sparkles around it, and the motes coming off somebody running one.
+    ///
+    /// Deliberately NOT the Epic blue a perk is ranked at. Rarity says how lucky
+    /// you were to find a thing; this says what kind of thing it is, and a player
+    /// needs to read "power-up" off a figure across the map without first working
+    /// out what tier it was. Violet is the only strong colour this game has not
+    /// already spent - teams are the primaries, healing is green, damage is pink,
+    /// money is gold - so nothing else on screen can be mistaken for it.
+    static let perkAura = rgb(0xB4, 0x6C, 0xF5)
+
+    /// The bright end of the same, for the middle of a sparkle.
+    static let perkSpark = rgb(0xEE, 0xD9, 0xFF)
+
     /// The colour of yes, and the colour of no, for anything you press.
     ///
     /// One pair, used by the sell button, the shop's price pills and the buy

@@ -660,6 +660,13 @@ final class GameScene: SKScene {
             case .jackpot(let position):
                 effectsRenderer.jackpot(at: position)
 
+            case .perkStarted(_, let user):
+                // The steady violet trail comes off the world state a frame later;
+                // this is only the switch being thrown, which nothing about the
+                // state a second afterwards can show.
+                guard let actor = world.actors[user] else { break }
+                effectsRenderer.charge(at: actor.position)
+
             case .gas(let position):
                 // The cloud itself is drawn from the world every frame; this is the
                 // burst that says it arrived, which state alone cannot show.

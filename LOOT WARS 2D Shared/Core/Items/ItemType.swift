@@ -40,6 +40,9 @@ enum ItemType: Hashable {
     /// somewhere nobody can reach without breaking in.
     case arcade
 
+    /// Something you switch on for a while - see Perk.
+    case perk(Perk)
+
     /// How many fit in one inventory slot.
     var maxStack: Int {
         switch self {
@@ -54,6 +57,9 @@ enum ItemType: Hashable {
         // Same as a bomb: both are thrown, and a pocket of four of anything thrown
         // decides a fight on its own.
         case .stink:   return 3
+        // One apiece. You can only have one running, so a second in the same slot
+        // would be a queue - and a queue of power-ups is a different game.
+        case .perk:    return 1
         case .chest:   return 2
         // One apiece. Two tiers of the same gear are different item types anyway,
         // so a stack of them could never have meant anything.
@@ -67,12 +73,25 @@ enum ItemType: Hashable {
     /// happily let you dress a wound with one.
     var isHealing: Bool { healFraction > 0 }
 
+    /// The perk inside this, if that is what it is.
+    var perk: Perk? {
+        if case .perk(let which) = self { return which }
+        return nil
+    }
+
+    /// Whether this is drawn with an enchanted sheen on it.
+    ///
+    /// A property of the ITEM rather than a list kept in the renderer, so the
+    /// hotbar, the chest, the ground and the shop all agree without being told -
+    /// and so the second perk gets its shimmer by existing.
+    var isEnchanted: Bool { perk != nil }
+
     /// Share of maximum health restored when used.
     var healFraction: Double {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .stink, .chest, .helmet, .blaster, .arcade: return 0
+        case .bomb, .stink, .chest, .helmet, .blaster, .arcade, .perk: return 0
         }
     }
 
@@ -93,7 +112,7 @@ enum ItemType: Hashable {
 
     var use: Use {
         switch self {
-        case .bandage, .medkit, .bomb, .stink, .helmet, .blaster: return .actionButton
+        case .bandage, .medkit, .bomb, .stink, .helmet, .blaster, .perk: return .actionButton
         // Both want you to say WHERE.
         case .chest, .arcade: return .mapTap
         }
@@ -103,7 +122,7 @@ enum ItemType: Hashable {
     var isGear: Bool {
         switch self {
         case .helmet, .blaster: return true
-        case .bandage, .medkit, .bomb, .stink, .chest, .arcade: return false
+        case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .perk: return false
         }
     }
 

@@ -57,6 +57,18 @@ struct Actor {
     /// portion always arrives a full interval after you get there.
     var recoveryTimer: Double = GameConfig.Player.recoveryTick
 
+    /// The power-up currently running, and how long is left of it.
+    ///
+    /// One, never a list. See Perk for why the rule is written before there is a
+    /// second perk to break it - and note that this is state on the ACTOR rather
+    /// than an item in a slot: once it is switched on there is nothing to drop,
+    /// nothing to steal, and dying ends it.
+    var perk: Perk?
+    var perkRemaining: Double = 0
+
+    /// Counts down to the next thing a running perk does.
+    var perkTick: Double = 0
+
     var inventory = Inventory()
 
     /// Currency. Worth nothing yet - the shop is what will give it meaning - but
@@ -104,6 +116,13 @@ struct Actor {
         switch stack.type {
         case .bomb, .stink:
             return true
+        // A perk is switched on rather than aimed, so the button will do - but
+        // only while one is not already running. Everything else about "one at a
+        // time" follows from this single answer: the hotbar greys the slot, the
+        // button goes faint, and ConsumableSystem refuses the command.
+        case .perk:
+            return perk == nil
+
         case .chest, .arcade:
             // Always tappable. Whether either can go down HERE depends on the tile
             // you then pick, which is the placing system's call - the hotbar cannot

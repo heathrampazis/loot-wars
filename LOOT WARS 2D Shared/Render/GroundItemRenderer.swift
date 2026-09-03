@@ -116,6 +116,12 @@ final class GroundItemRenderer {
             ]))
         }
 
+        // The same sheen the hotbar puts on it, so a power-up is recognisable
+        // lying under a tree before you have ever picked one up.
+        if case .item(let type) = item.pickup, type.isEnchanted {
+            sprite.addChild(EnchantArt.overlay(box: box * 1.15))
+        }
+
         let bob: CGFloat = 4
         sprite.run(.repeatForever(.sequence([
             .moveBy(x: 0, y: bob, duration: 0.6),

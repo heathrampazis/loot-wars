@@ -235,7 +235,13 @@ enum GameConfig {
         static let offShelf: [ItemType: Int] = [
             .bomb: 11,
             .chest: 14,
-            .arcade: 24
+            .arcade: 24,
+
+            // A power-up is not on the shelf either, and never will be - the whole
+            // point of it is that it is found. It gets a notional price anyway so
+            // the shop has an offer to make for one, on the principle two lines
+            // down: nobody decides for the player which of their things are junk.
+            .perk(.regeneration): 18
         ]
 
         /// What the shop pays for something you sell back, as a share of its price.
@@ -671,6 +677,15 @@ enum GameConfig {
         /// would mostly be thrown away.
         static let topUpHealthFraction: Double = 0.85
 
+        /// How hurt a bot must be before it switches a power-up on.
+        ///
+        /// Higher than the bandage thresholds, and deliberately: a regeneration is
+        /// spent to WIN a fight rather than to recover from one, so the moment for
+        /// it is while a bot still has most of a health bar and is losing it. Wait
+        /// until it is desperate and the perk is a slow drip against a blaster that
+        /// is already winning, which is the same as not having had one.
+        static let perkHealthFraction: Double = 0.75
+
         /// How much of a break-off is "get away from them" versus "get home". Close
         /// up, distance is all that matters; with daylight between you, home does.
         static let breakOffDistance: Double = 8
@@ -1083,6 +1098,34 @@ enum GameConfig {
         /// sweep hands it straight back on the next tick, and dropping an item
         /// would silently do nothing at all.
         static let throwDistances: [Double] = [1.25, 1.6, 2.0]
+    }
+
+    enum Perks {
+        /// How long a regeneration runs.
+        ///
+        /// Long enough to change a fight rather than patch you between two. A
+        /// medkit is an answer to damage already taken; this is an answer to damage
+        /// about to be taken, and the difference only exists if it is still running
+        /// while somebody is shooting at you. Fourteen seconds is two or three
+        /// exchanges at this game's ranges.
+        static let regenerationDuration: Double = 14
+
+        /// Seconds between portions of health.
+        ///
+        /// Portions, not a trickle, for the third time in this project and the same
+        /// reason as home recovery and gas damage: every point of healing makes the
+        /// screen react, so sixty a second is not a warm glow, it is a strobe. Ten
+        /// beats over the duration reads as a steady pulse.
+        static let tickInterval: Double = 1.4
+
+        /// Share of a full health bar handed back per beat.
+        ///
+        /// 5.5% ten times is a little over half a health bar across the fourteen
+        /// seconds - more than a medkit gives, but paid out slowly enough that
+        /// enough damage still kills you through it. That is the trade the perk is
+        /// meant to be: it does not save you from a fight you are losing, it wins
+        /// you one you were only just losing.
+        static let regenerationPortion: Double = 0.055
     }
 
     enum Loot {

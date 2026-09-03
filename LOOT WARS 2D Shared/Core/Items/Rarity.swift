@@ -58,6 +58,10 @@ extension ItemType {
         case .medkit:  return .uncommon
         case .arcade:  return .epic
 
+        // Epic, like the machine: both are the rarest things you can be carrying,
+        // and both change the next minute of the match rather than the next shot.
+        case .perk:    return .epic
+
         case .helmet(let tier):
             switch tier {
             case .none, .common, .uncommon: return .common

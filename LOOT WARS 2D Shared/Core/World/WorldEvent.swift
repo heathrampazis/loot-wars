@@ -47,6 +47,14 @@ enum WorldEvent {
     /// and only one of those is worth interrupting somebody for.
     case jackpot(at: Vec2)
 
+    /// Somebody switched a power-up on.
+    ///
+    /// The RUNNING perk is state and the renderer reads it every frame - that is
+    /// what the particles come off. This is only the moment it started, which state
+    /// cannot show a second later, and which deserves something louder than the
+    /// steady effect that follows it.
+    case perkStarted(Perk, by: ActorID)
+
     /// Somebody bought something.
     case purchase(ItemType, by: ActorID)
 

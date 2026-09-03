@@ -848,6 +848,7 @@ final class World {
         // rather than on where they started the tick.
         GasSystem.update(self, dt: dt)
         CombatSystem.update(self, dt: dt)
+        PerkSystem.update(self, dt: dt)
         RespawnSystem.update(self, dt: dt)
         tick += 1
         elapsed += dt
