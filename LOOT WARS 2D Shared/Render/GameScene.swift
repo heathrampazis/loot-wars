@@ -40,6 +40,7 @@ final class GameScene: SKScene {
     private let bombRenderer = BombRenderer()
     private let projectileRenderer = ProjectileRenderer()
     private let actorRenderer = ActorRenderer()
+    private let gasRenderer = GasRenderer()
     private let effectsRenderer = EffectsRenderer()
     private let placementGhost = PlacementGhost()
     private let cameraController = CameraController()
@@ -272,6 +273,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(bombRenderer.node)
         worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
+        worldLayer.addChild(gasRenderer.node)
         worldLayer.addChild(effectsRenderer.node)
         worldLayer.addChild(placementGhost.node)
         addChild(worldLayer)
@@ -532,6 +534,7 @@ final class GameScene: SKScene {
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
         updateHint(with: world)
+        gasRenderer.sync(with: world)
         effectsRenderer.sync(with: world)
         dispatch(world.takeEvents(), in: world)
         if let player = world.localPlayer {
@@ -623,6 +626,11 @@ final class GameScene: SKScene {
             switch event {
             case .blast(let position):
                 bombRenderer.flash(at: position)
+
+            case .gas(let position):
+                // The cloud itself is drawn from the world every frame; this is the
+                // burst that says it arrived, which state alone cannot show.
+                effectsRenderer.burst(at: position)
 
             case .purchase(_, let buyer):
                 guard buyer == world.localPlayerID else { break }

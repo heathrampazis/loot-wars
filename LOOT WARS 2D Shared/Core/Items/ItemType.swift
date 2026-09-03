@@ -15,6 +15,15 @@ enum ItemType: Hashable {
     case bandage
     case medkit
     case bomb
+
+    /// The other thing you throw.
+    ///
+    /// A bomb takes a piece of the map; this leaves a cloud of gas standing in it.
+    /// The difference is what each is FOR - a bomb opens a base, a stink bomb
+    /// closes a doorway, a corridor, or the ground somebody is standing on - and it
+    /// is why they are two items rather than one with a switch.
+    case stink
+
     case chest
 
     /// Gear you can carry rather than wear.
@@ -42,6 +51,9 @@ enum ItemType: Hashable {
         // slot left to give.
         case .medkit:  return 3
         case .bomb:    return 3
+        // Same as a bomb: both are thrown, and a pocket of four of anything thrown
+        // decides a fight on its own.
+        case .stink:   return 3
         case .chest:   return 2
         // One apiece. Two tiers of the same gear are different item types anyway,
         // so a stack of them could never have meant anything.
@@ -60,7 +72,7 @@ enum ItemType: Hashable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .chest, .helmet, .blaster, .arcade: return 0
+        case .bomb, .stink, .chest, .helmet, .blaster, .arcade: return 0
         }
     }
 
@@ -81,7 +93,7 @@ enum ItemType: Hashable {
 
     var use: Use {
         switch self {
-        case .bandage, .medkit, .bomb, .helmet, .blaster: return .actionButton
+        case .bandage, .medkit, .bomb, .stink, .helmet, .blaster: return .actionButton
         // Both want you to say WHERE.
         case .chest, .arcade: return .mapTap
         }
@@ -91,7 +103,7 @@ enum ItemType: Hashable {
     var isGear: Bool {
         switch self {
         case .helmet, .blaster: return true
-        case .bandage, .medkit, .bomb, .chest, .arcade: return false
+        case .bandage, .medkit, .bomb, .stink, .chest, .arcade: return false
         }
     }
 

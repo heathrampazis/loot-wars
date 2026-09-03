@@ -71,6 +71,12 @@ enum AIBrain {
         // into one in full view.
         steerAroundObstacles(&state, actor: actor, in: world)
 
+        // Gas is walked AROUND, whatever else the bot had in mind. Above the goal
+        // list entirely rather than inside it, because no goal is worth standing in
+        // a cloud for - a bot that walks through one to reach a chest arrives with
+        // half a bar gone and dies to the first person it meets.
+        avoidGas(&state, actor: actor, in: world)
+
         // The edge nudge is for roaming. Applying it in a fight fights the bot's
         // own attempt to hold its range near a border.
         if !state.goal.isFight {
@@ -98,6 +104,10 @@ enum AIBrain {
         }
 
         if let slot = bombToThrow(state: state, actor: actor, in: world) {
+            commands.append(.useItem(slot: slot))
+        }
+
+        if let slot = stinkToThrow(state: state, actor: actor, in: world) {
             commands.append(.useItem(slot: slot))
         }
 
@@ -1073,7 +1083,7 @@ enum AIBrain {
         switch type {
         case .helmet(let tier):  return tier > GameConfig.AI.buysHelmetsAbove
         case .blaster(let tier): return tier > GameConfig.AI.buysBlastersAbove
-        case .bandage, .medkit, .bomb, .chest, .arcade: return false
+        case .bandage, .medkit, .bomb, .stink, .chest, .arcade: return false
         }
     }
 
@@ -1226,6 +1236,35 @@ enum AIBrain {
 
     /// Which hotbar slot to lob, or nil for "not yet".
     ///
+    /// Steers clear of any cloud the bot is standing in or about to walk into.
+    ///
+    /// A push directly away from the middle of it, blended into the heading rather
+    /// than replacing it - so a bot skirts a cloud on its way somewhere instead of
+    /// turning round and abandoning the trip. Checked a short way AHEAD as well as
+    /// underfoot, because a bot that only reacts once it is already choking has
+    /// already paid for the mistake.
+    private static func avoidGas(_ state: inout AIState, actor: Actor, in world: World) {
+        let ahead = actor.feet + state.desiredHeading * GameConfig.AI.gasLookAhead
+
+        for id in world.gasClouds.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let cloud = world.gasClouds[id],
+                  cloud.density >= GameConfig.Stink.bitingDensity else { continue }
+
+            let inIt = cloud.contains(actor.feet)
+            guard inIt || cloud.contains(ahead) else { continue }
+
+            let away = actor.feet - cloud.centre
+            let escape = away.length > 0.01 ? away.normalized() : Vec2(x: 1, y: 0)
+
+            // Standing in one is an emergency and outruns whatever it was doing;
+            // seeing one ahead is a nudge.
+            let weight = inIt ? 1.0 : GameConfig.AI.gasSwerve
+            state.desiredHeading = (state.desiredHeading * (1 - weight)
+                                    + escape * weight).normalized()
+            return
+        }
+    }
+
     /// A bomb flies along the aim, which for a raiding bot is wherever it is
     /// walking - so it has to be close enough AND actually pointed at the wall
     /// before throwing. Without the second test it would fling bombs sideways while
@@ -1253,6 +1292,37 @@ enum AIBrain {
 
         let towards = tile.center - actor.position
         guard towards.length <= GameConfig.Bomb.throwRange else { return nil }
+        guard abs(shortestAngle(from: actor.aim.angle, to: towards.angle))
+                <= GameConfig.AI.throwTolerance else { return nil }
+
+        return slot
+    }
+
+    /// A stink bomb worth throwing, or nil.
+    ///
+    /// At a PERSON rather than at a wall, which is the whole difference between the
+    /// two things a bot can throw: a blast opens a base and is aimed at masonry, a
+    /// cloud takes the ground somebody is standing on and is aimed at them. Using
+    /// one on a wall would waste it, and the bomb picker above only ever finds
+    /// blast bombs, so the two can never be confused.
+    ///
+    /// It will not throw one into gas that is already there. Two clouds on the same
+    /// spot are one cloud that cost twice as much, and a bot that cannot see that
+    /// looks like a bot.
+    private static func stinkToThrow(state: AIState, actor: Actor, in world: World) -> Int? {
+        guard case .fight(let id) = state.goal,
+              let enemy = world.actors[id], enemy.isAlive else { return nil }
+
+        guard let slot = actor.inventory.firstSlot(holding: .stink),
+              BombSystem.canThrow(actor, from: slot) else { return nil }
+
+        guard !world.gasAt(enemy.feet) else { return nil }
+
+        let towards = enemy.position - actor.position
+        guard towards.length <= GameConfig.Bomb.throwRange else { return nil }
+
+        // Aimed, like a bomb: a bot lobbing one sideways while rounding a corner
+        // gasses the ground it is about to walk over.
         guard abs(shortestAngle(from: actor.aim.angle, to: towards.angle))
                 <= GameConfig.AI.throwTolerance else { return nil }
 

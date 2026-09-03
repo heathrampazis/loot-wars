@@ -51,6 +51,10 @@ extension ItemType {
         case .bandage: return .common
         case .chest:   return .common
         case .bomb:    return .uncommon
+        // A rung above a bomb: rarer in every table it appears in, and the only
+        // thing in the game that takes ground away from somebody without taking
+        // any of the map with it.
+        case .stink:   return .rare
         case .medkit:  return .uncommon
         case .arcade:  return .epic
 

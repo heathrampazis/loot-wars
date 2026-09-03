@@ -29,12 +29,23 @@ enum BombSystem {
         }
     }
 
-    /// Whether this actor could throw the bomb in that slot right now.
+    /// Whether this actor could throw whatever is in that slot right now.
     ///
     /// Asked by the bots before they commit to a raid and by the throw itself, so a
     /// bot can never line one up that the simulation would refuse.
     static func canThrow(_ actor: Actor, from slot: Int) -> Bool {
-        actor.canUse(slot: slot) && actor.inventory.slots[slot]?.type == .bomb
+        guard actor.canUse(slot: slot) else { return false }
+        return kind(of: actor.inventory.slots[slot]?.type) != nil
+    }
+
+    /// What an item turns into once it leaves your hand, or nil for anything that
+    /// is not thrown at all.
+    static func kind(of type: ItemType?) -> Bomb.Kind? {
+        switch type {
+        case .bomb:  return .blast
+        case .stink: return .stink
+        default:     return nil
+        }
     }
 
     /// The first slot with a bomb in it, or nil.
@@ -43,7 +54,8 @@ enum BombSystem {
     }
 
     private static func throwBomb(by id: ActorID, from slot: Int, in world: World) {
-        guard var actor = world.actors[id], canThrow(actor, from: slot) else { return }
+        guard var actor = world.actors[id], canThrow(actor, from: slot),
+              let kind = kind(of: actor.inventory.slots[slot]?.type) else { return }
 
         // Thrown along the aim, which is wherever the actor was last walking or
         // shooting. Same rule for everybody: no separate targeting for bombs, and
@@ -54,7 +66,8 @@ enum BombSystem {
         _ = actor.inventory.consume(at: slot)
         world.actors[id] = actor
 
-        world.spawnBomb(owner: id,
+        world.spawnBomb(kind,
+                        owner: id,
                         team: actor.team,
                         position: actor.position + heading * GameConfig.Bomb.launchOffset,
                         velocity: heading * GameConfig.Bomb.speed)
@@ -102,6 +115,16 @@ enum BombSystem {
     // MARK: - Detonation
 
     private static func detonate(_ bomb: Bomb, in world: World) {
+        // A stink bomb stops here. It takes nothing off the map, hurts nobody on
+        // landing and kills nothing standing next to it - all of its effect is the
+        // cloud it leaves behind, which is what makes it a way of taking GROUND
+        // rather than a smaller way of taking health.
+        guard case .blast = bomb.kind else {
+            world.spawnGas(at: bomb.position, owner: bomb.owner, team: bomb.team)
+            world.record(.gas(at: bomb.position))
+            return
+        }
+
         let radius = GameConfig.Bomb.blastRadius
         let reach = Int(radius.rounded(.up))
         let centre = GridPoint(containing: bomb.position)

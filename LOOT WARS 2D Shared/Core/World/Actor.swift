@@ -102,7 +102,7 @@ struct Actor {
               let stack = inventory.slots[index] else { return false }
 
         switch stack.type {
-        case .bomb:
+        case .bomb, .stink:
             return true
         case .chest, .arcade:
             // Always tappable. Whether either can go down HERE depends on the tile

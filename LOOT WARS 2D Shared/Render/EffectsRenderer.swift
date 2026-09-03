@@ -239,6 +239,49 @@ final class EffectsRenderer {
         }
     }
 
+    // MARK: - Gas arriving
+
+    /// The puff a stink bomb makes on landing.
+    ///
+    /// The cloud that follows is state and is drawn from the world; this is the
+    /// instant, which state cannot show. A cloud that simply faded up would read as
+    /// fog rolling in, where a burst reads as something having been thrown - and
+    /// the difference matters because one of those is a thing you should be
+    /// backing away from.
+    func burst(at position: Vec2) {
+        let origin = GridGeometry.point(for: position)
+
+        for index in 0..<10 {
+            let puff = SKSpriteNode(texture: GlowArt.pool)
+            let side = GridGeometry.length(ofTiles: Double.random(in: 0.5...0.9))
+
+            puff.size = CGSize(width: side, height: side)
+            puff.color = RenderPalette.gas
+            puff.colorBlendFactor = 1
+            puff.alpha = 0.8
+            puff.position = origin
+            puff.zPosition = 11
+            node.addChild(puff)
+
+            // Thrown outwards and slowing, which is what a gas does and a spark
+            // does not - so this and the impact stars cannot be confused for one
+            // another even though both are a handful of things leaving a point.
+            let angle = (Double(index) / 10) * 2 * .pi + Double.random(in: -0.3...0.3)
+            let reach = CGFloat.random(in: 16...30)
+
+            puff.run(.sequence([
+                .group([
+                    .move(by: CGVector(dx: cos(angle) * Double(reach),
+                                       dy: sin(angle) * Double(reach)),
+                          duration: 0.5),
+                    .scale(to: 1.6, duration: 0.5),
+                    .fadeOut(withDuration: 0.5)
+                ]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     // MARK: - Kills
 
     /// The mark left where somebody went down, and what it paid.

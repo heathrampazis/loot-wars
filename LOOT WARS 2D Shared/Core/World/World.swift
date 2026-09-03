@@ -745,8 +745,44 @@ final class World {
         projectiles.append(projectile)
     }
 
-    func spawnBomb(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2) {
+    // MARK: - Gas
+
+    private(set) var gasClouds: [GasCloudID: GasCloud] = [:]
+    private var nextGasID = 0
+
+    @discardableResult
+    func spawnGas(at centre: Vec2, owner: ActorID, team: TeamID) -> GasCloudID {
+        let cloud = GasCloud(id: GasCloudID(nextGasID),
+                             centre: centre,
+                             owner: owner,
+                             team: team,
+                             timeRemaining: GameConfig.Stink.duration)
+        nextGasID += 1
+        gasClouds[cloud.id] = cloud
+        return cloud.id
+    }
+
+    func removeGas(_ id: GasCloudID) {
+        gasClouds[id] = nil
+    }
+
+    /// Whether this point is inside gas thick enough to hurt.
+    ///
+    /// Asked by the bots when they are deciding where to walk, so a bot routes
+    /// round a cloud for exactly as long as the cloud is worth routing round.
+    func gasAt(_ point: Vec2) -> Bool {
+        gasClouds.values.contains {
+            $0.density >= GameConfig.Stink.bitingDensity && $0.contains(point)
+        }
+    }
+
+    func spawnBomb(_ kind: Bomb.Kind,
+                   owner: ActorID,
+                   team: TeamID,
+                   position: Vec2,
+                   velocity: Vec2) {
         let bomb = Bomb(id: BombID(nextBombID),
+                        kind: kind,
                         owner: owner,
                         team: team,
                         position: position,
@@ -803,6 +839,9 @@ final class World {
         // After the sweep: a token paid out this tick should be lying there to be
         // seen, not swallowed instantly by whoever happens to be standing on it.
         ArcadeSystem.update(self, commands: everyone, dt: dt)
+        // After movement, so a dose lands on where somebody actually ended up
+        // rather than on where they started the tick.
+        GasSystem.update(self, dt: dt)
         CombatSystem.update(self, dt: dt)
         RespawnSystem.update(self, dt: dt)
         tick += 1

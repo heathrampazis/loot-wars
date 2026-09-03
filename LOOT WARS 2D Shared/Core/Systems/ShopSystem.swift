@@ -43,7 +43,7 @@ enum ShopSystem {
         switch type {
         case .helmet(let tier):  return GameConfig.Shop.helmetPrices[tier]
         case .blaster(let tier): return GameConfig.Shop.blasterPrices[tier]
-        case .bandage, .medkit, .bomb, .chest, .arcade: return nil
+        case .bandage, .medkit, .bomb, .stink, .chest, .arcade: return nil
         }
     }
 

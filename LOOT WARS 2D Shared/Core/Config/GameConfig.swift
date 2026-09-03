@@ -703,6 +703,13 @@ enum GameConfig {
         /// need the precision a shot does.
         static let throwTolerance: Double = 0.45
 
+        /// How far ahead a bot looks for gas, and how hard it swerves when it sees
+        /// some. Standing in a cloud overrides the heading entirely; seeing one
+        /// coming only bends it, so a bot skirts a cloud rather than abandoning
+        /// wherever it was going.
+        static let gasLookAhead: Double = 2.5
+        static let gasSwerve: Double = 0.6
+
         /// How close a bot has to be to somebody's claim before raiding it even
         /// occurs to it, in tiles.
         ///
@@ -938,6 +945,49 @@ enum GameConfig {
         static let blocksWhenBehind: ClosedRange<Int> = 14...20
     }
 
+    /// The stink bomb, and what it leaves behind.
+    ///
+    /// Priced as a way of taking GROUND rather than as a second way of taking
+    /// health. Stand in it for the full nine seconds and it costs about 54 - half a
+    /// bar - which is enough that nobody walks through casually and not so much
+    /// that being caught in one is the end of your match. What it is really for is
+    /// making two tiles unusable: a doorway, the gap you were about to break
+    /// through, or the ground under somebody who has nowhere good to go.
+    enum Stink {
+        /// How far the cloud reaches, in tiles. Wider than a blast, because a blast
+        /// is an instant and a cloud is a place.
+        static let radius: Double = 2.2
+
+        /// Seconds it stands for, and how long it takes to billow out and to thin
+        /// away at the end. A cloud that arrived and vanished instantly would be a
+        /// trap rather than a hazard - you can see this one coming and you can see
+        /// it going.
+        static let duration: Double = 9
+        static let spread: Double = 0.45
+        static let fade: Double = 1.6
+
+        /// How thick it has to be before it bites, on the same nought-to-one scale
+        /// the renderer draws. Tying both to one number is what stops gas you can
+        /// barely see from still taking your health.
+        static let bitingDensity: Double = 0.35
+
+        /// Damage per dose, and seconds between doses.
+        ///
+        /// Portions rather than a trickle - see GasSystem. The first pass at this
+        /// was eight every half second, which the arithmetic caught before anybody
+        /// played it: seven biting seconds at sixteen a second is 112 damage, and a
+        /// cloud that kills a full-health player outright is not a piece of ground
+        /// to avoid, it is a death sentence with a radius.
+        ///
+        /// Six every three quarters of a second is about 54 over a full stay -
+        /// roughly half a bar - and six to twelve for crossing one, which is the
+        /// shape this wants: walking through costs something you can shrug off,
+        /// standing in it is a decision you regret in instalments, and it is the
+        /// GROUND being taken away rather than your health.
+        static let dose = 6
+        static let doseInterval: Double = 0.75
+    }
+
     enum Bomb {
         /// How far a bomb can be lobbed, in tiles. It goes off where it lands even
         /// over open ground, so a throw into nothing is a wasted bomb rather than
@@ -1150,22 +1200,22 @@ enum GameConfig {
         /// breaking into exactly as often as they were, and worth more when you do.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 58), (.medkit, 20), (.bomb, 26),
+                (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
                 (.helmet(.common), 11), (.helmet(.rare), 6),
                 (.blaster(.two),   11), (.blaster(.three), 6)
             ]),
             (0.35, [
-                (.bandage, 58), (.medkit, 20), (.bomb, 26),
+                (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
                 (.helmet(.rare), 11), (.helmet(.epic), 6),
                 (.blaster(.three), 11), (.blaster(.four), 6)
             ]),
             (0.65, [
-                (.bandage, 58), (.medkit, 20), (.bomb, 26),
+                (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
                 (.helmet(.epic), 11), (.helmet(.legendary), 6),
                 (.blaster(.four), 11), (.blaster(.five), 6)
             ]),
             (0.85, [
-                (.bandage, 58), (.medkit, 20), (.bomb, 26),
+                (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
                 (.helmet(.legendary), 11), (.helmet(.mythical), 6),
                 (.blaster(.five), 11), (.blaster(.six), 6)
             ])

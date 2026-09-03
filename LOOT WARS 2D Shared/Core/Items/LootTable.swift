@@ -75,6 +75,7 @@ enum LootTable {
             (.item(.bandage), 88),
             (.item(.medkit),  22),
             (.item(.bomb),    58),
+            (.item(.stink),   18),
             (.item(.chest),   26),
 
             (.item(.helmet(.common)),    26),
@@ -87,6 +88,7 @@ enum LootTable {
             (.item(.bandage), 88),
             (.item(.medkit),  24),
             (.item(.bomb),    50),
+            (.item(.stink),   16),
             (.item(.chest),   26),
 
             // The Common and the Blaster 2 are gone: by now everybody has better,
@@ -100,6 +102,7 @@ enum LootTable {
             (.item(.bandage), 96),
             (.item(.medkit),  34),
             (.item(.bomb),    38),
+            (.item(.stink),   14),
             (.item(.chest),   22),
 
             (.item(.helmet(.rare)),      20),
@@ -171,6 +174,9 @@ enum LootTable {
         // medkit, and bombs nudged up a little further, because bombs are the
         // supply line for raiding and were rationed by one row in a table shared
         // with the supplies.
+        //
+        // A stink bomb is not filtered out either: it is a rung rarer than a bomb
+        // everywhere it appears, so a rare crate is where most of them come from.
         //
         // So a rare crate is about half gear, a third bombs and the rest medkits.
         // There is nothing in it you would throw away, which is the entire point of

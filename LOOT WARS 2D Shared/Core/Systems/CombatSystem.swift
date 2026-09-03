@@ -209,7 +209,7 @@ enum CombatSystem {
                 drop(.item(stack.type), chance: GameConfig.Drops.healingChance,
                      at: actor.position, in: world)
 
-            case .bomb, .chest, .arcade:
+            case .bomb, .stink, .chest, .arcade:
                 break
             }
         }

@@ -19,7 +19,22 @@ struct BombID: Hashable {
 }
 
 struct Bomb {
+    /// What happens when it stops.
+    ///
+    /// One type with a kind rather than two types, because everything BEFORE the
+    /// landing is identical - thrown along the aim, same speed, same arc, stopped
+    /// by the same walls - and only the last instant differs. Two structs would
+    /// have meant two copies of the flight code drifting apart, and the flight is
+    /// the part with the interesting bugs in it.
+    enum Kind {
+        /// Takes a piece of the map with it.
+        case blast
+        /// Leaves a cloud of gas standing where it landed.
+        case stink
+    }
+
     let id: BombID
+    let kind: Kind
     /// Who threw it. Kept so a raider is not caught in its own blast.
     let owner: ActorID
     let team: TeamID

@@ -103,6 +103,12 @@ enum RenderPalette {
         rarities[min(rarity.rawValue, rarities.count - 1)]
     }
 
+    /// Stink gas. A sickly yellow-green rather than a clean one, because the map
+    /// is already made of clean greens - a cloud in the same family as the grass
+    /// would read as terrain, and this has to read as something you do not walk
+    /// into.
+    static let gas = rgb(0xA8, 0xD8, 0x3A)
+
     /// The colour of yes, and the colour of no, for anything you press.
     ///
     /// One pair, used by the sell button, the shop's price pills and the buy

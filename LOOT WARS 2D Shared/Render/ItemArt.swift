@@ -65,6 +65,7 @@ enum ItemArt {
         case .bandage: return "Bandage"
         case .medkit:  return "Medkit"
         case .bomb:    return "Bomb"
+        case .stink:   return "Stink Bomb"
         case .chest:   return "Chest"
         case .arcade:  return "Arcade"
         case .helmet:  return "Helmet"
@@ -77,6 +78,7 @@ enum ItemArt {
         case .item(.bandage):    return "Bandage"
         case .item(.medkit):     return "Medkit"
         case .item(.bomb):       return "Bomb"
+        case .item(.stink):      return "StinkBomb"
         case .item(.chest):      return "Chest"
         case .item(.arcade):     return "Arcade"
         case .item(.helmet(let tier)):  return tier.name

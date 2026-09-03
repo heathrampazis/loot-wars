@@ -31,6 +31,14 @@ enum WorldEvent {
     /// A bomb went off here.
     case blast(at: Vec2)
 
+    /// A stink bomb went off here, and there is now gas standing in it.
+    ///
+    /// Announced rather than noticed, unlike the cloud itself: the cloud IS state
+    /// and the renderer draws it from the world every frame. What cannot be seen in
+    /// the state is the moment it arrived, and a cloud that fades up out of nothing
+    /// looks like fog rolling in where one that bursts looks like something landed.
+    case gas(at: Vec2)
+
     /// Somebody bought something.
     case purchase(ItemType, by: ActorID)
 
