@@ -834,7 +834,7 @@ final class World {
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
                      .placeChest, .placeArcade, .storeItem, .takeItem,
-                     .dropItem, .buyItem:
+                     .dropItem, .buyItem, .sellItem:
                     break   // other systems' business, not movement's
                 }
             }
