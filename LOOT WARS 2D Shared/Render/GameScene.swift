@@ -123,6 +123,9 @@ final class GameScene: SKScene {
     private var dropHintsLeft = 2
     private var hasDropped = false
 
+    /// Who killed you, while you are waiting to come back - see aimCamera.
+    private var killedBy: ActorID?
+
     /// Whether the player was already standing on something they could not take.
     ///
     /// The hint fires on the EDGE - the step onto the item - rather than the whole
@@ -537,9 +540,7 @@ final class GameScene: SKScene {
         gasRenderer.sync(with: world, dt: frameDelta)
         effectsRenderer.sync(with: world)
         dispatch(world.takeEvents(), in: world)
-        if let player = world.localPlayer {
-            cameraController.follow(player.position)
-        }
+        aimCamera(in: world)
     }
 
     /// Offers the one thing worth offering, and waves at the shop button.
@@ -610,6 +611,35 @@ final class GameScene: SKScene {
         hint.show("HOLD AN ITEM TO DROP IT")
     }
 
+    /// Points the camera at whoever it should be watching.
+    ///
+    /// You while you are alive, and while you are dead, whoever killed you - which
+    /// is the only interesting thing on the map at that moment and is usually what
+    /// you most want to see. It answers the question every death asks and none of
+    /// them used to: where did that come from.
+    ///
+    /// Falls back to your own body if the killer is gone by the time you look. They
+    /// can be killed themselves inside your three second wait, and a camera that
+    /// insisted on following a corpse would spend the rest of it watching an empty
+    /// patch of grass.
+    private func aimCamera(in world: World) {
+        guard let player = world.localPlayer else { return }
+
+        if player.isAlive { killedBy = nil }
+
+        if !player.isAlive,
+           let id = killedBy,
+           let killer = world.actors[id],
+           killer.isAlive {
+            cameraController.follow(killer.position, subject: id, dt: frameDelta)
+            return
+        }
+
+        cameraController.follow(player.position,
+                                subject: world.localPlayerID,
+                                dt: frameDelta)
+    }
+
     /// Takes everything the world announced this frame and hands it to whoever
     /// draws it.
     ///
@@ -643,7 +673,13 @@ final class GameScene: SKScene {
                     flyingTo: shopPanel.convert(.zero, from: hotbar)
                 )
 
-            case .kill(_, let killer, let position, let points, _):
+            case .kill(let victim, let killer, let position, let points, _):
+                // Remembered so the camera can go and watch them - see aimCamera.
+                // Taken from the EVENT rather than worked out later, because by the
+                // time anything is drawn the body has been stripped and moved home,
+                // and nothing left in the world says who did it.
+                if victim == world.localPlayerID { killedBy = killer }
+
                 effectsRenderer.mark(killAt: position,
                                      points: points,
                                      mine: killer == world.localPlayerID)
