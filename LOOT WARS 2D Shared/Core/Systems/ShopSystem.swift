@@ -131,14 +131,20 @@ enum ShopSystem {
     /// that appears unasked has to be answerable at a glance, and three choices is
     /// a shop, which is what the shop is for.
     ///
-    /// Patching up comes first when you are hurt, because a bandage you can afford
-    /// while bleeding is worth more than a rung you could climb later. Otherwise it
-    /// is the cheaper of the two gear offers - the same rule the bots buy on, so
-    /// the prompt is never suggesting something a bot would consider a mistake.
+    /// It is a gear prompt that yields to an emergency, rather than a shop that
+    /// happens to sell gear. The ladder is what people forget to spend on and what
+    /// decides fights, so it is the default answer; patching up takes over only
+    /// when you are down past half a bar, where a bandage you can afford beats a
+    /// rung you would have to survive to enjoy.
+    ///
+    /// The gear offer is the cheaper of the two rungs - the same rule the bots buy
+    /// on, so the prompt never suggests something a bot would call a mistake.
     static func quickOffer(for actor: Actor, in world: World) -> GameConfig.Shop.Item? {
         guard actor.isAlive else { return nil }
 
-        if actor.health < actor.maxHealth {
+        // Only when it is actually going badly - see GameConfig.Shop.quickHealBelow
+        // for why a scratch is not enough to spend this prompt on.
+        if Double(actor.health) < Double(actor.maxHealth) * GameConfig.Shop.quickHealBelow {
             let healing = GameConfig.Shop.tabs
                 .flatMap { tab -> [GameConfig.Shop.Item] in
                     if case .shelf(let items) = tab.stock { return items }

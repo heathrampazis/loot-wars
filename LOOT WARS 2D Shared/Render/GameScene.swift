@@ -385,12 +385,17 @@ final class GameScene: SKScene {
         let hotbarTop = hotbar.position.y + HotbarNode.size.height / 2
         chestPanel.position = CGPoint(x: 0, y: (hudBottom + hotbarTop) / 2)
 
-        // Sat on the hotbar, centred, where a thumb already is. It lands inside the
-        // move stick's grab circle on a small phone, which is why touchesBegan
-        // offers it BEFORE the stick - the same trade the item button makes, and
-        // for the same reason: a small target that is only up for six seconds
-        // beats a large forgiving one that is always there.
-        quickBuy.position = CGPoint(x: 0, y: hotbarTop + 14 + QuickBuyNode.size.height / 2)
+        // Hung under the health panel, left edges flush with it. It is a reading
+        // of your purse as much as an offer, so it belongs with the other numbers
+        // about you rather than out among the controls - and the top-left corner is
+        // where the eye already goes for those.
+        //
+        // Still offered to a finger BEFORE the move stick in touchesBegan: on a
+        // phone this small the stick's grab circle reaches most of the left-hand
+        // side, and the stick gets first refusal on everything it covers.
+        quickBuy.position = CGPoint(
+            x: hud.position.x + QuickBuyNode.size.width / 2,
+            y: hudBottom - 10 - QuickBuyNode.size.height / 2)
     }
 
     // MARK: - Loop
@@ -739,10 +744,11 @@ extension GameScene {
 
         for touch in touches {
             // BEFORE the move stick, which otherwise swallows it: the prompt sits
-            // on the hotbar, and on a small phone that is inside the stick's grab
-            // circle. Same trade the item button makes against the aim stick - a
-            // small target that is only there for a few seconds beats a large
-            // forgiving one that is always there, and the stick loses nothing.
+            // under the health panel, and on a small phone the stick's grab circle
+            // reaches that far up the left-hand side. Same trade the item button
+            // makes against the aim stick - a small target that is only there for a
+            // few seconds beats a large forgiving one that is always there, and the
+            // stick loses nothing it needs.
             if quickBuy.isPressed(atLocalPoint: touch.location(in: quickBuy)),
                let type = quickBuy.offer {
                 if let player = world.localPlayer,

@@ -201,6 +201,24 @@ enum GameConfig {
         /// How long the quick-buy prompt stays up before getting out of the way.
         static let quickBuySeconds: Double = 6
 
+        /// How hurt you have to be before the prompt offers a bandage instead of a
+        /// rung of the ladder.
+        ///
+        /// Half a bar, not a scratch. The prompt exists to push the LADDER - that
+        /// is the thing people forget to spend on, and the thing that decides
+        /// fights - and offering a bandage the moment anybody grazes you would
+        /// spend the prompt's whole budget of attention on the one purchase you
+        /// were always going to remember to make while bleeding.
+        static let quickHealBelow: Double = 0.5
+
+        /// How long before an offer you ignored is put in front of you again.
+        ///
+        /// It comes BACK, and that is the point. An upgrade you cannot afford yet
+        /// is announced once and forgotten; one you have been able to afford for
+        /// half a minute is one you have not noticed, and noticing is the entire
+        /// job of this prompt.
+        static let quickBuyReappear: Double = 20
+
         /// How often the shop button nudges itself while you can afford something
         /// and have not been in. Long enough not to nag.
         static let nudgeInterval: Double = 14

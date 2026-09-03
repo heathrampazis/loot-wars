@@ -9,10 +9,12 @@
 //  mid-fight, or one token past a rung you have been saving for and not noticing.
 //  This is the shop coming to you for those moments, and only those.
 //
-//  ONE offer, never a menu. A prompt that appears while you are being shot at has
-//  to be answerable without reading, and the moment it needs comparing it has
-//  become a shop - which is what the shop is for. Which offer is Core's answer, not
-//  this file's: see ShopSystem.quickOffer.
+//  ONE offer, never a menu, and no words on it: the picture and the price. A
+//  prompt that appears while you are being shot at has to be answerable without
+//  READING, and a name is the part of a card you skip anyway when you already know
+//  what a bandage looks like. The moment it needs comparing it has become a shop -
+//  which is what the shop is for. Which offer is Core's answer, not this file's:
+//  see ShopSystem.quickOffer.
 //
 //  It also shows itself only on a CHANGE. Left to appear whenever something was
 //  affordable it would be permanently on screen, which is the same mistake the
@@ -24,13 +26,12 @@ import SpriteKit
 
 final class QuickBuyNode: SKNode {
 
-    static let size = CGSize(width: 186, height: 46)
+    /// Small, because it lives under the health panel rather than across the
+    /// bottom of the screen, and because a picture and a number is all it holds.
+    static let size = CGSize(width: 104, height: 44)
 
     private let plate = SKShapeNode()
     private let icon = SKSpriteNode()
-    /// Called `title` rather than `name`: SKNode already has a `name`, and it is a
-    /// String - a stored property of a different type cannot share the spelling.
-    private let title = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let token = SKSpriteNode()
 
@@ -65,27 +66,20 @@ final class QuickBuyNode: SKNode {
         plate.lineWidth = 2
         addChild(plate)
 
-        icon.position = CGPoint(x: -box.width / 2 + 28, y: 0)
+        icon.position = CGPoint(x: -box.width / 2 + 26, y: 0)
         icon.zPosition = 1
         addChild(icon)
 
-        title.fontSize = 15
-        title.fontColor = .white
-        title.horizontalAlignmentMode = .left
-        title.verticalAlignmentMode = .center
-        title.position = CGPoint(x: -box.width / 2 + 52, y: 0)
-        addChild(title)
-
-        price.fontSize = 16
+        price.fontSize = 17
         price.fontColor = .white
         price.horizontalAlignmentMode = .right
         price.verticalAlignmentMode = .center
-        price.position = CGPoint(x: box.width / 2 - 32, y: 0)
+        price.position = CGPoint(x: box.width / 2 - 30, y: 0)
         addChild(price)
 
         token.texture = ItemArt.texture(for: .token(1))
         token.size = ItemArt.size(of: ItemArt.texture(for: .token(1)), fittingInto: 20)
-        token.position = CGPoint(x: box.width / 2 - 18, y: 0)
+        token.position = CGPoint(x: box.width / 2 - 16, y: 0)
         addChild(token)
     }
 
@@ -149,8 +143,7 @@ final class QuickBuyNode: SKNode {
 
         let texture = ItemArt.texture(for: item.type)
         icon.texture = texture
-        icon.size = ItemArt.size(of: texture, fittingInto: 30)
-        title.text = ItemArt.name(for: item.type)
+        icon.size = ItemArt.size(of: texture, fittingInto: 34)
         price.text = "\(item.price)"
 
         removeAction(forKey: "life")
@@ -165,7 +158,14 @@ final class QuickBuyNode: SKNode {
             .wait(forDuration: GameConfig.Shop.quickBuySeconds),
             .run { [weak self] in self?.live = false },
             .fadeOut(withDuration: 0.25),
-            .hide()
+            .hide(),
+
+            // And then it is forgotten, so the same offer counts as new again and
+            // is put back in front of you. An upgrade you have been able to afford
+            // for half a minute is one you have not noticed - see
+            // GameConfig.Shop.quickBuyReappear.
+            .wait(forDuration: GameConfig.Shop.quickBuyReappear),
+            .run { [weak self] in self?.offer = nil }
         ]), withKey: "life")
     }
 
