@@ -79,12 +79,25 @@ enum ItemType: Hashable {
         return nil
     }
 
-    /// Whether this is drawn with an enchanted sheen on it.
+    /// Whether this is drawn with an enchanted sheen and sparkles on it.
+    ///
+    /// Every power-up, and everything from Epic up.
     ///
     /// A property of the ITEM rather than a list kept in the renderer, so the
     /// hotbar, the chest, the ground and the shop all agree without being told -
-    /// and so the second perk gets its shimmer by existing.
-    var isEnchanted: Bool { perk != nil }
+    /// and so the next perk gets its shimmer by existing.
+    ///
+    /// The sparkles began as the mark of a PERK, which made them a mark of kind -
+    /// and then a violet helmet and a violet potion sat side by side in a hotbar
+    /// saying two different things in the same colour. Reading them as a mark of
+    /// how good a thing is fixes that and costs nothing: a rarity glow tells you a
+    /// helmet is Epic if you have already learned what six colours mean, while
+    /// something that twinkles says it is one of the best things in the game before
+    /// you have learned anything at all.
+    ///
+    /// Epic and above precisely because most things are not. If a bandage
+    /// twinkled, nothing would.
+    var isEnchanted: Bool { perk != nil || rarity >= .epic }
 
     /// Share of maximum health restored when used.
     var healFraction: Double {

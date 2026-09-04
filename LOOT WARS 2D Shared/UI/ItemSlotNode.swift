@@ -292,7 +292,7 @@ final class ItemSlotNode: SKNode {
         enchant.isHidden = !stack.type.isEnchanted
         enchant.alpha = dimmed ? 0.4 : 1.0
 
-        if let perk = stack.type.perk { enchant.tint(for: perk) }
+        if stack.type.isEnchanted { enchant.tint(for: stack.type) }
 
         // A badge on a single item is noise - it only earns its place once there
         // is more than one.

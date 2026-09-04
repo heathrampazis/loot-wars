@@ -143,9 +143,13 @@ final class GroundItemRenderer {
 
         // The same sheen the hotbar puts on it, so a power-up is recognisable
         // lying under a tree before you have ever picked one up.
-        if case .item(let type) = item.pickup, let perk = type.perk {
+        // Power-ups and everything from Epic up - see ItemType.isEnchanted. On the
+        // grass this is what makes a Cosmic helmet read as treasure from across a
+        // base, rather than as the same shape with a different coloured puddle
+        // under it.
+        if case .item(let type) = item.pickup, type.isEnchanted {
             let enchant = EnchantArt.overlay(box: box * 1.15)
-            enchant.tint(for: perk)
+            enchant.tint(for: type)
             sprite.addChild(enchant)
         }
 

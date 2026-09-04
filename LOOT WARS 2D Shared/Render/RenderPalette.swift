@@ -94,8 +94,14 @@ enum RenderPalette {
         // up and not think about again.
         rgb(0x8E, 0xC2, 0x76),   // uncommon - sage
         rgb(0x46, 0xB1, 0xFF),   // rare - blue
-        rgb(0xB9, 0x6B, 0xFF),   // epic - purple
-        rgb(0xFF, 0x9C, 0x2B),   // legendary - orange
+        rgb(0xB9, 0x6B, 0xFF),   // epic - light violet
+        // Legendary was orange, and orange is the one hue this map cannot hold: the
+        // grass is warm green, the tokens are gold and a blast is pink-white, so an
+        // orange pool under an item sat in the middle of colours it half matched.
+        // A deep violet has the ladder climbing INTO its own colour - epic is the
+        // pale version of it - and it is the only strong shade the map has not
+        // already spent.
+        rgb(0x7A, 0x2B, 0xD1),   // legendary - deep violet
         rgb(0xFF, 0xD6, 0x3A)    // mythical - gold
     ]
 

@@ -146,4 +146,19 @@ final class EnchantNode: SKNode {
     func tint(for perk: Perk) {
         sheen?.color = RenderPalette.colours(of: perk).bright
     }
+
+    /// Whatever the item's own colour is: a power-up's is the power it holds, and
+    /// everything else's is its rarity.
+    ///
+    /// The one place that choice is made, so a Cosmic blaster in a hotbar, the same
+    /// blaster lying on the grass and the same blaster on a shop card cannot end up
+    /// glowing three different colours.
+    func tint(for type: ItemType) {
+        if let perk = type.perk {
+            tint(for: perk)
+            return
+        }
+
+        sheen?.color = RenderPalette.colour(of: type.rarity)
+    }
 }
