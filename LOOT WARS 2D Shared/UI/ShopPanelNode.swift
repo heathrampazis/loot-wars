@@ -446,7 +446,13 @@ final class ShopPanelNode: SKNode {
         // centred on the button rather than pushed to its ends, which at this width
         // is the difference between one price and two things sharing a capsule.
         price.fontSize = 18
-        price.fontColor = .white
+
+        // Near-black on the colour rather than white on it. White on this green is
+        // a contrast of about 1.5 to 1 - legible at a glance and no more - while
+        // black on it is fourteen, and black is what this game's artwork is drawn
+        // with anyway: every sprite on the screen has a black line round it, so a
+        // black number belongs to the same set of pictures.
+        price.fontColor = SKColor(white: 0.06, alpha: 1)
         price.horizontalAlignmentMode = .right
         price.verticalAlignmentMode = .center
         price.position = CGPoint(x: pillCentre.x - 4, y: pillCentre.y)
@@ -568,7 +574,48 @@ final class ShopPanelNode: SKNode {
 
     // MARK: - Answering a tap
 
-    /// The sale was refused: shake the card that was pressed.
+    /// The card that was pressed shakes, and washes over in a colour.
+    ///
+    /// ONE movement for both answers, and the colour is what tells them apart. That
+    /// is deliberate rather than lazy: what the shake says is "your tap landed on
+    /// THIS card", which is equally true of a yes and a no, and the eye reads a
+    /// wash of green or red faster than it reads any difference between two
+    /// wobbles. Two motions meant learning two motions.
+    ///
+    /// A wobble rather than a slide, and that is not a stylistic choice. The redraw
+    /// owns card POSITION - it is what puts a card in its place - so a moveBy
+    /// interrupted by a redraw would fight it and could leave the card parked where
+    /// it used to be. Rotation and scale are nobody else's, so an interrupted
+    /// wobble can only ever end where it started.
+    private func shake(_ card: Card, washedIn colour: SKColor, strength: CGFloat) {
+        card.holder.removeAction(forKey: "bought")
+        card.holder.setScale(1)
+        card.holder.zRotation = 0
+
+        card.holder.run(
+            .sequence([
+                .group([
+                    .rotate(toAngle: -0.055, duration: 0.05),
+                    .scale(to: 0.95, duration: 0.05)
+                ]),
+                .rotate(toAngle: 0.055, duration: 0.09),
+                .rotate(toAngle: -0.035, duration: 0.07),
+                .group([
+                    .rotate(toAngle: 0, duration: 0.06),
+                    .scale(to: 1.0, duration: 0.06)
+                ])
+            ]),
+            withKey: "bought"
+        )
+
+        card.flash.removeAllActions()
+        card.flash.fillColor = colour
+        card.flash.strokeColor = colour
+        card.flash.alpha = strength
+        card.flash.run(.fadeAlpha(to: 0, duration: 0.42))
+    }
+
+    /// The sale was refused: shake the card red.
     ///
     /// The other half of not greying cards out for a full bag. Something has to
     /// answer a tap that cannot go through, and a card that simply sat there would
@@ -579,37 +626,7 @@ final class ShopPanelNode: SKNode {
             return
         }
 
-        let card = cards[index]
-
-        card.holder.removeAction(forKey: "bought")
-        card.holder.setScale(1)
-
-        // A wobble rather than a slide, and that is not a stylistic choice. The
-        // redraw owns card POSITION - it is what puts a card in its place - so a
-        // moveBy interrupted by a redraw would fight it and could leave the card
-        // parked where it used to be. Rotation and scale are nobody else's, so an
-        // interrupted wobble can only ever end where it started.
-        card.holder.run(
-            .sequence([
-                .group([
-                    .rotate(toAngle: -0.05, duration: 0.05),
-                    .scale(to: 0.95, duration: 0.05)
-                ]),
-                .rotate(toAngle: 0.05, duration: 0.09),
-                .group([
-                    .rotate(toAngle: 0, duration: 0.05),
-                    .scale(to: 1.0, duration: 0.05)
-                ])
-            ]),
-            withKey: "bought"
-        )
-
-        card.flash.removeAllActions()
-        card.flash.fillColor = RenderPalette.placementBlocked
-        card.flash.strokeColor = RenderPalette.placementBlocked
-        card.flash.alpha = 0.38
-        card.flash.run(.fadeAlpha(to: 0, duration: 0.35))
-
+        shake(cards[index], washedIn: RenderPalette.placementBlocked, strength: 0.38)
         lastPressed = nil
     }
 
@@ -633,30 +650,10 @@ final class ShopPanelNode: SKNode {
         deliver(card, to: destination)
         pulse(card)
 
-        card.holder.removeAction(forKey: "bought")
-        card.holder.setScale(1)
-        card.holder.zRotation = 0
-
-        // Pressed, then sprung. The refusal wobbles side to side - a head shaking -
-        // so the yes had to be a motion nothing about a no resembles, and down-then-
-        // up is the one a button makes when it actually goes in. Both live on scale
-        // and rotation for the same reason: the redraw owns card POSITION, so an
-        // animation that moved the card could be interrupted and leave it parked
-        // somewhere the layout did not put it.
-        card.holder.run(
-            .sequence([
-                .scale(to: 0.93, duration: 0.06),
-                .scale(to: 1.11, duration: 0.09),
-                .scale(to: 1.0, duration: 0.13)
-            ]),
-            withKey: "bought"
-        )
-
-        card.flash.removeAllActions()
-        card.flash.fillColor = RenderPalette.placementValid
-        card.flash.strokeColor = RenderPalette.placementValid
-        card.flash.alpha = 0.5
-        card.flash.run(.fadeAlpha(to: 0, duration: 0.4))
+        // The same shake the refusal uses, washed green instead of red - and
+        // harder, because this is the good one. A purchase is the thing you came
+        // to the shop to do and it used to be the quieter of the two answers.
+        shake(card, washedIn: RenderPalette.placementValid, strength: 0.6)
 
         lastPressed = nil
     }
