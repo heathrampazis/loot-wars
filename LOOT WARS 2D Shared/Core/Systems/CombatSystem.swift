@@ -232,8 +232,23 @@ enum CombatSystem {
                 drop(.item(stack.type), chance: GameConfig.Drops.healingChance,
                      at: actor.position, in: world)
 
-            case .bomb, .stink, .chest, .arcade:
-                break
+            // Bombs and gas, on slightly worse odds than healing. A raider killed
+            // on your doorstep used to take their bomb with them into nothing,
+            // which made winning that fight strangely empty - they had crossed a
+            // map to break your wall open and the tool for it simply stopped
+            // existing.
+            case .bomb, .stink:
+                drop(.item(stack.type), chance: GameConfig.Drops.suppliesChance,
+                     at: actor.position, in: world)
+
+            // And what they were carrying to put down. Rare, because a machine in a
+            // bag is the most valuable object on the map - but never is worse than
+            // rare: killing somebody carrying one and watching it evaporate is the
+            // game deleting the best thing anybody has found all match.
+            case .chest, .arcade:
+                drop(.item(stack.type),
+                     chance: GameConfig.Drops.carriedStructureChance,
+                     at: actor.position, in: world)
             }
         }
 

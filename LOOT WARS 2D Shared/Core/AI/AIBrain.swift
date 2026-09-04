@@ -394,6 +394,25 @@ enum AIBrain {
             return .build(wall)
         }
 
+        // Gear on the grass that beats what it is holding.
+        //
+        // High in the list, and it belongs here for the reason the raid urge does:
+        // the problem was never that a bot did not WANT the better blaster, it was
+        // that collecting sits at the bottom of this list behind building, raiding
+        // and errands, so by the time the question came round it had committed to
+        // something else and the drop had expired. Gear decides fights, a fight
+        // decides a chunk of the scoreboard, and a rung lying eight tiles away is
+        // the cheapest one anybody will ever get.
+        //
+        // Only a genuine upgrade - Actor.wantsFromGround is the same test that
+        // decides whether walking over it would pick it up, so a bot can never set
+        // off for something it would then decline - and only within arm's reach of
+        // its own route. Below fighting, because a blaster is no use to a corpse.
+        if state.lootCooldown <= 0,
+           let upgrade = upgradeWorthTheDetour(for: actor, in: world) {
+            return .collect(upgrade.id)
+        }
+
         // The raid urge, and this is the highest anything voluntary sits.
         //
         // Above the build commitment on purpose - see AIState.raidUrgeTimer. Every
@@ -523,6 +542,29 @@ enum AIBrain {
         }
 
         return .wander
+    }
+
+    /// A rung of gear, or a power-up, lying close enough to be worth the detour.
+    ///
+    /// Deliberately narrower than nearestItem: healing and tokens are not worth
+    /// interrupting a build or a raid for, and they already have their own places
+    /// in the list - the emergency supply check above and the general collect below.
+    /// This is only for the things that change what happens the next time somebody
+    /// shoots at this bot.
+    private static func upgradeWorthTheDetour(for actor: Actor,
+                                              in world: World) -> GroundItem? {
+        let candidate = nearestItem(to: actor, in: world, include: { pickup in
+            switch pickup {
+            case .item(.helmet), .item(.blaster), .item(.perk): return true
+            case .item, .token: return false
+            }
+        })
+
+        guard let candidate,
+              (candidate.position - actor.position).length
+                  <= GameConfig.AI.upgradeSearchRange else { return nil }
+
+        return candidate
     }
 
     /// The nearest thing on the ground this bot would actually pick up.

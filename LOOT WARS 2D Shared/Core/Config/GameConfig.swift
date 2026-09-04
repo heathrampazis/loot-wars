@@ -834,6 +834,22 @@ enum GameConfig {
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26
 
+        /// How far a bot will break off what it is doing for a piece of gear on the
+        /// ground that beats what it is holding.
+        ///
+        /// Shorter than lootSearchRange, and that is the point: this is not "go
+        /// looting", it is "do not walk past that". A bot deciding what to do next
+        /// weighs gear against building, raiding and everything else, and by the
+        /// time the question reaches the bottom of the list where collecting lives,
+        /// it has usually already committed to an armful of walls - so a Blaster 5
+        /// lying eight tiles away would sit there until it expired.
+        ///
+        /// Fourteen tiles is about three seconds of walking, against a drop that
+        /// lies on the grass for ten. Far enough to catch anything a bot could
+        /// plausibly have seen, short enough that nobody crosses a map for it and
+        /// arrives to find it gone.
+        static let upgradeSearchRange: Double = 14
+
         /// Carrying less healing than this - at most one bandage - a bot drops what
         /// it is doing and goes shopping.
         ///
@@ -1100,6 +1116,30 @@ enum GameConfig {
         /// fight, and before this you always walked away poorer than you arrived,
         /// however well you shot.
         static let healingChance = 0.5
+
+        /// The odds that one bomb, or one stink bomb, comes off a body.
+        ///
+        /// Supplies rather than gear, so the same "one item, not the stack" rule
+        /// applies. A bomb was the one thing a kill never yielded, which made
+        /// killing a raider on your own doorstep oddly hollow: they had walked
+        /// across the map to break your wall open, and the tool they were going to
+        /// do it with evaporated with them.
+        ///
+        /// Slightly under healing, because a bomb is worth more than a bandage and
+        /// this is the supply line for raiding: at a half you could keep yourself
+        /// in bombs by winning fights, which would make the shop's bomb price - and
+        /// the crate rows that ration them - decoration.
+        static let suppliesChance = 0.4
+
+        /// The odds that a chest or a machine somebody was carrying survives them.
+        ///
+        /// Lower again, and the lowest of the three on purpose: a machine in a bag
+        /// is the most valuable object in the game and there are one or two on the
+        /// whole map. Finding one on a body should be a story somebody tells, not a
+        /// thing that happens on a Tuesday - but it has to be POSSIBLE, because
+        /// killing somebody who is carrying one and watching it vanish is the game
+        /// quietly deleting the best thing on the map.
+        static let carriedStructureChance = 0.25
 
         /// How far a drop is flung from where its owner fell, in tiles. Enough that
         /// a helmet and a blaster from the same kill land side by side instead of
