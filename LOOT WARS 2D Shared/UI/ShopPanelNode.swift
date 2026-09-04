@@ -19,9 +19,13 @@
 //  play: hold an item and it turns into tokens. So the shop is exactly one thing,
 //  and while it is open nothing else is on screen competing to be read.
 //
-//  Cards are laid out in a grid rather than a row, and centred by ROW, so a player
-//  wearing the best helmet in the game gets three cards arranged deliberately
-//  rather than a hole where the fourth was.
+//  Cards are laid out in ONE ROW, which is how a shelf is read: everything the shop
+//  sells is in your eye at once, at the same size, and choosing is a glance along a
+//  line rather than a scan around a block. The layout is still written as a grid -
+//  as many columns as there are things to sell - so a fifth item would start a
+//  second row rather than run off the side of a phone, and each row is centred on
+//  its own, which is what gives a player who has topped out a ladder three
+//  deliberate cards instead of a hole where the fourth was.
 //
 //  Exactly one thing greys a card out: a machine you already own, which the shop
 //  will not sell you a second of however rich you get. Nothing else does - not the
@@ -38,16 +42,28 @@ final class ShopPanelNode: SKNode {
     // MARK: - Measurements
 
     /// Sized against the smallest phone this runs on - an SE is 568 x 320 in
-    /// landscape - with room to spare now that the bar is not sharing the screen.
-    /// At 440 x 264 the panel sits in the middle of the screen with nearly 30
-    /// points of air above and below it, which is what lets it read as a thing that
-    /// opened ON TOP of the game rather than a drawer wedged between the HUD and
-    /// the bar.
-    private static let cardSize = CGSize(width: 196, height: 88)
+    /// landscape, with no safe-area inset to give away - so a 520-wide panel leaves
+    /// 24 points of margin either side there and a great deal more on everything
+    /// newer. It is the row of four that sets that width, and the width that sets
+    /// how tall a card has to be.
+    ///
+    /// ONE ROW. Four cards side by side is how a shelf is read: everything the shop
+    /// sells is in your eye at once, at the same size, and choosing between them is
+    /// a glance along a line rather than a scan around a block. It costs the cards
+    /// their width - 112 points is not enough to put a picture beside its words, so
+    /// they go back to being portrait, picture over name over price - and that is
+    /// the trade, taken deliberately.
+    private static let cardSize = CGSize(width: 112, height: 146)
     private static let cardGap: CGFloat = 12
     private static let padding: CGFloat = 18
     private static let headerHeight: CGFloat = 40
-    private static let columns = 2
+
+    /// As many columns as there are things to sell, which is what makes it a row.
+    ///
+    /// Written as the grid it still is rather than as a special case: home() lays
+    /// cards out left to right and wraps, so a fifth item added to this shop would
+    /// start a second row on its own instead of running off the side of a phone.
+    private static var columns: Int { max(1, slots) }
 
     /// Every card the shop could ever need at once: both gear rungs plus the shelf.
     private static var slots: Int { GameConfig.Shop.catalogueSize }
@@ -200,14 +216,14 @@ final class ShopPanelNode: SKNode {
         let coin = SKSpriteNode(texture: texture)
 
         coin.size = ItemArt.size(of: texture, fittingInto: 22)
-        coin.position = CGPoint(x: size.width / 2 - 134, y: centreY)
+        coin.position = CGPoint(x: size.width / 2 - 118, y: centreY)
         addChild(coin)
 
         purse.fontSize = 18
         purse.fontColor = .white
         purse.horizontalAlignmentMode = .left
         purse.verticalAlignmentMode = .center
-        purse.position = CGPoint(x: size.width / 2 - 116, y: centreY)
+        purse.position = CGPoint(x: size.width / 2 - 100, y: centreY)
         addChild(purse)
     }
 
@@ -280,12 +296,13 @@ final class ShopPanelNode: SKNode {
         )
     }
 
-    /// A card is read left to right: what it is, then what it costs.
+    /// A card is read top to bottom: what it is, what it is called, what it costs.
     ///
-    /// Landscape rather than the portrait card this replaced, and the shape follows
-    /// from the page. Four cards two-up need to be wide and short, and a wide card
-    /// wants its picture beside its words rather than stacked over them - which
-    /// also happens to be how every price tag anybody has ever read is arranged.
+    /// Portrait, because the row of four leaves it 112 points of width and a
+    /// picture beside its words needs nearly twice that. On a narrow card the
+    /// stack is not a compromise anyway - it is how a shelf label works, and the
+    /// eye running down one card and along to the next is the same motion it makes
+    /// in a shop.
     private func makeCard(at index: Int) -> Card {
         let card = ShopPanelNode.cardSize
         let holder = SKNode()
@@ -319,14 +336,14 @@ final class ShopPanelNode: SKNode {
         flash.zPosition = 5
         holder.addChild(flash)
 
-        // The picture, on its own tile on the left.
-        let tileCentre = CGPoint(x: -card.width / 2 + 42, y: 0)
+        // The picture, on its own tile at the top.
+        let tileCentre = CGPoint(x: 0, y: card.height / 2 - 42)
 
         let tile = SKShapeNode(
             path: CGPath(
-                roundedRect: CGRect(x: -32, y: -32, width: 64, height: 64),
-                cornerWidth: 14,
-                cornerHeight: 14,
+                roundedRect: CGRect(x: -30, y: -30, width: 60, height: 60),
+                cornerWidth: 13,
+                cornerHeight: 13,
                 transform: nil
             )
         )
@@ -337,7 +354,7 @@ final class ShopPanelNode: SKNode {
         holder.addChild(tile)
 
         let glow = SKSpriteNode(texture: GlowArt.pool)
-        glow.size = CGSize(width: 76, height: 76)
+        glow.size = CGSize(width: 72, height: 72)
         glow.colorBlendFactor = 1
         glow.alpha = 0.7
         glow.position = tileCentre
@@ -349,22 +366,18 @@ final class ShopPanelNode: SKNode {
         icon.zPosition = 1
         holder.addChild(icon)
 
-        let textLeft = tileCentre.x + 46
-
         let name = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        name.fontSize = 16
+        name.fontSize = 15
         name.fontColor = .white
-        name.horizontalAlignmentMode = .left
+        name.horizontalAlignmentMode = .center
         name.verticalAlignmentMode = .center
-        name.position = CGPoint(x: textLeft, y: 21)
+        name.position = CGPoint(x: 0, y: -card.height / 2 + 66)
         holder.addChild(name)
 
-        // The price pill: a capsule with the cost and the token you pay it in. It
-        // runs from the text column to the card's right margin, so a card is two
-        // clean columns - picture, then words over price - at every width this is
-        // ever built at.
-        let pillWidth = card.width / 2 - 14 - textLeft
-        let pillCentre = CGPoint(x: textLeft + pillWidth / 2, y: -19)
+        // The price pill: a capsule with the cost and the token you pay it in,
+        // sitting on the bottom margin like a price tag on a shelf edge.
+        let pillWidth = card.width - 24
+        let pillCentre = CGPoint(x: 0, y: -card.height / 2 + 27)
 
         let pill = SKShapeNode(
             path: CGPath(
@@ -389,11 +402,14 @@ final class ShopPanelNode: SKNode {
         pill.lineWidth = 3
         holder.addChild(pill)
 
+        // The coin and the number are CENTRED as a pair rather than pinned to the
+        // ends of the pill: at this width a number pushed to one edge and a coin to
+        // the other reads as two things that happen to share a capsule.
         let tokenTexture = ItemArt.texture(for: Pickup.token(1))
         let token = SKSpriteNode(texture: tokenTexture)
 
         token.size = ItemArt.size(of: tokenTexture, fittingInto: 20)
-        token.position = CGPoint(x: pillCentre.x - pillWidth / 2 + 18, y: pillCentre.y)
+        token.position = CGPoint(x: pillCentre.x - 17, y: pillCentre.y)
         token.zPosition = 1
         holder.addChild(token)
 
@@ -402,7 +418,7 @@ final class ShopPanelNode: SKNode {
         price.fontColor = .white
         price.horizontalAlignmentMode = .left
         price.verticalAlignmentMode = .center
-        price.position = CGPoint(x: token.position.x + 16, y: pillCentre.y)
+        price.position = CGPoint(x: pillCentre.x - 3, y: pillCentre.y)
         price.zPosition = 1
         holder.addChild(price)
 
