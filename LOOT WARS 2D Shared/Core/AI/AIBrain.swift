@@ -1104,22 +1104,18 @@ enum AIBrain {
         // rare crate still carries it home and stands it up - see chestSpotWanted,
         // which prefers a machine over a chest when it happens to be holding both.
 
-        // Then furniture, and before any gear. A bot in a Legendary standing in an
-        // empty base is a bot nobody has any reason to visit - and it is the
-        // visiting that this whole game is built round.
+        // No chest here either, and that is a change worth recording rather than a
+        // gap. Bots used to buy one the moment their wall shut, which is where
+        // most bases got theirs. Then the shop became two cards - gear and healing
+        // - and nothing has sold a chest since, so this branch sat here asking
+        // ShopSystem for a price that no longer exists and quietly answering "no"
+        // every time. Dead code that looks like a feature is worse than no
+        // feature: it is why nobody noticed bases were going empty.
         //
-        // Bought only once the wall is SHUT, which is the timing that makes this
-        // work rather than just spending tokens. A chest cannot be placed in an
-        // open base, so one bought early is carried around for minutes waiting for
-        // the wall, and lost to the first death that happens in the meantime.
-        // Bought at the moment it can be put down, it is put down.
-        if !world.baseIsBreached(actor.team),
-           world.chestCount(ownedBy: actor.team) < GameConfig.AI.chestsWanted,
-           actor.inventory.firstSlot(holding: .chest) == nil,
-           ShopSystem.canBuy(.chest, actor: actor, in: world) {
-            return .chest
-        }
-
+        // Chests come out of crates now, at about one crate in twelve, and a bot
+        // carrying one takes it home - see chestSpotWanted. The other half of
+        // keeping a base worth visiting is that a stripped chest is no longer
+        // destroyed; see ChestSystem.
         return upgradeToBuy(actor: actor, in: world)
     }
 

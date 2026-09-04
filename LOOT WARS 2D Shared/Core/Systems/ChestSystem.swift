@@ -324,30 +324,29 @@ enum ChestSystem {
 
         world.actors[id] = actor
 
-        // Stripped by somebody who does not own it: the chest goes with the
-        // contents.
+        // Stripped bare, and the chest STAYS. This is a reversal, and the reason is
+        // that the rule it replaces stopped making sense when the shop changed.
         //
-        // This is what makes a raid cost the victim something that lasts. Refilling
-        // alone meant a raid was a dent that healed itself - annoying, then gone.
-        // Losing the chest means finding another one and standing it up again, and
-        // since a chest cannot be placed until the wall is shut, it means fixing
-        // the hole first. One raid therefore costs a repair AND a replacement.
+        // Destroying an emptied chest was there to make a raid cost the victim
+        // something lasting: find another one, wait for the wall to shut, stand it
+        // up again. That worked while a chest was fourteen tokens away - the shop
+        // sold them, and a robbed bot bought a replacement on its next trip home.
+        // The shop is two cards of gear and healing now. Nothing sells chests, so
+        // "find another one" means opening crates until one turns up, which for a
+        // bot is minutes, and the result was a map of bases with nothing in them:
+        // one raid each, permanently stripped, and no reason for anybody to visit
+        // any of them again. A game about breaking into places had run out of
+        // places worth breaking into.
         //
-        // Emptied rather than touched: a chest that vanished on the first item
-        // taken would hand a raider one bandage for a bomb, a breach and the walk.
-        // And taking your OWN things out is not a raid, so this never fires on the
-        // owner - otherwise nobody could ever use a chest for what it is for.
-        let emptied = chest.contents.slots.allSatisfy { $0 == nil }
-
-        if emptied, chest.owner != actor.team {
-            world.removeChest(chestID)
-            return
-        }
-
-        // Survived, with less in it. The clock starts again rather than carrying
-        // on from wherever it had got to, so a partial raid always costs a full
-        // wait - but it is the SHORTER wait, because a base that has just been
-        // robbed should be worth calling on again before the whistle.
+        // An empty chest that refills is the better trade in both directions. The
+        // victim still loses everything in it and the wait to get it back; the
+        // raider still gets the whole haul, and gets a reason to come back later.
+        // What nobody gets is a base that is finished for the rest of the match.
+        //
+        // The clock starts again rather than carrying on from wherever it had got
+        // to, so a raid always costs a full wait - but it is the SHORTER wait,
+        // because a base that has just been robbed should be worth calling on again
+        // before the whistle.
         chest.restockTimer = GameConfig.Chest.restockAfterRaid
         world.chests[chestID] = chest
     }

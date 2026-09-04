@@ -83,7 +83,7 @@ enum LootTable {
             (.item(.medkit),  22),
             (.item(.bomb),    82),
             (.item(.stink),   18),
-            (.item(.chest),   26),
+            (.item(.chest),   34),
 
             (.item(.helmet(.common)),    26),
             (.item(.helmet(.uncommon)),  18),
@@ -96,7 +96,7 @@ enum LootTable {
             (.item(.medkit),  24),
             (.item(.bomb),    70),
             (.item(.stink),   16),
-            (.item(.chest),   26),
+            (.item(.chest),   34),
 
             // The Common and the Blaster 2 are gone: by now everybody has better,
             // so those rows were rolls that produced nothing.
@@ -110,7 +110,7 @@ enum LootTable {
             (.item(.medkit),  34),
             (.item(.bomb),    52),
             (.item(.stink),   14),
-            (.item(.chest),   22),
+            (.item(.chest),   28),
 
             (.item(.helmet(.rare)),      20),
             (.item(.helmet(.epic)),      10),

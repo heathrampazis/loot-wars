@@ -784,13 +784,17 @@ enum GameConfig {
         ///
         /// How many chests a bot wants standing in its base.
         ///
-        /// Bots buy these now, and the measurement is why. Left to the crates, a
-        /// chest is one drop in eleven and has to survive a full bag, every death
-        /// between finding it and the wall closing, and the wall closing at all -
-        /// modelled over 200,000 matches that put a chest in a base 42% of the
-        /// time and left 58% of bases with NOTHING in them to raid. A base worth
-        /// breaking into is the entire reason bases exist, so it cannot be left to
-        /// a one-in-eleven drop.
+        /// Bots no longer BUY these - the shop stopped selling them when it became
+        /// two cards - so they come out of crates, which is what the measurement
+        /// behind this number was originally warning about: at one drop in eleven,
+        /// surviving a full bag and every death between finding it and the wall
+        /// closing, 200,000 simulated matches left 58% of bases with nothing in
+        /// them to raid.
+        ///
+        /// Two things carry it now instead of a purchase. The chest row in the
+        /// crate tables is heavier, and a stripped chest is no longer destroyed -
+        /// so a base needs to get lucky ONCE rather than once per raid, which is a
+        /// completely different bet.
         ///
         /// Two, not more. A base is a place worth two visits; a base with five
         /// chests in it is a warehouse, and raiding stops being a raid.
@@ -1261,28 +1265,37 @@ enum GameConfig {
 
         /// How heavily a machine sits in a rare crate's table.
         ///
-        /// Against a rare table that totals around 180, this is roughly one rare
-        /// crate in six - and rare crates are one in ten, so a match turns up one
-        /// or two machines between everybody. Still scarce: it is the most valuable
-        /// thing anybody can own and it used to be a purchase. What changed is WHEN
-        /// - at the old rate the first machine tended to arrive around the point
-        /// the match was already decided, and a token economy that starts in the
-        /// last ninety seconds is one nobody plays.
-        static let rareArcadeWeight = 32
+        /// Better than one rare crate in four now, with rare crates at one in eight
+        /// - so a match turns up three or four machines between eight teams, where
+        /// it used to turn up one.
+        ///
+        /// This has been raised twice and the reasoning changed the second time.
+        /// Scarcity was originally the point: the most valuable thing anybody can
+        /// own, one or two on the map, a story when you found one. What playing it
+        /// showed is that a machine is not really a PRIZE, it is furniture - it is
+        /// the thing that makes a base worth breaking into, and at one or two a
+        /// match seven bases out of eight had nothing in them but a chest somebody
+        /// had already emptied. Raiding needs somewhere to raid more than machines
+        /// need to be rare.
+        ///
+        /// Four or five is still not one each. Whoever has one has something worth
+        /// defending, everybody else has somewhere worth going, and that gap is the
+        /// part that matters.
+        static let rareArcadeWeight = 90
 
         /// Share of crates on the map that are the good ones.
         ///
-        /// One in ten. At one in six they were everywhere, and a thing you see
+        /// One in eight. At one in six they were everywhere, and a thing you see
         /// constantly is not rare however it is drawn - the glow stopped meaning
-        /// anything within a minute. At one in fourteen, where this sat until now,
-        /// a whole match turned up under one machine between eight players, and the
-        /// economy those machines drive barely started. One in ten keeps the glow
-        /// worth crossing a map for - a map of forty crates holds four - while
-        /// putting a machine or two in play early enough to matter.
+        /// anything within a minute. At one in fourteen, where this began, a whole
+        /// match turned up under one machine between eight players and the economy
+        /// those machines drive never started. One in eight is the closest this can
+        /// sit to "everywhere" while a glowing crate is still worth changing
+        /// direction for: a map of forty holds five.
         ///
         /// Rolled per crate rather than counted out, so no two maps hold the same
         /// number.
-        static let rareShare: Double = 0.10
+        static let rareShare: Double = 0.125
 
         /// How heavily ONE power-up sits in a crate's table, by how far the match
         /// has run.
@@ -1366,7 +1379,13 @@ enum GameConfig {
         /// life rather than be finished for the match - the first item is the one
         /// that makes it worth calling on again, and everything after it can take
         /// its time.
-        static let restockAfterRaid: Double = 16
+        ///
+        /// Eleven rather than sixteen, now that a stripped chest survives instead
+        /// of being destroyed. The two changes are one decision: what makes raiding
+        /// keep happening is bases being worth a second visit, and both the old
+        /// rules pushed the other way - one removed the chest, the other made the
+        /// wait long enough that nobody would have come back for what was in it.
+        static let restockAfterRaid: Double = 11
 
         /// Seconds between a raided bot chest putting one item back.
         ///

@@ -346,6 +346,12 @@ final class World {
         return chest.id
     }
 
+    /// Takes a chest off the map.
+    ///
+    /// Nothing calls this today: a stripped chest stays standing and refills - see
+    /// ChestSystem. It is kept because a chest caught in a blast is the obvious
+    /// next thing to want, and because "how does a chest stop existing" should have
+    /// one answer rather than being reinvented at the call site.
     func removeChest(_ id: ChestID) {
         chests[id] = nil
     }
