@@ -134,6 +134,9 @@ enum LootSystem {
     private static func take(_ pickup: Pickup, by actor: inout Actor, in world: World) -> Bool {
         switch pickup {
         case .item(let type):
+            // Gear you already beat stays on the grass - see Actor.wantsFromGround.
+            guard actor.wantsFromGround(type) else { return false }
+
             // Worn if it beats what is on, bagged if it does not - and that rule
             // lives on the Actor, so walking over a helmet and pulling one out of a
             // chest cannot come to different conclusions.

@@ -206,6 +206,29 @@ struct Actor {
         return inventory.canAccept(type)
     }
 
+    /// Whether this is worth bending down for.
+    ///
+    /// Stricter than canAcquire, and only for things lying on the ground: a helmet
+    /// or a blaster is taken only if it BEATS what you are wearing. Anything at or
+    /// below your own rung is left where it is.
+    ///
+    /// The bag is four slots. Before this, walking across a map after a firefight
+    /// filled it with gear a rung or two under what was already on your head -
+    /// none of it usable, all of it in the way of the medkit you actually wanted,
+    /// and the only cure was throwing things away one at a time. The theory was
+    /// that a spare is insurance against dying and dropping a rung; in practice
+    /// nobody banks a spare, they just carry rubbish.
+    ///
+    /// Chests are deliberately NOT held to this rule. Taking something out of a
+    /// chest is a decision somebody made on purpose, and a raider standing in an
+    /// enemy base looking at a Rare helmet they cannot use may still want it for
+    /// the tokens - see ChestSystem, which asks canAcquire.
+    func wantsFromGround(_ type: ItemType) -> Bool {
+        if case .helmet(let tier) = type { return tier > helmet }
+        if case .blaster(let tier) = type { return tier > blaster }
+        return canAcquire(type)
+    }
+
     /// Takes an item: worn if it beats what is on, bagged if it does not.
     ///
     /// The one place this rule lives. Walking over a helmet, pulling one out of a
@@ -242,7 +265,7 @@ struct Actor {
     func wants(_ pickup: Pickup) -> Bool {
         switch pickup {
         case .item(let type):
-            return canAcquire(type)
+            return wantsFromGround(type)
         case .token:
             // Always. Currency never fills up and never becomes the wrong kind.
             return true

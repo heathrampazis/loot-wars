@@ -20,6 +20,18 @@ final class GroundItemRenderer {
     /// surrounded by treasure.
     private static let tokenWidthInTiles: Double = 0.5
 
+    /// Whether the LOCAL player would pick this up if they walked over it.
+    ///
+    /// The player's own answer, not a general one: what is junk depends entirely on
+    /// what is on your head, so the same helmet is drawn bright for somebody who
+    /// needs it and faint for somebody who does not. Bots are not consulted - this
+    /// is a mark on the screen, and there is only one person reading it.
+    private func wanted(_ item: GroundItem, in world: World) -> Bool {
+        guard let player = world.localPlayer else { return true }
+        guard case .item(let type) = item.pickup else { return true }
+        return player.wantsFromGround(type)
+    }
+
     private static func width(of pickup: Pickup) -> Double {
         if case .token = pickup { return tokenWidthInTiles }
         return widthInTiles
@@ -42,6 +54,19 @@ final class GroundItemRenderer {
                     .fadeAlpha(to: 0.25, duration: 0.22),
                     .fadeAlpha(to: 1.0, duration: 0.22)
                 ])), withKey: "expiring")
+            }
+
+            // Gear you already beat is drawn faint, because you will now walk
+            // straight over it - see Actor.wantsFromGround. Something the game
+            // silently refuses has to LOOK refused, or the player is left thinking
+            // the pickup is broken; a helmet at half strength reads as "not for
+            // you" at a glance and from a distance, which is where the decision to
+            // detour for it is actually made.
+            //
+            // Skipped while it is flashing out: two things fighting over the same
+            // alpha is how a fading item ends up stuck half-visible.
+            if sprite.action(forKey: "expiring") == nil {
+                sprite.alpha = wanted(item, in: world) ? 1.0 : 0.42
             }
         }
 

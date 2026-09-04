@@ -748,8 +748,22 @@ final class GameScene: SKScene {
                 guard seller == world.localPlayerID else { break }
                 hotbar.reward(slot: slot, tokens: tokens)
 
-            case .purchase(_, let buyer):
+            case .purchase(let bought, let buyer):
                 guard buyer == world.localPlayerID else { break }
+
+                // A heal you just bought is a heal you are about to want.
+                //
+                // Buying one and then having to find it in the bar and pick it out
+                // before the button appears is two steps of admin between deciding
+                // to patch yourself up and doing it - and the second step is
+                // invisible, because nothing on screen says the corner button
+                // belongs to whichever slot is selected. Bought while hurt, in a
+                // shop you opened because you are hurt: arm it.
+                if bought.isHealing,
+                   let slot = world.localPlayer?.inventory.slots
+                       .firstIndex(where: { $0?.type == bought }) {
+                    selectedSlot = slot
+                }
 
                 // Where the thing you just bought should appear to land: your own
                 // bar, converted into the panel's coordinates, because the panel is
