@@ -71,7 +71,18 @@ enum CombatSystem {
               actor.isAlive,
               actor.invulnerability <= 0 else { return }
 
-        actor.health -= max(1, amount)
+        // Every source of damage in the game comes through here, which is what
+        // makes resistance one line rather than four. A bullet, a blast and a
+        // lungful of gas are all blunted by the same share, and a perk added later
+        // that halves fire damage would be blunted by it too without anybody
+        // remembering to say so.
+        //
+        // Never below one. A perk that made you immune to something would be a perk
+        // that ends fights by making them unwinnable for the other person.
+        let taken = max(1, Int((Double(max(1, amount))
+                                * actor.damageTakenShare).rounded()))
+
+        actor.health -= taken
         actor.secondsSinceHit = 0
 
         if actor.health <= 0 {

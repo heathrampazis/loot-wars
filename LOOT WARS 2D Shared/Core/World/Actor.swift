@@ -69,6 +69,27 @@ struct Actor {
     /// Counts down to the next thing a running perk does.
     var perkTick: Double = 0
 
+    /// How fast this actor moves, as a share of the standard speed.
+    ///
+    /// The three perks that are not regeneration all work like this - a number
+    /// read at the point of use rather than a system that reaches in and edits
+    /// something. Nothing has to be put back when the perk ends, nothing can be
+    /// applied twice by a system that ran the same frame, and a perk that stops
+    /// existing takes its effect with it in the same instant.
+    var speedMultiplier: Double {
+        perk == .speed ? GameConfig.Perks.speedBoost : 1
+    }
+
+    /// How hard this actor's shots hit, as a share of the blaster's own damage.
+    var damageMultiplier: Double {
+        perk == .strength ? GameConfig.Perks.strengthMultiplier : 1
+    }
+
+    /// The share of incoming damage this actor actually takes.
+    var damageTakenShare: Double {
+        perk == .resistance ? GameConfig.Perks.resistanceShare : 1
+    }
+
     var inventory = Inventory()
 
     /// Currency. Worth nothing yet - the shop is what will give it meaning - but

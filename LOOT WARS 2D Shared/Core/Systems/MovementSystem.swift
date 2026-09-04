@@ -13,7 +13,10 @@ enum MovementSystem {
         for id in Array(world.actors.keys) {
             guard var actor = world.actors[id], actor.isAlive else { continue }
 
-            let step = actor.moveInput.clampedToUnit() * (GameConfig.Player.moveSpeed * dt)
+            // The perk multiplies the standard speed rather than replacing it, so
+            // there is still exactly one number that says how fast anybody walks.
+            let speed = GameConfig.Player.moveSpeed * actor.speedMultiplier
+            let step = actor.moveInput.clampedToUnit() * (speed * dt)
 
             // One axis at a time. Moving both at once and then resolving makes
             // actors snag on the seam between two tiles.

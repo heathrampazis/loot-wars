@@ -65,6 +65,15 @@ enum PerkSystem {
         case .regeneration:
             let portion = Double(actor.maxHealth) * GameConfig.Perks.regenerationPortion
             CombatSystem.heal(id, amount: max(1, Int(portion.rounded())), in: world)
+
+        // Nothing to do on a beat, and that is the shape of them rather than an
+        // omission. Speed, strength and resistance are numbers READ at the point
+        // they matter - by MovementSystem, by WeaponSystem, by CombatSystem - so
+        // they need no system reaching in to apply them and nothing put back when
+        // they end. What this file still does for all four is run the clock, which
+        // is why they are listed here doing nothing rather than left out.
+        case .speed, .strength, .resistance:
+            break
         }
     }
 }

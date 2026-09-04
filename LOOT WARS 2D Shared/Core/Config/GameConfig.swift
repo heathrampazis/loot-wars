@@ -237,11 +237,15 @@ enum GameConfig {
             .chest: 14,
             .arcade: 24,
 
-            // A power-up is not on the shelf either, and never will be - the whole
-            // point of it is that it is found. It gets a notional price anyway so
-            // the shop has an offer to make for one, on the principle two lines
-            // down: nobody decides for the player which of their things are junk.
-            .perk(.regeneration): 18
+            // The four power-ups, at one price. They are never on the shelf - the
+            // whole point of a perk is that it is found - but the shop still makes
+            // an offer for one, because nobody decides for the player which of
+            // their things are junk.
+            .perk(.regeneration): 18,
+            .perk(.speed): 18,
+            .perk(.strength): 18,
+            .perk(.resistance): 18
+
         ]
 
         /// What the shop pays for something you sell back, as a share of its price.
@@ -1130,6 +1134,40 @@ enum GameConfig {
         /// Up from 5.5% over fourteen seconds, which was on the timid side of that
         /// line - it took the edge off a duel without ever deciding one.
         static let regenerationPortion: Double = 0.065
+
+        /// How long the three instant-effect perks run.
+        ///
+        /// Shorter than regeneration, which has to pay out in instalments to be
+        /// what it is. These three are already at full strength the moment they are
+        /// pressed, so their length is simply how much of a fight they cover, and
+        /// twelve seconds is about one.
+        static let speedDuration: Double = 12
+        static let strengthDuration: Double = 12
+        static let resistanceDuration: Double = 12
+
+        /// How much faster you move on a speed perk.
+        ///
+        /// A third again. Large enough to be the reason you get away, or the reason
+        /// you reach the wall before their bomb does, and short of the point where
+        /// the map stops feeling like the same size - past about 1.5 the aiming and
+        /// the collision resolution both start showing their seams.
+        static let speedBoost: Double = 1.35
+
+        /// How much harder your shots hit on a strength perk.
+        ///
+        /// Two fifths again, which at mid tiers is about one shot fewer to a kill.
+        /// Deliberately less than the resistance perk gives, because damage is
+        /// worth more than durability in a game where the first shot usually
+        /// decides who wins: the numbers are equal only if the fights are.
+        static let strengthMultiplier: Double = 1.4
+
+        /// The share of incoming damage you still take on a resistance perk.
+        ///
+        /// Everything, not only bullets - a bomb that goes off beside you, a lungful
+        /// of gas. "Resistant to bullets" is what it is FOR, but a perk that let a
+        /// blast through at full strength would be a perk with a footnote, and the
+        /// only way anybody would ever learn the footnote is by dying to it.
+        static let resistanceShare: Double = 0.6
     }
 
     enum Loot {
@@ -1162,6 +1200,28 @@ enum GameConfig {
         /// to go next. Rolled per crate rather than counted out, so no two maps hold
         /// the same number.
         static let rareShare: Double = 0.07
+
+        /// How heavily ONE power-up sits in a crate's table, by how far the match
+        /// has run.
+        ///
+        /// Per perk, not for all of them together, and the arithmetic is worth
+        /// writing down. Against band totals around three hundred, four of these
+        /// come to roughly one crate in twenty early and one in twelve late - so
+        /// power-ups arrive somewhat more often than when regeneration was the only
+        /// one, and any PARTICULAR one is about a third as likely as regeneration
+        /// used to be. That is the shape variety wants: you hold a perk often
+        /// enough to have learned what they all do, and holding the one you wanted
+        /// is luck.
+        ///
+        /// This is the dial for all four. Halve it and perks become a story you
+        /// tell about a match; double it and they are part of the loadout.
+        static func perkWeight(at progress: Double) -> Int {
+            switch progress {
+            case ..<0.35: return 3
+            case ..<0.70: return 4
+            default:      return 5
+            }
+        }
 
         static let lootboxCount = 42
 

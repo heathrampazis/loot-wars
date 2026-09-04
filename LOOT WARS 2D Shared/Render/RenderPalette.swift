@@ -123,38 +123,38 @@ enum RenderPalette {
 
     // MARK: - Power-ups
 
-    /// The colour of a perk, wherever one appears: the sheen on the item, the
-    /// sparkles around it, and the motes coming off somebody running one.
+    /// The two shades a perk's particles vary between.
     ///
-    /// Deliberately NOT the Epic blue a perk is ranked at. Rarity says how lucky
-    /// you were to find a thing; this says what kind of thing it is, and a player
-    /// needs to read "power-up" off a figure across the map without first working
-    /// out what tier it was. Violet is the only strong colour this game has not
-    /// already spent - teams are the primaries, healing is green, damage is pink,
-    /// money is gold - so nothing else on screen can be mistaken for it.
-    static let perkAura = rgb(0xC7, 0x8B, 0xFF)
+    /// Read off the ARTWORK, hue for hue: the regeneration bottle is violet, the
+    /// speed one is sky blue, strength is a hot pink and resistance is amber. That
+    /// is the whole rule, and it is the only rule that works - a player learns what
+    /// a colour means by looking at the thing they picked up, so a trail that did
+    /// not match its own bottle would be teaching them something false about a
+    /// fight they can see from across the map.
+    ///
+    /// Two shades a STEP apart rather than a light one against a dark one. A wide
+    /// spread puts the dark half down into the grass and turns any colour muddy,
+    /// which is how the first violet ended up looking like poison; a step apart
+    /// shimmers instead.
+    ///
+    /// Deliberately not the rarity colours. Rarity says how lucky you were to find
+    /// a thing; this says which power is running - and both are on screen at once,
+    /// so they must never be the same language.
+    static func colours(of perk: Perk) -> (bright: SKColor, deep: SKColor) {
+        switch perk {
+        case .regeneration: return (rgb(0xC7, 0x8B, 0xFF), rgb(0xA2, 0x53, 0xF5))
+        case .speed:        return (rgb(0x96, 0xD8, 0xFF), rgb(0x4F, 0xB0, 0xF5))
+        case .strength:     return (rgb(0xFF, 0x7F, 0xAE), rgb(0xF5, 0x3C, 0x7E))
+        case .resistance:   return (rgb(0xFF, 0xC0, 0x8A), rgb(0xF5, 0x8A, 0x3C))
+        }
+    }
 
-    /// The deeper end of the same, so the particles have two purples to vary
-    /// between rather than one flat one.
+    /// The near-white middle of a SPARKLE, which is a glint rather than a colour.
     ///
-    /// Deliberately only a shade apart, which is the fix for the version before
-    /// this. A light violet against a near-indigo was a wide enough spread that the
-    /// dark half went muddy over green grass, and dark purple next to green is the
-    /// colour of poison in every game anybody has played. Two bright amethysts a
-    /// step apart shimmer instead, and nothing in the pair is dark enough to read
-    /// as something wrong with you.
-    ///
-    /// BOTH ends are purple, which sounds obvious and was not: the first pass
-    /// varied violet against a near-white lilac and drew it additively, and the
-    /// pale half over a light green map came out white. A colour only survives
-    /// this game's background if it is dark enough to sit ON it - added light on
-    /// pale grass washes to nothing, whatever colour it started as.
-    static let perkDeep = rgb(0xA2, 0x53, 0xF5)
-
-    /// The near-white middle of a SPARKLE, which is a glint rather than a colour -
-    /// and the one place the pale end is right, because a sparkle sits on top of
-    /// artwork rather than on the grass.
-    static let perkSpark = rgb(0xEE, 0xD9, 0xFF)
+    /// The one thing about a perk that does NOT change with which perk it is: every
+    /// enchanted item twinkles the same way, because the sparkles say "this is a
+    /// power-up" while the tint under them says which one.
+    static let perkSpark = rgb(0xFF, 0xF2, 0xE4)
 
     /// The colour of yes, and the colour of no, for anything you press.
     ///

@@ -47,7 +47,7 @@ final class ItemSlotNode: SKNode {
     /// and thrown away as the slot's contents change: a hotbar slot is rewritten
     /// every time anything at all happens to your inventory, and a node built that
     /// often would restart its own twinkle constantly and never finish one.
-    private let enchant: SKNode
+    private let enchant: EnchantNode
 
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -291,6 +291,8 @@ final class ItemSlotNode: SKNode {
         // busy being powerful.
         enchant.isHidden = !stack.type.isEnchanted
         enchant.alpha = dimmed ? 0.4 : 1.0
+
+        if let perk = stack.type.perk { enchant.tint(for: perk) }
 
         // A badge on a single item is noise - it only earns its place once there
         // is more than one.

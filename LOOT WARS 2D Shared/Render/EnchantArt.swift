@@ -59,7 +59,8 @@ enum EnchantArt {
         return texture
     }()
 
-    /// The overlay itself: sparkles that come and go around something.
+    /// The overlay itself: sparkles that come and go around something, over a wash
+    /// the colour of whichever perk it is.
     ///
     /// - Parameter box: the width the item is drawn at. Everything scales off it,
     ///   so a 66-point hotbar slot and an item on the map are the same drawing.
@@ -68,8 +69,8 @@ enum EnchantArt {
     /// Four is the number where at any instant one or two are visible and the
     /// pattern never repeats obviously enough to be counted; at eight it read as a
     /// border made of stars, which is the coloured frame this was avoiding.
-    static func overlay(box: CGFloat) -> SKNode {
-        let overlay = SKNode()
+    static func overlay(box: CGFloat) -> EnchantNode {
+        let overlay = EnchantNode()
 
         let radius = box * 0.44
         let places: [(CGFloat, CGFloat)] = [
@@ -106,11 +107,11 @@ enum EnchantArt {
             overlay.addChild(star)
         }
 
-        // And a violet wash sitting ON the artwork, which is what makes the item
-        // itself look treated rather than merely decorated.
+        // And a wash sitting ON the artwork, which is what makes the item itself
+        // look treated rather than merely decorated. Its colour is the perk's, set
+        // by whoever shows the item - see EnchantNode.
         let sheen = SKSpriteNode(texture: GlowArt.pool)
         sheen.size = CGSize(width: box * 0.95, height: box * 0.95)
-        sheen.color = RenderPalette.perkAura
         sheen.colorBlendFactor = 1
         sheen.alpha = 0.30
         sheen.zPosition = 2
@@ -122,6 +123,27 @@ enum EnchantArt {
         ])))
 
         overlay.addChild(sheen)
+        overlay.sheen = sheen
+        overlay.tint(for: .regeneration)
         return overlay
+    }
+}
+
+/// An enchanted overlay whose wash can be recoloured after it is built.
+///
+/// The recolouring is the whole reason this is a class rather than a plain SKNode.
+/// A hotbar slot builds ONE of these when the bar is built and then shows a
+/// hundred different items in it over a match - rebuilding the overlay per item
+/// would restart the twinkle every time anything at all happened to your
+/// inventory, and the sparkles would never finish a cycle. So the node is
+/// permanent and its colour is not.
+final class EnchantNode: SKNode {
+
+    fileprivate var sheen: SKSpriteNode?
+
+    /// The wash takes the perk's colour; the sparkles never do - they say "this is
+    /// a power-up" and the wash says which one.
+    func tint(for perk: Perk) {
+        sheen?.color = RenderPalette.colours(of: perk).bright
     }
 }

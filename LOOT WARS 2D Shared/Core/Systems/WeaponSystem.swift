@@ -93,7 +93,12 @@ enum WeaponSystem {
             // from the same numbers.
             position: actor.position + aim * actor.blaster.muzzleOffset,
             velocity: aim * GameConfig.Blaster.projectileSpeed,
-            damage: actor.blaster.damage
+            // Priced when the shot is FIRED, not when it lands. A projectile
+            // already in the air keeps the damage it left with, so a perk running
+            // out mid-flight cannot weaken a bullet somebody has already dodged -
+            // and one switched on mid-flight cannot strengthen it either.
+            damage: max(1, Int((Double(actor.blaster.damage)
+                                * actor.damageMultiplier).rounded()))
         )
     }
 }

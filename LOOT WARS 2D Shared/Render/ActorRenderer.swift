@@ -466,12 +466,12 @@ final class ActorRenderer {
     /// - stronger than a heal's green, twice the flinch's black. It is on screen
     /// for a third of a second and it is the one moment the game says something
     /// about you rather than about what just hit you.
-    func charge(_ id: ActorID) {
+    func charge(_ id: ActorID, perk: Perk) {
         guard let nodes = nodesByActor[id] else { return }
 
         nodes.sprite.removeAction(forKey: "hit")
         nodes.sprite.run(.sequence([
-            .colorize(with: RenderPalette.perkAura,
+            .colorize(with: RenderPalette.colours(of: perk).bright,
                       colorBlendFactor: 0.9, duration: 0.09),
             .wait(forDuration: 0.1),
             .colorize(withColorBlendFactor: 0, duration: 0.42)

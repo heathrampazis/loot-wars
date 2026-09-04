@@ -69,8 +69,9 @@ final class EffectsRenderer {
             if actor.perk != nil {
                 let previous = lastPerk[id] ?? (actor.perkRemaining + EffectsRenderer.auraInterval)
                 if Int(previous / EffectsRenderer.auraInterval)
-                    != Int(actor.perkRemaining / EffectsRenderer.auraInterval) {
-                    aura(at: actor.position)
+                    != Int(actor.perkRemaining / EffectsRenderer.auraInterval),
+                   let perk = actor.perk {
+                    aura(at: actor.position, perk: perk)
                 }
                 lastPerk[id] = actor.perkRemaining
             } else {
@@ -116,14 +117,15 @@ final class EffectsRenderer {
     /// Grand on purpose. This is a thing you find perhaps twice in a match and
     /// choose the moment for, and the first version - one thin ring - spent that
     /// moment as quietly as a bandage.
-    func charge(at position: Vec2) {
+    func charge(at position: Vec2, perk: Perk) {
         let origin = GridGeometry.point(for: position)
         let tile = GridGeometry.length(ofTiles: 1)
+        let colours = RenderPalette.colours(of: perk)
 
         // On the ground, under the figure's feet.
         let disc = SKShapeNode(ellipseOf: CGSize(width: tile * 1.7, height: tile * 0.8))
         disc.position = CGPoint(x: origin.x, y: origin.y - tile * 0.42)
-        disc.fillColor = RenderPalette.perkAura
+        disc.fillColor = colours.bright
         disc.strokeColor = RenderPalette.perkSpark
         disc.lineWidth = 2
         disc.alpha = 0.55
@@ -144,7 +146,7 @@ final class EffectsRenderer {
 
             ring.position = origin
             ring.fillColor = .clear
-            ring.strokeColor = index == 0 ? RenderPalette.perkAura : RenderPalette.perkDeep
+            ring.strokeColor = index == 0 ? colours.bright : colours.deep
             ring.lineWidth = 4
             ring.alpha = 0
             ring.zPosition = 11
@@ -164,7 +166,7 @@ final class EffectsRenderer {
         // And a column of it going up through them.
         let column = SKSpriteNode(texture: GlowArt.pool)
         column.size = CGSize(width: tile * 0.9, height: tile * 1.2)
-        column.color = RenderPalette.perkAura
+        column.color = colours.bright
         column.colorBlendFactor = 1
         column.anchorPoint = CGPoint(x: 0.5, y: 0.1)
         column.position = CGPoint(x: origin.x, y: origin.y - tile * 0.45)
@@ -186,7 +188,7 @@ final class EffectsRenderer {
             let step = Double(index) * 0.05
             node.run(.sequence([
                 .wait(forDuration: step),
-                .run { [weak self] in self?.aura(at: position) }
+                .run { [weak self] in self?.aura(at: position, perk: perk) }
             ]))
         }
     }
@@ -205,8 +207,14 @@ final class EffectsRenderer {
     /// moving player leave a trail and a standing one wear a cloud - one behaviour
     /// out of one emitter, and the reason this is not an SKEmitterNode bolted to
     /// the sprite.
-    private func aura(at position: Vec2) {
+    private func aura(at position: Vec2, perk: Perk) {
         let origin = GridGeometry.point(for: position)
+
+        // Whichever perk is running paints them. Four power-ups all trailing the
+        // same violet would be four different things wearing one uniform, and the
+        // colour is the only thing that says across a map which of them the person
+        // charging at you just drank.
+        let colours = RenderPalette.colours(of: perk)
 
         // Two at a time, on opposite sides of the figure more often than not. One
         // per beat came off the middle in a single file, which read as steam from a
@@ -216,7 +224,7 @@ final class EffectsRenderer {
             let size = CGFloat.random(in: 9...15)
 
             mote.size = CGSize(width: size, height: size)
-            mote.color = index == 0 ? RenderPalette.perkAura : RenderPalette.perkDeep
+            mote.color = index == 0 ? colours.bright : colours.deep
             mote.colorBlendFactor = 1
             mote.alpha = 0.95
 

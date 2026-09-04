@@ -1359,25 +1359,31 @@ enum AIBrain {
     /// The power-up worth switching on, if there is one and now is the moment.
     ///
     /// Bots get these on exactly the same terms as the player - found in a crate,
-    /// one at a time, refused by Actor.canUse while one is running - and that is
-    /// the whole reason this is eight lines rather than a subsystem. What it has to
-    /// decide is only WHEN, and a regeneration has one obvious when: hurt, and
-    /// still being shot at. Spending it on a scratch in an empty field is the one
-    /// mistake available here, so both halves of that are required.
+    /// one at a time, refused by Actor.canUse while one is running - so all this
+    /// has to decide is WHEN. Being in a fight is the answer for three of them:
+    /// strength, resistance and speed are spent ON a fight, and a bot that saved
+    /// them for a better one would die holding them.
+    ///
+    /// Regeneration is the exception, and has to be, because it is the only one
+    /// whose worth depends on what has already happened to you. Fifteen seconds of
+    /// healing at full health is fifteen seconds of nothing.
     ///
     /// No cooldown timer of its own. Holding two perks at once is already rare, and
-    /// Actor.canUse will refuse the second while the first runs.
+    /// Actor.canUse refuses the second while the first runs.
     private static func perkToUse(state: AIState, actor: Actor) -> Int? {
-        let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
-        guard healthLeft <= GameConfig.AI.perkHealthFraction else { return nil }
-
         // In it, rather than merely scratched at some point in the past.
         guard state.goal.isFight
                 || actor.secondsSinceHit < GameConfig.AI.combatRecency else { return nil }
 
+        let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
+
         for (index, slot) in actor.inventory.slots.enumerated() {
-            guard let stack = slot, stack.type.perk != nil,
+            guard let stack = slot, let perk = stack.type.perk,
                   actor.canUse(slot: index) else { continue }
+
+            if perk == .regeneration,
+               healthLeft > GameConfig.AI.perkHealthFraction { continue }
+
             return index
         }
 
