@@ -39,6 +39,10 @@ final class HotbarNode: SKNode {
     private(set) var selling = false
 
     private var slots: [ItemSlotNode] = []
+
+    /// The payout currently climbing out of each slot, so a second sale out of the
+    /// same square replaces it rather than stacking on top of it.
+    private var payouts: [Int: SKNode] = [:]
     private var heldSlot: Int?
     private var lastInventory: Inventory?
     private var lastUsable: [Bool] = []
@@ -113,57 +117,84 @@ final class HotbarNode: SKNode {
     /// corner was the other option and is what a PURCHASE does in reverse - but a
     /// purchase has to explain where the thing went, and a sale does not: you can
     /// see the slot is empty. This only has to say it was worth something.
+    ///
+    /// One pill, on a dark ground. The version before this drew the number five
+    /// times - four dark copies as a fake outline - and at this size the copies
+    /// did not read as an outline, they read as the text being printed twice. A
+    /// panel behind it does the same job properly, and it is the language the rest
+    /// of this bar already speaks: the count badge and the shop's price pill are
+    /// both a colour on a dark plate.
     func reward(slot index: Int, tokens: Int) {
         guard slots.indices.contains(index), tokens > 0 else { return }
 
+        // Only ever one per slot. Selling four things in four seconds used to leave
+        // four of these climbing over each other out of the same square, which is
+        // the one thing a payout must not look like - a mess where a reward is.
+        payouts[index]?.removeFromParent()
+
         let payout = SKNode()
         payout.position = CGPoint(x: HotbarNode.centreX(of: index),
-                                  y: HotbarNode.slotSize * 0.35)
+                                  y: HotbarNode.slotSize * 0.42)
         payout.zPosition = 20
         addChild(payout)
+        payouts[index] = payout
+
+        let amount = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        amount.text = "+\(tokens)"
+        amount.fontSize = HotbarNode.slotSize * 0.3
+        amount.fontColor = RenderPalette.payout
+        amount.horizontalAlignmentMode = .left
+        amount.verticalAlignmentMode = .center
+        amount.zPosition = 1
 
         let texture = ItemArt.texture(for: Pickup.token(1))
         let coin = SKSpriteNode(texture: texture)
-        let side = HotbarNode.slotSize * 0.42
+        let side = HotbarNode.slotSize * 0.3
+
         coin.size = ItemArt.size(of: texture, fittingInto: side)
-        coin.position = CGPoint(x: -side * 0.45, y: 0)
+        coin.zPosition = 1
+
+        // Laid out from the two things it holds rather than from guessed numbers,
+        // so "+1" and "+14" both sit centred in a pill that fits them.
+        let gap = side * 0.24
+        let padding = side * 0.42
+        let content = coin.size.width + gap + amount.frame.width
+        let height = max(side, amount.frame.height) + padding
+
+        coin.position = CGPoint(x: -content / 2 + coin.size.width / 2, y: 0)
+        amount.position = CGPoint(x: coin.position.x + coin.size.width / 2 + gap,
+                                  y: 0)
+
+        let pill = SKShapeNode(
+            rect: CGRect(x: -content / 2 - padding, y: -height / 2,
+                         width: content + padding * 2, height: height),
+            cornerRadius: height / 2
+        )
+
+        pill.fillColor = RenderPalette.payoutPill
+        pill.strokeColor = .clear
+
+        payout.addChild(pill)
         payout.addChild(coin)
-
-        // Drawn five times: four dark copies a point and a half out in each
-        // direction, then the bright one over them. SKLabelNode has no outline, and
-        // this is a vivid green number over pale green grass - the two are a long
-        // way apart in hue and almost identical in brightness, which is the pairing
-        // the eye is worst at. The ring of dark copies is the outline the class
-        // does not have, and it costs four labels for three quarters of a second.
-        let outline: [CGPoint] = [CGPoint(x: 1.6, y: 1.6), CGPoint(x: -1.6, y: 1.6),
-                                  CGPoint(x: 1.6, y: -1.6), CGPoint(x: -1.6, y: -1.6)]
-
-        var copies: [(CGPoint, SKColor)] = outline.map { ($0, RenderPalette.payoutShadow) }
-        copies.append((CGPoint.zero, RenderPalette.payout))
-
-        for (offset, colour) in copies {
-            let amount = SKLabelNode(fontNamed: "AvenirNext-Bold")
-            amount.text = "+\(tokens)"
-            amount.fontSize = HotbarNode.slotSize * 0.36
-            amount.fontColor = colour
-            amount.horizontalAlignmentMode = .left
-            amount.verticalAlignmentMode = .center
-            amount.position = CGPoint(x: side * 0.2 + offset.x, y: offset.y)
-            payout.addChild(amount)
-        }
+        payout.addChild(amount)
 
         // Pops, climbs, goes. The pop is what makes it read as being handed to you
         // rather than as a caption that faded in.
         payout.setScale(0.4)
         payout.run(.sequence([
             .group([
-                .sequence([.scale(to: 1.18, duration: 0.12),
+                .sequence([.scale(to: 1.14, duration: 0.12),
                            .scale(to: 1.0, duration: 0.1)]),
-                .moveBy(x: 0, y: HotbarNode.slotSize * 0.85, duration: 0.75),
-                .sequence([.wait(forDuration: 0.42),
-                           .fadeOut(withDuration: 0.33)])
+                .moveBy(x: 0, y: HotbarNode.slotSize * 0.8, duration: 0.75),
+                .sequence([.wait(forDuration: 0.45),
+                           .fadeOut(withDuration: 0.3)])
             ]),
-            .removeFromParent()
+            .removeFromParent(),
+            .run { [weak self] in
+                // Only if it is still the one being tracked: a replacement will
+                // have claimed the slot by now if a second sale came through.
+                if self?.payouts[index] === payout { self?.payouts[index] = nil }
+            }
         ]))
 
         // And the slot it came out of flinches, so the two are one event.

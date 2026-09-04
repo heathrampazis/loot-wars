@@ -173,8 +173,13 @@ enum RenderPalette {
     /// coming in.
     static let payout = rgb(0x3D, 0xF5, 0x74)
 
-    /// Sat behind it, so a bright green number survives pale green grass.
-    static let payoutShadow = SKColor(red: 0.04, green: 0.16, blue: 0.07, alpha: 0.85)
+    /// The pill it sits on, so a bright green number survives pale green grass.
+    ///
+    /// A dark plate rather than an outline drawn out of offset copies of the text,
+    /// which is what this replaced and which read as the number being printed
+    /// twice. It is the same device the count badge and the shop's price pill use,
+    /// so a payout belongs to the bar it comes out of.
+    static let payoutPill = SKColor(red: 0.04, green: 0.14, blue: 0.07, alpha: 0.88)
     static let affordable = rgb(0x4C, 0xC9, 0x5E)
     static let unaffordable = rgb(0xE0, 0x4B, 0x4B)
 
