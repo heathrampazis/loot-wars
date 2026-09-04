@@ -183,6 +183,17 @@ enum RenderPalette {
     static let affordable = rgb(0x4C, 0xC9, 0x5E)
     static let unaffordable = rgb(0xE0, 0x4B, 0x4B)
 
+    /// The same two, a few shades down, for the lip under a button.
+    ///
+    /// A button in this game is a solid colour with a darker edge along the bottom
+    /// of it, which is the one thing that makes a flat shape look like something
+    /// you can press. It replaced a black outline, and the difference is what an
+    /// outline SAYS: black around a shape is how this game draws objects in the
+    /// world - the token, the crates, the figures - so a black-ringed capsule read
+    /// as a thing lying on the grass rather than a control on a panel.
+    static let affordableDeep = rgb(0x2C, 0x8B, 0x3F)
+    static let unaffordableDeep = rgb(0x96, 0x2C, 0x2C)
+
     // Placement preview. Green while a footprint would take, red while it would
     // not - the only two colours nobody has to be taught.
     static let placementValid   = rgb(0x6E, 0xF0, 0x6E)

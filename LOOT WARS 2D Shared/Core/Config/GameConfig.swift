@@ -175,8 +175,15 @@ enum GameConfig {
         /// No bombs either, for the older reason: being both cheap and the way into
         /// somebody's base, a bomb on a shelf turned the shop into a raid vending
         /// machine.
+        /// HEALING first, which is what puts the bandage and the medkit on the LEFT
+        /// of the shelf and the two gear rungs on the right.
+        ///
+        /// Order is the only layout decision the config still makes, and it is
+        /// worth making here rather than in the panel: healing is what you open the
+        /// shop for in a hurry, and the left of a row is where a thumb and an eye
+        /// both start. The ladder is the considered purchase and can afford to be
+        /// the second thing read.
         static let tabs: [Tab] = [
-            Tab(name: "GEAR", stock: .upgrades),
             Tab(name: "HEALING", stock: .shelf([
                 Item(type: .bandage, price: 6),
                 // Eleven, down from fifteen. At fifteen a medkit was worse than a
@@ -186,7 +193,8 @@ enum GameConfig {
                 // that lost to the cheap one, which is not a choice, it is a trap.
                 // At eleven it pays 0.091 a token and three bars a slot.
                 Item(type: .medkit,  price: 11)
-            ]))
+            ])),
+            Tab(name: "GEAR", stock: .upgrades)
         ]
 
         /// The most cards the shop can ever show at once, which is what the panel

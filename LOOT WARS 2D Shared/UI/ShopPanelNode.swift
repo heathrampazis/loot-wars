@@ -107,6 +107,10 @@ final class ShopPanelNode: SKNode {
         let price: SKLabelNode
         let pill: SKShapeNode
 
+        /// The darker lip under the price button. Recoloured with it, and the
+        /// reason the button reads as something you press rather than a label.
+        let bevel: SKShapeNode
+
         /// Lit for a moment when the sale goes through. Its own node rather than a
         /// colour on the plate, because the plate's fill and the holder's alpha are
         /// both rewritten by the next redraw - which lands on the same frame as the
@@ -381,40 +385,49 @@ final class ShopPanelNode: SKNode {
         name.position = CGPoint(x: 0, y: -card.height / 2 + 74)
         holder.addChild(name)
 
-        // The price button: a dark capsule with a coloured edge, sitting on the
-        // bottom margin like a price tag on a shelf edge.
+        // The price button: a solid capsule sitting on the bottom margin like a
+        // price tag on a shelf edge.
         //
-        // Dark with a green or red EDGE rather than a solid green or red slab, and
-        // the quick-buy prompt is where that came from - it has always been a dark
-        // plate outlined in green, and having the two say yes in two different
-        // visual languages was the shop disagreeing with itself about what a price
-        // looks like. A dark ground is also simply better at holding white text
-        // than a saturated fill, and there are four of these on screen at once:
-        // four bright slabs shouted the prices louder than the items they belonged
-        // to, which is the wrong way round for a shelf.
+        // SOLID, with a darker lip under it and no outline at all. Both of the
+        // other things tried here are worth writing down. A black outline read as
+        // an OBJECT: black rings are how this game draws things in the world - the
+        // token, the crates, the figures - so a black-ringed capsule looked like
+        // loot lying on a card rather than a control. And a dark plate with a
+        // coloured edge, borrowed from the quick-buy prompt, lost the one thing the
+        // solid version does best: at a glance across four cards, green and red
+        // ARE the answer, and a thin edge makes you look twice to read it.
+        //
+        // What the bevel adds is the press. A flat shape with a darker shade along
+        // its bottom edge is the whole of how a button is drawn in a game that
+        // looks like this one, and it costs one more node.
         let pillWidth = card.width - 20
-        let pillCentre = CGPoint(x: 0, y: -card.height / 2 + 28)
+        let pillCentre = CGPoint(x: 0, y: -card.height / 2 + 29)
 
-        let pill = SKShapeNode(
-            path: CGPath(
-                roundedRect: CGRect(
-                    x: pillCentre.x - pillWidth / 2,
-                    y: pillCentre.y - 16,
-                    width: pillWidth,
-                    height: 32
-                ),
-                cornerWidth: 16,
-                cornerHeight: 16,
-                transform: nil
+        func capsule(offsetBy drop: CGFloat) -> SKShapeNode {
+            SKShapeNode(
+                path: CGPath(
+                    roundedRect: CGRect(
+                        x: pillCentre.x - pillWidth / 2,
+                        y: pillCentre.y - 16 - drop,
+                        width: pillWidth,
+                        height: 32
+                    ),
+                    cornerWidth: 16,
+                    cornerHeight: 16,
+                    transform: nil
+                )
             )
-        )
+        }
 
-        // The STROKE is what is recoloured on every redraw - see update. The fill
-        // stays where it is: near black, a shade darker than the panel, so the
-        // button reads as cut into the card rather than laid on top of it.
-        pill.fillColor = SKColor(white: 0.03, alpha: 0.85)
-        pill.strokeColor = RenderPalette.affordable
-        pill.lineWidth = 2.5
+        let bevel = capsule(offsetBy: 3)
+        bevel.fillColor = RenderPalette.affordableDeep
+        bevel.strokeColor = .clear
+        holder.addChild(bevel)
+
+        // Both fills are recoloured on every redraw - see update.
+        let pill = capsule(offsetBy: 0)
+        pill.fillColor = RenderPalette.affordable
+        pill.strokeColor = .clear
         holder.addChild(pill)
 
         // The coin and the number are CENTRED as a pair rather than pinned to the
@@ -424,16 +437,19 @@ final class ShopPanelNode: SKNode {
         let token = SKSpriteNode(texture: tokenTexture)
 
         token.size = ItemArt.size(of: tokenTexture, fittingInto: 21)
-        token.position = CGPoint(x: pillCentre.x - 18, y: pillCentre.y)
+        token.position = CGPoint(x: pillCentre.x + 10, y: pillCentre.y)
         token.zPosition = 1
         holder.addChild(token)
 
         let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        // Number first, coin after it - the way a price is spoken. The pair is
+        // centred on the button rather than pushed to its ends, which at this width
+        // is the difference between one price and two things sharing a capsule.
         price.fontSize = 18
         price.fontColor = .white
-        price.horizontalAlignmentMode = .left
+        price.horizontalAlignmentMode = .right
         price.verticalAlignmentMode = .center
-        price.position = CGPoint(x: pillCentre.x - 2, y: pillCentre.y)
+        price.position = CGPoint(x: pillCentre.x - 4, y: pillCentre.y)
         price.zPosition = 1
         holder.addChild(price)
 
@@ -444,6 +460,7 @@ final class ShopPanelNode: SKNode {
             name: name,
             price: price,
             pill: pill,
+            bevel: bevel,
             flash: flash,
             type: nil
         )
@@ -614,14 +631,22 @@ final class ShopPanelNode: SKNode {
 
         let card = cards[index]
         deliver(card, to: destination)
+        pulse(card)
 
         card.holder.removeAction(forKey: "bought")
         card.holder.setScale(1)
         card.holder.zRotation = 0
 
+        // Pressed, then sprung. The refusal wobbles side to side - a head shaking -
+        // so the yes had to be a motion nothing about a no resembles, and down-then-
+        // up is the one a button makes when it actually goes in. Both live on scale
+        // and rotation for the same reason: the redraw owns card POSITION, so an
+        // animation that moved the card could be interrupted and leave it parked
+        // somewhere the layout did not put it.
         card.holder.run(
             .sequence([
-                .scale(to: 1.07, duration: 0.07),
+                .scale(to: 0.93, duration: 0.06),
+                .scale(to: 1.11, duration: 0.09),
                 .scale(to: 1.0, duration: 0.13)
             ]),
             withKey: "bought"
@@ -630,10 +655,55 @@ final class ShopPanelNode: SKNode {
         card.flash.removeAllActions()
         card.flash.fillColor = RenderPalette.placementValid
         card.flash.strokeColor = RenderPalette.placementValid
-        card.flash.alpha = 0.42
-        card.flash.run(.fadeAlpha(to: 0, duration: 0.45))
+        card.flash.alpha = 0.5
+        card.flash.run(.fadeAlpha(to: 0, duration: 0.4))
 
         lastPressed = nil
+    }
+
+    /// A green ring thrown off the card that was just bought from.
+    ///
+    /// The card's own outline, growing outwards and fading - so the confirmation
+    /// starts at the exact shape you tapped and leaves it, which is what makes it
+    /// read as coming FROM the card rather than being drawn on top of one. Built
+    /// fresh each time and thrown away after: it exists for a third of a second and
+    /// a node kept around for that would be a node to keep in sync with a card
+    /// whose contents change every purchase.
+    private func pulse(_ card: Card) {
+        let size = ShopPanelNode.cardSize
+
+        let ring = SKShapeNode(
+            path: CGPath(
+                roundedRect: CGRect(
+                    x: -size.width / 2,
+                    y: -size.height / 2,
+                    width: size.width,
+                    height: size.height
+                ),
+                cornerWidth: 14,
+                cornerHeight: 14,
+                transform: nil
+            )
+        )
+
+        ring.fillColor = .clear
+        ring.strokeColor = RenderPalette.affordable
+        ring.lineWidth = 3
+        ring.zPosition = 6
+        card.holder.addChild(ring)
+
+        ring.run(
+            .sequence([
+                .group([
+                    .scale(to: 1.18, duration: 0.34),
+                    .sequence([
+                        .wait(forDuration: 0.06),
+                        .fadeOut(withDuration: 0.28)
+                    ])
+                ]),
+                .removeFromParent()
+            ])
+        )
     }
 
     /// Throws a copy of the item from its card down to the bag.
@@ -769,14 +839,19 @@ final class ShopPanelNode: SKNode {
             let soldOut = ShopSystem.isSoldOut(item.type, actor: player, in: world)
             card.holder.alpha = soldOut ? 0.45 : 1.0
 
-            // Green when you can have it, red when you cannot afford it - on the
-            // EDGE, which is the whole of the price button's colour now.
+            // Green when you can have it, red when you cannot afford it.
             // Affordability only: a full bag also refuses a purchase, but that is a
             // fact about you rather than about the shelf, and the card says nothing
             // about it (see ShopSystem.isSoldOut).
-            card.pill.strokeColor = player.tokens >= item.price
+            let affordable = player.tokens >= item.price
+
+            card.pill.fillColor = affordable
                 ? RenderPalette.affordable
                 : RenderPalette.unaffordable
+
+            card.bevel.fillColor = affordable
+                ? RenderPalette.affordableDeep
+                : RenderPalette.unaffordableDeep
 
             cards[index] = card
         }
