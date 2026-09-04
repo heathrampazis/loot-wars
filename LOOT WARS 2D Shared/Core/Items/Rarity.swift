@@ -58,9 +58,11 @@ extension ItemType {
         case .medkit:  return .uncommon
         case .arcade:  return .epic
 
-        // Epic, like the machine: both are the rarest things you can be carrying,
-        // and both change the next minute of the match rather than the next shot.
-        case .perk:    return .epic
+        // Each power-up carries its own rung - see Perk.rarity. They are not all
+        // the same size of find: two of them decide a fight and two of them are
+        // simply useful, and a table that painted all four Epic was overselling
+        // half of them.
+        case .perk(let which): return which.rarity
 
         case .helmet(let tier):
             switch tier {

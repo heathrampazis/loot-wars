@@ -111,7 +111,7 @@ final class ArcadeRenderer {
             return
         }
 
-        sprite.color = RenderPalette.colour(of: .mythical)
+        sprite.color = RenderPalette.treasure
 
         sprite.run(.repeatForever(.sequence([
             .colorize(withColorBlendFactor: 0.75, duration: 0.18),

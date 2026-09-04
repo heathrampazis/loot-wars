@@ -1275,14 +1275,15 @@ enum GameConfig {
         /// How heavily ONE power-up sits in a crate's table, by how far the match
         /// has run.
         ///
-        /// Per perk, not for all of them together, and the arithmetic is worth
-        /// writing down. Against band totals around three hundred, four of these
-        /// come to roughly one crate in twenty early and one in twelve late - so
-        /// power-ups arrive somewhat more often than when regeneration was the only
-        /// one, and any PARTICULAR one is about a third as likely as regeneration
-        /// used to be. That is the shape variety wants: you hold a perk often
-        /// enough to have learned what they all do, and holding the one you wanted
-        /// is luck.
+        /// The BASE weight, doubled for the blue pair in LootTable - see
+        /// Perk.rarity - so the arithmetic is worth writing down. Against band
+        /// totals around three hundred, the six shares together come to roughly one
+        /// crate in nineteen early and one in ten late. A particular blue perk is
+        /// about one crate in forty, a particular purple one about one in eighty.
+        ///
+        /// That is the shape variety wants: a power-up is a normal part of a match
+        /// rather than an event, you hold each of them often enough to learn what
+        /// they do, and the two that decide a fight outright stay scarce.
         ///
         /// This is the dial for all four. Halve it and perks become a story you
         /// tell about a match; double it and they are part of the loadout.

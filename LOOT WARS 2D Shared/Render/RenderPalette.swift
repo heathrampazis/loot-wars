@@ -102,7 +102,7 @@ enum RenderPalette {
         // pale version of it - and it is the only strong shade the map has not
         // already spent.
         rgb(0x7A, 0x2B, 0xD1),   // legendary - deep violet
-        rgb(0xFF, 0xD6, 0x3A)    // mythical - gold
+        rgb(0xFF, 0xD6, 0x3A)    // mythical - gold, and Cosmic gear alone wears it
     ]
 
     static func colour(of rarity: Rarity) -> SKColor {
@@ -126,6 +126,17 @@ enum RenderPalette {
     /// too thin to do, and now that the fill is nearly solid the silhouette draws
     /// itself.
     static let gas = rgb(0xB4, 0xE3, 0x92)
+
+    /// Money: a loose golden token, a machine paying out, the fountain of a
+    /// jackpot.
+    ///
+    /// The same gold as the top of the rarity ladder and kept as its own name on
+    /// purpose. They are the same colour for a reason a player already understands
+    /// - gold is the best thing here - but they are different CLAIMS, and one of
+    /// them is allowed to change without dragging the other with it. Cosmic gear is
+    /// the only rarity that wears this, and asking for the rarity by name in the
+    /// arcade code was how that guarantee would have quietly stopped being true.
+    static let treasure = rgb(0xFF, 0xD6, 0x3A)
 
     // MARK: - Power-ups
 

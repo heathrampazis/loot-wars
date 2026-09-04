@@ -105,7 +105,7 @@ final class GroundItemRenderer {
            value >= GameConfig.Arcade.goldenValue {
             let glow = SKSpriteNode(texture: GlowArt.pool)
             glow.size = CGSize(width: box * 2.1, height: box * 2.1)
-            glow.color = RenderPalette.colour(of: .mythical)
+            glow.color = RenderPalette.treasure
             glow.colorBlendFactor = 1
             glow.alpha = 0.85
             glow.zPosition = -1

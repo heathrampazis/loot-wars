@@ -181,7 +181,14 @@ enum LootTable {
         // the gear rungs do: twelve seconds of anything is worth more in a late
         // fight than an early one.
         let perkWeight = GameConfig.Loot.perkWeight(at: progress)
-        rows += Perk.allCases.map { (pickup: Pickup.item(.perk($0)), weight: perkWeight) }
+
+        rows += Perk.allCases.map { perk in
+            // Weighted by the perk's own rung: the two blue ones turn up about
+            // twice as often as the two purple ones. One line, and a fifth perk
+            // gets its supply from whichever rung it is given.
+            let share = perk.rarity <= .rare ? 2 : 1
+            return (pickup: Pickup.item(.perk(perk)), weight: perkWeight * share)
+        }
 
         // A rare crate cannot hand you a bandage.
         //

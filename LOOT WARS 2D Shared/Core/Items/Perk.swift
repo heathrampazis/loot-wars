@@ -37,6 +37,25 @@ enum Perk: Hashable, CaseIterable {
     /// Everything that hits you hurts less.
     case resistance
 
+    /// Which rung of the ladder this one sits on.
+    ///
+    /// Not all four together, which is where they started. A power-up is a power-up
+    /// and the sparkles say so whatever colour is under them - but four items all
+    /// painted Epic told a player that every one of them was a jackpot, when two of
+    /// them are simply useful. Speed gets you somewhere and regeneration undoes a
+    /// mistake; strength and resistance decide the fight you are in the middle of.
+    ///
+    /// The rung is also the supply. LootTable weights each perk by it, so the blue
+    /// pair turn up about twice as often as the purple pair - which is what makes
+    /// holding one a normal part of a match rather than an event, while the two
+    /// that swing a fight stay scarce.
+    var rarity: Rarity {
+        switch self {
+        case .regeneration, .speed: return .rare
+        case .strength, .resistance: return .epic
+        }
+    }
+
     /// How long it runs for.
     ///
     /// Regeneration lasts longest because it pays out in instalments - cut it short

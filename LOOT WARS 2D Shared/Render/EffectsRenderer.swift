@@ -445,7 +445,7 @@ final class EffectsRenderer {
             let side = GridGeometry.length(ofTiles: Double.random(in: 0.3...0.5))
 
             star.size = CGSize(width: side, height: side)
-            star.color = RenderPalette.colour(of: .mythical)
+            star.color = RenderPalette.treasure
             star.colorBlendFactor = 0.55
             star.zPosition = 14
             star.position = CGPoint(x: origin.x + CGFloat.random(in: -26...26),
