@@ -168,6 +168,13 @@ final class GameScene: SKScene {
     private let respawnBanner = RespawnBanner()
 
 
+    /// The local player's health last frame, so being HIT can be noticed.
+    ///
+    /// A moment rather than a state, which is what makes arming a heal safe: if the
+    /// game re-armed whenever nothing was selected, tapping a slot to put it away
+    /// would put it straight back, and the player could never have an empty hand.
+    private var lastLocalHealth: Int?
+
     /// The hotbar slot picked out, waiting to be acted on.
     ///
     /// Scene state, not world state, and deliberately so: a selection is a thing
@@ -571,6 +578,8 @@ final class GameScene: SKScene {
            world.localPlayer?.inventory.stack(at: slot) == nil {
             selectedSlot = nil
         }
+
+        armHealingIfHit(in: world)
         hotbar.setSelected(shopPanel.isOpen ? nil : selectedSlot)
 
         updateRightControl(with: world)
@@ -993,6 +1002,35 @@ final class GameScene: SKScene {
         // is the actor's own, so what you see and what the simulation allows cannot
         // disagree.
         itemButton.setEnabled(player.canUse(slot: slot))
+    }
+
+    /// Puts a heal in your hand the moment somebody shoots you, if your hand was
+    /// empty.
+    ///
+    /// On the HIT, not on being hurt. The difference matters: "hurt with nothing
+    /// selected" is a state that lasts until you patch up, so arming from it would
+    /// override the player every time they tried to put the heal away. Being shot
+    /// is an instant, it happens exactly when the answer to "what do I want in my
+    /// hand" changes, and it leaves anybody who deselects on purpose alone until
+    /// the next bullet.
+    ///
+    /// It never overrides a choice - a bomb you had ready stays ready - and WHICH
+    /// heal is ConsumableSystem's answer, the same one the bots get, so the game
+    /// cannot arm one thing and recommend another.
+    private func armHealingIfHit(in world: World) {
+        guard let player = world.localPlayer, player.isAlive else {
+            lastLocalHealth = nil
+            return
+        }
+
+        defer { lastLocalHealth = player.health }
+
+        guard let previous = lastLocalHealth, player.health < previous,
+              selectedSlot == nil,
+              chestPanel.openChest == nil, !shopPanel.isOpen,
+              let heal = ConsumableSystem.bestHeal(for: player) else { return }
+
+        selectedSlot = heal
     }
 
     /// Input becomes a Command. Later, AI brains and network packets produce their

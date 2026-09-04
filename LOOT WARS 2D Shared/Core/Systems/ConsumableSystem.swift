@@ -29,6 +29,41 @@ enum ConsumableSystem {
         return type.isHealing || type.perk != nil
     }
 
+    /// The heal worth reaching for right now, or nil if there is none.
+    ///
+    /// Smallest that covers the wound, and the biggest one otherwise. That is the
+    /// rule the bots already play by - a graze should not cost a medkit, and when
+    /// nothing in the bag is enough you want the most it can give - and putting it
+    /// here means the screen arming a heal for the player and a bot deciding to
+    /// drink one cannot come to different conclusions about which is the right one.
+    ///
+    /// Slot order breaks a tie, so the same bag always offers the same slot rather
+    /// than swapping between two identical bandages.
+    static func bestHeal(for actor: Actor) -> Int? {
+        let missing = actor.maxHealth - actor.health
+        guard missing > 0 else { return nil }
+
+        var smallestThatFills: (slot: Int, amount: Int)?
+        var biggest: (slot: Int, amount: Int)?
+
+        for (index, slot) in actor.inventory.slots.enumerated() {
+            guard let stack = slot, stack.type.isHealing,
+                  canUse(slot: index, actor: actor) else { continue }
+
+            let amount = stack.type.healAmount(of: actor.maxHealth)
+
+            if amount >= missing, amount < (smallestThatFills?.amount ?? .max) {
+                smallestThatFills = (index, amount)
+            }
+
+            if amount > (biggest?.amount ?? 0) {
+                biggest = (index, amount)
+            }
+        }
+
+        return (smallestThatFills ?? biggest)?.slot
+    }
+
     private static func use(slot: Int, by id: ActorID, in world: World) {
         guard var actor = world.actors[id], canUse(slot: slot, actor: actor) else { return }
         guard let supply = actor.inventory.consume(at: slot) else { return }
