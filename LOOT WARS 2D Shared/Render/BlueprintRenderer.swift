@@ -2,34 +2,37 @@
 //  BlueprintRenderer.swift
 //  Loot Wars
 //
-//  Two ghost walls that ask to be tapped, and then go away for good.
+//  One ghost wall, with a tap on it, that goes away once you can build.
 //
-//  This is a TUTORIAL, not a build interface, and getting that distinction wrong is
-//  what the first two versions of this file did. Building used to be the most
-//  invisible thing in the game - you may build inside your own claim, on a free
-//  tile, while standing on your own ground, and not for a few seconds after being
-//  bombed, and a tap that missed any of those did nothing at all, which looks
-//  exactly like the game ignoring your finger. The fix for that is not a permanent
-//  overlay of everywhere you could ever build. It is showing somebody, once, that
-//  tapping the ground puts up a wall - and then getting out of the way.
+//  This is a TUTORIAL, not a build interface, and every wrong version of it came
+//  from forgetting that. Building used to be the most invisible thing in the game -
+//  you may build inside your own claim, on a free tile, while standing on your own
+//  ground, and not for a few seconds after being bombed, and a tap that missed any
+//  of those did nothing at all, which looks exactly like the game ignoring your
+//  finger. The fix is not an overlay of everywhere you could ever build. It is
+//  showing somebody, once, that tapping the ground puts up a wall.
 //
-//  So: at most two ghosts, the nearest unbuilt tiles of your own base plan, drawn
-//  as the wall they would become rather than as an abstract marker. A stand-in
-//  shape would teach a player to look for something the game never puts down; a
-//  translucent wall pulsing on the exact tile teaches the gesture and the result in
-//  one picture.
+//  ONE, AND IT STAYS PUT. Two ghosts chosen fresh every frame followed the player
+//  around the base like a shoal - each step re-sorted the plan by distance and the
+//  pair hopped to different tiles, which reads as something alive to be watched
+//  rather than a square to be pressed. A target is picked once and held until it is
+//  built or something else takes the tile, so the instruction stops moving while
+//  you walk towards it.
 //
-//  They pulse because a still thing on the ground is scenery. The whole job of this
-//  animation is to be the only thing moving in your base when you walk into it.
+//  It is drawn as the wall it would become, because a stand-in shape teaches a
+//  player to look for something the game never puts down. And it carries a tap
+//  marker - a ring going out of a dot, the pictogram every phone user has already
+//  learned - because a translucent wall alone still has to be guessed at. The wall
+//  says WHAT, the tap says HOW.
 //
-//  And they retire. Three walls in, the player has the mechanic, and Prefs
-//  remembers it for every match after this one. Not after a match COUNT: somebody
-//  whose first five minutes were spent being shot at in a field has not learned
-//  anything, and a tutorial that expires on a clock rather than on the player doing
-//  the thing is a tutorial for whoever had a quiet first match. What is left behind is the part
-//  that was always missing and is not a lesson: a refused tap flashes the tile red,
-//  so "you cannot build there" stops being indistinguishable from "the game did not
-//  see you".
+//  It retires after three walls, remembered by Prefs, and not after a match count:
+//  somebody whose first five minutes were spent being shot at in a field has not
+//  learned anything, and a tutorial that expires on a clock is a tutorial for
+//  whoever happened to have a quiet first match.
+//
+//  What is left behind afterwards is the part that was never a lesson: a refused
+//  tap flashes the tile red, so "you cannot build there" stops being
+//  indistinguishable from "the game did not see you".
 //
 
 import SpriteKit
@@ -39,23 +42,21 @@ final class BlueprintRenderer {
     /// On the ground with the claim tint, under everything that stands on it.
     let node = SKNode()
 
-    /// How many ghosts stand at once.
-    ///
-    /// Two. One is a single instruction and reads as a bug when you build it and
-    /// nothing takes its place; the whole plan is a diagram of a building, which is
-    /// a different and much louder claim than "tap here". Two says "and another one
-    /// after that", which is the shape of the actual mechanic.
-    private static let ghostCount = 2
-
-    /// How faint the wall is, at the bottom and the top of its breath.
+    /// How faint the ghost wall is, at the bottom and the top of its breath.
     private static let dimmest: CGFloat = 0.3
     private static let brightest: CGFloat = 0.62
 
-    private var ghosts: [SKSpriteNode] = []
+    /// Everything that marks the tile: the ghost wall and the tap on top of it.
+    private let marker = SKNode()
+
     private var shownFor: TeamID?
 
-    /// Whether a ghost is standing anywhere - the scene asks before spending the
-    /// text hint, so nobody is told to tap an outline that is not there.
+    /// The tile being pointed at. Held rather than recomputed, which is the whole
+    /// difference between an instruction and a distraction.
+    private var target: GridPoint?
+
+    /// Whether the marker is standing anywhere - the scene asks before spending the
+    /// text hint, so nobody is told to tap something that is not there.
     private(set) var hasSlots = false
 
     // MARK: - Drawing
@@ -73,82 +74,108 @@ final class BlueprintRenderer {
 
         build(for: player.team)
 
-        // The nearest unbuilt tiles of the plan, so the ghosts are always the ones
-        // you could reach out and touch rather than the next two in the plan's own
-        // order - which on a wall built from both ends can be halfway round the
-        // base from where you are standing.
+        // Keep the tile it is already pointing at. It is only re-chosen when it
+        // stops being a place a wall can go - because it just became one, or
+        // because a chest landed on it.
+        if let held = target,
+           BuildSystem.isBuildableTile(held, for: player.team, in: world) {
+            place(at: held)
+            return
+        }
+
         let plan = world.baseLayouts[player.team]?.tiles ?? []
 
-        let targets = Array(
-            plan
-                .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
-                .sorted { first, second in
-                    distance(from: player.feet, to: first)
-                        < distance(from: player.feet, to: second)
-                }
-                .prefix(BlueprintRenderer.ghostCount)
-        )
+        // The nearest one when a choice has to be made, so the first thing the
+        // tutorial ever points at is within arm's reach of where you spawned.
+        let next = plan
+            .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+            .min { distance(from: player.feet, to: $0) < distance(from: player.feet, to: $1) }
 
-        hasSlots = !targets.isEmpty
-        node.isHidden = targets.isEmpty
+        target = next
 
-        for (index, ghost) in ghosts.enumerated() {
-            guard index < targets.count else {
-                ghost.isHidden = true
-                continue
-            }
-
-            let tile = targets[index]
-            ghost.isHidden = false
-            ghost.position = GridGeometry.pointAtCentre(of: tile)
+        guard let next else {
+            hasSlots = false
+            marker.isHidden = true
+            return
         }
+
+        place(at: next)
+    }
+
+    private func place(at tile: GridPoint) {
+        hasSlots = true
+        marker.isHidden = false
+        marker.position = GridGeometry.pointAtCentre(of: tile)
     }
 
     private func distance(from feet: Vec2, to tile: GridPoint) -> Double {
         (Vec2(x: Double(tile.col) + 0.5, y: Double(tile.row) + 0.5) - feet).length
     }
 
-    /// Built once, on the first frame anybody needs one, because the team is not
+    /// Built once, on the first frame anybody needs it, because the team is not
     /// known before that.
     private func build(for team: TeamID) {
         guard shownFor != team else { return }
         shownFor = team
 
-        for ghost in ghosts { ghost.removeFromParent() }
-        ghosts.removeAll()
+        marker.removeAllChildren()
+        marker.removeFromParent()
+        node.addChild(marker)
 
         let side = GridGeometry.tileSize
 
-        for _ in 0..<BlueprintRenderer.ghostCount {
-            let ghost = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
-                                     size: CGSize(width: side, height: side))
-            ghost.zPosition = 1
-            ghost.alpha = BlueprintRenderer.dimmest
-            ghost.setScale(0.9)
+        // The wall it would become.
+        let wall = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
+                                size: CGSize(width: side, height: side))
+        wall.zPosition = 1
+        wall.alpha = BlueprintRenderer.dimmest
+        wall.setScale(0.9)
 
-            // In step with each other rather than staggered: two ghosts breathing
-            // out of phase read as two separate things happening, and these are one
-            // instruction written twice.
-            ghost.run(.repeatForever(.sequence([
-                .group([
-                    .fadeAlpha(to: BlueprintRenderer.brightest, duration: 0.55),
-                    .scale(to: 1.0, duration: 0.55)
-                ]),
-                .group([
-                    .fadeAlpha(to: BlueprintRenderer.dimmest, duration: 0.65),
-                    .scale(to: 0.9, duration: 0.65)
-                ])
-            ])))
+        wall.run(.repeatForever(.sequence([
+            .group([.fadeAlpha(to: BlueprintRenderer.brightest, duration: 0.55),
+                    .scale(to: 1.0, duration: 0.55)]),
+            .group([.fadeAlpha(to: BlueprintRenderer.dimmest, duration: 0.65),
+                    .scale(to: 0.9, duration: 0.65)])
+        ])))
 
-            node.addChild(ghost)
-            ghosts.append(ghost)
-        }
+        marker.addChild(wall)
+
+        // And the tap: a dot with a ring going out of it, on its own beat rather
+        // than the wall's. The two moving together would read as one thing
+        // throbbing; a ring that leaves a still dot reads as a finger arriving.
+        let dot = SKShapeNode(circleOfRadius: side * 0.11)
+        dot.fillColor = .white
+        dot.strokeColor = SKColor(white: 0, alpha: 0.55)
+        dot.lineWidth = 2
+        dot.zPosition = 3
+        marker.addChild(dot)
+
+        let ring = SKShapeNode(circleOfRadius: side * 0.2)
+        ring.fillColor = .clear
+        ring.strokeColor = .white
+        ring.lineWidth = 2.5
+        ring.zPosition = 2
+        ring.alpha = 0
+        marker.addChild(ring)
+
+        dot.run(.repeatForever(.sequence([
+            .scale(to: 0.75, duration: 0.12),
+            .scale(to: 1.0, duration: 0.28),
+            .wait(forDuration: 0.8)
+        ])))
+
+        ring.run(.repeatForever(.sequence([
+            .run { ring.setScale(0.5); ring.alpha = 0.9 },
+            .group([.scale(to: 1.9, duration: 0.7),
+                    .fadeOut(withDuration: 0.7)]),
+            .wait(forDuration: 0.5)
+        ])))
     }
 
     /// Off, and off for good once the lesson is learned.
     private func retire() {
         hasSlots = false
-        node.isHidden = true
+        marker.isHidden = true
     }
 
     // MARK: - Answering a tap
@@ -160,7 +187,11 @@ final class BlueprintRenderer {
     /// the ghost itself is about to be moved to the next tile, and something that
     /// animates and then jumps somewhere else is a glitch.
     func fill(at tile: GridPoint) {
-        guard let team = shownFor, !node.isHidden else { return }
+        guard let team = shownFor, !marker.isHidden else { return }
+
+        // The tile it was pointing at is about to have a wall on it, so the next
+        // frame picks the next one.
+        if target == tile { target = nil }
 
         let side = GridGeometry.tileSize
         let flourish = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
