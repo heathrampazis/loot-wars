@@ -117,20 +117,21 @@ final class GameScene: SKScene {
 
     /// The hold hint's whole budget for a match.
     ///
-    /// Two showings, spent only on the moment that earns them: walking over
-    /// something and not picking it up - which is the moment a full bag stops
-    /// being an abstraction. After that it is gone for the rest of the match, and
-    /// one successful hold retires it early: somebody who has done it once knows
-    /// how to do it.
-    private var holdHintsLeft = 2
+    /// One showing, spent only on the moment that earns it: walking over something
+    /// and not picking it up - which is the moment a full bag stops being an
+    /// abstraction. After that it is gone for the rest of the match, one successful
+    /// hold retires it early, and Prefs retires it for good: every lesson in this
+    /// game is shown on a first match and never again.
+    private var holdHintsLeft = 1
     private var hasUsedHold = false
 
     /// The build hint's own budget, on the same terms.
     ///
-    /// Spent when you are standing in your own base with somewhere to build and
-    /// have not built anything yet - which is the moment the outlines are lit and
-    /// the question "what are those?" is actually being asked.
-    private var buildHintsLeft = 2
+    /// Spent when you arrive in your own base with somewhere to build and have not
+    /// built anything yet - the moment the outlines light up and the question "what
+    /// are those?" is actually being asked. ONE showing, and only ever on a first
+    /// match: see Prefs. A tip that keeps coming back is not teaching.
+    private var buildHintsLeft = 1
     private var hasBuilt = false
 
     /// Whether the player was standing in their own claim last frame, so the build
@@ -260,6 +261,11 @@ final class GameScene: SKScene {
     // MARK: - Setup
 
     class func newGameScene() -> GameScene {
+        // Counted here rather than at the whistle: what it gates is the tutorial,
+        // and somebody who quit halfway through their first match has still seen
+        // it.
+        Prefs.matchesStarted += 1
+
         let scene = GameScene(size: CGSize(width: 1024, height: 768))
         scene.scaleMode = .resizeFill
         return scene
@@ -645,14 +651,19 @@ final class GameScene: SKScene {
         wasHome = home
 
         if arrivedHome, !hasBuilt, buildHintsLeft > 0,
+           Prefs.isFirstMatch, !Prefs.taughtBuilding,
            blueprint.hasSlots, world.canBuild(player.team) {
             buildHintsLeft -= 1
-            hint.show("TAP THE OUTLINES TO BUILD YOUR WALLS", seconds: 2.2)
+            Prefs.taughtBuilding = true
+            hint.show("TAP THE OUTLINES TO BUILD", seconds: 1.6)
             return
         }
 
-        guard stepped, !hasUsedHold, holdHintsLeft > 0, !hint.isShowing else { return }
+        guard stepped, !hasUsedHold, holdHintsLeft > 0, !hint.isShowing,
+              Prefs.isFirstMatch, !Prefs.taughtSelling else { return }
+
         holdHintsLeft -= 1
+        Prefs.taughtSelling = true
         hint.show(GameScene.holdSells ? "HOLD AN ITEM TO SELL IT"
                                       : "HOLD AN ITEM TO DROP IT")
     }

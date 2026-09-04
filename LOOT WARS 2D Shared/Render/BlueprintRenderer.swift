@@ -40,14 +40,29 @@ final class BlueprintRenderer {
     /// everybody - these are holes in a wall, so things stand in front of them.
     let node = SKNode()
 
-    /// How faint the plan is from across the map, and how bright it goes when you
-    /// are stood in your base with the tap available.
+    /// How faint the plan is from across the map, and how bright a socket goes when
+    /// you are stood beside it with the tap available.
     ///
     /// The dim state earns its keep on a 64 x 64 map with no minimap: it is the one
     /// mark on screen that says "your base is over there". The bright state is the
     /// button.
-    private static let restingAlpha: CGFloat = 0.22
-    private static let readyAlpha: CGFloat = 0.85
+    private static let restingAlpha: CGFloat = 0.14
+    private static let readyAlpha: CGFloat = 0.9
+
+    /// How far the lit state reaches, in tiles, and how far past that it takes to
+    /// fade out entirely.
+    ///
+    /// THE WHOLE PLAN LIT AT ONCE WAS TOO MUCH. Thirty sockets is a complete base
+    /// drawn on the ground, and what a player standing in the corner of their claim
+    /// needs to know is not "here is the finished building" - it is "a wall goes
+    /// HERE, under your feet, now". So the light follows you: the four or five
+    /// sockets within reach are bright, the rest of the plan falls away, and
+    /// walking the perimeter lights it a section at a time.
+    ///
+    /// It also means the outlines never compete with the fight. Somebody defending
+    /// their base at close quarters sees a couple of sockets rather than a grid.
+    private static let litRadius: Double = 2.6
+    private static let fadeRadius: Double = 4.0
 
     /// Seconds per breath of the lit state. Slow: this is a thing waiting for you,
     /// not a thing demanding attention.
@@ -103,11 +118,38 @@ final class BlueprintRenderer {
 
         phase += dt * 2 * .pi / BlueprintRenderer.pulseRate
 
-        // Written every frame rather than run as an action, so nothing can be left
-        // half-faded by a state change mid-animation.
-        node.alpha = ready
+        // The container carries the breath; each socket carries its own distance.
+        // Written every frame rather than run as actions, so nothing can be left
+        // half-faded by a state change part way through an animation - and there is
+        // no per-brick action to start and stop as you walk past it.
+        node.alpha = 1
+
+        let breath = ready
             ? BlueprintRenderer.readyAlpha - 0.18 * CGFloat((sin(phase) + 1) / 2)
             : BlueprintRenderer.restingAlpha
+
+        for (tile, brick) in bricks {
+            guard ready else {
+                brick.alpha = breath
+                continue
+            }
+
+            let centre = Vec2(x: Double(tile.col) + 0.5, y: Double(tile.row) + 0.5)
+            let distance = (centre - player.feet).length
+
+            brick.alpha = breath * CGFloat(BlueprintRenderer.reach(at: distance))
+        }
+    }
+
+    /// One at the tile you are standing on, nothing past the fade radius, and a
+    /// smooth ramp in between - a smoothstep rather than a straight line, so the
+    /// edge of the light has no visible rim to it.
+    private static func reach(at distance: Double) -> Double {
+        guard distance > litRadius else { return 1 }
+        guard distance < fadeRadius else { return 0 }
+
+        let t = (fadeRadius - distance) / (fadeRadius - litRadius)
+        return t * t * (3 - 2 * t)
     }
 
     private func rebuild(for team: TeamID, in world: World) {
@@ -121,17 +163,24 @@ final class BlueprintRenderer {
 
         for tile in plan where BuildSystem.isBuildableTile(tile, for: team, in: world) {
             let brick = SKShapeNode(
-                rect: CGRect(x: -side / 2 + 2, y: -side / 2 + 2,
-                             width: side - 4, height: side - 4),
-                cornerRadius: 5
+                rect: CGRect(x: -side / 2 + 3, y: -side / 2 + 3,
+                             width: side - 6, height: side - 6),
+                cornerRadius: 6
             )
 
-            // An outline with almost nothing inside it. A filled ghost reads as a
-            // wall that is already there and greys out your own base; an outline
-            // reads as a space waiting for one.
-            brick.fillColor = colour.withAlphaComponent(0.16)
-            brick.strokeColor = colour
-            brick.lineWidth = 2
+            // A dark socket rather than a bright outline, and the difference is
+            // what the shape claims to be. A ring of team colour looked like a
+            // thing that was already there - a marker, a decoration, something with
+            // its own meaning - and eight of them in a row read as bunting. A
+            // recessed square reads as a HOLE, which is exactly what an unbuilt
+            // wall tile is, and it takes the wall arriving in it as the obvious
+            // next event.
+            //
+            // The team colour stays, as a thin edge and nothing more: enough that
+            // the sockets belong to you rather than to the ground.
+            brick.fillColor = SKColor(white: 0, alpha: 0.30)
+            brick.strokeColor = colour.withAlphaComponent(0.55)
+            brick.lineWidth = 1.5
             brick.position = GridGeometry.pointAtCentre(of: tile)
             brick.zPosition = 1
 
