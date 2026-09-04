@@ -195,20 +195,20 @@ enum RenderPalette {
     /// panel that means anything, and is what every shop in every game does. The
     /// refusal is still red - shake a card you actually pressed and cannot buy, and
     /// it flashes red - because that IS a moment, and it is over in half a second.
-    /// Lighter than the card it sits on, and that direction is the whole trick.
+    /// Deliberately DARKER than the card it sits on rather than lighter.
     ///
-    /// There is a wrong lighter and a right one here. The card plate sits at about
-    /// 0.34 brightness, so nudging the button UP from near-black lands it straight
-    /// on the plate's own value and the button dissolves into the card - the two
-    /// worst versions of this are both greys within a few points of 0.34. Going
-    /// past it to 0.48 puts the button back above its card, where the green one
-    /// already is: the pair then reads as one button lit and one not, rather than
-    /// as a button and a hole.
+    /// A lighter grey was tried and looked worse, and it is worth saying why the
+    /// argument for it did not survive contact. The theory was that lifting the
+    /// button above its card would make the pair read as one button lit and one
+    /// not; what it actually did was give a price you cannot pay the same visual
+    /// weight as one you can, so the row stopped sorting itself at a glance. Dark
+    /// reads as the unlit version of the green - the same button with nothing
+    /// behind it - which is exactly what it is.
     ///
-    /// White on this is about a 2:1 contrast, which is deliberately unremarkable.
-    /// The number on a price you cannot pay is the one thing on this panel that
-    /// should not be shouting; at 18-point bold it stays perfectly readable.
-    static let unaffordable = SKColor(red: 0.44, green: 0.48, blue: 0.54, alpha: 1)
+    /// Still clear of the plate's own brightness in the other direction, which is
+    /// the one rule here that does not bend: a grey at the plate's value dissolves
+    /// into the card and stops being a button at all.
+    static let unaffordable = SKColor(red: 0.24, green: 0.27, blue: 0.32, alpha: 1)
 
     /// The same two, a few shades down, for the lip under a button.
     ///
@@ -219,7 +219,7 @@ enum RenderPalette {
     /// world - the token, the crates, the figures - so a black-ringed capsule read
     /// as a thing lying on the grass rather than a control on a panel.
     static let affordableDeep = rgb(0x2C, 0x8B, 0x3F)
-    static let unaffordableDeep = SKColor(red: 0.29, green: 0.32, blue: 0.37, alpha: 1)
+    static let unaffordableDeep = SKColor(red: 0.14, green: 0.16, blue: 0.20, alpha: 1)
 
     // Placement preview. Green while a footprint would take, red while it would
     // not - the only two colours nobody has to be taught.
