@@ -2,218 +2,185 @@
 //  BlueprintRenderer.swift
 //  Loot Wars
 //
-//  The wall you have not built yet, drawn where it goes.
+//  Two ghost walls that ask to be tapped, and then go away for good.
 //
-//  Building used to be the most invisible thing in this game, and the reason is
-//  worth stating plainly: every rule about it was true and none of it was VISIBLE.
-//  You may build inside your own claim, on a free tile, while standing on your own
-//  ground, and not for a few seconds after being bombed. A tap that satisfied all
-//  four put up a wall; a tap that missed any of them did nothing whatsoever - and
-//  nothing whatsoever looks exactly like the game not registering your finger. So
-//  the first question a new player has - "can I even do this here?" - had no answer
-//  on screen at all, and the second - "what am I supposed to be building?" - had
-//  never been asked out loud.
+//  This is a TUTORIAL, not a build interface, and getting that distinction wrong is
+//  what the first two versions of this file did. Building used to be the most
+//  invisible thing in the game - you may build inside your own claim, on a free
+//  tile, while standing on your own ground, and not for a few seconds after being
+//  bombed, and a tap that missed any of those did nothing at all, which looks
+//  exactly like the game ignoring your finger. The fix for that is not a permanent
+//  overlay of everywhere you could ever build. It is showing somebody, once, that
+//  tapping the ground puts up a wall - and then getting out of the way.
 //
-//  Both are answered by drawing the plan. Every team already has one: BaseLayout is
-//  the ordered list of wall tiles the bots lay, generated per claim at map time, and
-//  it exists for the player's team exactly as it does for theirs. Nobody was showing
-//  it to the one team that could read it.
+//  So: at most two ghosts, the nearest unbuilt tiles of your own base plan, drawn
+//  as the wall they would become rather than as an abstract marker. A stand-in
+//  shape would teach a player to look for something the game never puts down; a
+//  translucent wall pulsing on the exact tile teaches the gesture and the result in
+//  one picture.
 //
-//  So the unbuilt tiles of your own base are drawn as empty bricks. Faint from
-//  across the map - which incidentally is the only thing on screen that says which
-//  base is yours - and lit up when you are standing inside your claim, because that
-//  is exactly when tapping one will work. The affordance and the rule are the same
-//  shape: if it is glowing, it will build.
+//  They pulse because a still thing on the ground is scenery. The whole job of this
+//  animation is to be the only thing moving in your base when you walk into it.
 //
-//  It stays a SUGGESTION. Tapping any free tile in your claim still builds there,
-//  the same as it always did - the plan is what the game recommends, not a track it
-//  puts you on. What it buys is that a player who has no idea what a base should
-//  look like is shown the answer the bots are already using, and can trace it with
-//  a finger.
+//  And they retire. Two or three walls in, the player has the mechanic, and Prefs
+//  remembers it for every match after this one. What is left behind is the part
+//  that was always missing and is not a lesson: a refused tap flashes the tile red,
+//  so "you cannot build there" stops being indistinguishable from "the game did not
+//  see you".
 //
 
 import SpriteKit
 
 final class BlueprintRenderer {
 
-    /// Above the claim tint and the ground, below the trees, the walls and
-    /// everybody - these are holes in a wall, so things stand in front of them.
+    /// On the ground with the claim tint, under everything that stands on it.
     let node = SKNode()
 
-    /// How faint the plan is from across the map, and how bright a socket goes when
-    /// you are stood beside it with the tap available.
+    /// How many ghosts stand at once.
     ///
-    /// The dim state earns its keep on a 64 x 64 map with no minimap: it is the one
-    /// mark on screen that says "your base is over there". The bright state is the
-    /// button.
-    private static let restingAlpha: CGFloat = 0.14
-    private static let readyAlpha: CGFloat = 0.9
+    /// Two. One is a single instruction and reads as a bug when you build it and
+    /// nothing takes its place; the whole plan is a diagram of a building, which is
+    /// a different and much louder claim than "tap here". Two says "and another one
+    /// after that", which is the shape of the actual mechanic.
+    private static let ghostCount = 2
 
-    /// How far the lit state reaches, in tiles, and how far past that it takes to
-    /// fade out entirely.
-    ///
-    /// THE WHOLE PLAN LIT AT ONCE WAS TOO MUCH. Thirty sockets is a complete base
-    /// drawn on the ground, and what a player standing in the corner of their claim
-    /// needs to know is not "here is the finished building" - it is "a wall goes
-    /// HERE, under your feet, now". So the light follows you: the four or five
-    /// sockets within reach are bright, the rest of the plan falls away, and
-    /// walking the perimeter lights it a section at a time.
-    ///
-    /// It also means the outlines never compete with the fight. Somebody defending
-    /// their base at close quarters sees a couple of sockets rather than a grid.
-    private static let litRadius: Double = 2.6
-    private static let fadeRadius: Double = 4.0
+    /// How faint the wall is, at the bottom and the top of its breath.
+    private static let dimmest: CGFloat = 0.3
+    private static let brightest: CGFloat = 0.62
 
-    /// Seconds per breath of the lit state. Slow: this is a thing waiting for you,
-    /// not a thing demanding attention.
-    private static let pulseRate: Double = 1.9
+    private var ghosts: [SKSpriteNode] = []
+    private var shownFor: TeamID?
 
-    private var bricks: [GridPoint: SKShapeNode] = [:]
-
-    /// What the plan was last drawn against.
-    ///
-    /// The map's revision counts walls going up and coming down; the structure
-    /// count catches the other thing that can occupy a tile a brick is sitting on -
-    /// a chest or a machine put down inside your own base. Without the second, you
-    /// get an outline drawn over your own chest that flashes red when tapped, which
-    /// is the exact confusion this file exists to remove.
-    private var drawnRevision = -1
-    private var drawnStructures = -1
-    private var drawnTeam: TeamID?
-    private var phase: Double = 0
-
-    /// Whether there is anything left to build at all - the scene asks, so the hint
-    /// is never offered to somebody whose base is already finished.
+    /// Whether a ghost is standing anywhere - the scene asks before spending the
+    /// text hint, so nobody is told to tap an outline that is not there.
     private(set) var hasSlots = false
 
     // MARK: - Drawing
 
     func sync(with world: World, dt: TimeInterval) {
-        guard let player = world.localPlayer, player.isAlive, !world.isOver else {
-            node.isHidden = true
+        guard Prefs.isFirstMatch, !Prefs.taughtBuilding,
+              let player = world.localPlayer, player.isAlive, !world.isOver,
+              world.canBuild(player.team),
+              world.claim(for: player.team)?
+                  .contains(GridPoint(containing: player.feet)) == true
+        else {
+            retire()
             return
         }
 
-        let structures = world.chests.count + world.arcades.count
+        build(for: player.team)
 
-        if world.mapRevision != drawnRevision
-            || structures != drawnStructures
-            || drawnTeam != player.team {
-            drawnRevision = world.mapRevision
-            drawnStructures = structures
-            drawnTeam = player.team
-            rebuild(for: player.team, in: world)
-        }
+        // The nearest unbuilt tiles of the plan, so the ghosts are always the ones
+        // you could reach out and touch rather than the next two in the plan's own
+        // order - which on a wall built from both ends can be halfway round the
+        // base from where you are standing.
+        let plan = world.baseLayouts[player.team]?.tiles ?? []
 
-        hasSlots = !bricks.isEmpty
-        node.isHidden = bricks.isEmpty
+        let targets = Array(
+            plan
+                .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+                .sorted { first, second in
+                    distance(from: player.feet, to: first)
+                        < distance(from: player.feet, to: second)
+                }
+                .prefix(BlueprintRenderer.ghostCount)
+        )
 
-        // Lit exactly when a tap would work, which is the whole point: the two
-        // conditions the player cannot see - standing on your own ground, and the
-        // seconds of quiet after being bombed - are the two that turn it on.
-        let standingHome = world.claim(for: player.team)?
-            .contains(GridPoint(containing: player.feet)) == true
+        hasSlots = !targets.isEmpty
+        node.isHidden = targets.isEmpty
 
-        let ready = standingHome && world.canBuild(player.team)
-
-        phase += dt * 2 * .pi / BlueprintRenderer.pulseRate
-
-        // The container carries the breath; each socket carries its own distance.
-        // Written every frame rather than run as actions, so nothing can be left
-        // half-faded by a state change part way through an animation - and there is
-        // no per-brick action to start and stop as you walk past it.
-        node.alpha = 1
-
-        let breath = ready
-            ? BlueprintRenderer.readyAlpha - 0.18 * CGFloat((sin(phase) + 1) / 2)
-            : BlueprintRenderer.restingAlpha
-
-        for (tile, brick) in bricks {
-            guard ready else {
-                brick.alpha = breath
+        for (index, ghost) in ghosts.enumerated() {
+            guard index < targets.count else {
+                ghost.isHidden = true
                 continue
             }
 
-            let centre = Vec2(x: Double(tile.col) + 0.5, y: Double(tile.row) + 0.5)
-            let distance = (centre - player.feet).length
-
-            brick.alpha = breath * CGFloat(BlueprintRenderer.reach(at: distance))
+            let tile = targets[index]
+            ghost.isHidden = false
+            ghost.position = GridGeometry.pointAtCentre(of: tile)
         }
     }
 
-    /// One at the tile you are standing on, nothing past the fade radius, and a
-    /// smooth ramp in between - a smoothstep rather than a straight line, so the
-    /// edge of the light has no visible rim to it.
-    private static func reach(at distance: Double) -> Double {
-        guard distance > litRadius else { return 1 }
-        guard distance < fadeRadius else { return 0 }
-
-        let t = (fadeRadius - distance) / (fadeRadius - litRadius)
-        return t * t * (3 - 2 * t)
+    private func distance(from feet: Vec2, to tile: GridPoint) -> Double {
+        (Vec2(x: Double(tile.col) + 0.5, y: Double(tile.row) + 0.5) - feet).length
     }
 
-    private func rebuild(for team: TeamID, in world: World) {
-        for brick in bricks.values { brick.removeFromParent() }
-        bricks.removeAll()
+    /// Built once, on the first frame anybody needs one, because the team is not
+    /// known before that.
+    private func build(for team: TeamID) {
+        guard shownFor != team else { return }
+        shownFor = team
 
-        guard let plan = world.baseLayouts[team]?.tiles else { return }
+        for ghost in ghosts { ghost.removeFromParent() }
+        ghosts.removeAll()
 
-        let colour = RenderPalette.colour(for: team)
         let side = GridGeometry.tileSize
 
-        for tile in plan where BuildSystem.isBuildableTile(tile, for: team, in: world) {
-            let brick = SKShapeNode(
-                rect: CGRect(x: -side / 2 + 3, y: -side / 2 + 3,
-                             width: side - 6, height: side - 6),
-                cornerRadius: 6
-            )
+        for _ in 0..<BlueprintRenderer.ghostCount {
+            let ghost = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
+                                     size: CGSize(width: side, height: side))
+            ghost.zPosition = 1
+            ghost.alpha = BlueprintRenderer.dimmest
+            ghost.setScale(0.9)
 
-            // A dark socket rather than a bright outline, and the difference is
-            // what the shape claims to be. A ring of team colour looked like a
-            // thing that was already there - a marker, a decoration, something with
-            // its own meaning - and eight of them in a row read as bunting. A
-            // recessed square reads as a HOLE, which is exactly what an unbuilt
-            // wall tile is, and it takes the wall arriving in it as the obvious
-            // next event.
-            //
-            // The team colour stays, as a thin edge and nothing more: enough that
-            // the sockets belong to you rather than to the ground.
-            brick.fillColor = SKColor(white: 0, alpha: 0.30)
-            brick.strokeColor = colour.withAlphaComponent(0.55)
-            brick.lineWidth = 1.5
-            brick.position = GridGeometry.pointAtCentre(of: tile)
-            brick.zPosition = 1
+            // In step with each other rather than staggered: two ghosts breathing
+            // out of phase read as two separate things happening, and these are one
+            // instruction written twice.
+            ghost.run(.repeatForever(.sequence([
+                .group([
+                    .fadeAlpha(to: BlueprintRenderer.brightest, duration: 0.55),
+                    .scale(to: 1.0, duration: 0.55)
+                ]),
+                .group([
+                    .fadeAlpha(to: BlueprintRenderer.dimmest, duration: 0.65),
+                    .scale(to: 0.9, duration: 0.65)
+                ])
+            ])))
 
-            node.addChild(brick)
-            bricks[tile] = brick
+            node.addChild(ghost)
+            ghosts.append(ghost)
         }
+    }
+
+    /// Off, and off for good once the lesson is learned.
+    private func retire() {
+        hasSlots = false
+        node.isHidden = true
     }
 
     // MARK: - Answering a tap
 
-    /// A tap that would have built here, and did.
+    /// A tap that built here.
     ///
-    /// The wall itself appears on the next frame, so this is only the brick getting
-    /// out of the way - it pops and vanishes rather than being switched off, which
-    /// is what makes the wall look like it came from the outline rather than
-    /// replacing it.
+    /// The ghost pops out of the way rather than being switched off, so the wall
+    /// looks like it came FROM the ghost rather than replacing it. A copy pops -
+    /// the ghost itself is about to be moved to the next tile, and something that
+    /// animates and then jumps somewhere else is a glitch.
     func fill(at tile: GridPoint) {
-        guard let brick = bricks[tile] else { return }
-        bricks[tile] = nil
+        guard let team = shownFor, !node.isHidden else { return }
 
-        brick.run(.sequence([
-            .group([.scale(to: 1.25, duration: 0.12),
-                    .fadeOut(withDuration: 0.12)]),
+        let side = GridGeometry.tileSize
+        let flourish = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
+                                    size: CGSize(width: side, height: side))
+
+        flourish.position = GridGeometry.pointAtCentre(of: tile)
+        flourish.zPosition = 2
+        flourish.alpha = 0.7
+        node.addChild(flourish)
+
+        flourish.run(.sequence([
+            .group([.scale(to: 1.3, duration: 0.16),
+                    .fadeOut(withDuration: 0.16)]),
             .removeFromParent()
         ]))
     }
 
     /// A tap that could not build here.
     ///
-    /// Something has to happen. A refused tap used to be indistinguishable from a
-    /// tap the game had not noticed, which is the single worst failure state an
-    /// interface can have: the player cannot tell whether to try again, try
-    /// elsewhere, or stop trying.
+    /// This one outlives the tutorial. Something has to happen: a refused tap used
+    /// to be indistinguishable from a tap the game had not noticed, which is the
+    /// worst failure state an interface has - the player cannot tell whether to try
+    /// again, try elsewhere, or stop trying.
     func refuse(at tile: GridPoint) {
         let side = GridGeometry.tileSize
 
@@ -227,15 +194,11 @@ final class BlueprintRenderer {
         flash.strokeColor = RenderPalette.placementBlocked
         flash.lineWidth = 2.5
         flash.position = GridGeometry.pointAtCentre(of: tile)
-
-        // Above the plan and above its own parent's fade: a refusal has to be
-        // readable whether or not the blueprint happens to be lit.
         flash.zPosition = 2
-        flash.alpha = 1
 
-        // Parented to the world layer's own node rather than to the blueprint, or
-        // it would inherit the resting alpha and be a whisper exactly when it needs
-        // to be a word.
+        // Parented to the world layer rather than to this node, which spends most
+        // of a match hidden - a refusal has to be readable whether or not the
+        // tutorial is still running.
         node.parent?.addChild(flash)
 
         flash.run(.sequence([

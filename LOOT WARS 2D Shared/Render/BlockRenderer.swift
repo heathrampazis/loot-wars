@@ -115,6 +115,24 @@ final class BlockRenderer {
 
     // MARK: - Textures
 
+    /// A single unattached wall in a team's colour, for anything that needs to draw
+    /// one that is not on the map yet.
+    ///
+    /// Public and static because the blueprint draws a GHOST of a wall to teach
+    /// building, and a ghost of a wall has to be the wall - a stand-in shape would
+    /// be teaching the player to look for something the game never puts down. Mask
+    /// zero is a block with no neighbours, which is what the first one you place
+    /// always is.
+    static func ghostTexture(for team: TeamID) -> SKTexture {
+        if let cached = ghostCache[team] { return cached }
+
+        let made = makeTexture(mask: 0, colour: RenderPalette.colour(for: team))
+        ghostCache[team] = made
+        return made
+    }
+
+    private static var ghostCache: [TeamID: SKTexture] = [:]
+
     private func texture(for key: TextureKey) -> SKTexture {
         if let cached = textureCache[key] { return cached }
         let made = BlockRenderer.makeTexture(mask: key.mask,

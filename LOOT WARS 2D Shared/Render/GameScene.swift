@@ -134,6 +134,15 @@ final class GameScene: SKScene {
     private var buildHintsLeft = 1
     private var hasBuilt = false
 
+    /// Walls laid this match, and how many it takes to have learned the gesture.
+    ///
+    /// Three. One could be an accident, two is a habit forming, and by the third
+    /// the ghosts have said everything they have to say - so they go, and Prefs
+    /// keeps them gone for every match after this one. A tutorial that outstays
+    /// this is furniture.
+    private var wallsBuilt = 0
+    private static let wallsToLearn = 3
+
     /// Whether the player was standing in their own claim last frame, so the build
     /// hint fires on ARRIVING home rather than once per frame while standing there.
     /// The same shape as wasBlocked, and for the same reason: a hint is a reaction
@@ -654,8 +663,12 @@ final class GameScene: SKScene {
            Prefs.isFirstMatch, !Prefs.taughtBuilding,
            blueprint.hasSlots, world.canBuild(player.team) {
             buildHintsLeft -= 1
-            Prefs.taughtBuilding = true
-            hint.show("TAP THE OUTLINES TO BUILD", seconds: 1.6)
+
+            // The words name what the ghosts are doing; they do not end the lesson.
+            // Building three walls does that - see tapMap - because the lesson is
+            // over when the player can do the thing, not when they have been told
+            // about it.
+            hint.show("TAP THE WALLS TO BUILD", seconds: 1.6)
             return
         }
 
@@ -1400,6 +1413,11 @@ extension GameScene {
         if BuildSystem.canPlace(at: tile, by: player, in: world) {
             blueprint.fill(at: tile)
             hasBuilt = true
+            wallsBuilt += 1
+
+            // Learned. The ghosts read this the next frame and stand down, and it
+            // is remembered, so a second match never teaches building again.
+            if wallsBuilt >= GameScene.wallsToLearn { Prefs.taughtBuilding = true }
             return
         }
 
