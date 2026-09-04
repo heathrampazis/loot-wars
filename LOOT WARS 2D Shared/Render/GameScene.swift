@@ -114,14 +114,15 @@ final class GameScene: SKScene {
     /// Teaches the one gesture nothing on screen suggests: hold a slot to drop it.
     private let hint = HintNode()
 
-    /// The drop hint's whole budget for a match.
+    /// The hold hint's whole budget for a match.
     ///
     /// Two showings, spent only on the moment that earns them: walking over
-    /// something and not picking it up. After that it is gone for the rest of the
-    /// match, and one successful drop retires it early - somebody who has dropped
-    /// something knows how to drop something.
-    private var dropHintsLeft = 2
-    private var hasDropped = false
+    /// something and not picking it up - which is the moment a full bag stops
+    /// being an abstraction. After that it is gone for the rest of the match, and
+    /// one successful hold retires it early: somebody who has done it once knows
+    /// how to do it.
+    private var holdHintsLeft = 2
+    private var hasUsedHold = false
 
     /// Who killed you, while you are waiting to come back - see aimCamera.
     private var killedBy: ActorID?
@@ -606,9 +607,10 @@ final class GameScene: SKScene {
         // a tip arriving then is not teaching, it is interrupting.
         guard world.matchProgress < GameScene.hintWindow else { return }
 
-        guard stepped, !hasDropped, dropHintsLeft > 0, !hint.isShowing else { return }
-        dropHintsLeft -= 1
-        hint.show("HOLD AN ITEM TO DROP IT")
+        guard stepped, !hasUsedHold, holdHintsLeft > 0, !hint.isShowing else { return }
+        holdHintsLeft -= 1
+        hint.show(GameScene.holdSells ? "HOLD AN ITEM TO SELL IT"
+                                      : "HOLD AN ITEM TO DROP IT")
     }
 
     /// Points the camera at whoever it should be watching.
@@ -672,6 +674,10 @@ final class GameScene: SKScene {
                 // The cloud itself is drawn from the world every frame; this is the
                 // burst that says it arrived, which state alone cannot show.
                 effectsRenderer.burst(at: position)
+
+            case .sold(let slot, let tokens, let seller):
+                guard seller == world.localPlayerID else { break }
+                hotbar.reward(slot: slot, tokens: tokens)
 
             case .purchase(_, let buyer):
                 guard buyer == world.localPlayerID else { break }
@@ -1139,8 +1145,22 @@ extension GameScene {
         pending = nil
     }
 
+    /// What a long press on a hotbar slot does.
+    ///
+    /// Both answers are built and only one is wired up, which is deliberate. This
+    /// gesture used to throw the item on the floor, and dropping is still the
+    /// honest reading of it - you can pick the thing back up, you can hand it to
+    /// somebody, and nothing about it is irreversible. Selling is the more USEFUL
+    /// reading: what a full bag is actually full of is junk, and a bandage on the
+    /// grass helps nobody while three tokens do.
+    ///
+    /// Which of those feels better is not a question anybody can answer by
+    /// thinking about it, so the drop path stays exactly where it is - Command,
+    /// LootSystem and all - and this one line decides which of them a hold means.
+    private static let holdSells = true
+
     /// Turns a finger that has stayed put into the second meaning of that gesture:
-    /// take your own wall back down, or throw the item away.
+    /// take your own wall back down, or turn the item into tokens.
     private func resolveHold(at now: TimeInterval) {
         guard var press = pending,
               !press.fired,
@@ -1153,11 +1173,12 @@ extension GameScene {
         case .map:
             queuedCommands.append(.removeBlock(GridGeometry.gridPoint(for: press.worldOrigin)))
         case .hotbar(let slot):
-            queuedCommands.append(.dropItem(slot: slot))
+            queuedCommands.append(GameScene.holdSells ? .sellItem(slot: slot)
+                                                      : .dropItem(slot: slot))
             hotbar.endHold()
 
-            // Somebody who has dropped something knows how to drop something.
-            hasDropped = true
+            // Somebody who has done it once knows how to do it.
+            hasUsedHold = true
             hint.hide()
         }
     }

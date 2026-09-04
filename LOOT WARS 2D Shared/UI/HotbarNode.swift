@@ -100,6 +100,62 @@ final class HotbarNode: SKNode {
         }
     }
 
+    /// The payout, thrown up out of the slot the item came from.
+    ///
+    /// At the slot rather than up at the token counter, and that is the whole
+    /// point of it. The counter in the corner already went up by three; what it
+    /// cannot say is that the three came from THAT square, and the square you were
+    /// holding when it happened is the only place a player is looking. A number
+    /// arriving somewhere else on screen is a number nobody connects to the gesture
+    /// they just made.
+    ///
+    /// It rises and fades rather than flying to the counter. An arc across to the
+    /// corner was the other option and is what a PURCHASE does in reverse - but a
+    /// purchase has to explain where the thing went, and a sale does not: you can
+    /// see the slot is empty. This only has to say it was worth something.
+    func reward(slot index: Int, tokens: Int) {
+        guard slots.indices.contains(index), tokens > 0 else { return }
+
+        let payout = SKNode()
+        payout.position = CGPoint(x: HotbarNode.centreX(of: index),
+                                  y: HotbarNode.slotSize * 0.35)
+        payout.zPosition = 20
+        addChild(payout)
+
+        let texture = ItemArt.texture(for: Pickup.token(1))
+        let coin = SKSpriteNode(texture: texture)
+        let side = HotbarNode.slotSize * 0.42
+        coin.size = ItemArt.size(of: texture, fittingInto: side)
+        coin.position = CGPoint(x: -side * 0.45, y: 0)
+        payout.addChild(coin)
+
+        let amount = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        amount.text = "+\(tokens)"
+        amount.fontSize = HotbarNode.slotSize * 0.34
+        amount.fontColor = RenderPalette.sellButton
+        amount.horizontalAlignmentMode = .left
+        amount.verticalAlignmentMode = .center
+        amount.position = CGPoint(x: side * 0.2, y: 0)
+        payout.addChild(amount)
+
+        // Pops, climbs, goes. The pop is what makes it read as being handed to you
+        // rather than as a caption that faded in.
+        payout.setScale(0.4)
+        payout.run(.sequence([
+            .group([
+                .sequence([.scale(to: 1.18, duration: 0.12),
+                           .scale(to: 1.0, duration: 0.1)]),
+                .moveBy(x: 0, y: HotbarNode.slotSize * 0.85, duration: 0.75),
+                .sequence([.wait(forDuration: 0.42),
+                           .fadeOut(withDuration: 0.33)])
+            ]),
+            .removeFromParent()
+        ]))
+
+        // And the slot it came out of flinches, so the two are one event.
+        slots[index].flinch()
+    }
+
     /// Turns the bar into a sell counter, or back into a bar.
     func setSelling(_ selling: Bool) {
         guard selling != self.selling else { return }

@@ -4,7 +4,7 @@
 //
 //  A line of text that teaches one gesture and then goes away for good.
 //
-//  Holding a hotbar slot drops the item, and holding a wall takes it down. Both are
+//  Holding a hotbar slot sells the item, and holding a wall takes it down. Both are
 //  good gestures and neither is discoverable: nothing on the screen suggests that
 //  pressing something for half a second means anything different from tapping it,
 //  so a player either finds it by accident or never finds it at all.

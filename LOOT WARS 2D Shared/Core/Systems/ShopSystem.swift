@@ -174,6 +174,7 @@ enum ShopSystem {
 
         actor.tokens += paid
         world.actors[id] = actor
+        world.record(.sold(slot: slot, tokens: paid, by: id))
     }
 
     /// The one thing worth offering out of the blue, or nil.

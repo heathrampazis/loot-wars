@@ -55,6 +55,15 @@ enum WorldEvent {
     /// steady effect that follows it.
     case perkStarted(Perk, by: ActorID)
 
+    /// Somebody sold something, out of which slot, and what it paid.
+    ///
+    /// All three of those are gone by the next frame - the slot is empty, the item
+    /// no longer exists, and the tokens have been added to a total that says
+    /// nothing about where they came from. A screen that wants to show a sale
+    /// being rewarded cannot work any of it out by looking, which is exactly the
+    /// test for whether something belongs in here.
+    case sold(slot: Int, tokens: Int, by: ActorID)
+
     /// Somebody bought something.
     case purchase(ItemType, by: ActorID)
 

@@ -229,6 +229,20 @@ final class ItemSlotNode: SKNode {
         ])), withKey: "rare")
     }
 
+    /// A quick squeeze that ends back at this slot's own resting size.
+    ///
+    /// Not a plain scale action from outside: a selected slot rests at 1.14 and a
+    /// held one is on its way to 0.8, and anything that ends at a flat 1 would
+    /// quietly resize whichever slot you had picked out. It also takes the same
+    /// key, so a squeeze and a settle cannot both be running.
+    func flinch() {
+        removeAction(forKey: "scale")
+        run(.sequence([
+            .scale(to: restingScale * 0.86, duration: 0.07),
+            .scale(to: restingScale, duration: 0.14)
+        ]), withKey: "scale")
+    }
+
     private func settle() {
         removeAction(forKey: "scale")
         run(.scale(to: restingScale, duration: 0.12), withKey: "scale")
