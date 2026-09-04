@@ -20,10 +20,11 @@
 //  you walk towards it.
 //
 //  It is drawn as the wall it would become, because a stand-in shape teaches a
-//  player to look for something the game never puts down. And it carries a tap
-//  marker - a ring going out of a dot, the pictogram every phone user has already
-//  learned - because a translucent wall alone still has to be guessed at. The wall
-//  says WHAT, the tap says HOW.
+//  player to look for something the game never puts down. A tap pictogram was tried
+//  on top of it - a ring going out of a dot - and came off again: on a screen this
+//  busy it was a third thing to read on a tile that already had two, and a wall
+//  fading in and out on a piece of ground you are standing next to is an invitation
+//  on its own.
 //
 //  It retires after three walls, remembered by Prefs, and not after a match count:
 //  somebody whose first five minutes were spent being shot at in a field has not
@@ -84,11 +85,26 @@ final class BlueprintRenderer {
         }
 
         let plan = world.baseLayouts[player.team]?.tiles ?? []
+        let free = plan.filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
 
-        // The nearest one when a choice has to be made, so the first thing the
-        // tutorial ever points at is within arm's reach of where you spawned.
-        let next = plan
-            .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+        // On the OUTSIDE of the plan, not simply the nearest tile.
+        //
+        // The nearest one is usually behind you or beside your own chest, which
+        // teaches "tapping the ground makes a wall" and nothing else. A wall is not
+        // a wall until it goes round something, and the thing this tutorial is
+        // actually for is the shape: the first tile it points at should be one a
+        // player would recognise as the EDGE of their base, so the wall they build
+        // next to it continues an outline rather than starting a stump in the
+        // middle of their own yard.
+        //
+        // So: the ring of tiles furthest from the middle of the claim, and the one
+        // of those nearest the player - out on the perimeter, but the part of the
+        // perimeter they are already standing by.
+        let centre = world.claim(for: player.team)?.centreTile
+        let outermost = free.map { edginess(of: $0, from: centre) }.max() ?? 0
+
+        let next = free
+            .filter { edginess(of: $0, from: centre) >= outermost - 0.75 }
             .min { distance(from: player.feet, to: $0) < distance(from: player.feet, to: $1) }
 
         target = next
@@ -106,6 +122,15 @@ final class BlueprintRenderer {
         hasSlots = true
         marker.isHidden = false
         marker.position = GridGeometry.pointAtCentre(of: tile)
+    }
+
+    /// How far out towards the edge of the claim a tile sits. Chebyshev rather than
+    /// straight-line distance, because a claim is a square and its edge is a square:
+    /// by this measure every tile on the same ring scores the same, which is what
+    /// makes "the outer ring" a set rather than four corners.
+    private func edginess(of tile: GridPoint, from centre: GridPoint?) -> Double {
+        guard let centre else { return 0 }
+        return Double(max(abs(tile.col - centre.col), abs(tile.row - centre.row)))
     }
 
     private func distance(from feet: Vec2, to tile: GridPoint) -> Double {
@@ -140,36 +165,6 @@ final class BlueprintRenderer {
 
         marker.addChild(wall)
 
-        // And the tap: a dot with a ring going out of it, on its own beat rather
-        // than the wall's. The two moving together would read as one thing
-        // throbbing; a ring that leaves a still dot reads as a finger arriving.
-        let dot = SKShapeNode(circleOfRadius: side * 0.11)
-        dot.fillColor = .white
-        dot.strokeColor = SKColor(white: 0, alpha: 0.55)
-        dot.lineWidth = 2
-        dot.zPosition = 3
-        marker.addChild(dot)
-
-        let ring = SKShapeNode(circleOfRadius: side * 0.2)
-        ring.fillColor = .clear
-        ring.strokeColor = .white
-        ring.lineWidth = 2.5
-        ring.zPosition = 2
-        ring.alpha = 0
-        marker.addChild(ring)
-
-        dot.run(.repeatForever(.sequence([
-            .scale(to: 0.75, duration: 0.12),
-            .scale(to: 1.0, duration: 0.28),
-            .wait(forDuration: 0.8)
-        ])))
-
-        ring.run(.repeatForever(.sequence([
-            .run { ring.setScale(0.5); ring.alpha = 0.9 },
-            .group([.scale(to: 1.9, duration: 0.7),
-                    .fadeOut(withDuration: 0.7)]),
-            .wait(forDuration: 0.5)
-        ])))
     }
 
     /// Off, and off for good once the lesson is learned.

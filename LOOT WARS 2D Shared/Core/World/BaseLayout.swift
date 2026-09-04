@@ -58,8 +58,21 @@ enum BaseLayoutFactory {
     /// build on.
     private static func rectangle(in size: Int, using rng: inout SeededRandom) -> Set<GridPoint> {
         let span = size - 2
-        let width = Int.random(in: 3...span, using: &rng)
-        let height = Int.random(in: 3...span, using: &rng)
+
+        // Never small. A three-by-three room inside a nine-by-nine claim puts the
+        // whole wall two tiles from the middle, which is a hut standing in a field
+        // rather than the edge of anybody's territory - and the claim tint around
+        // it, which is the thing that actually says "this ground is yours", ends up
+        // with a fence in the centre of it saying something different.
+        //
+        // At five and up the wall reads as the outline of the claim, the tint and
+        // the wall agree, and the base a player is being taught to build is the one
+        // the ground was already showing them. It costs about a third more wall
+        // tiles per base, which the bots absorb in one extra trip home.
+        let smallest = max(3, span - 2)
+
+        let width = Int.random(in: smallest...span, using: &rng)
+        let height = Int.random(in: smallest...span, using: &rng)
         let col = Int.random(in: 1...(size - 1 - width), using: &rng)
         let row = Int.random(in: 1...(size - 1 - height), using: &rng)
 
