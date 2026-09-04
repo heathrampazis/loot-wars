@@ -402,10 +402,15 @@ final class ActorRenderer {
             .colorize(withColorBlendFactor: 0, duration: 0.16)
         ]), withKey: "hit")
 
+        // The y is in here because the charge lifts the figure off its feet and
+        // shares this key: being shot halfway through one would otherwise cut the
+        // landing off and leave somebody hovering for the rest of the match. Every
+        // reaction on this node puts it back on the ground.
         nodes.figure.removeAction(forKey: "react")
         nodes.figure.run(.sequence([
             .group([.scaleX(to: 1.12, y: 0.88, duration: 0.05),
-                    .rotate(toAngle: 0.10, duration: 0.05)]),
+                    .rotate(toAngle: 0.10, duration: 0.05),
+                    .moveTo(y: 0, duration: 0.05)]),
             .group([.scaleX(to: 1, y: 1, duration: 0.16),
                     .rotate(toAngle: 0, duration: 0.16)])
         ]), withKey: "react")
@@ -437,8 +442,53 @@ final class ActorRenderer {
 
         nodes.figure.removeAction(forKey: "react")
         nodes.figure.run(.sequence([
-            .scaleX(to: 0.92, y: 1.12, duration: 0.09),
+            .group([.scaleX(to: 0.92, y: 1.12, duration: 0.09),
+                    .moveTo(y: 0, duration: 0.09)]),
             .scaleX(to: 1, y: 1, duration: 0.22)
+        ]), withKey: "react")
+    }
+
+    /// Switching a power-up on, performed by the FIGURE.
+    ///
+    /// The third shape in the same vocabulary, and it has to be told apart from the
+    /// other two at a glance: a hit squashes down and snaps back, a heal stretches
+    /// up and settles. This crouches first and THEN throws itself up - a gather and
+    /// a release, which is the one movement neither of the others makes, and the
+    /// only one that reads as a decision rather than as something that happened to
+    /// you.
+    ///
+    /// It also rises off its own feet for a moment, which nothing else here does.
+    /// The lift is on the figure rather than the body, so the walk cycle underneath
+    /// keeps running - somebody who switches this on mid-sprint does not stop dead
+    /// to do it.
+    ///
+    /// The violet wash is deliberately the strongest colour ever put on this sprite
+    /// - stronger than a heal's green, twice the flinch's black. It is on screen
+    /// for a third of a second and it is the one moment the game says something
+    /// about you rather than about what just hit you.
+    func charge(_ id: ActorID) {
+        guard let nodes = nodesByActor[id] else { return }
+
+        nodes.sprite.removeAction(forKey: "hit")
+        nodes.sprite.run(.sequence([
+            .colorize(with: RenderPalette.perkAura,
+                      colorBlendFactor: 0.9, duration: 0.09),
+            .wait(forDuration: 0.1),
+            .colorize(withColorBlendFactor: 0, duration: 0.42)
+        ]), withKey: "hit")
+
+        nodes.figure.removeAction(forKey: "react")
+        nodes.figure.run(.sequence([
+            // Gather.
+            .group([.scaleX(to: 1.16, y: 0.8, duration: 0.11),
+                    .moveTo(y: -3, duration: 0.11)]),
+            // Release.
+            .group([.scaleX(to: 0.84, y: 1.26, duration: 0.13),
+                    .moveTo(y: 13, duration: 0.13)]),
+            // And down, overshooting once so it lands rather than glides.
+            .group([.scaleX(to: 1.06, y: 0.94, duration: 0.16),
+                    .moveTo(y: 0, duration: 0.16)]),
+            .scaleX(to: 1, y: 1, duration: 0.12)
         ]), withKey: "react")
     }
 

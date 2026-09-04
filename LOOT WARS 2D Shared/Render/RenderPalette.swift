@@ -132,9 +132,21 @@ enum RenderPalette {
     /// out what tier it was. Violet is the only strong colour this game has not
     /// already spent - teams are the primaries, healing is green, damage is pink,
     /// money is gold - so nothing else on screen can be mistaken for it.
-    static let perkAura = rgb(0xB4, 0x6C, 0xF5)
+    static let perkAura = rgb(0xA1, 0x4B, 0xF0)
 
-    /// The bright end of the same, for the middle of a sparkle.
+    /// The deep end of the same, so the particles have two purples to vary
+    /// between rather than one flat one.
+    ///
+    /// BOTH ends are purple, which sounds obvious and was not: the first pass
+    /// varied violet against a near-white lilac and drew it additively, and the
+    /// pale half over a light green map came out white. A colour only survives
+    /// this game's background if it is dark enough to sit ON it - added light on
+    /// pale grass washes to nothing, whatever colour it started as.
+    static let perkDeep = rgb(0x6E, 0x27, 0xC4)
+
+    /// The near-white middle of a SPARKLE, which is a glint rather than a colour -
+    /// and the one place the pale end is right, because a sparkle sits on top of
+    /// artwork rather than on the grass.
     static let perkSpark = rgb(0xEE, 0xD9, 0xFF)
 
     /// The colour of yes, and the colour of no, for anything you press.

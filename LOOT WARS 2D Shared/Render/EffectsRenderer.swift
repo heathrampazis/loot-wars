@@ -101,37 +101,94 @@ final class EffectsRenderer {
 
     // MARK: - Power-ups
 
-    /// The instant a power-up is switched on: a ring closing INTO somebody.
+    /// The instant a power-up is switched on, and it is meant to be a MOMENT.
     ///
-    /// Inwards, which is the opposite of every other ring in this game - a blast
-    /// throws one out, a kill leaves one behind. A perk is the only thing here that
-    /// happens TO the person holding it rather than to everything around them, and
-    /// a shape that gathers rather than spreads says that without a caption.
+    /// Four things at once, each doing a job the others cannot. A disc thrown flat
+    /// across the ground says where it happened - flattened, because everything
+    /// else in this game is drawn standing up and a flat ellipse is the only shape
+    /// that reads as lying on the grass. Two rings closing inward say the power is
+    /// gathering rather than exploding, which is the opposite of every other ring
+    /// here and the whole difference between being buffed and being blown up. A
+    /// column of light going up says it is going INTO somebody. And a burst of
+    /// motes hands over to the steady aura, so the effect does not stop and start
+    /// again a fifth of a second later.
+    ///
+    /// Grand on purpose. This is a thing you find perhaps twice in a match and
+    /// choose the moment for, and the first version - one thin ring - spent that
+    /// moment as quietly as a bandage.
     func charge(at position: Vec2) {
         let origin = GridGeometry.point(for: position)
-        let ring = SKShapeNode(circleOfRadius: GridGeometry.length(ofTiles: 0.95))
+        let tile = GridGeometry.length(ofTiles: 1)
 
-        ring.position = origin
-        ring.fillColor = .clear
-        ring.strokeColor = RenderPalette.perkAura
-        ring.lineWidth = 3
-        ring.alpha = 0
-        ring.zPosition = 11
-        ring.blendMode = .add
-        node.addChild(ring)
+        // On the ground, under the figure's feet.
+        let disc = SKShapeNode(ellipseOf: CGSize(width: tile * 1.7, height: tile * 0.8))
+        disc.position = CGPoint(x: origin.x, y: origin.y - tile * 0.42)
+        disc.fillColor = RenderPalette.perkAura
+        disc.strokeColor = RenderPalette.perkSpark
+        disc.lineWidth = 2
+        disc.alpha = 0.55
+        disc.zPosition = 3
+        disc.setScale(0.2)
+        node.addChild(disc)
 
-        ring.run(.sequence([
+        disc.run(.sequence([
+            .group([.scale(to: 1.5, duration: 0.45),
+                    .sequence([.fadeAlpha(to: 0.55, duration: 0.1),
+                               .fadeOut(withDuration: 0.35)])]),
+            .removeFromParent()
+        ]))
+
+        // Closing in, one behind the other.
+        for index in 0..<2 {
+            let ring = SKShapeNode(circleOfRadius: tile * 1.15)
+
+            ring.position = origin
+            ring.fillColor = .clear
+            ring.strokeColor = index == 0 ? RenderPalette.perkAura : RenderPalette.perkDeep
+            ring.lineWidth = 4
+            ring.alpha = 0
+            ring.zPosition = 11
+            node.addChild(ring)
+
+            ring.run(.sequence([
+                .wait(forDuration: Double(index) * 0.12),
+                .group([
+                    .sequence([.fadeAlpha(to: 0.95, duration: 0.1),
+                               .fadeOut(withDuration: 0.3)]),
+                    .scale(to: 0.12, duration: 0.4)
+                ]),
+                .removeFromParent()
+            ]))
+        }
+
+        // And a column of it going up through them.
+        let column = SKSpriteNode(texture: GlowArt.pool)
+        column.size = CGSize(width: tile * 0.9, height: tile * 1.2)
+        column.color = RenderPalette.perkAura
+        column.colorBlendFactor = 1
+        column.anchorPoint = CGPoint(x: 0.5, y: 0.1)
+        column.position = CGPoint(x: origin.x, y: origin.y - tile * 0.45)
+        column.alpha = 0
+        column.zPosition = 10
+        node.addChild(column)
+
+        column.run(.sequence([
             .group([
-                .sequence([.fadeAlpha(to: 0.9, duration: 0.12),
-                           .fadeAlpha(to: 0, duration: 0.28)]),
-                .scale(to: 0.15, duration: 0.4)
+                .scaleX(to: 0.75, y: 2.4, duration: 0.4),
+                .sequence([.fadeAlpha(to: 0.75, duration: 0.12),
+                           .fadeOut(withDuration: 0.34)])
             ]),
             .removeFromParent()
         ]))
 
-        // And a handful of motes thrown up at once, so the aura begins as a puff
-        // rather than fading in one speck at a time.
-        for _ in 0..<4 { aura(at: position) }
+        // Handing over to the aura, which takes it from here.
+        for index in 0..<6 {
+            let step = Double(index) * 0.05
+            node.run(.sequence([
+                .wait(forDuration: step),
+                .run { [weak self] in self?.aura(at: position) }
+            ]))
+        }
     }
 
     /// Violet particles coming off somebody who has a perk running.
@@ -159,10 +216,14 @@ final class EffectsRenderer {
             let size = CGFloat.random(in: 9...15)
 
             mote.size = CGSize(width: size, height: size)
-            mote.color = index == 0 ? RenderPalette.perkAura : RenderPalette.perkSpark
+            mote.color = index == 0 ? RenderPalette.perkAura : RenderPalette.perkDeep
             mote.colorBlendFactor = 1
-            mote.alpha = 0.9
-            mote.blendMode = .add
+            mote.alpha = 0.95
+
+            // Painted ON the map rather than added to it. Additive blending is what
+            // fire and muzzle flashes want, because those ARE light - but this map
+            // is pale green, and adding violet to pale green gives white. The whole
+            // point of the effect is the colour, so it is drawn as pigment.
             mote.zPosition = 11
 
             let side: CGFloat = index == 0 ? 1 : -1

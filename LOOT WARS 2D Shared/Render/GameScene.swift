@@ -666,6 +666,7 @@ final class GameScene: SKScene {
                 // state a second afterwards can show.
                 guard let actor = world.actors[user] else { break }
                 effectsRenderer.charge(at: actor.position)
+                actorRenderer.charge(user)
 
             case .gas(let position):
                 // The cloud itself is drawn from the world every frame; this is the
