@@ -43,6 +43,7 @@ final class GameScene: SKScene {
     private let gasRenderer = GasRenderer()
     private let effectsRenderer = EffectsRenderer()
     private let placementGhost = PlacementGhost()
+    private let blueprint = BlueprintRenderer()
     private let cameraController = CameraController()
 
     /// The map revision the block layer was last drawn from, so it is only rebuilt
@@ -123,6 +124,20 @@ final class GameScene: SKScene {
     /// how to do it.
     private var holdHintsLeft = 2
     private var hasUsedHold = false
+
+    /// The build hint's own budget, on the same terms.
+    ///
+    /// Spent when you are standing in your own base with somewhere to build and
+    /// have not built anything yet - which is the moment the outlines are lit and
+    /// the question "what are those?" is actually being asked.
+    private var buildHintsLeft = 2
+    private var hasBuilt = false
+
+    /// Whether the player was standing in their own claim last frame, so the build
+    /// hint fires on ARRIVING home rather than once per frame while standing there.
+    /// The same shape as wasBlocked, and for the same reason: a hint is a reaction
+    /// to a moment, and "being at home" is a state.
+    private var wasHome = false
 
     /// Who killed you, while you are waiting to come back - see aimCamera.
     private var killedBy: ActorID?
@@ -268,6 +283,10 @@ final class GameScene: SKScene {
         arcadeRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(claimRenderer.node)
+
+        // On the ground with the claim tint, under everything that stands on it.
+        worldLayer.addChild(blueprint.node)
+
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
@@ -509,6 +528,7 @@ final class GameScene: SKScene {
         }
 
         blockRenderer.sync(with: world)
+        blueprint.sync(with: world, dt: frameDelta)
         lootboxRenderer.sync(with: world)
         chestRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
@@ -611,6 +631,25 @@ final class GameScene: SKScene {
         // has either worked the gesture out or settled into playing without it, and
         // a tip arriving then is not teaching, it is interrupting.
         guard world.matchProgress < GameScene.hintWindow else { return }
+
+        // Arriving home with a wall to lay and no idea that is a thing you can do.
+        //
+        // On the rising edge of being home, not while standing there: a hint is a
+        // reaction to a moment. Offered before the selling lesson because it is the
+        // one the game cannot teach any other way - selling at least has a hotbar
+        // you are already looking at, while building is a tap on a piece of ground.
+        let home = world.claim(for: player.team)?
+            .contains(GridPoint(containing: player.feet)) == true
+
+        let arrivedHome = home && !wasHome
+        wasHome = home
+
+        if arrivedHome, !hasBuilt, buildHintsLeft > 0,
+           blueprint.hasSlots, world.canBuild(player.team) {
+            buildHintsLeft -= 1
+            hint.show("TAP THE OUTLINES TO BUILD YOUR WALLS", seconds: 2.2)
+            return
+        }
 
         guard stepped, !hasUsedHold, holdHintsLeft > 0, !hint.isShowing else { return }
         holdHintsLeft -= 1
@@ -1338,7 +1377,33 @@ extension GameScene {
     /// nothing showed you where it would land, and a refusal looked exactly like
     /// the game ignoring you. That is a drag with an outline on it now, below.
     private func tapMap(at pointInWorld: CGPoint) {
-        queuedCommands.append(.placeBlock(GridGeometry.gridPoint(for: pointInWorld)))
+        let tile = GridGeometry.gridPoint(for: pointInWorld)
+        queuedCommands.append(.placeBlock(tile))
+
+        // And then say what will happen to it, which the map never used to. The
+        // answer comes from BuildSystem rather than from a copy of its rules kept
+        // here, so the outline that lights up, the brick that pops and the wall
+        // that appears are all one decision seen three times.
+        guard let player = world.localPlayer else { return }
+
+        if BuildSystem.canPlace(at: tile, by: player, in: world) {
+            blueprint.fill(at: tile)
+            hasBuilt = true
+            return
+        }
+
+        // Only inside your own ground. A red flash out on the open map would be the
+        // game telling you off for tapping the scenery.
+        guard world.claim(for: player.team)?.contains(tile) == true else { return }
+
+        blueprint.refuse(at: tile)
+
+        // One refusal has a reason worth spelling out, because it is temporary and
+        // nothing else on screen mentions it: the quiet after a raid, which exists
+        // so a raider can still get back out through the hole they made.
+        if !world.canBuild(player.team) {
+            hint.show("WALLS ARE DOWN FOR A MOMENT")
+        }
     }
 
     // MARK: - Aiming something onto the map
