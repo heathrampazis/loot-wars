@@ -42,10 +42,17 @@ final class ShopPanelNode: SKNode {
     // MARK: - Measurements
 
     /// Sized against the smallest phone this runs on - an SE is 568 x 320 in
-    /// landscape, with no safe-area inset to give away - so a 520-wide panel leaves
-    /// 24 points of margin either side there and a great deal more on everything
+    /// landscape, with no safe-area inset to give away - so a 530-wide panel leaves
+    /// 19 points of margin either side there and a great deal more on everything
     /// newer. It is the row of four that sets that width, and the width that sets
     /// how tall a card has to be.
+    ///
+    /// The HEIGHT has a harder limit than it looks: 230 points is what fits between
+    /// the bottom of the HUD and the bottom of an SE's screen, and the panel is
+    /// hung in exactly that gap - see GameScene.layOutUI - so that health and
+    /// tokens stay readable while you are deciding what to spend them on. Every
+    /// point of it went into the cards rather than the frame: the padding and the
+    /// header came in, the cards grew by nearly a fifth.
     ///
     /// ONE ROW. Four cards side by side is how a shelf is read: everything the shop
     /// sells is in your eye at once, at the same size, and choosing between them is
@@ -53,10 +60,10 @@ final class ShopPanelNode: SKNode {
     /// their width - 112 points is not enough to put a picture beside its words, so
     /// they go back to being portrait, picture over name over price - and that is
     /// the trade, taken deliberately.
-    private static let cardSize = CGSize(width: 112, height: 146)
-    private static let cardGap: CGFloat = 12
-    private static let padding: CGFloat = 18
-    private static let headerHeight: CGFloat = 40
+    private static let cardSize = CGSize(width: 118, height: 164)
+    private static let cardGap: CGFloat = 10
+    private static let padding: CGFloat = 14
+    private static let headerHeight: CGFloat = 38
 
     /// As many columns as there are things to sell, which is what makes it a row.
     ///
@@ -337,13 +344,13 @@ final class ShopPanelNode: SKNode {
         holder.addChild(flash)
 
         // The picture, on its own tile at the top.
-        let tileCentre = CGPoint(x: 0, y: card.height / 2 - 42)
+        let tileCentre = CGPoint(x: 0, y: card.height / 2 - 44)
 
         let tile = SKShapeNode(
             path: CGPath(
-                roundedRect: CGRect(x: -30, y: -30, width: 60, height: 60),
-                cornerWidth: 13,
-                cornerHeight: 13,
+                roundedRect: CGRect(x: -33, y: -33, width: 66, height: 66),
+                cornerWidth: 14,
+                cornerHeight: 14,
                 transform: nil
             )
         )
@@ -354,7 +361,7 @@ final class ShopPanelNode: SKNode {
         holder.addChild(tile)
 
         let glow = SKSpriteNode(texture: GlowArt.pool)
-        glow.size = CGSize(width: 72, height: 72)
+        glow.size = CGSize(width: 80, height: 80)
         glow.colorBlendFactor = 1
         glow.alpha = 0.7
         glow.position = tileCentre
@@ -367,39 +374,47 @@ final class ShopPanelNode: SKNode {
         holder.addChild(icon)
 
         let name = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        name.fontSize = 15
+        name.fontSize = 16
         name.fontColor = .white
         name.horizontalAlignmentMode = .center
         name.verticalAlignmentMode = .center
-        name.position = CGPoint(x: 0, y: -card.height / 2 + 66)
+        name.position = CGPoint(x: 0, y: -card.height / 2 + 74)
         holder.addChild(name)
 
-        // The price pill: a capsule with the cost and the token you pay it in,
-        // sitting on the bottom margin like a price tag on a shelf edge.
-        let pillWidth = card.width - 24
-        let pillCentre = CGPoint(x: 0, y: -card.height / 2 + 27)
+        // The price button: a dark capsule with a coloured edge, sitting on the
+        // bottom margin like a price tag on a shelf edge.
+        //
+        // Dark with a green or red EDGE rather than a solid green or red slab, and
+        // the quick-buy prompt is where that came from - it has always been a dark
+        // plate outlined in green, and having the two say yes in two different
+        // visual languages was the shop disagreeing with itself about what a price
+        // looks like. A dark ground is also simply better at holding white text
+        // than a saturated fill, and there are four of these on screen at once:
+        // four bright slabs shouted the prices louder than the items they belonged
+        // to, which is the wrong way round for a shelf.
+        let pillWidth = card.width - 20
+        let pillCentre = CGPoint(x: 0, y: -card.height / 2 + 28)
 
         let pill = SKShapeNode(
             path: CGPath(
                 roundedRect: CGRect(
                     x: pillCentre.x - pillWidth / 2,
-                    y: pillCentre.y - 15,
+                    y: pillCentre.y - 16,
                     width: pillWidth,
-                    height: 30
+                    height: 32
                 ),
-                cornerWidth: 11,
-                cornerHeight: 11,
+                cornerWidth: 16,
+                cornerHeight: 16,
                 transform: nil
             )
         )
 
-        // The FILL is recoloured on every redraw - see update. The outline is
-        // black and stays black: green on green and red on red was an outline
-        // doing nothing, and against the panel a dark edge is what gives a small
-        // bright shape its shape.
-        pill.fillColor = RenderPalette.affordable
-        pill.strokeColor = .black
-        pill.lineWidth = 3
+        // The STROKE is what is recoloured on every redraw - see update. The fill
+        // stays where it is: near black, a shade darker than the panel, so the
+        // button reads as cut into the card rather than laid on top of it.
+        pill.fillColor = SKColor(white: 0.03, alpha: 0.85)
+        pill.strokeColor = RenderPalette.affordable
+        pill.lineWidth = 2.5
         holder.addChild(pill)
 
         // The coin and the number are CENTRED as a pair rather than pinned to the
@@ -408,17 +423,17 @@ final class ShopPanelNode: SKNode {
         let tokenTexture = ItemArt.texture(for: Pickup.token(1))
         let token = SKSpriteNode(texture: tokenTexture)
 
-        token.size = ItemArt.size(of: tokenTexture, fittingInto: 20)
-        token.position = CGPoint(x: pillCentre.x - 17, y: pillCentre.y)
+        token.size = ItemArt.size(of: tokenTexture, fittingInto: 21)
+        token.position = CGPoint(x: pillCentre.x - 18, y: pillCentre.y)
         token.zPosition = 1
         holder.addChild(token)
 
         let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        price.fontSize = 17
+        price.fontSize = 18
         price.fontColor = .white
         price.horizontalAlignmentMode = .left
         price.verticalAlignmentMode = .center
-        price.position = CGPoint(x: pillCentre.x - 3, y: pillCentre.y)
+        price.position = CGPoint(x: pillCentre.x - 2, y: pillCentre.y)
         price.zPosition = 1
         holder.addChild(price)
 
@@ -754,11 +769,12 @@ final class ShopPanelNode: SKNode {
             let soldOut = ShopSystem.isSoldOut(item.type, actor: player, in: world)
             card.holder.alpha = soldOut ? 0.45 : 1.0
 
-            // Green when you can have it, red when you cannot afford it.
+            // Green when you can have it, red when you cannot afford it - on the
+            // EDGE, which is the whole of the price button's colour now.
             // Affordability only: a full bag also refuses a purchase, but that is a
             // fact about you rather than about the shelf, and the card says nothing
             // about it (see ShopSystem.isSoldOut).
-            card.pill.fillColor = player.tokens >= item.price
+            card.pill.strokeColor = player.tokens >= item.price
                 ? RenderPalette.affordable
                 : RenderPalette.unaffordable
 

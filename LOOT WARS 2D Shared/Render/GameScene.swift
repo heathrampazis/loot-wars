@@ -424,11 +424,19 @@ final class GameScene: SKScene {
         let hotbarTop = hotbar.position.y + HotbarNode.size.height / 2
         chestPanel.position = CGPoint(x: 0, y: (hudBottom + hotbarTop) / 2)
 
-        // Centred on the screen, now that the bar is hidden underneath it rather
-        // than being part of the transaction. A modal that sits in the middle is
-        // read as something that opened ON TOP of the game; the same panel wedged
-        // against the bottom edge read as a drawer the game had grown.
-        shopPanel.position = CGPoint(x: 0, y: (hudBottom + hotbarTop) / 2)
+        // Hung in the gap the hotbar leaves behind: centred between the bottom of
+        // the HUD and the bottom of the screen.
+        //
+        // Not the middle of the screen, which is where this sat first. The panel is
+        // 230 tall and an SE gives it 234 points down there, so centring it moved
+        // the whole thing up over the health bar - and health is the one number you
+        // are still reading while you decide whether to buy a bandage. Hung here it
+        // clears the HUD by a point on the smallest phone and by plenty on every
+        // other one, which is also why the panel's own height is capped where it
+        // is: it is sized to the gap it lives in.
+        shopPanel.position = CGPoint(
+            x: 0,
+            y: (hudBottom + (-size.height / 2 + 12)) / 2)
 
         // Hung under the health panel, left edges flush with it. It is a reading
         // of your purse as much as an offer, so it belongs with the other numbers
@@ -778,11 +786,18 @@ final class GameScene: SKScene {
             // is nothing but clutter behind a panel. That difference is the whole
             // reason the shop stopped being two interfaces at once.
             hotbar.isHidden = shopPanel.isOpen
+
+            // And the standings go with it. The panel is as wide as a small phone
+            // allows, so its top-right corner and the leaderboard's bottom-left
+            // corner want the same points - and of the two, a table of scores is
+            // the one nobody is reading while they shop.
+            leaderboard.isHidden = shopPanel.isOpen
             return
         }
 
         shopButton.isHidden = false
         hotbar.isHidden = false
+        leaderboard.isHidden = false
 
 
         moveStick.isHidden = false
@@ -843,6 +858,12 @@ final class GameScene: SKScene {
         // to have your head in one when the whistle went.
         chestPanel.close()
         shopPanel.close()
+
+        // Put the standings back if the shop had them hidden when the whistle
+        // went. The results panel covers them either way, but leaving a control's
+        // visibility owned by a screen that no longer exists is how the aim stick
+        // once went missing for a whole match.
+        leaderboard.isHidden = false
         shopButton.isHidden = true
         moveStick.isHidden = true
         moveStick.end()
