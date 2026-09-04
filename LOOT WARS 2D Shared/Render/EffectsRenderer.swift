@@ -44,7 +44,7 @@ final class EffectsRenderer {
     private var lastPerk: [ActorID: Double] = [:]
 
     /// Seconds between motes coming off somebody running a perk.
-    private static let auraInterval: Double = 0.22
+    private static let auraInterval: Double = 0.17
 
     // MARK: - Noticing
 
@@ -131,42 +131,62 @@ final class EffectsRenderer {
 
         // And a handful of motes thrown up at once, so the aura begins as a puff
         // rather than fading in one speck at a time.
-        for _ in 0..<7 { aura(at: position) }
+        for _ in 0..<4 { aura(at: position) }
     }
 
-    /// One violet mote drifting up off somebody who has a perk running.
+    /// Violet particles coming off somebody who has a perk running.
     ///
-    /// Rising and turning, rather than orbiting: an orbit needs a centre held for
-    /// its whole life, and this is drawn on the map rather than parented to the
-    /// figure, so a mote outlives the position it was made at - which is what makes
-    /// a moving player leave a trail and a standing one wear a haze. The same node
-    /// doing both is the reason this is not an emitter attached to the sprite.
+    /// Soft round motes rather than the sparkles the ITEM wears, and the two being
+    /// different is the point of the split. The sparkles say "this object is
+    /// enchanted" - they belong to a thing lying on the grass or sitting in a slot,
+    /// and they twinkle because a still object needs the movement to be noticed.
+    /// This says "this PERSON is powered up", and a person is already moving, so
+    /// what it needs instead is a haze: something the figure is inside rather than
+    /// something decorating it.
+    ///
+    /// Drawn on the map rather than parented to the figure, which is what makes a
+    /// moving player leave a trail and a standing one wear a cloud - one behaviour
+    /// out of one emitter, and the reason this is not an SKEmitterNode bolted to
+    /// the sprite.
     private func aura(at position: Vec2) {
         let origin = GridGeometry.point(for: position)
 
-        let mote = SKSpriteNode(texture: EnchantArt.spark)
-        let size = CGFloat.random(in: 5...9)
+        // Two at a time, on opposite sides of the figure more often than not. One
+        // per beat came off the middle in a single file, which read as steam from a
+        // kettle rather than as somebody surrounded by it.
+        for index in 0..<2 {
+            let mote = SKSpriteNode(texture: GlowArt.pool)
+            let size = CGFloat.random(in: 9...15)
 
-        mote.size = CGSize(width: size, height: size)
-        mote.color = RenderPalette.perkAura
-        mote.colorBlendFactor = 1
-        mote.blendMode = .add
-        mote.zPosition = 11
-        mote.position = CGPoint(x: origin.x + CGFloat.random(in: -13...13),
-                                y: origin.y + CGFloat.random(in: -16...6))
-        node.addChild(mote)
+            mote.size = CGSize(width: size, height: size)
+            mote.color = index == 0 ? RenderPalette.perkAura : RenderPalette.perkSpark
+            mote.colorBlendFactor = 1
+            mote.alpha = 0.9
+            mote.blendMode = .add
+            mote.zPosition = 11
 
-        mote.run(.sequence([
-            .group([
-                .moveBy(x: CGFloat.random(in: -8...8),
-                        y: CGFloat.random(in: 28...46), duration: 0.8),
-                .rotate(byAngle: CGFloat.random(in: -1.6...1.6), duration: 0.8),
-                .sequence([.scale(to: 1.35, duration: 0.2),
-                           .scale(to: 0.4, duration: 0.6)]),
-                .sequence([.wait(forDuration: 0.3), .fadeOut(withDuration: 0.5)])
-            ]),
-            .removeFromParent()
-        ]))
+            let side: CGFloat = index == 0 ? 1 : -1
+            mote.position = CGPoint(
+                x: origin.x + side * CGFloat.random(in: 2...14),
+                y: origin.y + CGFloat.random(in: -18...4)
+            )
+
+            node.addChild(mote)
+
+            // Up and slightly inward, which gathers them over the figure's head
+            // instead of letting them drift apart into a fog.
+            mote.run(.sequence([
+                .group([
+                    .moveBy(x: -side * CGFloat.random(in: 1...7),
+                            y: CGFloat.random(in: 22...38), duration: 0.75),
+                    .sequence([.scale(to: 1.3, duration: 0.18),
+                               .scale(to: 0.35, duration: 0.57)]),
+                    .sequence([.wait(forDuration: 0.25),
+                               .fadeOut(withDuration: 0.5)])
+                ]),
+                .removeFromParent()
+            ]))
+        }
     }
 
     // MARK: - Footfalls

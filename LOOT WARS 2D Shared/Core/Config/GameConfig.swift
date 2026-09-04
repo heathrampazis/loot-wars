@@ -1106,26 +1106,30 @@ enum GameConfig {
         /// Long enough to change a fight rather than patch you between two. A
         /// medkit is an answer to damage already taken; this is an answer to damage
         /// about to be taken, and the difference only exists if it is still running
-        /// while somebody is shooting at you. Fourteen seconds is two or three
-        /// exchanges at this game's ranges.
-        static let regenerationDuration: Double = 14
+        /// while somebody is shooting at you. Fifteen seconds is three exchanges at
+        /// this game's ranges.
+        static let regenerationDuration: Double = 15
 
         /// Seconds between portions of health.
         ///
         /// Portions, not a trickle, for the third time in this project and the same
         /// reason as home recovery and gas damage: every point of healing makes the
-        /// screen react, so sixty a second is not a warm glow, it is a strobe. Ten
-        /// beats over the duration reads as a steady pulse.
-        static let tickInterval: Double = 1.4
+        /// screen react, so sixty a second is not a warm glow, it is a strobe.
+        /// Twelve beats over the duration reads as a steady pulse.
+        static let tickInterval: Double = 1.25
 
         /// Share of a full health bar handed back per beat.
         ///
-        /// 5.5% ten times is a little over half a health bar across the fourteen
-        /// seconds - more than a medkit gives, but paid out slowly enough that
-        /// enough damage still kills you through it. That is the trade the perk is
-        /// meant to be: it does not save you from a fight you are losing, it wins
-        /// you one you were only just losing.
-        static let regenerationPortion: Double = 0.055
+        /// 6.5% twelve times is about three quarters of a health bar across the
+        /// fifteen seconds - getting on for two medkits, but paid out slowly enough
+        /// that enough damage still kills you through it. At five and a bit points
+        /// a second it cancels a light exchange outright and merely slows a serious
+        /// one, which is the trade the perk is meant to be: it does not save you
+        /// from a fight you are losing, it wins you one you were only just losing.
+        ///
+        /// Up from 5.5% over fourteen seconds, which was on the timid side of that
+        /// line - it took the edge off a duel without ever deciding one.
+        static let regenerationPortion: Double = 0.065
     }
 
     enum Loot {
