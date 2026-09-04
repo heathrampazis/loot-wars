@@ -182,16 +182,24 @@ enum RenderPalette {
     static let payoutPill = SKColor(red: 0.04, green: 0.14, blue: 0.07, alpha: 0.88)
     static let affordable = rgb(0x4C, 0xC9, 0x5E)
 
-    /// The colour of no, and it is a game red rather than a warning red.
+    /// A price you cannot pay yet: grey, not red.
     ///
-    /// The brick 0xE04B4B this replaced was borrowed from the sort of interface
-    /// that has a dialog box in it. Nothing else on this screen is that colour:
-    /// the health bar is a hot pink, a blast is pink-white, blocked ground is a
-    /// bright red - the whole game leans warm and saturated, and a dull brown-red
-    /// button sat on it like a sticker from another app. This is the same family
-    /// as the rest: bright enough to belong beside the pink health bar, red enough
-    /// that nobody reads it as anything but a refusal.
-    static let unaffordable = rgb(0xF0, 0x4E, 0x5C)
+    /// Two reds were tried on this button and both were wrong, in the end for the
+    /// same reason rather than for their hues. Red is an ERROR - it is what this
+    /// game says when you try to build on ground you cannot build on - and not
+    /// having saved up thirteen tokens yet is not a mistake anybody has made. It is
+    /// simply a thing that has not happened. Four cards side by side with two of
+    /// them shouting in red also read as a shop that was half broken.
+    ///
+    /// Grey says the true thing quietly, leaves green as the only colour on the
+    /// panel that means anything, and is what every shop in every game does. The
+    /// refusal is still red - shake a card you actually pressed and cannot buy, and
+    /// it flashes red - because that IS a moment, and it is over in half a second.
+    /// Deliberately DARKER than the card it sits on rather than lighter. A grey at
+    /// the plate's own brightness disappeared into it - the button has to stay a
+    /// button - and a recessed one also reads as the empty version of the lit
+    /// green, which is exactly what it is.
+    static let unaffordable = SKColor(red: 0.24, green: 0.27, blue: 0.32, alpha: 1)
 
     /// The same two, a few shades down, for the lip under a button.
     ///
@@ -202,7 +210,7 @@ enum RenderPalette {
     /// world - the token, the crates, the figures - so a black-ringed capsule read
     /// as a thing lying on the grass rather than a control on a panel.
     static let affordableDeep = rgb(0x2C, 0x8B, 0x3F)
-    static let unaffordableDeep = rgb(0xAD, 0x28, 0x38)
+    static let unaffordableDeep = SKColor(red: 0.14, green: 0.16, blue: 0.20, alpha: 1)
 
     // Placement preview. Green while a footprint would take, red while it would
     // not - the only two colours nobody has to be taught.

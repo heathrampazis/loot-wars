@@ -135,6 +135,15 @@ final class ShopPanelNode: SKNode {
     /// still hold what you bought: buying a Rare helmet redraws that slot as an
     /// Epic, so by the time the sale is confirmed there is nothing on the panel
     /// with the bought item's name on it. The position is the thing that stays put.
+    ///
+    /// It SURVIVES A REDRAW, and that is the whole reason a purchase ever animated.
+    /// The redraw used to clear this, which looked harmless and was not: a purchase
+    /// changes your token count, the count is in the fingerprint, so buying
+    /// anything redrew the panel - and the scene drains world events AFTER it syncs
+    /// the renderers, so by the time the purchase arrived the card that had been
+    /// pressed was already forgotten and confirm() quietly did nothing. Cleared on
+    /// a tap, an open and a close instead, which are the three moments it actually
+    /// stops meaning anything.
     private var lastPressed: Int?
 
     /// A deal waiting for the next redraw, and how long to hold it first.
@@ -189,12 +198,15 @@ final class ShopPanelNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// A title, what is in your pocket, and a line under both.
+    /// What is in your pocket, and a band under it.
     ///
-    /// The purse is HERE rather than only in the corner of the screen, and it is
-    /// the one number this panel really owes you: every card on it is a question
-    /// about whether you can afford something, and the answer used to live in the
-    /// opposite corner of the screen behind the panel you were reading.
+    /// No title. A panel with four things for sale on it, that opened because you
+    /// pressed the shop button, does not need the word SHOP written across the top
+    /// - it was the one thing up there saying something the player already knew.
+    /// The purse takes its place at the left, which is where the eye lands first:
+    /// every card on this panel is a question about whether you can afford
+    /// something, and the answer used to live in the opposite corner of the screen,
+    /// behind the panel you were reading.
     private func buildHeader(inside size: CGSize) {
         let top = size.height / 2
         let centreY = top - ShopPanelNode.headerHeight / 2 - 4
@@ -213,28 +225,22 @@ final class ShopPanelNode: SKNode {
         band.strokeColor = .clear
         addChild(band)
 
-        let title = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        title.text = "SHOP"
-        title.fontSize = 19
-        title.fontColor = .white
-        title.horizontalAlignmentMode = .left
-        title.verticalAlignmentMode = .center
-        title.position = CGPoint(x: -size.width / 2 + ShopPanelNode.padding + 4,
-                                 y: centreY)
-        addChild(title)
+        let left = -size.width / 2 + ShopPanelNode.padding + 6
 
         let texture = ItemArt.texture(for: Pickup.token(1))
         let coin = SKSpriteNode(texture: texture)
 
-        coin.size = ItemArt.size(of: texture, fittingInto: 22)
-        coin.position = CGPoint(x: size.width / 2 - 118, y: centreY)
+        coin.size = ItemArt.size(of: texture, fittingInto: 26)
+        coin.position = CGPoint(x: left + 13, y: centreY)
         addChild(coin)
 
-        purse.fontSize = 18
+        // Bigger than it was in the corner it came from: it is the only number on
+        // this header now, and the one every card is asking about.
+        purse.fontSize = 21
         purse.fontColor = .white
         purse.horizontalAlignmentMode = .left
         purse.verticalAlignmentMode = .center
-        purse.position = CGPoint(x: size.width / 2 - 100, y: centreY)
+        purse.position = CGPoint(x: left + 34, y: centreY)
         addChild(purse)
     }
 
@@ -446,13 +452,7 @@ final class ShopPanelNode: SKNode {
         // centred on the button rather than pushed to its ends, which at this width
         // is the difference between one price and two things sharing a capsule.
         price.fontSize = 18
-
-        // Near-black on the colour rather than white on it. White on this green is
-        // a contrast of about 1.5 to 1 - legible at a glance and no more - while
-        // black on it is fourteen, and black is what this game's artwork is drawn
-        // with anyway: every sprite on the screen has a black line round it, so a
-        // black number belongs to the same set of pictures.
-        price.fontColor = SKColor(white: 0.06, alpha: 1)
+        price.fontColor = .white
         price.horizontalAlignmentMode = .right
         price.verticalAlignmentMode = .center
         price.position = CGPoint(x: pillCentre.x - 4, y: pillCentre.y)
@@ -809,7 +809,6 @@ final class ShopPanelNode: SKNode {
         guard fingerprint != lastDrawn else { return }
 
         lastDrawn = fingerprint
-        lastPressed = nil
         purse.text = "\(player.tokens)"
 
         for (index, var card) in cards.enumerated() {
@@ -836,7 +835,8 @@ final class ShopPanelNode: SKNode {
             let soldOut = ShopSystem.isSoldOut(item.type, actor: player, in: world)
             card.holder.alpha = soldOut ? 0.45 : 1.0
 
-            // Green when you can have it, red when you cannot afford it.
+            // Lit green when you can have it, dark when you cannot afford it yet -
+            // see RenderPalette.unaffordable for why that is grey rather than red.
             // Affordability only: a full bag also refuses a purchase, but that is a
             // fact about you rather than about the shelf, and the card says nothing
             // about it (see ShopSystem.isSoldOut).
