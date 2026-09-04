@@ -1115,7 +1115,15 @@ enum GameConfig {
         /// little, not enough that a body is a shop. You spend supplies winning a
         /// fight, and before this you always walked away poorer than you arrived,
         /// however well you shot.
-        static let healingChance = 0.5
+        /// Seven in ten, up from a half.
+        ///
+        /// The half was arithmetic that read as stinginess. A bot's bag is rarely
+        /// full - it spends its supplies staying alive - so with two occupied slots
+        /// a coin flip each, a body handed you nothing about a quarter of the time
+        /// and one thing most of the rest. The fight that earned it had taken ten
+        /// seconds and most of a health bar. At seven in ten a kill nearly always
+        /// pays something back, which is the feeling the rule was written for.
+        static let healingChance = 0.7
 
         /// The odds that one bomb, or one stink bomb, comes off a body.
         ///
@@ -1129,7 +1137,7 @@ enum GameConfig {
         /// this is the supply line for raiding: at a half you could keep yourself
         /// in bombs by winning fights, which would make the shop's bomb price - and
         /// the crate rows that ration them - decoration.
-        static let suppliesChance = 0.4
+        static let suppliesChance = 0.55
 
         /// The odds that a chest or a machine somebody was carrying survives them.
         ///
@@ -1139,7 +1147,7 @@ enum GameConfig {
         /// thing that happens on a Tuesday - but it has to be POSSIBLE, because
         /// killing somebody who is carrying one and watching it vanish is the game
         /// quietly deleting the best thing on the map.
-        static let carriedStructureChance = 0.25
+        static let carriedStructureChance = 0.35
 
         /// How far a drop is flung from where its owner fell, in tiles. Enough that
         /// a helmet and a blaster from the same kill land side by side instead of
@@ -1241,21 +1249,28 @@ enum GameConfig {
 
         /// How heavily a machine sits in a rare crate's table.
         ///
-        /// Against a rare table that totals around 170, this is roughly one rare
-        /// crate in seven - and rare crates are one in fourteen, so a match sees
-        /// one or two machines in total. That is deliberately scarce: it is the
-        /// most valuable thing anybody can own and it used to be a purchase.
-        static let rareArcadeWeight = 24
+        /// Against a rare table that totals around 180, this is roughly one rare
+        /// crate in six - and rare crates are one in ten, so a match turns up one
+        /// or two machines between everybody. Still scarce: it is the most valuable
+        /// thing anybody can own and it used to be a purchase. What changed is WHEN
+        /// - at the old rate the first machine tended to arrive around the point
+        /// the match was already decided, and a token economy that starts in the
+        /// last ninety seconds is one nobody plays.
+        static let rareArcadeWeight = 32
 
         /// Share of crates on the map that are the good ones.
         ///
-        /// One in fourteen. At one in six they were everywhere, and a thing you see
+        /// One in ten. At one in six they were everywhere, and a thing you see
         /// constantly is not rare however it is drawn - the glow stopped meaning
-        /// anything within a minute. At this share a map of thirty crates holds two
-        /// or three, which is few enough that spotting one is a decision about where
-        /// to go next. Rolled per crate rather than counted out, so no two maps hold
-        /// the same number.
-        static let rareShare: Double = 0.07
+        /// anything within a minute. At one in fourteen, where this sat until now,
+        /// a whole match turned up under one machine between eight players, and the
+        /// economy those machines drive barely started. One in ten keeps the glow
+        /// worth crossing a map for - a map of forty crates holds four - while
+        /// putting a machine or two in play early enough to matter.
+        ///
+        /// Rolled per crate rather than counted out, so no two maps hold the same
+        /// number.
+        static let rareShare: Double = 0.10
 
         /// How heavily ONE power-up sits in a crate's table, by how far the match
         /// has run.
@@ -1297,11 +1312,17 @@ enum GameConfig {
         /// Short on purpose: it keeps the map from silting up with everything
         /// anybody ever dropped, and it puts a clock on a kill - the helmet you
         /// just knocked off somebody is only yours if you go and get it.
-        static let itemLifetime: Double = 10
+        ///
+        /// Thirteen rather than ten, because ten was a clock on the WRONG thing.
+        /// A kill usually arrives in the middle of a fight with somebody else, and
+        /// the three seconds spent finishing that fight were coming out of the time
+        /// left to collect - so the reward for winning a hard fight was routinely
+        /// expiring while it was still being won.
+        static let itemLifetime: Double = 13
 
         /// How long before that it starts flashing, so nobody watches a drop
         /// vanish without warning.
-        static let itemWarningTime: Double = 3
+        static let itemWarningTime: Double = 4
 
         /// Seconds before an opened crate comes back, in the same spot. Without
         /// this the map is stripped bare a minute into a match.

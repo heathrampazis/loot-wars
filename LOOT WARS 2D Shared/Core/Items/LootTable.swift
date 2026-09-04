@@ -67,14 +67,21 @@ enum LootTable {
     /// crate that cannot meaningfully patch you up is a crate that does not matter
     /// at the exact point in a match where being alive matters most.
     ///
-    /// Bombs go the other way: one crate in six early, one in nine late. Early is
+    /// Bombs go the other way: about one crate in four early, one in six late.
+    ///
+    /// Up by a fifth across the board, and the early band most of all, because the
+    /// opening minutes are where the shape of a match is decided: a base goes up,
+    /// and then somebody has to be able to break into it. Without a bomb in the
+    /// first two minutes the whole raiding half of the game waits for the crates to
+    /// hand one over, and everybody spends that time building walls nobody is
+    /// threatening. Early is
     /// when nobody has a wall worth blowing open yet and a bomb is what starts the
     /// raiding; late everybody has three and the map does not need more.
     private static let bands: [(from: Double, rows: [(pickup: Pickup, weight: Int)])] = [
         (0.00, [
             (.item(.bandage), 88),
             (.item(.medkit),  22),
-            (.item(.bomb),    58),
+            (.item(.bomb),    70),
             (.item(.stink),   18),
             (.item(.chest),   26),
 
@@ -87,7 +94,7 @@ enum LootTable {
         (0.35, [
             (.item(.bandage), 88),
             (.item(.medkit),  24),
-            (.item(.bomb),    50),
+            (.item(.bomb),    60),
             (.item(.stink),   16),
             (.item(.chest),   26),
 
@@ -101,7 +108,7 @@ enum LootTable {
         (0.70, [
             (.item(.bandage), 96),
             (.item(.medkit),  34),
-            (.item(.bomb),    38),
+            (.item(.bomb),    44),
             (.item(.stink),   14),
             (.item(.chest),   22),
 
