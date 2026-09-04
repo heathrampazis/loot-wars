@@ -90,6 +90,20 @@ enum ShopSystem {
         }
     }
 
+    /// Everything the shop will sell this actor right now, in catalogue order.
+    ///
+    /// The panel is one page, so this is what a page is: both gear rungs followed
+    /// by the shelf. The TABS are still what the config groups by - they are how
+    /// prices are looked up, and they order this list - but nobody pages through
+    /// them any more, and a shop with four things in it never needed anybody to.
+    ///
+    /// Shorter than the full catalogue when a ladder has run out: somebody wearing
+    /// the best helmet in the game is offered three things, not three things and a
+    /// blank.
+    static func everythingOffered(to actor: Actor) -> [GameConfig.Shop.Item] {
+        GameConfig.Shop.tabs.indices.flatMap { offers(on: $0, for: actor) }
+    }
+
     /// The next rung up, or nil at the top.
     ///
     /// Walks the cases rather than doing arithmetic on raw values, so a tier

@@ -151,7 +151,13 @@ enum GameConfig {
             let stock: Stock
         }
 
-        /// GEAR and HEALING, and nothing else.
+        /// GEAR and HEALING, and nothing else - now as GROUPS rather than as tabs.
+        ///
+        /// The shop draws all of this on one page; what these two still decide is
+        /// the order it appears in, and where a price is looked up from. They are
+        /// kept because that grouping is real - a rung of the ladder and a bandage
+        /// are different kinds of purchase - and because the day this shop sells
+        /// six things, the page will want them grouped.
         ///
         /// Both ladders share the gear tab, side by side: two cards, one headed
         /// Helmet and one headed Blaster, each showing the next rung up. They belong
@@ -183,19 +189,21 @@ enum GameConfig {
             ]))
         ]
 
-        /// The most cards any one tab shows, which is what the panel is sized for.
+        /// The most cards the shop can ever show at once, which is what the panel
+        /// is sized for.
         ///
-        /// Read off the catalogue rather than written down, so adding a third thing
-        /// to a tab widens the shop instead of quietly hiding it.
-        static var widestTab: Int {
-            tabs.map { tab in
+        /// Everything added together now rather than the widest tab, because the
+        /// shop is one page: a fifth item makes the panel a row taller instead of
+        /// quietly not being drawn. Read off the catalogue rather than written
+        /// down, so nobody has to remember this exists.
+        static var catalogueSize: Int {
+            tabs.reduce(0) { total, tab in
                 switch tab.stock {
-                case .shelf(let items): return items.count
+                case .shelf(let items): return total + items.count
                 // A helmet rung and a blaster rung, and never more than that.
-                // A helmet rung and a blaster rung, and never more than that.
-                case .upgrades: return 2
+                case .upgrades: return total + 2
                 }
-            }.max() ?? 1
+            }
         }
 
         /// How long the quick-buy prompt stays up before getting out of the way.

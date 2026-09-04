@@ -2,71 +2,75 @@
 //  ShopPanelNode.swift
 //  Loot Wars
 //
-//  Spending tokens, laid out from the reference: a strip of tabs sitting on top of
-//  a panel of cards, each card a name, the item, and what it costs.
+//  Spending tokens: one page, four cards, a header and a way out.
 //
-//  Only tabs that have something in them are drawn. The catalogue is grouped by tab
-//  in GameConfig, so a second one appears here the day something is added to it -
-//  today that means one tab, because a BUILDING tab with nothing behind it would be
-//  a promise the shop cannot keep.
+//  ONE PAGE, and that is the change this file exists in its current shape for. It
+//  had tabs - GEAR and HEALING - and tabs are a way of hiding half a shop from
+//  somebody who is standing in the open with the game running. Everything this shop
+//  will ever sell is a helmet rung, a blaster rung, a bandage and a medkit: four
+//  things, which is not enough to be worth paging through. The tab strip cost a
+//  tap, a heading and thirty points of height to organise four items nobody needed
+//  organised.
+//
+//  The HOTBAR is hidden while this is up, which is the other half of the same idea.
+//  The bar used to double as the sell counter here, and it meant the shop was two
+//  interfaces stacked on top of each other with different rules - tap a card to
+//  buy, tap a slot to sell. Selling now lives where it belongs, on the bar during
+//  play: hold an item and it turns into tokens. So the shop is exactly one thing,
+//  and while it is open nothing else is on screen competing to be read.
+//
+//  Cards are laid out in a grid rather than a row, and centred by ROW, so a player
+//  wearing the best helmet in the game gets three cards arranged deliberately
+//  rather than a hole where the fourth was.
 //
 //  Exactly one thing greys a card out: a machine you already own, which the shop
 //  will not sell you a second of however rich you get. Nothing else does - not the
 //  price, not a full bag - because those are facts about YOU, they change minute to
 //  minute, and greying the shelf out for them had the shop looking permanently
 //  shut. The tap carries the rest: it asks ShopSystem.canBuy and shakes the card
-//  when the answer is no. See ShopSystem.isSoldOut.
+//  when the answer is no.
 //
 
 import SpriteKit
 
 final class ShopPanelNode: SKNode {
 
-    /// Cards, and a panel measured against the smallest phone this runs on with
-    /// the HOTBAR now sharing the screen.
-    ///
-    /// That is the new constraint and it is a tight one. Landscape on an SE is
-    /// 568 x 320, and the bar takes the bottom 82 of it, so the shop has 238 to
-    /// live in. The panel is 186 tall, the tab strip adds 30, and the way out is a
-    /// close button in the panel's own corner rather than a pill hanging 50 points
-    /// underneath it - which is where the missing 50 came from. 216 in 238.
+    // MARK: - Measurements
 
-    private static let cardSize = CGSize(width: 200, height: 150)
-    private static let cardGap: CGFloat = 14
+    /// Sized against the smallest phone this runs on - an SE is 568 x 320 in
+    /// landscape - with room to spare now that the bar is not sharing the screen.
+    /// At 440 x 264 the panel sits in the middle of the screen with nearly 30
+    /// points of air above and below it, which is what lets it read as a thing that
+    /// opened ON TOP of the game rather than a drawer wedged between the HUD and
+    /// the bar.
+    private static let cardSize = CGSize(width: 196, height: 88)
+    private static let cardGap: CGFloat = 12
     private static let padding: CGFloat = 18
-    private static let tabSize = CGSize(width: 128, height: 34)
-    private static let tabGap: CGFloat = 6
+    private static let headerHeight: CGFloat = 40
+    private static let columns = 2
 
-    /// The most cards a tab can show in one row, read off the catalogue rather than
-    /// written down here - so a third thing added to a tab widens the shop instead
-    /// of quietly not being drawn. Cards are CENTRED as a group, so a tab with
-    /// fewer than the maximum does not sit lopsided against the left edge.
+    /// Every card the shop could ever need at once: both gear rungs plus the shelf.
+    private static var slots: Int { GameConfig.Shop.catalogueSize }
 
-    private static var columns: Int {
-        max(1, GameConfig.Shop.widestTab)
+    private static var rows: Int {
+        max(1, Int(ceil(Double(slots) / Double(columns))))
     }
-
-    /// Wide enough for the cards OR the row of tabs, whichever needs more. The tabs
-    /// sit on top of the panel and would hang off the end of a panel sized only for
-    /// two cards - which is exactly what happened when the bomb came off the
-    /// building shelf and the widest tab went from three items to two.
 
     static var panelSize: CGSize {
-        let cards =
-            cardSize.width * CGFloat(columns)
-            + cardGap * CGFloat(max(0, columns - 1))
-
-        let tabCount = GameConfig.Shop.tabs.count
-
-        let tabs =
-            tabSize.width * CGFloat(tabCount)
-            + tabGap * CGFloat(max(0, tabCount - 1))
-
-        return CGSize(
-            width: padding * 2 + max(cards, tabs),
-            height: padding * 2 + cardSize.height
+        CGSize(
+            width: padding * 2
+                + cardSize.width * CGFloat(columns)
+                + cardGap * CGFloat(columns - 1),
+            height: padding * 2
+                + headerHeight
+                + cardSize.height * CGFloat(rows)
+                + cardGap * CGFloat(rows - 1)
         )
     }
+
+    private static let backSize = CGSize(width: 38, height: 38)
+
+    // MARK: - Parts
 
     private struct Card {
         let holder: SKNode
@@ -79,7 +83,6 @@ final class ShopPanelNode: SKNode {
         let name: SKLabelNode
         let price: SKLabelNode
         let pill: SKShapeNode
-        let token: SKSpriteNode
 
         /// Lit for a moment when the sale goes through. Its own node rather than a
         /// colour on the plate, because the plate's fill and the holder's alpha are
@@ -92,48 +95,29 @@ final class ShopPanelNode: SKNode {
 
     private let panel = SKShapeNode()
     private let back = SKNode()
-
-    private var tabs: [
-        (
-            holder: SKNode,
-            shape: SKShapeNode,
-            label: SKLabelNode
-        )
-    ] = []
+    private let purse = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
     private var cards: [Card] = []
 
-    /// The way out, now a round button in the panel's own top-right corner rather
-    /// than a pill hanging underneath it.
-    ///
-    /// Moved because the hotbar came back on screen and something had to give up
-    /// fifty points of height - and of everything on this panel, a BACK label is the
-    /// part that was least carrying its weight: tapping anywhere off the panel
-    /// already closes the shop, so this is the second way out, not the only one.
-
-    private static let backSize = CGSize(width: 38, height: 38)
-
     private(set) var isOpen = false
-    private var selectedTab = 0
     private var lastDrawn: [Int] = []
 
     /// The card the finger last landed on.
     ///
     /// Remembered rather than matched by item, because the card does not always
-    /// still hold what you bought: buying a Rare helmet redraws that column as an
+    /// still hold what you bought: buying a Rare helmet redraws that slot as an
     /// Epic, so by the time the sale is confirmed there is nothing on the panel
     /// with the bought item's name on it. The position is the thing that stays put.
-
     private var lastPressed: Int?
 
     /// A deal waiting for the next redraw, and how long to hold it first.
     ///
-    /// Set by open and by selectTab, spent by update. It cannot fire from either of
-    /// those directly: dealing animates each card from just below its HOME, and the
-    /// home is whatever the redraw is about to put it at - two tabs have different
-    /// card counts, so a deal started before the layout slides every card to where
-    /// the last tab's cards used to be.
+    /// Set by open, spent by update. It cannot fire from open directly: dealing
+    /// animates each card from just below its HOME, and the home is whatever the
+    /// redraw is about to put it at.
     private var pendingDeal: TimeInterval?
+
+    // MARK: - Building
 
     override init() {
         super.init()
@@ -150,20 +134,25 @@ final class ShopPanelNode: SKNode {
                 width: size.width,
                 height: size.height
             ),
-            cornerWidth: 20,
-            cornerHeight: 20,
+            cornerWidth: 22,
+            cornerHeight: 22,
             transform: nil
         )
 
         panel.fillColor = RenderPalette.hudPanel
-        panel.strokeColor = .clear
+
+        // A hairline of light along the edge. Small, and it does more than it
+        // sounds: the panel and the map behind it are both mid-toned, and without
+        // an edge the corners dissolve into whatever happens to be under them.
+        panel.strokeColor = SKColor(white: 1, alpha: 0.16)
+        panel.lineWidth = 1.5
 
         addChild(panel)
 
-        buildTabs(above: size)
+        buildHeader(inside: size)
 
-        for column in 0..<ShopPanelNode.columns {
-            cards.append(makeCard(at: column))
+        for index in 0..<ShopPanelNode.slots {
+            cards.append(makeCard(at: index))
         }
 
         buildCloseButton(inside: size)
@@ -173,7 +162,54 @@ final class ShopPanelNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
-    // MARK: - Building
+    /// A title, what is in your pocket, and a line under both.
+    ///
+    /// The purse is HERE rather than only in the corner of the screen, and it is
+    /// the one number this panel really owes you: every card on it is a question
+    /// about whether you can afford something, and the answer used to live in the
+    /// opposite corner of the screen behind the panel you were reading.
+    private func buildHeader(inside size: CGSize) {
+        let top = size.height / 2
+        let centreY = top - ShopPanelNode.headerHeight / 2 - 4
+
+        let band = SKShapeNode(
+            rect: CGRect(
+                x: -size.width / 2 + 8,
+                y: top - ShopPanelNode.headerHeight - 8,
+                width: size.width - 16,
+                height: ShopPanelNode.headerHeight
+            ),
+            cornerRadius: 14
+        )
+
+        band.fillColor = SKColor(white: 1, alpha: 0.07)
+        band.strokeColor = .clear
+        addChild(band)
+
+        let title = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        title.text = "SHOP"
+        title.fontSize = 19
+        title.fontColor = .white
+        title.horizontalAlignmentMode = .left
+        title.verticalAlignmentMode = .center
+        title.position = CGPoint(x: -size.width / 2 + ShopPanelNode.padding + 4,
+                                 y: centreY)
+        addChild(title)
+
+        let texture = ItemArt.texture(for: Pickup.token(1))
+        let coin = SKSpriteNode(texture: texture)
+
+        coin.size = ItemArt.size(of: texture, fittingInto: 22)
+        coin.position = CGPoint(x: size.width / 2 - 134, y: centreY)
+        addChild(coin)
+
+        purse.fontSize = 18
+        purse.fontColor = .white
+        purse.horizontalAlignmentMode = .left
+        purse.verticalAlignmentMode = .center
+        purse.position = CGPoint(x: size.width / 2 - 116, y: centreY)
+        addChild(purse)
+    }
 
     /// The way out: a round cross in the panel's own top-right corner.
     ///
@@ -181,13 +217,13 @@ final class ShopPanelNode: SKNode {
     /// is that forgetting to build it does not fail to compile. The node exists
     /// either way, so isBackButton keeps happily measuring against it - and an
     /// unpositioned node sits at the origin, which for this panel is dead centre
-    /// behind the cards. The symptom is not a missing button, it is the shop
+    /// among the cards. The symptom is not a missing button, it is the shop
     /// closing when you tap an item.
     private func buildCloseButton(inside size: CGSize) {
         let box = ShopPanelNode.backSize
 
         back.position = CGPoint(
-            x: size.width / 2 - box.width / 2 - 10,
+            x: size.width / 2 - box.width / 2 - 12,
             y: size.height / 2 - box.height / 2 - 10
         )
 
@@ -215,93 +251,46 @@ final class ShopPanelNode: SKNode {
         addChild(back)
     }
 
-    private func buildTabs(above size: CGSize) {
-        let tab = ShopPanelNode.tabSize
-
-        for (index, definition) in GameConfig.Shop.tabs.enumerated() {
-            let holder = SKNode()
-
-            holder.position = CGPoint(
-                x: -size.width / 2
-                    + ShopPanelNode.padding
-                    + tab.width / 2
-                    + CGFloat(index) * (tab.width + ShopPanelNode.tabGap),
-                y: size.height / 2 + tab.height / 2 - 4
-            )
-
-            holder.zPosition = -1
-            addChild(holder)
-
-            // Square along the bottom edge so it meets the panel, rounded on top.
-            let path = CGMutablePath()
-
-            let r: CGFloat = 10
-            let l = -tab.width / 2
-            let rr = tab.width / 2
-            let b = -tab.height / 2
-            let t = tab.height / 2
-
-            path.move(to: CGPoint(x: l, y: b))
-            path.addLine(to: CGPoint(x: l, y: t - r))
-
-            path.addQuadCurve(
-                to: CGPoint(x: l + r, y: t),
-                control: CGPoint(x: l, y: t)
-            )
-
-            path.addLine(to: CGPoint(x: rr - r, y: t))
-
-            path.addQuadCurve(
-                to: CGPoint(x: rr, y: t - r),
-                control: CGPoint(x: rr, y: t)
-            )
-
-            path.addLine(to: CGPoint(x: rr, y: b))
-            path.closeSubpath()
-
-            let shape = SKShapeNode(path: path)
-            shape.strokeColor = .clear
-            holder.addChild(shape)
-
-            let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-            label.text = definition.name
-            label.fontSize = 15
-            label.fontColor = .white
-            label.verticalAlignmentMode = .center
-            label.position = CGPoint(x: 0, y: 1)
-
-            holder.addChild(label)
-
-            tabs.append((holder: holder, shape: shape, label: label))
-        }
-    }
-
-    /// Where a card sits when a tab is showing `count` of them, centred as a group.
-    private static func centreX(of column: Int, outOf count: Int) -> CGFloat {
+    /// Where a card sits when `count` of them are showing.
+    ///
+    /// Filled left to right, top to bottom, with each ROW centred on its own. Four
+    /// cards make a block; three make a full row above a single centred card, which
+    /// is a deliberate arrangement rather than a gap where something used to be -
+    /// and three is what the shop shows the moment anybody tops out a ladder.
+    private static func home(of index: Int, outOf count: Int) -> CGPoint {
         let card = cardSize
+        let row = index / columns
+        let column = index % columns
 
-        let spread =
-            card.width * CGFloat(count)
-            + cardGap * CGFloat(max(0, count - 1))
+        let inRow = min(columns, count - row * columns)
+        let spread = card.width * CGFloat(inRow) + cardGap * CGFloat(inRow - 1)
 
-        return -spread / 2
-            + card.width / 2
-            + CGFloat(column) * (card.width + cardGap)
+        let usedRows = max(1, Int(ceil(Double(count) / Double(columns))))
+        let block = card.height * CGFloat(usedRows) + cardGap * CGFloat(usedRows - 1)
+
+        // The cards own everything below the header, and sit centred in it.
+        let top = panelSize.height / 2 - headerHeight - padding
+        let bottom = -panelSize.height / 2 + padding
+        let middle = (top + bottom) / 2
+
+        return CGPoint(
+            x: -spread / 2 + card.width / 2 + CGFloat(column) * (card.width + cardGap),
+            y: middle + block / 2 - card.height / 2
+                - CGFloat(row) * (card.height + cardGap)
+        )
     }
 
-    private func makeCard(at column: Int) -> Card {
+    /// A card is read left to right: what it is, then what it costs.
+    ///
+    /// Landscape rather than the portrait card this replaced, and the shape follows
+    /// from the page. Four cards two-up need to be wide and short, and a wide card
+    /// wants its picture beside its words rather than stacked over them - which
+    /// also happens to be how every price tag anybody has ever read is arranged.
+    private func makeCard(at index: Int) -> Card {
         let card = ShopPanelNode.cardSize
-
         let holder = SKNode()
 
-        holder.position = CGPoint(
-            x: ShopPanelNode.centreX(
-                of: column,
-                outOf: ShopPanelNode.columns
-            ),
-            y: 0
-        )
-
+        holder.position = ShopPanelNode.home(of: index, outOf: ShopPanelNode.slots)
         addChild(holder)
 
         let outline = CGPath(
@@ -311,15 +300,15 @@ final class ShopPanelNode: SKNode {
                 width: card.width,
                 height: card.height
             ),
-            cornerWidth: 12,
-            cornerHeight: 12,
+            cornerWidth: 14,
+            cornerHeight: 14,
             transform: nil
         )
 
         let plate = SKShapeNode(path: outline)
         plate.fillColor = SKColor(white: 1, alpha: 0.10)
-        plate.strokeColor = .clear
-
+        plate.strokeColor = SKColor(white: 1, alpha: 0.10)
+        plate.lineWidth = 1
         holder.addChild(plate)
 
         let flash = SKShapeNode(path: outline)
@@ -328,28 +317,14 @@ final class ShopPanelNode: SKNode {
         flash.lineWidth = 3
         flash.alpha = 0
         flash.zPosition = 5
-
         holder.addChild(flash)
 
-        let name = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        name.fontSize = 15
-        name.fontColor = .white
-        name.verticalAlignmentMode = .center
-        name.position = CGPoint(
-            x: 0,
-            y: card.height / 2 - 20
-        )
-
-        holder.addChild(name)
+        // The picture, on its own tile on the left.
+        let tileCentre = CGPoint(x: -card.width / 2 + 42, y: 0)
 
         let tile = SKShapeNode(
             path: CGPath(
-                roundedRect: CGRect(
-                    x: -32,
-                    y: -32,
-                    width: 64,
-                    height: 64
-                ),
+                roundedRect: CGRect(x: -32, y: -32, width: 64, height: 64),
                 cornerWidth: 14,
                 cornerHeight: 14,
                 transform: nil
@@ -358,37 +333,49 @@ final class ShopPanelNode: SKNode {
 
         tile.fillColor = SKColor(white: 1, alpha: 0.14)
         tile.strokeColor = .clear
-        tile.position = CGPoint(x: 0, y: 8)
-
+        tile.position = tileCentre
         holder.addChild(tile)
 
         let glow = SKSpriteNode(texture: GlowArt.pool)
         glow.size = CGSize(width: 76, height: 76)
         glow.colorBlendFactor = 1
         glow.alpha = 0.7
-        glow.position = tile.position
+        glow.position = tileCentre
         glow.zPosition = 0.5
-
         holder.addChild(glow)
 
         let icon = SKSpriteNode()
-        icon.position = tile.position
+        icon.position = tileCentre
         icon.zPosition = 1
-
         holder.addChild(icon)
 
-        // The price pill, from the reference: a light capsule with the cost and the
-        // token you pay it in.
+        let textLeft = tileCentre.x + 46
+
+        let name = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        name.fontSize = 16
+        name.fontColor = .white
+        name.horizontalAlignmentMode = .left
+        name.verticalAlignmentMode = .center
+        name.position = CGPoint(x: textLeft, y: 21)
+        holder.addChild(name)
+
+        // The price pill: a capsule with the cost and the token you pay it in. It
+        // runs from the text column to the card's right margin, so a card is two
+        // clean columns - picture, then words over price - at every width this is
+        // ever built at.
+        let pillWidth = card.width / 2 - 14 - textLeft
+        let pillCentre = CGPoint(x: textLeft + pillWidth / 2, y: -19)
+
         let pill = SKShapeNode(
             path: CGPath(
                 roundedRect: CGRect(
-                    x: -card.width / 2 + 12,
-                    y: -card.height / 2 + 12,
-                    width: card.width - 24,
-                    height: 32
+                    x: pillCentre.x - pillWidth / 2,
+                    y: pillCentre.y - 15,
+                    width: pillWidth,
+                    height: 30
                 ),
-                cornerWidth: 10,
-                cornerHeight: 10,
+                cornerWidth: 11,
+                cornerHeight: 11,
                 transform: nil
             )
         )
@@ -400,41 +387,24 @@ final class ShopPanelNode: SKNode {
         pill.fillColor = RenderPalette.affordable
         pill.strokeColor = .black
         pill.lineWidth = 3
-
         holder.addChild(pill)
 
-        let pillCentre = CGPoint(
-            x: 0,
-            y: -card.height / 2 + 28
-        )
+        let tokenTexture = ItemArt.texture(for: Pickup.token(1))
+        let token = SKSpriteNode(texture: tokenTexture)
+
+        token.size = ItemArt.size(of: tokenTexture, fittingInto: 20)
+        token.position = CGPoint(x: pillCentre.x - pillWidth / 2 + 18, y: pillCentre.y)
+        token.zPosition = 1
+        holder.addChild(token)
 
         let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
         price.fontSize = 17
         price.fontColor = .white
-        price.horizontalAlignmentMode = .right
+        price.horizontalAlignmentMode = .left
         price.verticalAlignmentMode = .center
-        price.position = CGPoint(
-            x: pillCentre.x + 4,
-            y: pillCentre.y
-        )
+        price.position = CGPoint(x: token.position.x + 16, y: pillCentre.y)
         price.zPosition = 1
-
         holder.addChild(price)
-
-        let tokenTexture = ItemArt.texture(for: .token(1))
-
-        let token = SKSpriteNode(texture: tokenTexture)
-        token.size = ItemArt.size(
-            of: tokenTexture,
-            fittingInto: 22
-        )
-        token.position = CGPoint(
-            x: pillCentre.x + 20,
-            y: pillCentre.y
-        )
-        token.zPosition = 1
-
-        holder.addChild(token)
 
         return Card(
             holder: holder,
@@ -443,7 +413,6 @@ final class ShopPanelNode: SKNode {
             name: name,
             price: price,
             pill: pill,
-            token: token,
             flash: flash,
             type: nil
         )
@@ -516,48 +485,13 @@ final class ShopPanelNode: SKNode {
             && abs(local.y) <= box.height / 2 + 14
     }
 
-    /// Whether a point in this node's own space is on the shop at all.
-    ///
-    /// Everything the panel owns: the card area, the strip of tabs sitting on top
-    /// of it and the back button hanging below. A tap anywhere else is a tap
-    /// outside, and closes the shop.
-    ///
-    /// The tab STRIP rather than the tabs themselves, deliberately. The six points
-    /// of gap between two tabs is somewhere a thumb lands often, and a gap that
-    /// shut the whole shop would feel like the panel had a hole in it.
-
+    /// Whether a point in this node's own space is on the shop at all. A tap
+    /// anywhere else is a tap outside, and closes the shop.
     func contains(localPoint point: CGPoint) -> Bool {
         let size = ShopPanelNode.panelSize
-        let tab = ShopPanelNode.tabSize
-
-        if abs(point.x) <= size.width / 2,
-           abs(point.y) <= size.height / 2 {
-            return true
-        }
-
-        let strip = size.height / 2 - 4
 
         return abs(point.x) <= size.width / 2
-            && point.y >= strip
-            && point.y <= strip + tab.height
-    }
-
-    func tabIndex(atLocalPoint point: CGPoint) -> Int? {
-        let tab = ShopPanelNode.tabSize
-
-        for (index, entry) in tabs.enumerated() {
-            let local = CGPoint(
-                x: point.x - entry.holder.position.x,
-                y: point.y - entry.holder.position.y
-            )
-
-            if abs(local.x) <= tab.width / 2,
-               abs(local.y) <= tab.height / 2 {
-                return index
-            }
-        }
-
-        return nil
+            && abs(point.y) <= size.height / 2
     }
 
     /// Which item a tap landed on, or nil.
@@ -584,12 +518,13 @@ final class ShopPanelNode: SKNode {
         return nil
     }
 
+    // MARK: - Answering a tap
+
     /// The sale was refused: shake the card that was pressed.
     ///
     /// The other half of not greying cards out for a full bag. Something has to
     /// answer a tap that cannot go through, and a card that simply sat there would
     /// be the shop looking broken rather than the shop saying no.
-
     func refuse() {
         guard let index = lastPressed,
               cards.indices.contains(index) else {
@@ -602,12 +537,10 @@ final class ShopPanelNode: SKNode {
         card.holder.setScale(1)
 
         // A wobble rather than a slide, and that is not a stylistic choice. The
-        // redraw owns card POSITION - it is what puts a card in its column - so a
-        // moveBy interrupted by a tab change would fight it and could leave the
-        // card parked at the position it had before. Rotation and scale are
-        // nobody else's, so an interrupted wobble can only ever end where it
-        // started.
-
+        // redraw owns card POSITION - it is what puts a card in its place - so a
+        // moveBy interrupted by a redraw would fight it and could leave the card
+        // parked where it used to be. Rotation and scale are nobody else's, so an
+        // interrupted wobble can only ever end where it started.
         card.holder.run(
             .sequence([
                 .group([
@@ -627,10 +560,7 @@ final class ShopPanelNode: SKNode {
         card.flash.fillColor = RenderPalette.placementBlocked
         card.flash.strokeColor = RenderPalette.placementBlocked
         card.flash.alpha = 0.38
-
-        card.flash.run(
-            .fadeAlpha(to: 0, duration: 0.35)
-        )
+        card.flash.run(.fadeAlpha(to: 0, duration: 0.35))
 
         lastPressed = nil
     }
@@ -638,16 +568,13 @@ final class ShopPanelNode: SKNode {
     /// The sale went through: light the card that was pressed.
     ///
     /// Driven by the world rather than by the tap, so a card that was pressed and
-    /// refused stays dark. Nothing here decides whether the purchase happened -
-    /// it is told.
-
-    /// The sale went through.
+    /// refused stays dark. Nothing here decides whether the purchase happened - it
+    /// is told.
     ///
     /// - Parameter destination: where the thing you bought should appear to go, in
-    ///   this panel's own coordinates. The scene passes the hotbar's position,
-    ///   because that is where your things live and the whole point of the flight
-    ///   is to say WHERE IT WENT - a card that merely flashes tells you a purchase
-    ///   happened and leaves you to find the result yourself.
+    ///   this panel's own coordinates. The scene passes the hotbar's position -
+    ///   hidden behind the panel while the shop is up, but still where your things
+    ///   live, and the whole point of the flight is to say WHERE IT WENT.
     func confirm(flyingTo destination: CGPoint) {
         guard let index = lastPressed,
               cards.indices.contains(index) else {
@@ -663,7 +590,7 @@ final class ShopPanelNode: SKNode {
 
         card.holder.run(
             .sequence([
-                .scale(to: 1.09, duration: 0.07),
+                .scale(to: 1.07, duration: 0.07),
                 .scale(to: 1.0, duration: 0.13)
             ]),
             withKey: "bought"
@@ -673,10 +600,7 @@ final class ShopPanelNode: SKNode {
         card.flash.fillColor = RenderPalette.placementValid
         card.flash.strokeColor = RenderPalette.placementValid
         card.flash.alpha = 0.42
-
-        card.flash.run(
-            .fadeAlpha(to: 0, duration: 0.45)
-        )
+        card.flash.run(.fadeAlpha(to: 0, duration: 0.45))
 
         lastPressed = nil
     }
@@ -731,36 +655,17 @@ final class ShopPanelNode: SKNode {
         )
     }
 
-    func selectTab(_ index: Int) {
-        guard index != selectedTab,
-              GameConfig.Shop.tabs.indices.contains(index) else {
-            return
-        }
-
-        selectedTab = index
-        lastDrawn = []
-        lastPressed = nil
-
-        // The cards for the new tab are dealt in on the next redraw, which happens
-        // this frame - see update, which is what actually fills them in. Kicking it
-        // off here rather than there keeps the animation tied to the DECISION
-        // rather than to the redraw, and the redraw fires for other reasons too:
-        // buying something must not re-deal the whole tab.
-        pendingDeal = 0
-    }
-
     /// Slides the visible cards in, one just after another.
     ///
     /// A stagger rather than all at once, and only 30 milliseconds of it. Together
-    /// they read as a hand being dealt - which is exactly what a tab change is -
-    /// where simultaneous movement reads as the panel twitching.
+    /// they read as a hand being dealt - which is what opening a shop is - where
+    /// simultaneous movement reads as the panel twitching.
     private func dealCards(from delay: TimeInterval) {
         for (index, card) in cards.enumerated() where !card.holder.isHidden {
             card.holder.removeAction(forKey: "deal")
 
-            // Faded back to where the redraw wanted it rather than to 1: a machine
-            // you already own is drawn faint, and should still be faint when it
-            // lands.
+            // Faded back to where the redraw wanted it rather than to 1: a card
+            // drawn faint should still be faint when it lands.
             let settled = card.holder.alpha
             let home = card.holder.position
 
@@ -785,30 +690,21 @@ final class ShopPanelNode: SKNode {
     func update(with world: World) {
         guard isOpen, let player = world.localPlayer else { return }
 
-        // The gear tab's cards depend on what you are wearing, so the offers come
-        // from Core rather than straight out of the config.
-        let items = ShopSystem.offers(on: selectedTab, for: player)
+        // The whole catalogue at once. What the gear half offers depends on what
+        // you are wearing, so this comes from Core rather than straight out of the
+        // config.
+        let items = ShopSystem.everythingOffered(to: player)
 
-        // Redraw when the tab, purse, offer identity, price, or sold-out state changes.
-        //
-        // We use hashValue for the offer's ItemType so we don't need to know anything
-        // about the concrete type returned by ShopSystem.offers().
-        var fingerprint: [Int] = [
-            selectedTab,
-            player.tokens,
-            items.count
-        ]
+        // Redrawn when the purse, the offers, their prices or their sold-out state
+        // change - and not otherwise, because a redraw resets card positions and
+        // would stamp on the animations.
+        var fingerprint: [Int] = [player.tokens, items.count]
 
         for item in items {
             fingerprint.append(item.type.hashValue)
             fingerprint.append(item.price)
 
-            let soldOut = ShopSystem.isSoldOut(
-                item.type,
-                actor: player,
-                in: world
-            )
-
+            let soldOut = ShopSystem.isSoldOut(item.type, actor: player, in: world)
             fingerprint.append(soldOut ? 1 : 0)
         }
 
@@ -816,16 +712,7 @@ final class ShopPanelNode: SKNode {
 
         lastDrawn = fingerprint
         lastPressed = nil
-
-        for (index, entry) in tabs.enumerated() {
-            let active = index == selectedTab
-
-            entry.shape.fillColor = active
-                ? RenderPalette.hudPanel
-                : SKColor(white: 0, alpha: 0.34)
-
-            entry.label.alpha = active ? 1 : 0.7
-        }
+        purse.text = "\(player.tokens)"
 
         for (index, var card) in cards.enumerated() {
             guard index < items.count else {
@@ -839,49 +726,25 @@ final class ShopPanelNode: SKNode {
             let texture = ItemArt.texture(for: .item(item.type))
 
             card.holder.isHidden = false
-
-            card.holder.position = CGPoint(
-                x: ShopPanelNode.centreX(
-                    of: index,
-                    outOf: items.count
-                ),
-                y: 0
-            )
+            card.holder.position = ShopPanelNode.home(of: index, outOf: items.count)
 
             card.type = item.type
             card.name.text = ItemArt.name(for: item.type)
             card.icon.texture = texture
-            card.icon.size = ItemArt.size(
-                of: texture,
-                fittingInto: 48
-            )
-
-            card.glow.color = RenderPalette.colour(
-                of: item.type.rarity
-            )
-
+            card.icon.size = ItemArt.size(of: texture, fittingInto: 48)
+            card.glow.color = RenderPalette.colour(of: item.type.rarity)
             card.price.text = "\(item.price)"
 
-            let soldOut = ShopSystem.isSoldOut(
-                item.type,
-                actor: player,
-                in: world
-            )
-
+            let soldOut = ShopSystem.isSoldOut(item.type, actor: player, in: world)
             card.holder.alpha = soldOut ? 0.45 : 1.0
 
-            // Green when you can have it, red when you cannot afford it - on the
-            // fill AND the outline, which is what the black outline used to be
-            // doing badly. Affordability only: a full bag also refuses a purchase,
-            // but that is a fact about you rather than about the shelf and the card
-            // says nothing about it (see ShopSystem.isSoldOut).
-            let affordable = player.tokens >= item.price
-
-            let colour = affordable
+            // Green when you can have it, red when you cannot afford it.
+            // Affordability only: a full bag also refuses a purchase, but that is a
+            // fact about you rather than about the shelf, and the card says nothing
+            // about it (see ShopSystem.isSoldOut).
+            card.pill.fillColor = player.tokens >= item.price
                 ? RenderPalette.affordable
                 : RenderPalette.unaffordable
-
-            card.pill.fillColor = colour
 
             cards[index] = card
         }
