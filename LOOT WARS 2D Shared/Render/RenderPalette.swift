@@ -195,11 +195,20 @@ enum RenderPalette {
     /// panel that means anything, and is what every shop in every game does. The
     /// refusal is still red - shake a card you actually pressed and cannot buy, and
     /// it flashes red - because that IS a moment, and it is over in half a second.
-    /// Deliberately DARKER than the card it sits on rather than lighter. A grey at
-    /// the plate's own brightness disappeared into it - the button has to stay a
-    /// button - and a recessed one also reads as the empty version of the lit
-    /// green, which is exactly what it is.
-    static let unaffordable = SKColor(red: 0.24, green: 0.27, blue: 0.32, alpha: 1)
+    /// Lighter than the card it sits on, and that direction is the whole trick.
+    ///
+    /// There is a wrong lighter and a right one here. The card plate sits at about
+    /// 0.34 brightness, so nudging the button UP from near-black lands it straight
+    /// on the plate's own value and the button dissolves into the card - the two
+    /// worst versions of this are both greys within a few points of 0.34. Going
+    /// past it to 0.48 puts the button back above its card, where the green one
+    /// already is: the pair then reads as one button lit and one not, rather than
+    /// as a button and a hole.
+    ///
+    /// White on this is about a 2:1 contrast, which is deliberately unremarkable.
+    /// The number on a price you cannot pay is the one thing on this panel that
+    /// should not be shouting; at 18-point bold it stays perfectly readable.
+    static let unaffordable = SKColor(red: 0.44, green: 0.48, blue: 0.54, alpha: 1)
 
     /// The same two, a few shades down, for the lip under a button.
     ///
@@ -210,7 +219,7 @@ enum RenderPalette {
     /// world - the token, the crates, the figures - so a black-ringed capsule read
     /// as a thing lying on the grass rather than a control on a panel.
     static let affordableDeep = rgb(0x2C, 0x8B, 0x3F)
-    static let unaffordableDeep = SKColor(red: 0.14, green: 0.16, blue: 0.20, alpha: 1)
+    static let unaffordableDeep = SKColor(red: 0.29, green: 0.32, blue: 0.37, alpha: 1)
 
     // Placement preview. Green while a footprint would take, red while it would
     // not - the only two colours nobody has to be taught.
