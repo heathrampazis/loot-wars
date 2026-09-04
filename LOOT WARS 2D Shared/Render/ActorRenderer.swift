@@ -53,6 +53,33 @@ final class ActorRenderer {
     private static let walkBob: Double = 0.075      // tiles
     private static let walkLean: Double = 0.045     // radians
 
+    /// Standing still: a breath.
+    ///
+    /// The walk is driven by DISTANCE, which is what makes it honest - stop and it
+    /// settles exactly where the foot landed. The cost of that honesty is that a
+    /// figure standing still is a figure frozen solid, and eight of them dotted
+    /// round a map read as a screenshot with one player in it.
+    ///
+    /// So the clock takes over when the ground stops: a slow rise and fall with the
+    /// chest swelling as it goes up. Three seconds a cycle, which is twenty breaths
+    /// a minute - a resting human, near enough - and the two amplitudes together
+    /// move the top of the head about three points. That is the size this wants: on
+    /// a figure drawn thirty-odd points tall it is unmistakable while you are
+    /// looking at somebody and invisible while you are looking at the fight. Bigger
+    /// was tried at every stage of this project's animation work and the answer
+    /// comes back the same: an idle you can measure is an idle that distracts.
+    private static let breathRate: Double = 3.0     // seconds per breath
+    private static let breathLift: Double = 0.035   // tiles
+    private static let breathSwell: Double = 0.028  // share of height
+
+    /// How fast a figure changes its mind about standing still, per second.
+    ///
+    /// Blended rather than switched, or the breath would snap on the instant a
+    /// thumb left the stick and off again the instant it came back - which is a
+    /// twitch, and the one thing an idle must never be. A fifth of a second either
+    /// way is quick enough to feel immediate and slow enough to be a settle.
+    private static let stillnessRate: Double = 5
+
     private final class ActorNodes {
         let root = SKNode()
 
@@ -85,6 +112,15 @@ final class ActorRenderer {
         /// and a stationary one does not jog on the spot.
         var walkPhase: Double = 0
         var lastPosition: Vec2?
+
+        /// Where the breathing has got to, and how much of it is showing.
+        ///
+        /// The phase runs on the CLOCK whether or not it is being used, so a figure
+        /// that stops walking joins a breath already in progress rather than
+        /// starting one from the bottom - which is the difference between somebody
+        /// standing still and somebody being switched on.
+        var breathPhase: Double = 0
+        var stillness: Double = 0
 
         /// The muzzle flash, hung at the end of the barrel.
         let muzzle = SKSpriteNode(texture: GlowArt.pool)
@@ -157,14 +193,46 @@ final class ActorRenderer {
             }
 
             let hop = abs(sin(nodes.walkPhase))
+
+            // Walking, or standing still? Not a question with two answers: the two
+            // are CROSS-FADED, so somebody stopping settles out of the walk and
+            // into the breath over about a fifth of a second rather than switching
+            // between them on the frame their thumb lifts.
+            //
+            // "Moving" is measured the way the walk is - ground actually covered -
+            // so somebody held against a wall by a stick pushed into it counts as
+            // standing still, which is what it looks like.
+            let target: Double = moved > 0.0004 ? 0 : 1
+            nodes.stillness += (target - nodes.stillness)
+                * min(1, dt * ActorRenderer.stillnessRate)
+
+            // Always turning, used or not - see ActorNodes.breathPhase.
+            nodes.breathPhase += dt * 2 * .pi / ActorRenderer.breathRate
+
+            let breath = sin(nodes.breathPhase)
+            let still = nodes.stillness
+
             nodes.body.position.y = GridGeometry.length(
-                ofTiles: hop * ActorRenderer.walkBob)
+                ofTiles: hop * ActorRenderer.walkBob * (1 - still)
+                    + (breath + 1) / 2 * ActorRenderer.breathLift * still)
 
             // And a lean, which is what stops the hop reading as a hiccup. It
-            // leans INTO the direction of travel, so it flips with the figure.
+            // leans INTO the direction of travel, so it flips with the figure. It
+            // fades out with the walk: a figure standing still has nothing to lean
+            // into.
             nodes.body.zRotation = sin(nodes.walkPhase * 0.5)
                 * ActorRenderer.walkLean
                 * (actor.facesLeft ? 1 : -1)
+                * (1 - still)
+
+            // The chest. On the BODY rather than the figure, which is the same rule
+            // the bob follows: the figure's scale belongs to the flinch and the
+            // heal, and a value rewritten every frame cannot also be animated by an
+            // action - the action simply loses. Taller and slightly narrower
+            // together, so it reads as a breath rather than as growth.
+            let swell = breath * ActorRenderer.breathSwell * still
+            nodes.body.yScale = 1 + swell
+            nodes.body.xScale = 1 - swell * 0.6
 
             // A drop in health is the hit, a rise is a heal. No event system needed
             // for something the renderer can simply notice.
@@ -297,6 +365,13 @@ final class ActorRenderer {
         nodes.root.addChild(nodes.body)
         nodes.root.addChild(bar)
         if let goalLabel { nodes.root.addChild(goalLabel) }
+
+        // Everybody breathes at the same rate and nobody breathes together. Eight
+        // figures rising and falling in step is a chorus line, and it is the single
+        // most obvious way an idle animation gives itself away - so each one starts
+        // somewhere else in the cycle, picked off its own id rather than at random
+        // so a replay of the same match looks the same both times.
+        nodes.breathPhase = Double(actor.id.raw % 11) * 0.57
 
         node.addChild(nodes.root)
         nodesByActor[actor.id] = nodes
