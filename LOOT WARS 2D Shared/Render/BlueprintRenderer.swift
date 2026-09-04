@@ -22,8 +22,11 @@
 //  They pulse because a still thing on the ground is scenery. The whole job of this
 //  animation is to be the only thing moving in your base when you walk into it.
 //
-//  And they retire. Two or three walls in, the player has the mechanic, and Prefs
-//  remembers it for every match after this one. What is left behind is the part
+//  And they retire. Three walls in, the player has the mechanic, and Prefs
+//  remembers it for every match after this one. Not after a match COUNT: somebody
+//  whose first five minutes were spent being shot at in a field has not learned
+//  anything, and a tutorial that expires on a clock rather than on the player doing
+//  the thing is a tutorial for whoever had a quiet first match. What is left behind is the part
 //  that was always missing and is not a lesson: a refused tap flashes the tile red,
 //  so "you cannot build there" stops being indistinguishable from "the game did not
 //  see you".
@@ -58,7 +61,7 @@ final class BlueprintRenderer {
     // MARK: - Drawing
 
     func sync(with world: World, dt: TimeInterval) {
-        guard Prefs.isFirstMatch, !Prefs.taughtBuilding,
+        guard !Prefs.taughtBuilding,
               let player = world.localPlayer, player.isAlive, !world.isOver,
               world.canBuild(player.team),
               world.claim(for: player.team)?

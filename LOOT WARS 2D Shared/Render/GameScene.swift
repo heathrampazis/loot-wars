@@ -659,8 +659,7 @@ final class GameScene: SKScene {
         let arrivedHome = home && !wasHome
         wasHome = home
 
-        if arrivedHome, !hasBuilt, buildHintsLeft > 0,
-           Prefs.isFirstMatch, !Prefs.taughtBuilding,
+        if arrivedHome, !hasBuilt, buildHintsLeft > 0, !Prefs.taughtBuilding,
            blueprint.hasSlots, world.canBuild(player.team) {
             buildHintsLeft -= 1
 
@@ -673,10 +672,12 @@ final class GameScene: SKScene {
         }
 
         guard stepped, !hasUsedHold, holdHintsLeft > 0, !hint.isShowing,
-              Prefs.isFirstMatch, !Prefs.taughtSelling else { return }
+              !Prefs.taughtSelling else { return }
 
+        // Shown, not learned. The lesson ends when a slot is actually held and
+        // sold - see resolveHold - on the same principle the build lesson follows:
+        // being told something is not the same as being able to do it.
         holdHintsLeft -= 1
-        Prefs.taughtSelling = true
         hint.show(GameScene.holdSells ? "HOLD AN ITEM TO SELL IT"
                                       : "HOLD AN ITEM TO DROP IT")
     }
@@ -1258,8 +1259,10 @@ extension GameScene {
                                                       : .dropItem(slot: slot))
             hotbar.endHold()
 
-            // Somebody who has done it once knows how to do it.
+            // Somebody who has done it once knows how to do it - this match, and
+            // every match after it.
             hasUsedHold = true
+            Prefs.taughtSelling = true
             hint.hide()
         }
     }
