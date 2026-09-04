@@ -916,14 +916,21 @@ enum GameConfig {
         /// minutes - it barely loots, so it turns up to fights with nothing to
         /// patch itself up with. Same build time either way; this version spends
         /// the difference out on the map.
-        static let urgeInterval: ClosedRange<Double> = 6...10
+        ///
+        /// Shortened along with the bomb supply, and the two have to move together.
+        /// Bombs are the key to a base, so making them commoner without making
+        /// bases go up faster does not produce more raiding - it produces bases
+        /// that are never finished, which is the same as no bases, which is nothing
+        /// to raid. The gap is what balances the two: walls have to arrive faster
+        /// than bombs take them away.
+        static let urgeInterval: ClosedRange<Double> = 5...8
 
         /// Walls laid per trip.
         ///
         /// More walls per trip rather than more trips: the walk home is what a trip
         /// actually costs, so a bigger armful finishes the base faster without
         /// eating into the time a bot spends out on the map looting.
-        static let blocksPerVisit: ClosedRange<Int> = 7...11
+        static let blocksPerVisit: ClosedRange<Int> = 8...12
 
         /// Seconds between individual walls. Quick enough to read as somebody
         /// laying a run of them, slow enough that you can still see it happen.
@@ -959,7 +966,7 @@ enum GameConfig {
         /// than the raid itself lasted. Patching a hole you are standing in front
         /// of should look urgent, and the sooner it is shut the sooner there is
         /// something in it worth coming back for.
-        static let repairInterval: Double = 0.18
+        static let repairInterval: Double = 0.15
 
         /// How long after being bombed before a team may lay walls again.
         ///
@@ -984,7 +991,12 @@ enum GameConfig {
         /// decision interval - one to three seconds of standing about before the
         /// bot re-commits - but an armful far bigger than the hole just keeps it at
         /// home laying wall nobody breached, and time at home is time not raiding.
-        static let blocksWhenBreached: ClosedRange<Int> = 8...12
+        ///
+        /// Raised with the bomb supply. More bombs means more holes and bigger
+        /// ones, and an armful sized for yesterday's hole is how a base ends up
+        /// permanently half open - at which point nobody needs a bomb to get in and
+        /// the whole exchange stops being a raid.
+        static let blocksWhenBreached: ClosedRange<Int> = 10...14
 
         /// Walls laid per trip by a bot that is behind.
         ///

@@ -67,7 +67,7 @@ enum LootTable {
     /// crate that cannot meaningfully patch you up is a crate that does not matter
     /// at the exact point in a match where being alive matters most.
     ///
-    /// Bombs go the other way: about one crate in four early, one in six late.
+    /// Bombs go the other way: about one crate in FOUR early, one in five late.
     ///
     /// Up by a fifth across the board, and the early band most of all, because the
     /// opening minutes are where the shape of a match is decided: a base goes up,
@@ -81,7 +81,7 @@ enum LootTable {
         (0.00, [
             (.item(.bandage), 88),
             (.item(.medkit),  22),
-            (.item(.bomb),    70),
+            (.item(.bomb),    82),
             (.item(.stink),   18),
             (.item(.chest),   26),
 
@@ -94,7 +94,7 @@ enum LootTable {
         (0.35, [
             (.item(.bandage), 88),
             (.item(.medkit),  24),
-            (.item(.bomb),    60),
+            (.item(.bomb),    70),
             (.item(.stink),   16),
             (.item(.chest),   26),
 
@@ -108,7 +108,7 @@ enum LootTable {
         (0.70, [
             (.item(.bandage), 96),
             (.item(.medkit),  34),
-            (.item(.bomb),    44),
+            (.item(.bomb),    52),
             (.item(.stink),   14),
             (.item(.chest),   22),
 

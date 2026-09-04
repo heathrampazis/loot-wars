@@ -97,7 +97,23 @@ enum ItemType: Hashable {
     ///
     /// Epic and above precisely because most things are not. If a bandage
     /// twinkled, nothing would.
-    var isEnchanted: Bool { perk != nil || rarity >= .epic }
+    var isEnchanted: Bool {
+        if perk != nil { return true }
+
+        // Bombs and gas, whatever rung they sit on.
+        //
+        // The rule everywhere else is "one of the best things in the game", and
+        // these two are the exception because of what they UNLOCK rather than what
+        // they are worth. A bomb is the only key to somebody else's base, and the
+        // whole second half of this game is behind that door - so a bomb lying in
+        // the grass is worth crossing a map for in a way a Rare helmet is not, and
+        // it should look it. They are also the two things a player is most likely
+        // to walk past without knowing what they were.
+        if case .bomb = self { return true }
+        if case .stink = self { return true }
+
+        return rarity >= .epic
+    }
 
     /// Share of maximum health restored when used.
     var healFraction: Double {
