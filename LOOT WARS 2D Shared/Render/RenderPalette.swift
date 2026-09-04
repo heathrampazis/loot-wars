@@ -132,17 +132,24 @@ enum RenderPalette {
     /// out what tier it was. Violet is the only strong colour this game has not
     /// already spent - teams are the primaries, healing is green, damage is pink,
     /// money is gold - so nothing else on screen can be mistaken for it.
-    static let perkAura = rgb(0xA1, 0x4B, 0xF0)
+    static let perkAura = rgb(0xC7, 0x8B, 0xFF)
 
-    /// The deep end of the same, so the particles have two purples to vary
+    /// The deeper end of the same, so the particles have two purples to vary
     /// between rather than one flat one.
+    ///
+    /// Deliberately only a shade apart, which is the fix for the version before
+    /// this. A light violet against a near-indigo was a wide enough spread that the
+    /// dark half went muddy over green grass, and dark purple next to green is the
+    /// colour of poison in every game anybody has played. Two bright amethysts a
+    /// step apart shimmer instead, and nothing in the pair is dark enough to read
+    /// as something wrong with you.
     ///
     /// BOTH ends are purple, which sounds obvious and was not: the first pass
     /// varied violet against a near-white lilac and drew it additively, and the
     /// pale half over a light green map came out white. A colour only survives
     /// this game's background if it is dark enough to sit ON it - added light on
     /// pale grass washes to nothing, whatever colour it started as.
-    static let perkDeep = rgb(0x6E, 0x27, 0xC4)
+    static let perkDeep = rgb(0xA2, 0x53, 0xF5)
 
     /// The near-white middle of a SPARKLE, which is a glint rather than a colour -
     /// and the one place the pale end is right, because a sparkle sits on top of
@@ -155,6 +162,19 @@ enum RenderPalette {
     /// outlines alike - so "you can do this" looks the same everywhere it is said,
     /// which is the only way a colour ever comes to mean anything.
     static let sellButton = rgb(0x3F, 0xB9, 0x50)
+
+    /// The number thrown up when something sells.
+    ///
+    /// Much brighter than the sell button it comes from, and they are different on
+    /// purpose: a button is a surface with a word on it and wants a green you can
+    /// read black text against, while this is a small number on grass for three
+    /// quarters of a second. Payouts elsewhere in this game are gold and they pop -
+    /// this had to earn the same attention in a colour that already means money
+    /// coming in.
+    static let payout = rgb(0x3D, 0xF5, 0x74)
+
+    /// Sat behind it, so a bright green number survives pale green grass.
+    static let payoutShadow = SKColor(red: 0.04, green: 0.16, blue: 0.07, alpha: 0.85)
     static let affordable = rgb(0x4C, 0xC9, 0x5E)
     static let unaffordable = rgb(0xE0, 0x4B, 0x4B)
 

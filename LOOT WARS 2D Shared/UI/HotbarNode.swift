@@ -129,14 +129,28 @@ final class HotbarNode: SKNode {
         coin.position = CGPoint(x: -side * 0.45, y: 0)
         payout.addChild(coin)
 
-        let amount = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        amount.text = "+\(tokens)"
-        amount.fontSize = HotbarNode.slotSize * 0.34
-        amount.fontColor = RenderPalette.sellButton
-        amount.horizontalAlignmentMode = .left
-        amount.verticalAlignmentMode = .center
-        amount.position = CGPoint(x: side * 0.2, y: 0)
-        payout.addChild(amount)
+        // Drawn five times: four dark copies a point and a half out in each
+        // direction, then the bright one over them. SKLabelNode has no outline, and
+        // this is a vivid green number over pale green grass - the two are a long
+        // way apart in hue and almost identical in brightness, which is the pairing
+        // the eye is worst at. The ring of dark copies is the outline the class
+        // does not have, and it costs four labels for three quarters of a second.
+        let outline: [CGPoint] = [CGPoint(x: 1.6, y: 1.6), CGPoint(x: -1.6, y: 1.6),
+                                  CGPoint(x: 1.6, y: -1.6), CGPoint(x: -1.6, y: -1.6)]
+
+        var copies: [(CGPoint, SKColor)] = outline.map { ($0, RenderPalette.payoutShadow) }
+        copies.append((CGPoint.zero, RenderPalette.payout))
+
+        for (offset, colour) in copies {
+            let amount = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            amount.text = "+\(tokens)"
+            amount.fontSize = HotbarNode.slotSize * 0.36
+            amount.fontColor = colour
+            amount.horizontalAlignmentMode = .left
+            amount.verticalAlignmentMode = .center
+            amount.position = CGPoint(x: side * 0.2 + offset.x, y: offset.y)
+            payout.addChild(amount)
+        }
 
         // Pops, climbs, goes. The pop is what makes it read as being handed to you
         // rather than as a caption that faded in.
