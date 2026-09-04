@@ -40,6 +40,7 @@ final class GameScene: SKScene {
     private let bombRenderer = BombRenderer()
     private let projectileRenderer = ProjectileRenderer()
     private let actorRenderer = ActorRenderer()
+    private let shadowRenderer = ShadowRenderer()
     private let gasRenderer = GasRenderer()
     private let effectsRenderer = EffectsRenderer()
     private let placementGhost = PlacementGhost()
@@ -268,6 +269,11 @@ final class GameScene: SKScene {
         arcadeRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(claimRenderer.node)
+
+        // Under everything that stands on the map, over the ground it stands on.
+        shadowRenderer.build(trees: generated.trees)
+        worldLayer.addChild(shadowRenderer.node)
+
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
@@ -503,6 +509,7 @@ final class GameScene: SKScene {
         }
 
         blockRenderer.sync(with: world)
+        shadowRenderer.sync(with: world)
         lootboxRenderer.sync(with: world)
         chestRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
