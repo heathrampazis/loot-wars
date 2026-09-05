@@ -27,6 +27,8 @@ enum Prefs {
 
     private enum Key {
         static let matchesStarted = "matchesStarted"
+        static let matchesFinished = "matchesFinished"
+        static let bestScore = "bestScore"
         static let taughtBuilding = "taughtBuilding"
         static let taughtSelling  = "taughtSelling"
         static let lessonsVersion = "lessonsVersion"
@@ -81,6 +83,29 @@ enum Prefs {
         store.set(lessons, forKey: Key.lessonsVersion)
         store.set(false, forKey: Key.taughtBuilding)
         store.set(false, forKey: Key.taughtSelling)
+    }
+
+    /// Matches played to the whistle, and the best you have ever scored.
+    ///
+    /// The first two things the menu has to say. A title screen with nothing on it
+    /// but a play button is a door; a title screen that knows your best score is
+    /// the start of a reason to press it again - and these are the two rows the
+    /// stats screen in the roadmap begins with.
+    static var matchesFinished: Int {
+        get { store.integer(forKey: Key.matchesFinished) }
+        set { store.set(newValue, forKey: Key.matchesFinished) }
+    }
+
+    static var bestScore: Int {
+        get { store.integer(forKey: Key.bestScore) }
+        set { store.set(newValue, forKey: Key.bestScore) }
+    }
+
+    /// Records the end of a match. Everything here is a high-water mark or a count,
+    /// so finishing badly can never take anything away from you.
+    static func finishedMatch(scoring score: Int) {
+        matchesFinished += 1
+        bestScore = max(bestScore, score)
     }
 
     /// For testing on a device, and for the day there is a settings screen with a

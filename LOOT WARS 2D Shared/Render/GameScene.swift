@@ -941,6 +941,13 @@ final class GameScene: SKScene {
 
         results.show(with: world)
 
+        // The first thing this game has ever remembered about how a match WENT.
+        // A high-water mark and a count, so a bad match can never take anything
+        // away - see Prefs, and the menu, which reads both.
+        if let team = world.localPlayer?.team {
+            Prefs.finishedMatch(scoring: world.score(for: team))
+        }
+
         // Everything you could press goes, including the chest panel if you happened
         // to have your head in one when the whistle went.
         chestPanel.close()
@@ -1054,12 +1061,23 @@ final class GameScene: SKScene {
 extension GameScene {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // Once the whistle has gone there is exactly one thing left to press.
+        // Once the whistle has gone there are two things left to press.
         if world != nil, world.isOver {
-            for touch in touches
-            where results.isPlayAgain(atLocalPoint: touch.location(in: results)) {
-                restart()
-                return
+            for touch in touches {
+                let point = touch.location(in: results)
+
+                // Play again first: it is the bigger target and the common answer,
+                // and asking about it first means an overlap can only ever resolve
+                // towards another match rather than out of the game.
+                if results.isPlayAgain(atLocalPoint: point) {
+                    restart()
+                    return
+                }
+
+                if results.isMenu(atLocalPoint: point) {
+                    openMenu()
+                    return
+                }
             }
             return
         }
@@ -1352,7 +1370,19 @@ extension GameScene {
     /// which is the path that gets exercised every single time.
     private func restart() {
         guard let view else { return }
-        view.presentScene(GameScene.newGameScene())
+        view.presentScene(GameScene.newGameScene(),
+                          transition: .fade(withDuration: 0.25))
+    }
+
+    /// Back to the title screen.
+    ///
+    /// The other half of having a menu at all: a way in is only a way in if there
+    /// is also a way back, and PLAY AGAIN on its own made the results screen a
+    /// door that only opened one way.
+    private func openMenu() {
+        guard let view else { return }
+        view.presentScene(MenuScene.newMenuScene(),
+                          transition: .fade(withDuration: 0.35))
     }
 
     /// Picks a slot out, or puts it back.

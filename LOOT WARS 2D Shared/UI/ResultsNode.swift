@@ -25,9 +25,23 @@ final class ResultsNode: SKNode {
     private let headline = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let subhead = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let again = SKNode()
+    private let menu = SKNode()
     private var rows: [(swatch: SKShapeNode, rank: SKLabelNode, score: SKLabelNode, highlight: SKShapeNode)] = []
 
     private static let againSize = CGSize(width: 156, height: 42)
+
+    /// Smaller than PLAY AGAIN, and beside it rather than under it.
+    ///
+    /// The two are not equals. Almost everybody who finishes a match wants another
+    /// one, so that stays the big pink pill and this is the quiet way out - a menu
+    /// button the same size as the thing it competes with would make the common
+    /// answer harder to hit for the sake of the rare one.
+    private static let menuSize = CGSize(width: 96, height: 42)
+    /// Wide enough that the two hit boxes do not overlap: PLAY AGAIN is generous
+    /// on every side because it is the answer almost everybody wants, and a
+    /// generous target that reaches into its neighbour is how somebody ends up
+    /// back at a title screen they did not ask for.
+    private static let buttonGap: CGFloat = 20
 
     override init() {
         super.init()
@@ -121,7 +135,14 @@ final class ResultsNode: SKNode {
 
     private func buildAgainButton(in size: CGSize) {
         let box = ResultsNode.againSize
-        again.position = CGPoint(x: 0, y: -size.height / 2 + 34)
+        let menuBox = ResultsNode.menuSize
+
+        // The pair is centred as a group, so neither sits under the standings by
+        // accident when one of them changes width.
+        let span = box.width + ResultsNode.buttonGap + menuBox.width
+        let bottom = -size.height / 2 + 34
+
+        again.position = CGPoint(x: -span / 2 + box.width / 2, y: bottom)
 
         let pill = SKShapeNode(path: CGPath(
             roundedRect: CGRect(x: -box.width / 2, y: -box.height / 2,
@@ -140,6 +161,30 @@ final class ResultsNode: SKNode {
         again.addChild(label)
 
         addChild(again)
+
+        menu.position = CGPoint(x: span / 2 - menuBox.width / 2, y: bottom)
+
+        let menuPill = SKShapeNode(path: CGPath(
+            roundedRect: CGRect(x: -menuBox.width / 2, y: -menuBox.height / 2,
+                                width: menuBox.width, height: menuBox.height),
+            cornerWidth: menuBox.height / 2, cornerHeight: menuBox.height / 2,
+            transform: nil))
+
+        // Dark rather than coloured: on this panel, colour means "press this", and
+        // there is only one thing here anybody presses twice.
+        menuPill.fillColor = SKColor(white: 0, alpha: 0.35)
+        menuPill.strokeColor = .black
+        menuPill.lineWidth = 3
+        menu.addChild(menuPill)
+
+        let menuLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        menuLabel.text = "MENU"
+        menuLabel.fontSize = 15
+        menuLabel.fontColor = SKColor(white: 1, alpha: 0.85)
+        menuLabel.verticalAlignmentMode = .center
+        menu.addChild(menuLabel)
+
+        addChild(menu)
     }
 
     /// The scrim has to cover whatever the screen happens to be.
@@ -152,8 +197,18 @@ final class ResultsNode: SKNode {
     func isPlayAgain(atLocalPoint point: CGPoint) -> Bool {
         let box = ResultsNode.againSize
         let local = CGPoint(x: point.x - again.position.x, y: point.y - again.position.y)
-        // Grown a little, because it is the only way out of this screen.
-        return abs(local.x) <= box.width / 2 + 16 && abs(local.y) <= box.height / 2 + 16
+        // Grown a little, because it is the way out most people want.
+        return abs(local.x) <= box.width / 2 + 14 && abs(local.y) <= box.height / 2 + 16
+    }
+
+    func isMenu(atLocalPoint point: CGPoint) -> Bool {
+        let box = ResultsNode.menuSize
+        let local = CGPoint(x: point.x - menu.position.x, y: point.y - menu.position.y)
+
+        // A tighter margin than PLAY AGAIN's, and deliberately: the two hit boxes
+        // are neighbours, and the one that must not be hit by accident is the one
+        // that throws away the match you have just finished reading about.
+        return abs(local.x) <= box.width / 2 + 6 && abs(local.y) <= box.height / 2 + 12
     }
 
     func show(with world: World) {

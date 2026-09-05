@@ -14,11 +14,12 @@ class GameViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let scene = GameScene.newGameScene()
-
-        // Present the scene
+        // The menu, not a match. A game that starts before anybody has agreed to
+        // play gives you no moment to arrive in and no way to stop without killing
+        // the app - and the world is built by GameScene when the menu asks for it,
+        // so nothing about a match exists until somebody presses PLAY.
         let skView = self.view as! SKView
-        skView.presentScene(scene)
+        skView.presentScene(MenuScene.newMenuScene())
         
         skView.ignoresSiblingOrder = true
         skView.showsFPS = true
