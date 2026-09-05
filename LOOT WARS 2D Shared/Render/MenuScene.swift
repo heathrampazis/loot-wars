@@ -2,26 +2,26 @@
 //  MenuScene.swift
 //  Loot Wars
 //
-//  The door into the game: a name, a button, and as little else as possible.
+//  The door into the game: the name, one button, and the grass.
 //
 //  It is a SCENE rather than a panel over a paused world, and that is the design
 //  decision worth keeping. A menu drawn on top of the game means the world has to
 //  exist first - forty crates, eight bots and a generated map built before anybody
 //  has pressed anything, torn down and rebuilt the moment they do. As its own scene
-//  it costs a background and three labels, and the match is built when it is asked
+//  it costs a background and three nodes, and the match is built when it is asked
 //  for.
 //
-//  The first version of this screen put the game's own furniture on it: the map's
-//  grass in giant checks, a token, a crate and a bomb bobbing about. The idea was
-//  that a title screen made of the same pieces as the match cannot go out of date.
-//  What it actually looked like was the game with the level missing - the same
-//  colours doing none of the same work, and three little sprites floating in a
-//  field with nothing to do. A menu is not a scene from the game, it is the quiet
-//  before one.
+//  Two versions came before this one and both were wrong in opposite directions.
+//  The first put the game's furniture on the screen - grass in giant checks, a
+//  token, a crate and a bomb bobbing about - and looked like the game with the
+//  level missing. The second went dark and typographic, which was clean and had
+//  nothing to do with this game at all.
 //
-//  So: a dark ground the game never uses, one bright thing to press, and space.
-//  Everything here is either the name, the button, or the one fact worth knowing
-//  before you press it. Nothing decorates.
+//  This one is the middle: the map's own green, flat and uninterrupted, black type
+//  on it, and a single button with a play triangle in it. The green is what makes
+//  it belong to Loot Wars; the emptiness is what makes it a menu. Nothing on the
+//  screen is decoration - the name, the button, and the one fact worth knowing
+//  before pressing it.
 //
 
 import SpriteKit
@@ -30,7 +30,11 @@ import UIKit
 final class MenuScene: SKScene {
 
     private let play = SKNode()
-    private static let playSize = CGSize(width: 260, height: 64)
+    /// Sized off the mockup's proportions rather than off a phone: a slab about
+    /// two and a bit times as wide as it is tall, big enough that it is the only
+    /// thing anybody could be reaching for.
+    private static let playSize = CGSize(width: 216, height: 96)
+    private static let playCorner: CGFloat = 26
 
     class func newMenuScene() -> MenuScene {
         let scene = MenuScene(size: CGSize(width: 1024, height: 768))
@@ -39,7 +43,7 @@ final class MenuScene: SKScene {
     }
 
     override func didMove(to view: SKView) {
-        backgroundColor = MenuScene.deep
+        backgroundColor = MenuScene.ground
         removeAllChildren()
         build()
     }
@@ -52,76 +56,78 @@ final class MenuScene: SKScene {
 
     // MARK: - The one palette this screen has
 
-    /// A slate two shades under the HUD's, which is the point: every panel in the
-    /// game sits ON something, and this sits on nothing. Going darker than anything
-    /// in a match is what makes the menu read as a different place rather than as
-    /// the game with the map switched off.
-    private static let deep = SKColor(red: 0.10, green: 0.13, blue: 0.16, alpha: 1)
-    private static let lift = SKColor(red: 0.16, green: 0.20, blue: 0.24, alpha: 1)
+    /// The map's own grass, flat. No checks, no texture, no gradient - a single
+    /// field of the colour the whole game is played on.
+    private static let ground = RenderPalette.floorLight
+
+    /// The button: a deeper, bluer green than anything in a match wears.
+    ///
+    /// Deliberately NOT the shop's affordable green, which is the colour of "you
+    /// can pay for this" and belongs to a price. This is the only button in the
+    /// game that is not answering a question, so it gets a colour of its own - and
+    /// a teal reads as a button against grass in a way another leaf-green does not.
+    private static let button = SKColor(red: 0.23, green: 0.64, blue: 0.51, alpha: 1)
+    private static let buttonEdge = SKColor(red: 0.16, green: 0.47, blue: 0.38, alpha: 1)
 
     // MARK: - Building
 
     private func build() {
         let middle = CGPoint(x: size.width / 2, y: size.height / 2)
 
-        buildBackdrop()
-
         // Measured off the middle rather than off the edges, so the layout holds
         // its shape on every phone: a tall screen gets more air, not more gaps
         // between things that belong together.
-        buildTitle(centredOn: CGPoint(x: middle.x, y: middle.y + 76))
-        buildPlayButton(centredOn: CGPoint(x: middle.x, y: middle.y - 30))
-        buildRecord(centredOn: CGPoint(x: middle.x, y: middle.y - 100))
+        buildTitle(centredOn: CGPoint(x: middle.x, y: middle.y + 78))
+        buildPlayButton(centredOn: CGPoint(x: middle.x, y: middle.y - 24))
+        buildRecord(centredOn: CGPoint(x: middle.x, y: middle.y - 108))
     }
 
-    /// A single soft gradient, lighter behind the title and falling away to the
-    /// corners. It is doing one job - putting the brightest part of the screen
-    /// behind the thing you are meant to read first - and no other.
-    private func buildBackdrop() {
-        let glow = SKSpriteNode(texture: GlowArt.pool)
-
-        glow.size = CGSize(width: size.width * 1.5, height: size.height * 1.9)
-        glow.position = CGPoint(x: size.width / 2, y: size.height * 0.62)
-        glow.color = MenuScene.lift
-        glow.colorBlendFactor = 1
-        glow.alpha = 0.85
-        glow.zPosition = -10
-        addChild(glow)
-    }
-
-    /// The name, tracked wide.
+    /// The name: black, heavy, and sitting straight on the grass.
     ///
-    /// No outline, and that is a departure from the game's own artwork on purpose.
-    /// The black line round every sprite is there to hold a small bright shape
-    /// against a busy map; there is no map here, and at this size an outline stops
-    /// being a silhouette and becomes a thick edge on the letters. Letter spacing
-    /// does the work instead - it is the whole difference between a word and a
-    /// title.
+    /// Black rather than white, which is the one choice on this screen that took
+    /// three goes. White on green is what the HUD does, and the HUD is a layer
+    /// floating over the map - it needs to look like it is in front. A title is not
+    /// in front of anything, and black on a light green reads as printed ON the
+    /// field rather than hovering above it. It is also the colour every sprite in
+    /// this game is outlined with, so the name belongs to the same set of pictures
+    /// without borrowing the outline itself.
+    ///
+    /// Barely any tracking. The wide-set version was cleaner and quieter, and quiet
+    /// is not what a title is for.
     private func buildTitle(centredOn centre: CGPoint) {
         let label = SKLabelNode()
-        label.attributedText = MenuScene.text("LOOT WARS", size: 46, kern: 9,
-                                              colour: .white)
+        label.attributedText = MenuScene.text("LOOT WARS", size: 48, kern: 1,
+                                              colour: SKColor(white: 0.04, alpha: 1))
         label.verticalAlignmentMode = .center
         label.position = centre
         addChild(label)
-
-        let rule = SKSpriteNode(color: SKColor(white: 1, alpha: 0.16),
-                                size: CGSize(width: 132, height: 2))
-        rule.position = CGPoint(x: centre.x, y: centre.y - 34)
-        addChild(rule)
     }
 
     /// The only thing on the screen you can press.
+    ///
+    /// A slab rather than a pill, and a triangle rather than the word PLAY. Both
+    /// for the same reason: this button has no neighbours and no alternatives, so
+    /// it does not have to say which of several things it is. A shape that size
+    /// with a play mark in it is already unambiguous in every app anybody has ever
+    /// used, and a label would only be the screen explaining something nobody
+    /// asked about.
+    ///
+    /// Three layers, drawn bottom up: a soft shadow on the grass, the darker edge
+    /// it stands on, and the face. That is the same lip the shop's price buttons
+    /// wear, at four times the size - a flat shape with a darker shade under it is
+    /// how this game draws anything that can be pressed.
     private func buildPlayButton(centredOn centre: CGPoint) {
         let box = MenuScene.playSize
         play.position = centre
         addChild(play)
 
-        func capsule(offsetBy drop: CGFloat, colour: SKColor) -> SKShapeNode {
+        func slab(offsetBy drop: CGFloat, colour: SKColor, inset: CGFloat = 0) -> SKShapeNode {
             let shape = SKShapeNode(path: CGPath(
-                roundedRect: CGRect(x: -box.width / 2, y: -box.height / 2 - drop,
-                                    width: box.width, height: box.height),
-                cornerWidth: box.height / 2, cornerHeight: box.height / 2,
+                roundedRect: CGRect(x: -box.width / 2 + inset,
+                                    y: -box.height / 2 - drop + inset,
+                                    width: box.width - inset * 2,
+                                    height: box.height - inset * 2),
+                cornerWidth: MenuScene.playCorner, cornerHeight: MenuScene.playCorner,
                 transform: nil))
 
             shape.fillColor = colour
@@ -129,23 +135,41 @@ final class MenuScene: SKScene {
             return shape
         }
 
-        // The lip the shop's buttons wear, and no black outline. Same reason as the
-        // title: an outline is for holding a shape against grass.
-        play.addChild(capsule(offsetBy: 4, colour: RenderPalette.affordableDeep))
-        play.addChild(capsule(offsetBy: 0, colour: RenderPalette.affordable))
+        // Two faint slabs rather than one solid one: SpriteKit has no blur, and two
+        // offsets at low alpha give the falloff a single hard shadow does not.
+        play.addChild(slab(offsetBy: 14, colour: SKColor(white: 0, alpha: 0.07)))
+        play.addChild(slab(offsetBy: 9, colour: SKColor(white: 0, alpha: 0.09)))
 
-        let label = SKLabelNode()
-        label.attributedText = MenuScene.text("PLAY", size: 22, kern: 4, colour: .white)
-        label.verticalAlignmentMode = .center
-        label.zPosition = 1
-        play.addChild(label)
+        play.addChild(slab(offsetBy: 0, colour: MenuScene.buttonEdge))
+        play.addChild(slab(offsetBy: -5, colour: MenuScene.button, inset: 6))
 
-        // One slow breath. It is the only movement on the screen, which is what
-        // makes it read as an invitation rather than as decoration.
-        play.run(.repeatForever(.sequence([
-            .scale(to: 1.035, duration: 1.1),
-            .scale(to: 1.0, duration: 1.1)
-        ])))
+        play.addChild(MenuScene.triangle())
+    }
+
+    /// The play mark: a triangle with rounded corners, nudged right of centre.
+    ///
+    /// The nudge is optical rather than arithmetic. A triangle centred by its
+    /// bounding box looks left-heavy, because its mass is all down the flat edge -
+    /// every play button ever drawn moves it a few points right, and the eye reads
+    /// the result as centred.
+    private static func triangle() -> SKShapeNode {
+        let width: CGFloat = 30
+        let height: CGFloat = 34
+
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: -width / 2, y: height / 2))
+        path.addLine(to: CGPoint(x: width / 2, y: 0))
+        path.addLine(to: CGPoint(x: -width / 2, y: -height / 2))
+        path.closeSubpath()
+
+        let mark = SKShapeNode(path: path)
+        mark.fillColor = .white
+        mark.strokeColor = .white
+        mark.lineWidth = 6
+        mark.lineJoin = .round
+        mark.position = CGPoint(x: 3, y: -5)
+        mark.zPosition = 1
+        return mark
     }
 
     /// What the game remembers about you. Nothing at all, the first time.
@@ -158,7 +182,7 @@ final class MenuScene: SKScene {
         let label = SKLabelNode()
         label.attributedText = MenuScene.text("BEST \(Prefs.bestScore)   ·   \(played)",
                                               size: 12, kern: 3,
-                                              colour: SKColor(white: 1, alpha: 0.45))
+                                              colour: SKColor(white: 0.04, alpha: 0.45))
         label.verticalAlignmentMode = .center
         label.position = centre
         addChild(label)
