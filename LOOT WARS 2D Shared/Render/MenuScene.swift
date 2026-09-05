@@ -4,6 +4,11 @@
 //
 //  The door into the game: the name, one button, and the grass.
 //
+//  The button is artwork rather than shapes. It was drawn here for a while - a
+//  rounded slab, a lip, a stand-in for a shadow SpriteKit cannot blur, a triangle
+//  nudged off centre - which was a program describing a button. The drawing is in
+//  the asset catalogue now and this only has to put it in the right place.
+//
 //  It is a SCENE rather than a panel over a paused world, and that is the design
 //  decision worth keeping. A menu drawn on top of the game means the world has to
 //  exist first - forty crates, eight bots and a generated map built before anybody
@@ -30,11 +35,14 @@ import UIKit
 final class MenuScene: SKScene {
 
     private let play = SKNode()
-    /// Sized off the mockup's proportions rather than off a phone: a slab about
-    /// two and a bit times as wide as it is tall, big enough that it is the only
-    /// thing anybody could be reaching for.
-    private static let playSize = CGSize(width: 216, height: 96)
-    private static let playCorner: CGFloat = 26
+    /// A share of the screen's width, capped so it cannot get silly on an iPad.
+    /// The height comes from the artwork.
+    private static let playWidthShare: CGFloat = 0.38
+    private static let playMaxWidth: CGFloat = 260
+
+    /// What the button was actually drawn at, kept for the hit test - which has to
+    /// measure the picture on screen rather than a number written down twice.
+    private var buttonSize = CGSize(width: 216, height: 96)
 
     class func newMenuScene() -> MenuScene {
         let scene = MenuScene(size: CGSize(width: 1024, height: 768))
@@ -59,15 +67,6 @@ final class MenuScene: SKScene {
     /// The map's own grass, flat. No checks, no texture, no gradient - a single
     /// field of the colour the whole game is played on.
     private static let ground = RenderPalette.floorLight
-
-    /// The button: a deeper, bluer green than anything in a match wears.
-    ///
-    /// Deliberately NOT the shop's affordable green, which is the colour of "you
-    /// can pay for this" and belongs to a price. This is the only button in the
-    /// game that is not answering a question, so it gets a colour of its own - and
-    /// a teal reads as a button against grass in a way another leaf-green does not.
-    private static let button = SKColor(red: 0.23, green: 0.64, blue: 0.51, alpha: 1)
-    private static let buttonEdge = SKColor(red: 0.16, green: 0.47, blue: 0.38, alpha: 1)
 
     // MARK: - Building
 
@@ -103,73 +102,43 @@ final class MenuScene: SKScene {
         addChild(label)
     }
 
-    /// The only thing on the screen you can press.
+    /// The only thing on the screen you can press, and it is a picture now.
     ///
-    /// A slab rather than a pill, and a triangle rather than the word PLAY. Both
-    /// for the same reason: this button has no neighbours and no alternatives, so
-    /// it does not have to say which of several things it is. A shape that size
-    /// with a play mark in it is already unambiguous in every app anybody has ever
-    /// used, and a label would only be the screen explaining something nobody
-    /// asked about.
+    /// It was drawn here for a while - a rounded slab, a lip under it, two faint
+    /// offset slabs standing in for a shadow SpriteKit cannot blur, and a triangle
+    /// nudged right of centre because a centred one looks left-heavy. All of that
+    /// was a program describing a button. An artist drawing one is better at it and
+    /// far easier to change, so the drawing lives in the asset catalogue and this
+    /// puts it on the screen at the right size.
     ///
-    /// Three layers, drawn bottom up: a soft shadow on the grass, the darker edge
-    /// it stands on, and the face. That is the same lip the shop's price buttons
-    /// wear, at four times the size - a flat shape with a darker shade under it is
-    /// how this game draws anything that can be pressed.
+    /// Sized by WIDTH against the screen, with the height following the artwork's
+    /// own proportions - so the button is the same share of every phone rather than
+    /// a fixed slab that dominates a small one and gets lost on a large one.
     private func buildPlayButton(centredOn centre: CGPoint) {
-        let box = MenuScene.playSize
+        let texture = SKTexture(imageNamed: "Play")
+        texture.usesMipmaps = true
+
+        let width = min(MenuScene.playMaxWidth, size.width * MenuScene.playWidthShare)
+        let art = texture.size()
+        let height = art.width > 0 ? width * (art.height / art.width) : width
+
+        let sprite = SKSpriteNode(texture: texture,
+                                  size: CGSize(width: width, height: height))
+
+        // The holder is a property and this runs again on every rotation or resize,
+        // so it is emptied rather than appended to - otherwise a second sprite
+        // lands on top of the first, at whatever scale the press animation happened
+        // to leave behind.
+        play.removeAllActions()
+        play.removeAllChildren()
+        play.removeFromParent()
+        play.setScale(1)
+
         play.position = centre
+        play.addChild(sprite)
         addChild(play)
 
-        func slab(offsetBy drop: CGFloat, colour: SKColor, inset: CGFloat = 0) -> SKShapeNode {
-            let shape = SKShapeNode(path: CGPath(
-                roundedRect: CGRect(x: -box.width / 2 + inset,
-                                    y: -box.height / 2 - drop + inset,
-                                    width: box.width - inset * 2,
-                                    height: box.height - inset * 2),
-                cornerWidth: MenuScene.playCorner, cornerHeight: MenuScene.playCorner,
-                transform: nil))
-
-            shape.fillColor = colour
-            shape.strokeColor = .clear
-            return shape
-        }
-
-        // Two faint slabs rather than one solid one: SpriteKit has no blur, and two
-        // offsets at low alpha give the falloff a single hard shadow does not.
-        play.addChild(slab(offsetBy: 14, colour: SKColor(white: 0, alpha: 0.07)))
-        play.addChild(slab(offsetBy: 9, colour: SKColor(white: 0, alpha: 0.09)))
-
-        play.addChild(slab(offsetBy: 0, colour: MenuScene.buttonEdge))
-        play.addChild(slab(offsetBy: -5, colour: MenuScene.button, inset: 6))
-
-        play.addChild(MenuScene.triangle())
-    }
-
-    /// The play mark: a triangle with rounded corners, nudged right of centre.
-    ///
-    /// The nudge is optical rather than arithmetic. A triangle centred by its
-    /// bounding box looks left-heavy, because its mass is all down the flat edge -
-    /// every play button ever drawn moves it a few points right, and the eye reads
-    /// the result as centred.
-    private static func triangle() -> SKShapeNode {
-        let width: CGFloat = 30
-        let height: CGFloat = 34
-
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: -width / 2, y: height / 2))
-        path.addLine(to: CGPoint(x: width / 2, y: 0))
-        path.addLine(to: CGPoint(x: -width / 2, y: -height / 2))
-        path.closeSubpath()
-
-        let mark = SKShapeNode(path: path)
-        mark.fillColor = .white
-        mark.strokeColor = .white
-        mark.lineWidth = 6
-        mark.lineJoin = .round
-        mark.position = CGPoint(x: 3, y: -5)
-        mark.zPosition = 1
-        return mark
+        buttonSize = CGSize(width: width, height: height)
     }
 
     /// What the game remembers about you. Nothing at all, the first time.
@@ -209,7 +178,7 @@ final class MenuScene: SKScene {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first, let view else { return }
 
-        let box = MenuScene.playSize
+        let box = buttonSize
         let point = touch.location(in: self)
         let local = CGPoint(x: point.x - play.position.x, y: point.y - play.position.y)
 
