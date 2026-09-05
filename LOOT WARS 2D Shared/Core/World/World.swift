@@ -626,6 +626,22 @@ final class World {
         nextBuildTile(for: team) != nil
     }
 
+    /// Counts down to the next payment for standing bases - see VaultSystem.
+    ///
+    /// One clock for every team rather than one each, so eight bases pay on the
+    /// same beat. Staggered timers would spread the leaderboard's movement out into
+    /// a permanent shimmer; together, it reads as a tick.
+    var holdTimer: Double = GameConfig.Score.holdInterval
+
+    /// Everything this team has banked, counted across all of its chests.
+    func storedItemCount(ownedBy team: TeamID) -> Int {
+        chests.values
+            .filter { $0.owner == team }
+            .reduce(0) { total, chest in
+                total + chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
+            }
+    }
+
     /// How many chests this team has standing.
     func chestCount(ownedBy team: TeamID) -> Int {
         chests.values.filter { $0.owner == team }.count
@@ -856,6 +872,7 @@ final class World {
         CombatSystem.update(self, dt: dt)
         PerkSystem.update(self, dt: dt)
         RespawnSystem.update(self, dt: dt)
+        VaultSystem.update(self, dt: dt)
         tick += 1
         elapsed += dt
     }

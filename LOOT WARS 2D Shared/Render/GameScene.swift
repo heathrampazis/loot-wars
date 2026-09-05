@@ -753,6 +753,21 @@ final class GameScene: SKScene {
                 // burst that says it arrived, which state alone cannot show.
                 effectsRenderer.burst(at: position)
 
+            case .vault(let points, let team, let position):
+                // Only your own base, and only when you can see it. Somebody else's
+                // wall paying out is a number over a base you are not standing in,
+                // and eight of those every twelve seconds is a screen full of
+                // arithmetic nobody asked for.
+                guard team == world.localPlayer?.team else { break }
+
+                effectsRenderer.earned(at: position, points: points)
+
+                // And once, ever, the sentence that explains what the number is.
+                if !Prefs.taughtHolding {
+                    Prefs.taughtHolding = true
+                    hint.show("YOUR BASE EARNS WHILE IT HOLDS", seconds: 2.0)
+                }
+
             case .sold(let slot, let tokens, let seller):
                 guard seller == world.localPlayerID else { break }
                 hotbar.reward(slot: slot, tokens: tokens)

@@ -31,6 +31,7 @@ enum Prefs {
         static let bestScore = "bestScore"
         static let taughtBuilding = "taughtBuilding"
         static let taughtSelling  = "taughtSelling"
+        static let taughtHolding  = "taughtHolding"
         static let lessonsVersion = "lessonsVersion"
     }
 
@@ -43,7 +44,7 @@ enum Prefs {
     /// and the result was a tutorial that could never appear on the only device it
     /// had to appear on. A flag saying "already seen" is a claim about a version of
     /// a lesson, not about the player, and the version has to be part of it.
-    private static let lessons = 2
+    private static let lessons = 3
 
     /// How many matches this player has ever begun.
     ///
@@ -78,11 +79,19 @@ enum Prefs {
         set { store.set(newValue, forKey: Key.taughtSelling) }
     }
 
+    /// The one lesson that teaches itself by happening: the first time your own
+    /// base pays out, the game says what the number was for.
+    static var taughtHolding: Bool {
+        get { migrateIfNeeded(); return store.bool(forKey: Key.taughtHolding) }
+        set { store.set(newValue, forKey: Key.taughtHolding) }
+    }
+
     private static func migrateIfNeeded() {
         guard store.integer(forKey: Key.lessonsVersion) != lessons else { return }
         store.set(lessons, forKey: Key.lessonsVersion)
         store.set(false, forKey: Key.taughtBuilding)
         store.set(false, forKey: Key.taughtSelling)
+        store.set(false, forKey: Key.taughtHolding)
     }
 
     /// Matches played to the whistle, and the best you have ever scored.
@@ -113,5 +122,6 @@ enum Prefs {
     static func forgetLessons() {
         taughtBuilding = false
         taughtSelling = false
+        taughtHolding = false
     }
 }

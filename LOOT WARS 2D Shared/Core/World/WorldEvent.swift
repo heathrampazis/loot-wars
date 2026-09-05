@@ -55,6 +55,13 @@ enum WorldEvent {
     /// steady effect that follows it.
     case perkStarted(Perk, by: ActorID)
 
+    /// A base paid out for still standing.
+    ///
+    /// Carries where, because the number belongs over the base that earned it
+    /// rather than over the player - who is usually somewhere else entirely, which
+    /// is the whole point of owning a base that earns without you.
+    case vault(points: Int, for: TeamID, at: Vec2)
+
     /// Somebody sold something, out of which slot, and what it paid.
     ///
     /// All three of those are gone by the next frame - the slot is empty, the item

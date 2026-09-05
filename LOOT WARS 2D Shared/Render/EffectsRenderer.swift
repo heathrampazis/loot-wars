@@ -563,4 +563,41 @@ final class EffectsRenderer {
         ]))
     }
 
+    /// A quiet number rising off your own base, for points that arrived on a clock.
+    ///
+    /// Deliberately NOT the kill mark. That draws a ring, and a ring means somebody
+    /// died on that spot - borrowing it for a wall that is simply still standing
+    /// would be the screen telling a small lie every twelve seconds. What is left
+    /// when the ring comes off is the part that was always doing the work: the
+    /// number, floating up and away.
+    ///
+    /// Smaller and slower than a kill's, too. This one arrives twenty times a match
+    /// whether or not you are looking at it, so it has to be readable when you are
+    /// standing at home and ignorable when you are not.
+    func earned(at position: Vec2, points: Int) {
+        guard points > 0 else { return }
+
+        let origin = GridGeometry.point(for: position)
+
+        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        label.text = "+\(points)"
+        label.fontSize = 15
+        label.fontColor = RenderPalette.countBadge
+        label.verticalAlignmentMode = .center
+        label.position = CGPoint(x: origin.x, y: origin.y)
+        label.zPosition = 14
+        label.alpha = 0
+        node.addChild(label)
+
+        label.setScale(0.7)
+        label.run(.sequence([
+            .group([.fadeAlpha(to: 0.95, duration: 0.18),
+                    .scale(to: 1.0, duration: 0.18)]),
+            .group([.moveBy(x: 0, y: 26, duration: 0.9),
+                    .sequence([.wait(forDuration: 0.35),
+                               .fadeOut(withDuration: 0.55)])]),
+            .removeFromParent()
+        ]))
+    }
+
 }

@@ -82,6 +82,52 @@ enum GameConfig {
 
         /// Blowing up a machine. Between a wall at 15 and a chest emptied.
         static let arcadeDestroyed = 40
+
+        // MARK: - Holding what you built
+
+        /// How often a standing base pays.
+        ///
+        /// Building had one payment and it was a lump sum: two points a wall and
+        /// sixty for closing it. That prices the ACT of building and nothing about
+        /// keeping it, so the correct play was to throw a base up, never look at it
+        /// again, and spend the rest of the match somewhere else - which is exactly
+        /// what everybody did, including the bots.
+        ///
+        /// Paying by the tick prices the thing the game is actually about. A wall
+        /// you are still standing behind at the whistle earned all match; one that
+        /// was opened in the second minute stopped earning the moment it was
+        /// opened, and started again when you fixed it. It also gives raiding a
+        /// second motive: breaking somebody's seal does not just take what is in
+        /// there, it turns their income off.
+        ///
+        /// Twelve seconds, which is slow enough to read as a drip rather than a
+        /// counter spinning, and quick enough that the difference between holding
+        /// and losing a base is visible inside one raid.
+        static let holdInterval: Double = 12
+
+        /// Paid for a wall with no hole in it.
+        static let holdStanding = 3
+
+        /// Paid for each item sitting in your chests, up to the cap.
+        ///
+        /// This is the answer to the other half of the question: why put anything
+        /// in a chest at all? Storing used to be pure insurance - your pockets are
+        /// lost when you die and a chest is not - and insurance is worth nothing
+        /// when dying is cheap, so the honest answer was "do not bother, just find
+        /// more". Now what is in the chest earns, every twelve seconds, for as long
+        /// as you keep the wall shut round it. Banking is a scoring move.
+        ///
+        /// It is also what makes a raid worth the walk twice over. The items a
+        /// raider carries out are not just supplies, they are the other team's
+        /// income - and the same items go on earning for whoever took them home.
+        static let holdPerStoredItem = 2
+
+        /// The most items that can earn at once.
+        ///
+        /// Five. A base is a place worth two visits, not a warehouse - without a cap
+        /// the best strategy is to never spend anything, which is the opposite of a
+        /// game about spending supplies to win fights.
+        static let holdItemCap = 5
     }
 
     /// Where tokens come from, other than the arcades.
