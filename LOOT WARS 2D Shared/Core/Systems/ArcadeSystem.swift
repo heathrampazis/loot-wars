@@ -29,6 +29,16 @@ enum ArcadeSystem {
     /// for one and 97.8% still do with a chest already down; the rest are the tight
     /// ones where the spawn tile sits in the only gap.
     static func canPlace(at origin: GridPoint, by actor: Actor, in world: World) -> Bool {
+
+        // Not until the wall is shut, and this is the rule the whole raiding loop
+        // rests on. Furniture standing in a half-built base is loot anybody can
+        // walk up to without spending a bomb on it, which makes the wall
+        // decorative and the bomb pointless. Build it, THEN fill it.
+        //
+        // It holds for a hole as well as for a base that was never finished: a
+        // raid is only worth running if what it opens cannot simply be topped up
+        // while it is still open.
+        guard !world.baseIsBreached(actor.team) else { return false }
         guard actor.inventory.firstSlot(holding: .arcade) != nil else { return false }
 
         // One to a base. Two machines in the same walls would double an income that

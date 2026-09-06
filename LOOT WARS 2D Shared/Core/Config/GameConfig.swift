@@ -1073,7 +1073,10 @@ enum GameConfig {
         /// than the raid itself lasted. Patching a hole you are standing in front
         /// of should look urgent, and the sooner it is shut the sooner there is
         /// something in it worth coming back for.
-        static let repairInterval: Double = 0.15
+        /// Quicker again now that every base has something in it worth breaking
+        /// into from the first minute: holes are commoner, so a hole has to be a
+        /// wound rather than a condition.
+        static let repairInterval: Double = 0.11
 
         /// How long after being bombed before a team may lay walls again.
         ///
@@ -1103,7 +1106,7 @@ enum GameConfig {
         /// ones, and an armful sized for yesterday's hole is how a base ends up
         /// permanently half open - at which point nobody needs a bomb to get in and
         /// the whole exchange stops being a raid.
-        static let blocksWhenBreached: ClosedRange<Int> = 10...14
+        static let blocksWhenBreached: ClosedRange<Int> = 13...17
 
         /// Walls laid per trip by a bot that is behind.
         ///

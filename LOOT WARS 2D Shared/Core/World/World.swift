@@ -224,40 +224,32 @@ final class World {
         self.localPlayerID = local
         self.rng = rng
 
-        standUpFirstChests()
+        dealStartingChests()
     }
 
-    /// Every base starts with a chest standing in it.
+    /// Everybody starts holding a chest.
     ///
-    /// This is the answer to a raid problem that four rounds of tuning could not
-    /// reach. A base is worth breaking into because of what is inside it, and
-    /// nothing was inside it: chests came out of crates at one drop in ten, had to
-    /// survive a full bag and every death on the way home, and needed the wall shut
-    /// before they could be put down. Most bases spent most of a match empty, so a
-    /// bomb bought you a hole in a fence with nothing behind it - which is the exact
-    /// complaint, and no number in the loot tables was ever going to fix it.
+    /// The version before this STOOD one in every base at generation, which was the
+    /// right diagnosis and the wrong cure: a base has nothing worth raiding for
+    /// most of a match. But a chest standing in a base that has no wall round it
+    /// yet is loot anybody can stroll up to in the first minute, without a bomb,
+    /// which is worse than the problem.
     ///
-    /// A found chest is still worth having: two to a base, so the second one is a
-    /// real upgrade to a real place, and it earns from the vault as much as the
-    /// first. What changes is that the floor is no longer zero.
+    /// Carried, it cannot be taken until it has been PUT somewhere, and it can only
+    /// be put down inside a finished wall - so the sequence the game wants is the
+    /// sequence it enforces: build the base, then it is worth something, then
+    /// somebody needs a bomb to get at it. What is removed is only the lottery in
+    /// the middle, where a base's entire reason to exist depended on a one-in-ten
+    /// crate roll surviving a full bag and the walk home.
     ///
-    /// A BOT's chest arrives stocked, because a bot does not walk loot home - see
-    /// ChestSystem.stock, which is the same shortcut its placed chests already use.
-    /// Yours arrives empty, and that asymmetry is right in both directions: the
-    /// game should not hand you a haul you did not earn, and nobody should be able
-    /// to rob you in the first minute of your first match for things you never had.
-    private func standUpFirstChests() {
-        for index in 0..<TeamID.count {
-            let team = TeamID(index)
-
-            guard let claim = claims[team],
-                  let tile = nextChestTile(for: team, near: claim.centreTile.center)
-            else { continue }
-
-            let id = spawnChest(at: tile, owner: team)
-
-            let ownedByABot = actors.values.contains { $0.team == team && $0.ai != nil }
-            if ownedByABot { ChestSystem.stock(id, in: self) }
+    /// Everybody, including you, because a match starts identical for everyone -
+    /// and because a chest in your bag on the first morning is the clearest
+    /// possible hint about what a base is for.
+    private func dealStartingChests() {
+        for id in actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var actor = actors[id] else { continue }
+            _ = actor.acquire(.chest)
+            actors[id] = actor
         }
     }
 

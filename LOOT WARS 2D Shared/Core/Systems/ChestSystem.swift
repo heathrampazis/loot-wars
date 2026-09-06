@@ -43,6 +43,16 @@ enum ChestSystem {
     static func canPlace(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
         guard actor.inventory.firstSlot(holding: .chest) != nil else { return false }
 
+        // Not until the wall is shut, and this is the rule the whole raiding loop
+        // rests on. Furniture standing in a half-built base is loot anybody can
+        // walk up to without spending a bomb on it, which makes the wall
+        // decorative and the bomb pointless. Build it, THEN fill it.
+        //
+        // It holds for a hole as well as for a base that was never finished: a
+        // raid is only worth running if what it opens cannot simply be topped up
+        // while it is still open.
+        guard !world.baseIsBreached(actor.team) else { return false }
+
         // The same ground rules a wall answers to: your own claim, nothing already
         // there. A chest is furniture in your base, not something you leave lying
         // in the open for anyone to walk up to.
@@ -134,7 +144,7 @@ enum ChestSystem {
     /// that is worth breaking into before anybody has done anything.
     ///
     /// Draws from world.rng in a fixed order, so a seed still replays exactly.
-    static func stock(_ id: ChestID, in world: World) {
+    private static func stock(_ id: ChestID, in world: World) {
         guard var chest = world.chests[id] else { return }
 
         chest.selfStocking = true

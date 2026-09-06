@@ -447,7 +447,14 @@ enum AIBrain {
         // it is a base nobody has any reason to break into, including the bot's own
         // reason to have built it. It ends the moment the chest is out of the bag,
         // so it cannot hold anyone up.
-        if state.buildUrgeTimer <= 0, let spot = chestSpotWanted(for: actor, in: world) {
+        //
+        // No longer waits for a build urge. The urge timer is there to stop bots
+        // commuting home constantly, and this is not a commute - the base is already
+        // shut, the thing is already in the bag, and the errand ends when it is out
+        // of it. All the gate ever did was leave a finished base standing empty for
+        // up to eight seconds at a time while its owner carried the reason to raid
+        // it around the map.
+        if let spot = chestSpotWanted(for: actor, in: world) {
             return .stash(spot)
         }
 
