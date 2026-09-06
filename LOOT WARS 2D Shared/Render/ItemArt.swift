@@ -70,10 +70,12 @@ enum ItemArt {
         case .arcade:  return "Arcade"
         case .perk(let which):
             switch which {
-            case .regeneration: return "Regeneration"
-            case .speed:        return "Speed"
-            case .strength:     return "Strength"
-            case .resistance:   return "Resistance"
+            // Not "Overdrive", which is what the code calls it. There is one
+            // power-up in the game, so the noun a player needs is the category -
+            // the word tells them what KIND of thing they are holding, and its own
+            // name would be a proper noun they have to learn before it means
+            // anything.
+            case .overdrive: return "Power-Up"
             }
         case .helmet:  return "Helmet"
         case .blaster: return "Blaster"
@@ -88,10 +90,7 @@ enum ItemArt {
         case .item(.stink):      return "StinkBomb"
         case .item(.chest):      return "Chest"
         case .item(.arcade):     return "Arcade"
-        case .item(.perk(.regeneration)): return "RegenerationPerk"
-        case .item(.perk(.speed)):        return "SpeedPerk"
-        case .item(.perk(.strength)):     return "StrengthPerk"
-        case .item(.perk(.resistance)):   return "ResistancePerk"
+        case .item(.perk(.overdrive)):  return "Perk"
         case .item(.helmet(let tier)):  return tier.name
         case .item(.blaster(let tier)): return tier.assetName
         // A golden token is the same pickup carrying a bigger number - Core has no

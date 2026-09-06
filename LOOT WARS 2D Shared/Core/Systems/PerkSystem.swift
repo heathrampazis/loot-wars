@@ -58,22 +58,20 @@ enum PerkSystem {
     }
 
     /// What one beat of a running perk does.
+    ///
+    /// Only the healing, because only the healing is a thing that HAPPENS. The
+    /// speed, the damage and the resistance are numbers read where they matter - by
+    /// MovementSystem, by WeaponSystem, by CombatSystem - so they need no beat and
+    /// nothing put back at the end. The switch stays a switch rather than an `if`,
+    /// so a second perk added later arrives as a compiler error here rather than as
+    /// a power-up that silently does nothing.
     private static func apply(_ perk: Perk?, to id: ActorID, in world: World) {
         guard let perk, let actor = world.actors[id] else { return }
 
         switch perk {
-        case .regeneration:
-            let portion = Double(actor.maxHealth) * GameConfig.Perks.regenerationPortion
+        case .overdrive:
+            let portion = Double(actor.maxHealth) * GameConfig.Perks.healPortion
             CombatSystem.heal(id, amount: max(1, Int(portion.rounded())), in: world)
-
-        // Nothing to do on a beat, and that is the shape of them rather than an
-        // omission. Speed, strength and resistance are numbers READ at the point
-        // they matter - by MovementSystem, by WeaponSystem, by CombatSystem - so
-        // they need no system reaching in to apply them and nothing put back when
-        // they end. What this file still does for all four is run the clock, which
-        // is why they are listed here doing nothing rather than left out.
-        case .speed, .strength, .resistance:
-            break
         }
     }
 }

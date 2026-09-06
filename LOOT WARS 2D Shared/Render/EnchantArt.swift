@@ -84,6 +84,7 @@ enum EnchantArt {
             star.size = CGSize(width: size, height: size)
             star.color = RenderPalette.perkSpark
             star.colorBlendFactor = 1
+            star.name = EnchantNode.starName
             star.position = CGPoint(x: place.0 * radius, y: place.1 * radius)
             star.alpha = 0
             star.zPosition = 3
@@ -124,7 +125,7 @@ enum EnchantArt {
 
         overlay.addChild(sheen)
         overlay.sheen = sheen
-        overlay.tint(for: .regeneration)
+        overlay.tint(for: .overdrive)
         return overlay
     }
 }
@@ -139,15 +140,104 @@ enum EnchantArt {
 /// permanent and its colour is not.
 final class EnchantNode: SKNode {
 
+    /// What the twinkling stars answer to when the rainbow needs to reach them.
+    fileprivate static let starName = "enchant.star"
+
+    /// The key both recolour loops run under, so switching from a power-up to a
+    /// piece of Epic gear in the same slot can stop them by name.
+    private static let cycleKey = "enchant.rainbow"
+
     fileprivate var sheen: SKSpriteNode?
 
-    /// The wash takes the perk's colour; the sparkles never do - they say "this is
-    /// a power-up" and the wash says which one.
-    func tint(for perk: Perk) {
-        sheen?.color = RenderPalette.colours(of: perk).bright
+    /// What this overlay is currently wearing, and the only reason it is recorded
+    /// is that asking for it again must do NOTHING.
+    ///
+    /// A hotbar slot rewrites itself every frame - the icon, the count, the glow,
+    /// and this - which is harmless when the answer is a colour and fatal when the
+    /// answer is an animation: restarting the walk sixty times a second pins it on
+    /// its first hue forever, and the rainbow becomes a flat red wash that nobody
+    /// can explain. Exactly the shape of bug the shop card and the quick-buy prompt
+    /// both had, so it is worth naming: anything here that ANIMATES has to survive
+    /// being asked for again.
+    private var wearingRainbow = false
+    private var flat: SKColor?
+
+    /// A power-up refuses to settle on a colour.
+    ///
+    /// Every other enchanted thing in the game wears one - a rarity, held still.
+    /// This walks the whole ring, slowly, and the walk is the claim: the only item
+    /// that does four things at once is the only thing on screen that will not pick
+    /// a colour.
+    ///
+    /// Slow on purpose - about six seconds for a full turn, which is most of the
+    /// nine the perk itself runs for. Fast enough that a bottle sitting in a slot
+    /// visibly moves through it while you decide whether to drink it, slow enough
+    /// that it never reads as flashing, which is a warning everywhere else in this
+    /// game and would be a lie here.
+    ///
+    /// The stars take the same walk a few steps ahead of the wash. Together rather
+    /// than in step, so the item is never one flat colour - there is always a glint
+    /// on it from further round the ring than the wash underneath.
+    func shimmer() {
+        guard !wearingRainbow else { return }
+        wearingRainbow = true
+        flat = nil
+
+        let step = 0.75
+
+        func walk(from offset: Int, blend: CGFloat) -> SKAction {
+            .repeatForever(.sequence(RenderPalette.spectrum.indices.map { index -> SKAction in
+                .colorize(with: RenderPalette.hue(at: index + offset),
+                          colorBlendFactor: blend,
+                          duration: step)
+            }))
+        }
+
+        sheen?.removeAction(forKey: EnchantNode.cycleKey)
+        sheen?.run(walk(from: 0, blend: 1), withKey: EnchantNode.cycleKey)
+
+        for star in children where star.name == EnchantNode.starName {
+            guard let star = star as? SKSpriteNode else { continue }
+            star.removeAction(forKey: EnchantNode.cycleKey)
+
+            // Never fully coloured. A sparkle is a glint before it is a hue, and a
+            // star painted solid violet stops reading as light coming off a
+            // surface - so the rainbow only ever gets two thirds of it and the
+            // near-white underneath keeps it a glint.
+            star.run(walk(from: 3, blend: 0.66), withKey: EnchantNode.cycleKey)
+        }
     }
 
-    /// Whatever the item's own colour is: a power-up's is the power it holds, and
+    /// The wash takes one colour and holds it, which is what everything except a
+    /// power-up does.
+    func tint(_ colour: SKColor) {
+        if !wearingRainbow, let flat, flat.isEqual(colour) { return }
+        wearingRainbow = false
+        flat = colour
+
+        sheen?.removeAction(forKey: EnchantNode.cycleKey)
+        sheen?.color = colour
+
+        for star in children where star.name == EnchantNode.starName {
+            guard let star = star as? SKSpriteNode else { continue }
+            star.removeAction(forKey: EnchantNode.cycleKey)
+            star.color = RenderPalette.perkSpark
+            star.colorBlendFactor = 1
+        }
+    }
+
+    /// A perk never gets a colour, only the ring.
+    ///
+    /// Still takes the perk rather than ignoring it, because the day there are two
+    /// again this is where the second one's colour goes - and a caller that had
+    /// stopped passing it would have to be found and fixed first.
+    func tint(for perk: Perk) {
+        switch perk {
+        case .overdrive: shimmer()
+        }
+    }
+
+    /// Whatever the item's own colour is: a power-up's is the rainbow, and
     /// everything else's is its rarity.
     ///
     /// The one place that choice is made, so a Cosmic blaster in a hotbar, the same
@@ -159,6 +249,6 @@ final class EnchantNode: SKNode {
             return
         }
 
-        sheen?.color = RenderPalette.colour(of: type.rarity)
+        tint(RenderPalette.colour(of: type.rarity))
     }
 }

@@ -140,30 +140,75 @@ enum RenderPalette {
 
     // MARK: - Power-ups
 
-    /// The two shades a perk's particles vary between.
+    /// The rainbow a power-up wears, as a ring of hues.
     ///
-    /// Read off the ARTWORK, hue for hue: the regeneration bottle is violet, the
-    /// speed one is sky blue, strength is a hot pink and resistance is amber. That
-    /// is the whole rule, and it is the only rule that works - a player learns what
-    /// a colour means by looking at the thing they picked up, so a trail that did
-    /// not match its own bottle would be teaching them something false about a
-    /// fight they can see from across the map.
+    /// There were four perks and four colours, and the colour was doing real work:
+    /// it told you across a map which of the four the person charging at you had
+    /// drunk. With one perk there is nothing left to tell apart, so the colour is
+    /// free to do the other job a colour can do - say how big a deal this is.
     ///
-    /// Two shades a STEP apart rather than a light one against a dark one. A wide
-    /// spread puts the dark half down into the grass and turns any colour muddy,
-    /// which is how the first violet ended up looking like poison; a step apart
-    /// shimmers instead.
+    /// Nothing else in this game cycles. Rarity is a colour, a team is a colour,
+    /// damage is red and money is gold, and every one of them holds still. A thing
+    /// that will not settle on a colour at all is therefore instantly legible as
+    /// not-of-that-system, which is exactly what the only item that does four
+    /// things at once should look like.
     ///
-    /// Deliberately not the rarity colours. Rarity says how lucky you were to find
-    /// a thing; this says which power is running - and both are on screen at once,
-    /// so they must never be the same language.
-    static func colours(of perk: Perk) -> (bright: SKColor, deep: SKColor) {
-        switch perk {
-        case .regeneration: return (rgb(0xC7, 0x8B, 0xFF), rgb(0xA2, 0x53, 0xF5))
-        case .speed:        return (rgb(0x96, 0xD8, 0xFF), rgb(0x4F, 0xB0, 0xF5))
-        case .strength:     return (rgb(0xFF, 0x7F, 0xAE), rgb(0xF5, 0x3C, 0x7E))
-        case .resistance:   return (rgb(0xFF, 0xC0, 0x8A), rgb(0xF5, 0x8A, 0x3C))
-        }
+    /// Eight hues, solved for one perceived lightness rather than picked by eye.
+    ///
+    /// A cycle through a naive rainbow pulses. Yellow is roughly twice as light as
+    /// violet at the same saturation, so a wash walking the ring gets visibly
+    /// brighter and dimmer twice a turn, and the eye reads that throb as the effect
+    /// doing something - flashing on and off - rather than as one steady thing
+    /// changing colour. These eight sit at CIE L* 64 to a tenth of a point, so the
+    /// only thing that changes as it turns is the hue.
+    ///
+    /// L* rather than plain relative luminance, which was the first attempt and is
+    /// the wrong measure here: flattening luminance instead pushes yellow down into
+    /// a dark olive to match violet, and a rainbow whose yellow has gone brown is
+    /// not a rainbow. L* flattens what the eye actually reports, which leaves gold
+    /// looking like gold.
+    ///
+    /// One yellow-adjacent hue, and it is a gold rather than a true yellow. The map
+    /// is pale yellow-green: a real yellow lands within a hair of the grass on
+    /// every measure and disappears the moment a mote leaves the figure. At L* 64
+    /// every one of these reads at about 1.8 against the floor, which is the number
+    /// that matters, because these are drawn as pigment on grass rather than as
+    /// light.
+    static let spectrum: [SKColor] = [
+        rgb(0xF0, 0x75, 0x80),
+        rgb(0xF3, 0x78, 0x3B),
+        rgb(0xC9, 0x91, 0x16),
+        rgb(0x0C, 0xB4, 0x17),
+        rgb(0x14, 0xAC, 0xB0),
+        rgb(0x6F, 0x99, 0xF6),
+        rgb(0xBE, 0x7F, 0xF7),
+        rgb(0xEF, 0x6C, 0xBE)
+    ]
+
+    /// One hue off the ring, counted round rather than clamped.
+    ///
+    /// Takes any integer, including a negative one, so callers can offset a second
+    /// stream of particles by a fixed number of steps, or count a beat DOWNWARDS,
+    /// without ever having to think about the length of the ring.
+    ///
+    /// Named apart from the array on purpose. `spectrum` and `spectrum(at:)` are
+    /// legal side by side and the compiler can usually tell them apart, but a bare
+    /// `RenderPalette.spectrum` in a `let` with no contextual type is then an
+    /// unapplied method reference as readily as it is an array - a coin-flip
+    /// diagnostic in a file nobody should have to think that hard about.
+    static func hue(at step: Int) -> SKColor {
+        let count = spectrum.count
+        return spectrum[((step % count) + count) % count]
+    }
+
+    /// The pair of hues a perk's particles vary between at one instant.
+    ///
+    /// Three apart on an eight-hue ring, which is most of the way to opposite. The
+    /// two-mote aura throws one of each, so at any moment the trail carries a
+    /// contrast rather than a shade - and because both walk forward together, the
+    /// contrast itself travels round the rainbow.
+    static func perkColours(at step: Int) -> (bright: SKColor, deep: SKColor) {
+        (hue(at: step), hue(at: step + 3))
     }
 
     /// The near-white middle of a SPARKLE, which is a glint rather than a colour.

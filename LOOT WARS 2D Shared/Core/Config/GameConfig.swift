@@ -299,15 +299,16 @@ enum GameConfig {
             .chest: 14,
             .arcade: 24,
 
-            // The four power-ups, at one price. They are never on the shelf - the
-            // whole point of a perk is that it is found - but the shop still makes
-            // an offer for one, because nobody decides for the player which of
-            // their things are junk.
-            .perk(.regeneration): 18,
-            .perk(.speed): 18,
-            .perk(.strength): 18,
-            .perk(.resistance): 18
-
+            // The power-up. Never on the shelf - the whole point of a perk is that
+            // it is found - but the shop still makes an offer for one, because
+            // nobody decides for the player which of their things are junk.
+            //
+            // Kept deliberately low against what it does. At a fifth back that is
+            // about four tokens, roughly a bandage, and it should stay there: the
+            // day selling a perk is worth more than drinking one, the strongest
+            // item in the game turns into a coin, which is the opposite of finding
+            // something.
+            .perk(.overdrive): 22
         ]
 
         /// What the shop pays for something you sell back, as a share of its price.
@@ -800,15 +801,6 @@ enum GameConfig {
         /// would mostly be thrown away.
         static let topUpHealthFraction: Double = 0.85
 
-        /// How hurt a bot must be before it switches a power-up on.
-        ///
-        /// Higher than the bandage thresholds, and deliberately: a regeneration is
-        /// spent to WIN a fight rather than to recover from one, so the moment for
-        /// it is while a bot still has most of a health bar and is losing it. Wait
-        /// until it is desperate and the perk is a slow drip against a blaster that
-        /// is already winning, which is the same as not having had one.
-        static let perkHealthFraction: Double = 0.75
-
         /// How much of a break-off is "get away from them" versus "get home". Close
         /// up, distance is all that matters; with daylight between you, home does.
         static let breakOffDistance: Double = 8
@@ -1291,69 +1283,71 @@ enum GameConfig {
     }
 
     enum Perks {
-        /// How long a regeneration runs.
+        /// How long a perk runs.
         ///
-        /// Long enough to change a fight rather than patch you between two. A
-        /// medkit is an answer to damage already taken; this is an answer to damage
-        /// about to be taken, and the difference only exists if it is still running
-        /// while somebody is shooting at you. Fifteen seconds is three exchanges at
-        /// this game's ranges.
-        static let regenerationDuration: Double = 15
+        /// Nine seconds, down from twelve and fifteen, and the cut is the price of
+        /// putting all four powers in one bottle. A perk is now the strongest thing
+        /// you can be holding, and the answer to "how do you keep that fair" is
+        /// time rather than strength - a short window you have to spend well reads
+        /// as a decision, where a long weak one reads as a status effect you
+        /// happened to be wearing.
+        ///
+        /// Nine is about one fight at this game's ranges, which is the length the
+        /// perk should be: long enough to decide the fight you drank it for, too
+        /// short to still be running for the next one.
+        static let duration: Double = 9
 
         /// Seconds between portions of health.
         ///
         /// Portions, not a trickle, for the third time in this project and the same
         /// reason as home recovery and gas damage: every point of healing makes the
         /// screen react, so sixty a second is not a warm glow, it is a strobe.
-        /// Twelve beats over the duration reads as a steady pulse.
-        static let tickInterval: Double = 1.25
+        ///
+        /// A second flat now rather than 1.25. Over a nine-second perk that is nine
+        /// beats instead of seven, and beats are what makes healing legible - the
+        /// bar has to visibly step up often enough that you can tell it is the perk
+        /// doing it and not luck.
+        static let tickInterval: Double = 1
 
         /// Share of a full health bar handed back per beat.
         ///
-        /// 6.5% twelve times is about three quarters of a health bar across the
-        /// fifteen seconds - getting on for two medkits, but paid out slowly enough
-        /// that enough damage still kills you through it. At five and a bit points
-        /// a second it cancels a light exchange outright and merely slows a serious
-        /// one, which is the trade the perk is meant to be: it does not save you
-        /// from a fight you are losing, it wins you one you were only just losing.
-        ///
-        /// Up from 5.5% over fourteen seconds, which was on the timid side of that
-        /// line - it took the edge off a duel without ever deciding one.
-        static let regenerationPortion: Double = 0.065
+        /// 5% nine times is about 45% of a bar across the perk, against the 78% the
+        /// old regeneration paid over fifteen seconds. Barely more than one medkit,
+        /// on purpose: this is no longer the whole item, it is one quarter of it,
+        /// and it now arrives alongside thicker skin, which is the same defence
+        /// bought twice. Stacked at the old rate the two together simply refused to
+        /// let a fight resolve.
+        static let healPortion: Double = 0.05
 
-        /// How long the three instant-effect perks run.
+        /// How much faster you move.
         ///
-        /// Shorter than regeneration, which has to pay out in instalments to be
-        /// what it is. These three are already at full strength the moment they are
-        /// pressed, so their length is simply how much of a fight they cover, and
-        /// twelve seconds is about one.
-        static let speedDuration: Double = 12
-        static let strengthDuration: Double = 12
-        static let resistanceDuration: Double = 12
+        /// Down from a third again to about a fifth. Enough to be the reason you
+        /// reach the wall first or break off a fight you are losing, and no longer
+        /// enough to make everyone else look like they are standing still - which
+        /// is what a third again looked like once it came free with the damage.
+        static let speedBoost: Double = 1.22
 
-        /// How much faster you move on a speed perk.
+        /// How much harder your shots hit.
         ///
-        /// A third again. Large enough to be the reason you get away, or the reason
-        /// you reach the wall before their bomb does, and short of the point where
-        /// the map stops feeling like the same size - past about 1.5 the aiming and
-        /// the collision resolution both start showing their seams.
-        static let speedBoost: Double = 1.35
+        /// Down from two fifths to a quarter. At mid tiers that is still often a
+        /// shot fewer to a kill, which is the whole point of it, but it no longer
+        /// combines with the resistance below to win a duel outright against
+        /// somebody playing better than you.
+        static let damageBoost: Double = 1.25
 
-        /// How much harder your shots hit on a strength perk.
-        ///
-        /// Two fifths again, which at mid tiers is about one shot fewer to a kill.
-        /// Deliberately less than the resistance perk gives, because damage is
-        /// worth more than durability in a game where the first shot usually
-        /// decides who wins: the numbers are equal only if the fights are.
-        static let strengthMultiplier: Double = 1.4
-
-        /// The share of incoming damage you still take on a resistance perk.
+        /// The share of incoming damage you still take.
         ///
         /// Everything, not only bullets - a bomb that goes off beside you, a lungful
         /// of gas. "Resistant to bullets" is what it is FOR, but a perk that let a
         /// blast through at full strength would be a perk with a footnote, and the
         /// only way anybody would ever learn the footnote is by dying to it.
-        static let resistanceShare: Double = 0.6
+        ///
+        /// 0.72, up from 0.6. On its own, 0.6 was a duel-winner; arriving with the
+        /// healing, the speed and the damage it was a different game for twelve
+        /// seconds. The rule of thumb across all four of these numbers is that
+        /// every one of them had to become something you NOTICE rather than
+        /// something you win with, because you get all four.
+        static let damageTaken: Double = 0.72
     }
 
     enum Loot {

@@ -1405,13 +1405,14 @@ enum AIBrain {
     ///
     /// Bots get these on exactly the same terms as the player - found in a crate,
     /// one at a time, refused by Actor.canUse while one is running - so all this
-    /// has to decide is WHEN. Being in a fight is the answer for three of them:
-    /// strength, resistance and speed are spent ON a fight, and a bot that saved
-    /// them for a better one would die holding them.
+    /// has to decide is WHEN, and being in a fight is now the whole answer.
     ///
-    /// Regeneration is the exception, and has to be, because it is the only one
-    /// whose worth depends on what has already happened to you. Fifteen seconds of
-    /// healing at full health is fifteen seconds of nothing.
+    /// It used to hold regeneration back until the bot was actually hurt, which was
+    /// right when regeneration was a bottle of healing and nothing else: fifteen
+    /// seconds of it at full health is fifteen seconds of nothing. The perk carries
+    /// three other powers now, and every one of them is worth as much in the first
+    /// second of a fight as in the last, so waiting to be hurt before drinking it
+    /// is waiting to be behind.
     ///
     /// No cooldown timer of its own. Holding two perks at once is already rare, and
     /// Actor.canUse refuses the second while the first runs.
@@ -1420,14 +1421,9 @@ enum AIBrain {
         guard state.goal.isFight
                 || actor.secondsSinceHit < GameConfig.AI.combatRecency else { return nil }
 
-        let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
-
         for (index, slot) in actor.inventory.slots.enumerated() {
-            guard let stack = slot, let perk = stack.type.perk,
+            guard let stack = slot, stack.type.perk != nil,
                   actor.canUse(slot: index) else { continue }
-
-            if perk == .regeneration,
-               healthLeft > GameConfig.AI.perkHealthFraction { continue }
 
             return index
         }

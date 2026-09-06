@@ -4,69 +4,48 @@
 //
 //  Something you switch ON rather than use up.
 //
-//  A bandage is spent the instant you press it; a perk is spent over the next
-//  quarter of a minute, and while it runs it is a thing that is TRUE of you rather
-//  than a thing you did. That distinction is why perks are their own kind rather
-//  than another healing item with a long fuse: everything about them - one at a
-//  time, a timer, particles coming off the person carrying it - belongs to the
-//  state and not to the press.
+//  A bandage is spent the instant you press it; a perk is spent over the next few
+//  seconds, and while it runs it is a thing that is TRUE of you rather than a thing
+//  you did. That distinction is why perks are their own kind rather than another
+//  healing item with a long fuse: everything about them - one at a time, a timer,
+//  particles coming off the person carrying it - belongs to the state and not to
+//  the press.
 //
-//  ONE AT A TIME, and the rule was written when there was one perk and nothing to
-//  conflict with. That is why adding three more cost almost nothing: the answer to
-//  "what happens if you drink two" was already decided, in Actor.canUse, and every
-//  screen and every bot reads it from there.
+//  ONE PERK, and it does all four things at once.
 //
-//  Four of them now, and they are deliberately four DIFFERENT verbs rather than
-//  four sizes of the same one. Regeneration answers damage already taken, strength
-//  answers a fight you are winning slowly, resistance answers one you are losing,
-//  and speed answers a fight you would rather not have - or a base on the far side
-//  of the map. Nothing here is strictly better than anything else here, which is
-//  what makes finding one a decision about when rather than a decision about what.
+//  There were four - regeneration, speed, strength, resistance - and on paper they
+//  were four different verbs for four different situations, which is a good shape
+//  for an item. In the hand they were four bottles a player had to tell apart at a
+//  glance, mid-fight, from a colour, having learned in advance which colour meant
+//  which. That is a lot of homework for a thing you find twice a match, and the
+//  usual outcome was drinking whichever one you had and finding out afterwards.
+//
+//  So the decision moved from WHICH to WHEN, which is the interesting half. One
+//  bottle, everything on, shorter than any of the four were, and every number
+//  underneath it pulled down so that all four together are worth about what one of
+//  them used to be. You still cannot run two, you still have to choose the moment,
+//  and now the moment is the entire skill.
+//
+//  Kept as an enum with one case on purpose. Everything downstream - the actor's
+//  perk slot, the event, the bots, the trail of particles - is written against
+//  "which perk is running", so a second one is still a case and a colour rather
+//  than a system, if this ever wants to go back.
 //
 
 enum Perk: Hashable, CaseIterable {
-    /// Health back, steadily, for as long as it runs.
-    case regeneration
+    /// Everything at once: health back, faster feet, harder shots, thicker skin.
+    case overdrive
 
-    /// Faster on your feet.
-    case speed
-
-    /// Your shots hit harder.
-    case strength
-
-    /// Everything that hits you hurts less.
-    case resistance
-
-    /// Which rung of the ladder this one sits on.
+    /// Which rung of the ladder it sits on.
     ///
-    /// Not all four together, which is where they started. A power-up is a power-up
-    /// and the sparkles say so whatever colour is under them - but four items all
-    /// painted Epic told a player that every one of them was a jackpot, when two of
-    /// them are simply useful. Speed gets you somewhere and regeneration undoes a
-    /// mistake; strength and resistance decide the fight you are in the middle of.
-    ///
-    /// The rung is also the supply. LootTable weights each perk by it, so the blue
-    /// pair turn up about twice as often as the purple pair - which is what makes
-    /// holding one a normal part of a match rather than an event, while the two
-    /// that swing a fight stay scarce.
-    var rarity: Rarity {
-        switch self {
-        case .regeneration, .speed: return .rare
-        case .strength, .resistance: return .epic
-        }
-    }
+    /// Epic, and the only power-up on the ladder now. Four of them split across two
+    /// rungs was the supply doing a second job - the blue pair common enough to be
+    /// normal, the purple pair scarce enough to be an event. With one item there is
+    /// no pair to balance, and a thing that does four things at once belongs at the
+    /// top: see LootTable, which turns up a perk about two thirds as often as it
+    /// used to turn up SOME perk.
+    var rarity: Rarity { .epic }
 
     /// How long it runs for.
-    ///
-    /// Regeneration lasts longest because it pays out in instalments - cut it short
-    /// and it stops being the thing it is. The other three are on the moment they
-    /// are spent in, and twelve seconds is about one fight.
-    var duration: Double {
-        switch self {
-        case .regeneration: return GameConfig.Perks.regenerationDuration
-        case .speed:        return GameConfig.Perks.speedDuration
-        case .strength:     return GameConfig.Perks.strengthDuration
-        case .resistance:   return GameConfig.Perks.resistanceDuration
-        }
-    }
+    var duration: Double { GameConfig.Perks.duration }
 }

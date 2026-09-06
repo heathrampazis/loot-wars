@@ -39,8 +39,11 @@ final class EffectsRenderer {
     ///
     /// Kept so the aura can be emitted on a BEAT rather than every frame, without
     /// this renderer being handed a clock: the perk's own countdown is a clock, and
-    /// crossing one of its fifths-of-a-second boundaries is one puff of violet.
-    /// Sixty a second would be a solid purple blob with a person somewhere inside.
+    /// crossing one of its fifths-of-a-second boundaries is one puff of colour.
+    /// Sixty a second would be a solid smear with a person somewhere inside.
+    ///
+    /// The beat now doubles as the position on the colour ring, so the same
+    /// countdown that decides WHEN a mote is thrown decides which hue it is.
     private var lastPerk: [ActorID: Double] = [:]
 
     /// Seconds between motes coming off somebody running a perk.
@@ -68,10 +71,13 @@ final class EffectsRenderer {
             // violet trail the player does, without a line of code saying so.
             if actor.perk != nil {
                 let previous = lastPerk[id] ?? (actor.perkRemaining + EffectsRenderer.auraInterval)
-                if Int(previous / EffectsRenderer.auraInterval)
-                    != Int(actor.perkRemaining / EffectsRenderer.auraInterval),
-                   let perk = actor.perk {
-                    aura(at: actor.position, perk: perk)
+                let beat = Int(actor.perkRemaining / EffectsRenderer.auraInterval)
+                if Int(previous / EffectsRenderer.auraInterval) != beat {
+                    // The beat number IS the hue. Counting down rather than up, so
+                    // the rainbow runs one way for everybody on the map regardless
+                    // of when they drank it, and two people running a perk side by
+                    // side are never mirror images of each other.
+                    aura(at: actor.position, step: -beat)
                 }
                 lastPerk[id] = actor.perkRemaining
             } else {
@@ -107,25 +113,29 @@ final class EffectsRenderer {
     /// Four things at once, each doing a job the others cannot. A disc thrown flat
     /// across the ground says where it happened - flattened, because everything
     /// else in this game is drawn standing up and a flat ellipse is the only shape
-    /// that reads as lying on the grass. Two rings closing inward say the power is
+    /// that reads as lying on the grass. Rings closing inward say the power is
     /// gathering rather than exploding, which is the opposite of every other ring
     /// here and the whole difference between being buffed and being blown up. A
     /// column of light going up says it is going INTO somebody. And a burst of
     /// motes hands over to the steady aura, so the effect does not stop and start
     /// again a fifth of a second later.
     ///
+    /// Every one of them in a different hue, which is the only reason this reads as
+    /// bigger than it used to while lasting exactly as long. The old version said
+    /// one thing loudly in violet; this says the same thing in four colours, and
+    /// four colours is the whole claim the item is making.
+    ///
     /// Grand on purpose. This is a thing you find perhaps twice in a match and
     /// choose the moment for, and the first version - one thin ring - spent that
     /// moment as quietly as a bandage.
-    func charge(at position: Vec2, perk: Perk) {
+    func charge(at position: Vec2) {
         let origin = GridGeometry.point(for: position)
         let tile = GridGeometry.length(ofTiles: 1)
-        let colours = RenderPalette.colours(of: perk)
 
-        // On the ground, under the figure's feet.
+        // On the ground, under the figure's feet, walking the ring as it spreads.
         let disc = SKShapeNode(ellipseOf: CGSize(width: tile * 1.7, height: tile * 0.8))
         disc.position = CGPoint(x: origin.x, y: origin.y - tile * 0.42)
-        disc.fillColor = colours.bright
+        disc.fillColor = RenderPalette.hue(at: 0)
         disc.strokeColor = RenderPalette.perkSpark
         disc.lineWidth = 2
         disc.alpha = 0.55
@@ -140,20 +150,27 @@ final class EffectsRenderer {
             .removeFromParent()
         ]))
 
-        // Closing in, one behind the other.
-        for index in 0..<2 {
-            let ring = SKShapeNode(circleOfRadius: tile * 1.15)
+        // Closing in, one behind the other, each a different hue.
+        //
+        // Four rather than two, and this is where the rainbow does its work: two
+        // rings of one colour said "something is happening", four rings of four
+        // said "and it is all of them". They arrive close enough together to read
+        // as one gesture, so the extra pair costs the moment nothing in length -
+        // which matters, because a perk that runs for nine seconds cannot afford a
+        // second and a half of ceremony in front of it.
+        for index in 0..<4 {
+            let ring = SKShapeNode(circleOfRadius: tile * (1.15 + CGFloat(index) * 0.14))
 
             ring.position = origin
             ring.fillColor = .clear
-            ring.strokeColor = index == 0 ? colours.bright : colours.deep
+            ring.strokeColor = RenderPalette.hue(at: index * 2)
             ring.lineWidth = 4
             ring.alpha = 0
             ring.zPosition = 11
             node.addChild(ring)
 
             ring.run(.sequence([
-                .wait(forDuration: Double(index) * 0.12),
+                .wait(forDuration: Double(index) * 0.075),
                 .group([
                     .sequence([.fadeAlpha(to: 0.95, duration: 0.1),
                                .fadeOut(withDuration: 0.3)]),
@@ -163,10 +180,10 @@ final class EffectsRenderer {
             ]))
         }
 
-        // And a column of it going up through them.
+        // And a column of it going up through them, changing colour on the way.
         let column = SKSpriteNode(texture: GlowArt.pool)
         column.size = CGSize(width: tile * 0.9, height: tile * 1.2)
-        column.color = colours.bright
+        column.color = RenderPalette.hue(at: 0)
         column.colorBlendFactor = 1
         column.anchorPoint = CGPoint(x: 0.5, y: 0.1)
         column.position = CGPoint(x: origin.x, y: origin.y - tile * 0.45)
@@ -178,22 +195,28 @@ final class EffectsRenderer {
             .group([
                 .scaleX(to: 0.75, y: 2.4, duration: 0.4),
                 .sequence([.fadeAlpha(to: 0.75, duration: 0.12),
-                           .fadeOut(withDuration: 0.34)])
+                           .fadeOut(withDuration: 0.34)]),
+                .sequence((0..<5).map { index -> SKAction in
+                    .colorize(with: RenderPalette.hue(at: index * 2),
+                              colorBlendFactor: 1, duration: 0.1)
+                })
             ]),
             .removeFromParent()
         ]))
 
-        // Handing over to the aura, which takes it from here.
+        // Handing over to the aura, which takes it from here - already partway
+        // round the ring, so the first steady motes carry on from the column
+        // rather than snapping back to where it started.
         for index in 0..<6 {
             let step = Double(index) * 0.05
             node.run(.sequence([
                 .wait(forDuration: step),
-                .run { [weak self] in self?.aura(at: position, perk: perk) }
+                .run { [weak self] in self?.aura(at: position, step: index) }
             ]))
         }
     }
 
-    /// Violet particles coming off somebody who has a perk running.
+    /// Rainbow particles coming off somebody who has a perk running.
     ///
     /// Soft round motes rather than the sparkles the ITEM wears, and the two being
     /// different is the point of the split. The sparkles say "this object is
@@ -207,14 +230,17 @@ final class EffectsRenderer {
     /// moving player leave a trail and a standing one wear a cloud - one behaviour
     /// out of one emitter, and the reason this is not an SKEmitterNode bolted to
     /// the sprite.
-    private func aura(at position: Vec2, perk: Perk) {
+    private func aura(at position: Vec2, step: Int) {
         let origin = GridGeometry.point(for: position)
 
-        // Whichever perk is running paints them. Four power-ups all trailing the
-        // same violet would be four different things wearing one uniform, and the
-        // colour is the only thing that says across a map which of them the person
-        // charging at you just drank.
-        let colours = RenderPalette.colours(of: perk)
+        // One step round the ring per puff, so the trail somebody leaves behind
+        // them is itself a rainbow laid out in the order they ran it.
+        //
+        // The step comes from the perk's own countdown rather than from a counter
+        // in here, which is what keeps the colour on the ground true when frames
+        // are dropped: a stutter loses a puff, it does not shift the whole trail
+        // out of phase with everybody else's.
+        let colours = RenderPalette.perkColours(at: step)
 
         // Two at a time, on opposite sides of the figure more often than not. One
         // per beat came off the middle in a single file, which read as steam from a

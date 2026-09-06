@@ -58,10 +58,11 @@ extension ItemType {
         case .medkit:  return .uncommon
         case .arcade:  return .epic
 
-        // Each power-up carries its own rung - see Perk.rarity. They are not all
-        // the same size of find: two of them decide a fight and two of them are
-        // simply useful, and a table that painted all four Epic was overselling
-        // half of them.
+        // The power-up carries its own rung - see Perk.rarity - rather than being
+        // given one here. There is one perk and it is Epic, so this line could say
+        // so directly and be correct today; asking the perk keeps the rung a fact
+        // about the ITEM, which is where it was already being read from by the
+        // loot table and the glow.
         case .perk(let which): return which.rarity
 
         case .helmet(let tier):

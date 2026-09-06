@@ -71,23 +71,29 @@ struct Actor {
 
     /// How fast this actor moves, as a share of the standard speed.
     ///
-    /// The three perks that are not regeneration all work like this - a number
-    /// read at the point of use rather than a system that reaches in and edits
-    /// something. Nothing has to be put back when the perk ends, nothing can be
-    /// applied twice by a system that ran the same frame, and a perk that stops
-    /// existing takes its effect with it in the same instant.
+    /// Three of the perk's four powers work like this - a number READ at the point
+    /// of use rather than a system that reaches in and edits something. Nothing has
+    /// to be put back when the perk ends, nothing can be applied twice by a system
+    /// that ran the same frame, and a perk that stops existing takes its effect
+    /// with it in the same instant. Only the healing needs a beat, and PerkSystem
+    /// runs that.
+    ///
+    /// All three now ask the same question - is a perk running - where they used to
+    /// each name their own. That collapse is the entire cost of merging the four
+    /// power-ups into one, which is a fair sign the original split was carrying its
+    /// weight in the right place.
     var speedMultiplier: Double {
-        perk == .speed ? GameConfig.Perks.speedBoost : 1
+        perk != nil ? GameConfig.Perks.speedBoost : 1
     }
 
     /// How hard this actor's shots hit, as a share of the blaster's own damage.
     var damageMultiplier: Double {
-        perk == .strength ? GameConfig.Perks.strengthMultiplier : 1
+        perk != nil ? GameConfig.Perks.damageBoost : 1
     }
 
     /// The share of incoming damage this actor actually takes.
     var damageTakenShare: Double {
-        perk == .resistance ? GameConfig.Perks.resistanceShare : 1
+        perk != nil ? GameConfig.Perks.damageTaken : 1
     }
 
     var inventory = Inventory()

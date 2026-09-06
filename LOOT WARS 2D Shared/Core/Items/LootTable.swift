@@ -171,23 +171,22 @@ enum LootTable {
         let table = table(at: progress)
         var rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
 
-        // The power-ups, one row each, added here rather than written into every
-        // band by hand.
+        // The power-up, added here rather than written into every band by hand.
         //
-        // They are all as rare as each other on purpose - there is no best one, so
-        // there is no reason for the game to hand out one of them more often - and
-        // a fifth perk gets its row from this line without anybody remembering to
-        // edit four tables. The weight climbs with the match for the same reason
-        // the gear rungs do: twelve seconds of anything is worth more in a late
-        // fight than an early one.
-        let perkWeight = GameConfig.Loot.perkWeight(at: progress)
+        // One row now, where there were four. The four used to carry different
+        // weights - the blue pair twice as often as the purple pair - and that
+        // arithmetic is now this multiplier: the old table offered a perk at six
+        // times the base weight in total, this offers it at four, so a power-up
+        // turns up about two thirds as often as SOME power-up used to. Rarer,
+        // because it is now worth four times as much, and not much rarer, because
+        // a perk you never see is a mechanic the game does not have.
+        //
+        // The weight climbs with the match for the same reason the gear rungs do:
+        // nine seconds of anything is worth more in a late fight than an early one.
+        let perkWeight = GameConfig.Loot.perkWeight(at: progress) * 4
 
         rows += Perk.allCases.map { perk in
-            // Weighted by the perk's own rung: the two blue ones turn up about
-            // twice as often as the two purple ones. One line, and a fifth perk
-            // gets its supply from whichever rung it is given.
-            let share = perk.rarity <= .rare ? 2 : 1
-            return (pickup: Pickup.item(.perk(perk)), weight: perkWeight * share)
+            (pickup: Pickup.item(.perk(perk)), weight: perkWeight)
         }
 
         // A rare crate cannot hand you a bandage.

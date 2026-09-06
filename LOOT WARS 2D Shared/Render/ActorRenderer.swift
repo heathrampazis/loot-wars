@@ -537,19 +537,26 @@ final class ActorRenderer {
     /// keeps running - somebody who switches this on mid-sprint does not stop dead
     /// to do it.
     ///
-    /// The violet wash is deliberately the strongest colour ever put on this sprite
-    /// - stronger than a heal's green, twice the flinch's black. It is on screen
-    /// for a third of a second and it is the one moment the game says something
-    /// about you rather than about what just hit you.
-    func charge(_ id: ActorID, perk: Perk) {
+    /// The wash is deliberately the strongest colour ever put on this sprite -
+    /// stronger than a heal's green, twice the flinch's black. It is on screen for
+    /// half a second and it is the one moment the game says something about you
+    /// rather than about what just hit you.
+    ///
+    /// And it is not one colour. The figure is run through four hues of the ring on
+    /// the way up, which is the only place in this game a SPRITE ever changes
+    /// colour more than once - the item twinkles and the trail cycles, but the
+    /// person themselves going through a rainbow is reserved for this single
+    /// instant, and that is what makes the instant read as the big one.
+    func charge(_ id: ActorID) {
         guard let nodes = nodesByActor[id] else { return }
 
         nodes.sprite.removeAction(forKey: "hit")
         nodes.sprite.run(.sequence([
-            .colorize(with: RenderPalette.colours(of: perk).bright,
-                      colorBlendFactor: 0.9, duration: 0.09),
-            .wait(forDuration: 0.1),
-            .colorize(withColorBlendFactor: 0, duration: 0.42)
+            .sequence((0..<4).map { index -> SKAction in
+                .colorize(with: RenderPalette.hue(at: index * 2),
+                          colorBlendFactor: 0.9, duration: 0.08)
+            }),
+            .colorize(withColorBlendFactor: 0, duration: 0.4)
         ]), withKey: "hit")
 
         nodes.figure.removeAction(forKey: "react")
