@@ -81,7 +81,7 @@ enum LootTable {
         (0.00, [
             (.item(.bandage), 88),
             (.item(.medkit),  22),
-            (.item(.bomb),    82),
+            (.item(.bomb),    92),
             (.item(.stink),   18),
             (.item(.chest),   34),
 
@@ -94,7 +94,7 @@ enum LootTable {
         (0.35, [
             (.item(.bandage), 88),
             (.item(.medkit),  24),
-            (.item(.bomb),    70),
+            (.item(.bomb),    78),
             (.item(.stink),   16),
             (.item(.chest),   34),
 

@@ -127,10 +127,14 @@ enum ChestSystem {
         }
     }
 
-    /// Fills a freshly placed bot chest, so there is something to raid it for.
+    /// Fills a chest and puts it on the restock clock.
+    ///
+    /// Called for a chest a bot has just put down, and for the one every base
+    /// starts the match with - see World's setup. Both want the same thing: a base
+    /// that is worth breaking into before anybody has done anything.
     ///
     /// Draws from world.rng in a fixed order, so a seed still replays exactly.
-    private static func stock(_ id: ChestID, in world: World) {
+    static func stock(_ id: ChestID, in world: World) {
         guard var chest = world.chests[id] else { return }
 
         chest.selfStocking = true

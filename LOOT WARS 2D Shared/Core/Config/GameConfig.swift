@@ -389,7 +389,15 @@ enum GameConfig {
         ///
         /// It applies to every source at once - crates, a bot's chest, and the
         /// supply floor bots get. A grace period with one way round it is not one.
-        static let bombGrace: Double = 120
+        ///
+        /// Ninety rather than a hundred and twenty. Two minutes was sized against
+        /// bases that took most of that to close; they seal around the minute mark
+        /// now that trips come round faster and carry more, so the last thirty
+        /// seconds were not a breather, they were everybody standing about behind a
+        /// finished wall with nothing to do. It is also most of why bombs FELT
+        /// rare: for two of a five-minute match there were none, so the supply a
+        /// player actually experienced was squeezed into the back three.
+        static let bombGrace: Double = 90
     }
 
     enum Map {
