@@ -542,6 +542,20 @@ enum GameConfig {
         // (currently 392 x 750, so 0.45 : 0.86) or the sprite will stretch.
 
         /// Half the figure's width, in tiles.
+        /// How hurt you have to be before a TAP on a healing slot spends it.
+        ///
+        /// Healing used to take two presses and a piece of knowledge: pick the slot,
+        /// then find the button above the corner - and nothing on screen says that
+        /// button belongs to the slot you picked. Under this threshold the tap does
+        /// the thing, because there is exactly one reason anybody touches a bandage
+        /// at forty per cent health.
+        ///
+        /// Not always, and the line is where the answer stops being obvious. Above
+        /// seventy per cent you might be topping up before a fight, saving the
+        /// medkit, or about to sell it - so the tap still picks it out and the
+        /// button still spends it. Below, hesitating is the expensive thing.
+        static let tapHealBelow: Double = 0.7
+
         static let halfWidth: Double = 0.45
 
         /// Half the figure's height, in tiles.

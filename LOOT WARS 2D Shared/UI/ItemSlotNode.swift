@@ -49,6 +49,12 @@ final class ItemSlotNode: SKNode {
     /// often would restart its own twinkle constantly and never finish one.
     private let enchant: EnchantNode
 
+    /// Shown when tapping this slot will spend what is in it rather than pick it
+    /// out - see GameScene.tapHotbar. A ring rather than a colour on the slot
+    /// itself, because every other thing a slot can say about its contents is
+    /// already said in colour: the rarity pool, the sell tab, the dimming.
+    private let urgentRing: SKShapeNode
+
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
@@ -78,6 +84,10 @@ final class ItemSlotNode: SKNode {
         panel = SKShapeNode(rect: CGRect(x: -side / 2, y: -side / 2,
                                          width: side, height: side),
                             cornerRadius: side * 0.182)
+
+        urgentRing = SKShapeNode(rect: CGRect(x: -side / 2 - 2, y: -side / 2 - 2,
+                                              width: side + 4, height: side + 4),
+                                 cornerRadius: side * 0.2)
         super.init()
 
         panel.fillColor = RenderPalette.hotbarSlot
@@ -88,6 +98,13 @@ final class ItemSlotNode: SKNode {
         glow.colorBlendFactor = 1
         glow.isHidden = true
         addChild(glow)
+
+        urgentRing.fillColor = .clear
+        urgentRing.strokeColor = RenderPalette.placementValid
+        urgentRing.lineWidth = 3
+        urgentRing.zPosition = 4
+        urgentRing.isHidden = true
+        addChild(urgentRing)
 
         icon.zPosition = 1
         icon.isHidden = true
@@ -227,6 +244,27 @@ final class ItemSlotNode: SKNode {
             .group([.fadeAlpha(to: 1.0, duration: 1.4), .scale(to: 1.12, duration: 1.4)]),
             .group([.fadeAlpha(to: 0.7, duration: 1.4), .scale(to: 1.0, duration: 1.4)])
         ])), withKey: "rare")
+    }
+
+    /// Rings the slot green while a tap on it would spend it.
+    ///
+    /// It breathes, which is the same signal the menu's button and the build ghost
+    /// use: on a screen where everything else is still, the thing that moves is the
+    /// thing to press. It is also the only warning the player gets that a tap here
+    /// is no longer free, which matters more than the invitation.
+    func setUrgent(_ urgent: Bool) {
+        guard urgent != !urgentRing.isHidden else { return }
+
+        urgentRing.removeAllActions()
+        urgentRing.isHidden = !urgent
+
+        guard urgent else { return }
+
+        urgentRing.alpha = 0.35
+        urgentRing.run(.repeatForever(.sequence([
+            .fadeAlpha(to: 0.95, duration: 0.45),
+            .fadeAlpha(to: 0.35, duration: 0.55)
+        ])))
     }
 
     /// A quick squeeze that ends back at this slot's own resting size.

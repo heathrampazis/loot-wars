@@ -209,8 +209,29 @@ final class HotbarNode: SKNode {
         lastInventory = nil      // force the prices on or off
     }
 
+    /// Acknowledges a tap that spent something, so the slot answers the finger
+    /// even though what it held is on its way out.
+    func acknowledge(_ index: Int) {
+        guard slots.indices.contains(index) else { return }
+        slots[index].flinch()
+    }
+
     func update(with world: World) {
         guard let player = world.localPlayer else { return }
+
+        // Which slots would be SPENT by a tap rather than picked out. Asked every
+        // frame rather than folded into the redraw below, because it turns on when
+        // your health crosses a line - and nothing about your inventory changes at
+        // that moment, so the redraw would not fire.
+        let urgent = Double(player.health)
+            < Double(player.maxHealth) * GameConfig.Player.tapHealBelow
+
+        for (index, stack) in player.inventory.slots.enumerated() {
+            let spends = urgent && !selling && player.isAlive
+                && stack?.type.isHealing == true
+
+            slots[index].setUrgent(spends)
+        }
 
         // Whether each slot can be used is the actor's own answer, so a greyed slot
         // always means the simulation would refuse it. A bandage greys out at full

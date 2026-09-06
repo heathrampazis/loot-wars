@@ -168,6 +168,11 @@ final class GameScene: SKScene {
     private let respawnBanner = RespawnBanner()
 
 
+    /// How much healing sat in each slot last frame, so PICKING ONE UP can be
+    /// noticed. Per slot rather than a total: a bandage landing in an empty slot
+    /// and a bandage joining a stack are the same event, and both are worth arming.
+    private var lastHealingPerSlot: [Int] = []
+
     /// The local player's health last frame, so being HIT can be noticed.
     ///
     /// A moment rather than a state, which is what makes arming a heal safe: if the
@@ -580,6 +585,7 @@ final class GameScene: SKScene {
         }
 
         armHealingIfHit(in: world)
+        armHealingWhenFound(in: world)
         hotbar.setSelected(shopPanel.isOpen ? nil : selectedSlot)
 
         updateRightControl(with: world)
@@ -1055,6 +1061,43 @@ final class GameScene: SKScene {
         selectedSlot = heal
     }
 
+    /// Puts a heal in your hand the moment you pick one up, if your hand was empty.
+    ///
+    /// The other half of arming on a hit, and the same rule: fill an empty hand,
+    /// never override a choice. Walking over a bandage and having it land silently
+    /// in a slot you then have to find is the same two-step problem tapping solved
+    /// at low health - except this one happens when you are fine, which is exactly
+    /// when you would rather it was already sorted.
+    ///
+    /// Noticed rather than announced. Nothing in Core has to send a "you picked up
+    /// a bandage" message: a slot that holds more healing than it did last frame IS
+    /// the event, which is the same trick every renderer in this project uses.
+    private func armHealingWhenFound(in world: World) {
+        guard let player = world.localPlayer, player.isAlive else {
+            lastHealingPerSlot = []
+            return
+        }
+
+        let healing = player.inventory.slots.map { slot -> Int in
+            guard let stack = slot, stack.type.isHealing else { return 0 }
+            return stack.count
+        }
+
+        defer { lastHealingPerSlot = healing }
+
+        guard lastHealingPerSlot.count == healing.count,
+              selectedSlot == nil,
+              chestPanel.openChest == nil, !shopPanel.isOpen else { return }
+
+        // The slot that GAINED, so a bandage picked up while a medkit sits two
+        // slots along arms the bandage - the thing that just happened rather than
+        // whichever heal happens to be best.
+        for slot in healing.indices where healing[slot] > lastHealingPerSlot[slot] {
+            selectedSlot = slot
+            return
+        }
+    }
+
     /// Input becomes a Command. Later, AI brains and network packets produce their
     /// Commands exactly the same way, and the world cannot tell them apart.
     private func gatherCommands() -> [ActorID: [Command]] {
@@ -1407,8 +1450,25 @@ extension GameScene {
     /// the item rather than to this screen (ItemType.use). Tapping the same slot
     /// again puts it back, because changing your mind should not cost you the item.
     private func tapHotbar(_ slot: Int) {
-        guard world.localPlayer?.inventory.stack(at: slot) != nil else {
+        guard let player = world.localPlayer,
+              let stack = player.inventory.stack(at: slot) else {
             selectedSlot = nil
+            return
+        }
+
+        // Hurt, and holding a bandage: the tap IS the heal.
+        //
+        // Two presses and an invisible rule stood between deciding to patch up and
+        // patching up - pick the slot, then find the button above the corner, which
+        // nothing on screen connects to the slot you picked. Below the threshold
+        // there is exactly one reason anybody touches a bandage, so the game stops
+        // asking. ConsumableSystem answers whether it can actually be spent, the
+        // same way it answers for the button and for a bot.
+        if stack.type.isHealing,
+           Double(player.health) < Double(player.maxHealth) * GameConfig.Player.tapHealBelow,
+           ConsumableSystem.canUse(slot: slot, actor: player) {
+            queuedCommands.append(.useItem(slot: slot))
+            hotbar.acknowledge(slot)
             return
         }
 
