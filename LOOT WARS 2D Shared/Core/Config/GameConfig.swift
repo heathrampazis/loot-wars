@@ -413,7 +413,42 @@ enum GameConfig {
         /// edge, and so adjacent bases are about 17 tiles apart centre to centre.
         /// Nothing goes in the middle: the centre of the map should be contested
         /// ground, not somebody's living room.
-        static let claimRingRadius: Double = 22
+        /// The band claims are scattered in, measured from the middle of the map.
+        ///
+        /// A band rather than a ring. Eight bases used to sit on one circle at fixed
+        /// angles, shuffled between the teams - so every match had the identical
+        /// octagon and the only thing that changed was which corner of it was
+        /// yours. You learned the map once and knew it forever: where your
+        /// neighbours were, how far the walk was, which way to run.
+        ///
+        /// Nineteen to twenty-seven keeps the two things that ring was protecting.
+        /// Nobody gets the middle, which stays contested open ground with the
+        /// densest loot on it; and nobody is exiled to a corner where no raider
+        /// would ever bother walking. Between those two, everything moves.
+        static let claimRadius: ClosedRange<Double> = 19...27
+
+        /// How far round its own eighth of the map a claim may wander, as a share
+        /// of that sector.
+        ///
+        /// Sectors rather than free placement, and this is what keeps the layout
+        /// FAIR while making it different. Dart-throwing eight claims at a 64-tile
+        /// map produces maps where three teams share a corner and one has the whole
+        /// west side - which is a different match for each of them, and nobody
+        /// chose to play an unfair one. One sector each means everybody has
+        /// neighbours; the jitter inside it means you never know where.
+        static let claimSectorJitter: Double = 0.32
+
+        /// The least distance allowed between two claim centres, in tiles.
+        ///
+        /// Claims are nine wide, so fourteen leaves five tiles of ground between
+        /// two walls - enough for a corridor, a crate and a fight in it. Relaxed a
+        /// tile at a time if a map cannot be laid out at fourteen, which happens on
+        /// about three maps in a hundred, and never goes below the floor.
+        static let claimSpacing: Double = 14
+        static let claimSpacingFloor: Double = 11
+
+        /// How far a claim's centre must stay from the map's edge.
+        static let claimMargin = 6
 
         /// Set this to replay one exact map. nil means a fresh map every launch -
         /// the seed used is printed to the console so you can pin it down here if
