@@ -31,6 +31,12 @@ final class QuickBuyNode: SKNode {
     static let size = CGSize(width: 104, height: 44)
 
     private let plate = SKShapeNode()
+
+    /// Lit for a moment when a tap is answered - green for a sale, red for a
+    /// refusal. Its own node rather than a colour on the plate, for the reason the
+    /// shop's card learned the hard way: the plate is redrawn by the next offer,
+    /// and a colour written onto it is wiped before it has been seen.
+    private let flash = SKShapeNode()
     private let glow = SKSpriteNode(texture: GlowArt.pool)
     private let icon = SKSpriteNode()
     private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -44,6 +50,14 @@ final class QuickBuyNode: SKNode {
     /// out over a quarter of a second, and a tap landing during the fade should
     /// miss rather than buy something that is on its way out.
     private var live = false
+
+    /// A tap has been sent and the answer has not come back yet.
+    ///
+    /// One frame, usually - the command goes into the queue, the world runs, and
+    /// the purchase arrives as an event on the way out. It matters anyway: without
+    /// it a fast double tap sends two buys, and the second one spends tokens on a
+    /// prompt that is already leaving.
+    private(set) var awaiting = false
 
     /// True for a while after you take an offer.
     ///
@@ -66,6 +80,14 @@ final class QuickBuyNode: SKNode {
         plate.strokeColor = RenderPalette.placementValid
         plate.lineWidth = 2
         addChild(plate)
+
+        flash.path = plate.path
+        flash.fillColor = RenderPalette.placementValid
+        flash.strokeColor = RenderPalette.placementValid
+        flash.lineWidth = 3
+        flash.alpha = 0
+        flash.zPosition = 5
+        addChild(flash)
 
         // Behind the artwork, like everywhere else loot is drawn. The plate's own
         // outline goes on meaning "you can afford this", which is a different fact
@@ -115,7 +137,7 @@ final class QuickBuyNode: SKNode {
 
     /// Whether a tap at this point in the node's own space takes the offer.
     func isPressed(atLocalPoint point: CGPoint) -> Bool {
-        guard live else { return false }
+        guard live, !awaiting else { return false }
         let box = QuickBuyNode.size
         return abs(point.x) <= box.width / 2 + 8 && abs(point.y) <= box.height / 2 + 8
     }
@@ -123,6 +145,15 @@ final class QuickBuyNode: SKNode {
     /// Puts it away, and forgets the offer so the same one can appear again later
     /// when it next becomes newly affordable.
     func dismiss() {
+        // Nothing goes away while an answer is owed.
+        //
+        // This guard is the whole reason the celebration is ever seen. Buying
+        // something spends tokens, the scene re-asks ShopSystem for an offer on the
+        // very next frame, the answer is now "you cannot afford anything" - and the
+        // prompt would take itself off screen a frame before the purchase event
+        // arrived to be celebrated. The shop card had the identical bug for weeks.
+        guard !awaiting else { return }
+
         // Called every frame by the scene while a panel is open, so it has to be
         // cheap and idempotent - running a fade-out sixty times a second would
         // leave the node permanently mid-animation.
@@ -137,8 +168,69 @@ final class QuickBuyNode: SKNode {
         run(.sequence([.fadeOut(withDuration: 0.18), .hide()]), withKey: "life")
     }
 
+    /// A tap went through to the simulation. Nothing visible yet - the answer
+    /// comes back as confirm or refuse.
+    func arm() {
+        awaiting = true
+    }
+
+    /// The purchase went through: wash it green, shake it, and away.
+    ///
+    /// The same answer the shop card gives, in the same colour and the same motion,
+    /// because they are the same act. Somebody who has learned what a green shake
+    /// means at a shop card has learned it here, and a prompt that celebrated
+    /// differently would be a second thing to learn for no reason.
+    func confirm() {
+        // Stays armed until take() runs, which is what keeps dismiss off it for the
+        // length of the celebration.
+        answer(in: RenderPalette.placementValid, strength: 0.6)
+
+        // Held just long enough to be seen before it leaves. The prompt's whole job
+        // is done at this point; what is left is telling you it worked.
+        run(.sequence([
+            .wait(forDuration: 0.28),
+            .run { [weak self] in self?.take() }
+        ]), withKey: "answered")
+    }
+
+    /// The purchase was refused: wash it red and leave it up.
+    ///
+    /// It STAYS, which is the opposite of a sale. A refusal means you could not
+    /// afford it or had nowhere to put it, and both of those can change in the next
+    /// few seconds - taking the offer away would be the game punishing you for
+    /// asking.
+    func refuse() {
+        awaiting = false
+        answer(in: RenderPalette.placementBlocked, strength: 0.42)
+    }
+
+    private func answer(in colour: SKColor, strength: CGFloat) {
+        flash.removeAllActions()
+        flash.fillColor = colour
+        flash.strokeColor = colour
+        flash.alpha = strength
+        flash.run(.fadeAlpha(to: 0, duration: 0.4))
+
+        // Rotation and scale only, the same as the shop's card: this node's
+        // POSITION is owned by the layout, and an interrupted move would leave the
+        // prompt parked somewhere the layout never put it.
+        removeAction(forKey: "answered")
+        setScale(1)
+        zRotation = 0
+
+        run(.sequence([
+            .group([.rotate(toAngle: -0.055, duration: 0.05),
+                    .scale(to: 0.95, duration: 0.05)]),
+            .rotate(toAngle: 0.055, duration: 0.09),
+            .rotate(toAngle: -0.035, duration: 0.07),
+            .group([.rotate(toAngle: 0, duration: 0.06),
+                    .scale(to: 1.0, duration: 0.06)])
+        ]), withKey: "shake")
+    }
+
     /// The offer was taken. Away it goes, and it stays away for a bit.
     func take() {
+        awaiting = false
         dismiss()
         cooling = true
         run(.sequence([

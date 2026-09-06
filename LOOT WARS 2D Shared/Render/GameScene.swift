@@ -795,6 +795,12 @@ final class GameScene: SKScene {
                     selectedSlot = slot
                 }
 
+                // Whichever of the two asked for it answers. The panel's confirm
+                // does nothing unless a card was pressed, and the prompt's does
+                // nothing unless it is waiting, so neither has to know about the
+                // other.
+                if quickBuy.awaiting { quickBuy.confirm() }
+
                 // Where the thing you just bought should appear to land: your own
                 // bar, converted into the panel's coordinates, because the panel is
                 // what animates it. The scene is the only thing that knows where
@@ -1149,11 +1155,20 @@ extension GameScene {
             // stick loses nothing it needs.
             if quickBuy.isPressed(atLocalPoint: touch.location(in: quickBuy)),
                let type = quickBuy.offer {
-                if let player = world.localPlayer,
-                   ShopSystem.canBuy(type, actor: player, in: world) {
-                    queuedCommands.append(.buyItem(type))
+                guard let player = world.localPlayer,
+                      ShopSystem.canBuy(type, actor: player, in: world) else {
+                    // Cannot afford it, or nowhere to put it. Say so and leave the
+                    // offer up: both of those can change in a few seconds.
+                    quickBuy.refuse()
+                    continue
                 }
-                quickBuy.take()
+
+                // Sent, not spent. The prompt waits for the purchase to come back
+                // as an event before it celebrates - it used to vanish on the tap,
+                // which meant the one moment worth showing happened to a node that
+                // was already fading out.
+                queuedCommands.append(.buyItem(type))
+                quickBuy.arm()
                 continue
             }
 
