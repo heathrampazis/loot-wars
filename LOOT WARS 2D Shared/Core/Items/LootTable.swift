@@ -85,9 +85,11 @@ enum LootTable {
             (.item(.stink),   18),
             (.item(.chest),   34),
 
-            (.item(.helmet(.common)),    26),
-            (.item(.helmet(.uncommon)),  18),
-            (.item(.helmet(.rare)),      11),
+            // Three helmet rows became two, at the same total weight, so gear is
+            // exactly as likely to come out of an early crate as it was - there is
+            // simply one fewer rung for it to land on.
+            (.item(.helmet(.common)),    34),
+            (.item(.helmet(.epic)),      21),
             (.item(.blaster(.two)),      24),
             (.item(.blaster(.three)),    14)
         ]),
@@ -98,10 +100,16 @@ enum LootTable {
             (.item(.stink),   16),
             (.item(.chest),   34),
 
-            // The Common and the Blaster 2 are gone: by now everybody has better,
-            // so those rows were rolls that produced nothing.
-            (.item(.helmet(.uncommon)),  22),
-            (.item(.helmet(.rare)),      20),
+            // The Blaster 2 is gone: by now everybody has better, so that row was a
+            // roll that produced nothing.
+            //
+            // The Common is NOT gone, which is the one place the shorter ladder
+            // shows. It used to be dropped here because Uncommon sat between it and
+            // Epic; with the middle deleted, dropping it would leave this band
+            // offering Epic and nothing else, and a band with one gear rung in it
+            // is a coin toss rather than a table. It carries the smaller share.
+            (.item(.helmet(.common)),    16),
+            (.item(.helmet(.epic)),      26),
             (.item(.blaster(.three)),    26),
             (.item(.blaster(.four)),     12)
         ]),
@@ -112,8 +120,12 @@ enum LootTable {
             (.item(.stink),   14),
             (.item(.chest),   28),
 
-            (.item(.helmet(.rare)),      20),
-            (.item(.helmet(.epic)),      10),
+            // Legendary is where the crates stop, and everything above it is bought.
+            // Same shape as before - the top natural roll is three fifths of the way
+            // up the ladder, and a rare crate's upgrade reaches one rung past it -
+            // so Cosmic remains the one rung nobody finds.
+            (.item(.helmet(.epic)),      20),
+            (.item(.helmet(.legendary)), 10),
             (.item(.blaster(.four)),     16),
             (.item(.blaster(.five)),      6)
         ])

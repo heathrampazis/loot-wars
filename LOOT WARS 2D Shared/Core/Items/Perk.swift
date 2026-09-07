@@ -38,13 +38,16 @@ enum Perk: Hashable, CaseIterable {
 
     /// Which rung of the ladder it sits on.
     ///
-    /// Epic, and the only power-up on the ladder now. Four of them split across two
-    /// rungs was the supply doing a second job - the blue pair common enough to be
-    /// normal, the purple pair scarce enough to be an event. With one item there is
-    /// no pair to balance, and a thing that does four things at once belongs at the
-    /// top: see LootTable, which turns up a perk about two thirds as often as it
-    /// used to turn up SOME perk.
-    var rarity: Rarity { .epic }
+    /// Mythical, which is purple - the same rung it has always drawn at, under the
+    /// name the ladder now uses. It was .epic when there were six rungs and the
+    /// gear ladders sat a rung below their own names; with the ladder cut to five
+    /// and the names lined up, purple is called Mythical and this is one of the two
+    /// rungs that still sparkles.
+    ///
+    /// The top but one, and it stays there for the same reason it went there: a
+    /// thing that does four things at once belongs high, and gold is reserved for
+    /// the one rung nobody can find.
+    var rarity: Rarity { .mythical }
 
     /// How long it runs for.
     var duration: Double { GameConfig.Perks.duration }

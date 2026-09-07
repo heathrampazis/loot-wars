@@ -95,8 +95,16 @@ enum ItemType: Hashable {
     /// something that twinkles says it is one of the best things in the game before
     /// you have learned anything at all.
     ///
-    /// Epic and above precisely because most things are not. If a bandage
+    /// Mythical and above precisely because most things are not. If a bandage
     /// twinkled, nothing would.
+    ///
+    /// It said Epic when the ladder had six rungs and the gear sat a rung below its
+    /// own name, which worked out to the top three helmets. The ladder is five now
+    /// and the names line up, so the same SET of things - Mythical and Cosmic gear,
+    /// the machine, the power-up - needs the threshold one rung higher. Left at
+    /// Epic it would have swept up the medkit, which moved onto that rung when the
+    /// middle of the ladder was deleted, and a twinkling medkit is exactly the
+    /// claim this property exists to avoid making.
     var isEnchanted: Bool {
         if perk != nil { return true }
 
@@ -112,7 +120,7 @@ enum ItemType: Hashable {
         if case .bomb = self { return true }
         if case .stink = self { return true }
 
-        return rarity >= .epic
+        return rarity >= .mythical
     }
 
     /// Share of maximum health restored when used.

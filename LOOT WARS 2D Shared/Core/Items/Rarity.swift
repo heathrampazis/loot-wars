@@ -4,10 +4,20 @@
 //
 //  How good a thing is, on one scale, for everything you can carry.
 //
-//  Six rungs, because that is what people already know: the colours have meant the
-//  same thing in every game with loot in it for fifteen years, and a player who has
-//  ever seen a purple item knows it beats a green one without being told. Borrowing
-//  a convention this well established is worth more than inventing a truer one.
+//  Five rungs, named after the gear tiers they belong to, and the names now MATCH:
+//  an Epic helmet is Epic and glows green, a Cosmic is Cosmic and glows gold. That
+//  sounds like the obvious arrangement and it was not the old one. There were six
+//  rungs and eight helmet tiers, so the ladders were shifted a rung apart to fit -
+//  an Epic helmet came out "rare" and wore blue - and every table, price and glow
+//  in the game had to be read through that offset by anybody trying to change one.
+//
+//  What fixed it was deleting two rungs rather than adding one. The orange and red
+//  helmets sat where a loot ladder conventionally has its cheap tiers, and orange
+//  and red are the two hues this map cannot hold: the grass is warm green, the
+//  tokens are gold, a blast is pink-white, and a warm pool under an item landed in
+//  the middle of colours it half matched. Cutting them leaves grey, green, blue,
+//  purple, gold - which is the sequence a player has known for fifteen years, in
+//  the order they already know it, with nothing left over to shift.
 //
 //  It lives in Core with the items rather than in the renderer with the colours,
 //  because it is a fact ABOUT an item - how hard it is to come by and how much it
@@ -15,76 +25,89 @@
 //  nothing alike: a slot in a bag, a glow on the ground, the tile behind a shop
 //  card. What each of those does with it is Render's business.
 //
-//  The gear ladders map straight across. The rest is judged by what it takes to get
-//  one and what it does when you use it: a bandage is the commonest thing on the
-//  map, a medkit is a whole health bar in one press, and a machine is the single
-//  most expensive thing anybody buys.
-//
 
 enum Rarity: Int, Comparable {
     case common = 0
-    case uncommon
-    case rare
     case epic
     case legendary
     case mythical
+    case cosmic
 
     static func < (a: Rarity, b: Rarity) -> Bool { a.rawValue < b.rawValue }
 }
 
 extension ItemType {
 
-    /// The gear ladders sit one rung LOWER than their names suggest, and that is
-    /// deliberate. There are eight helmet tiers and six colours, so something has to
-    /// give, and the honest place to give is the top: an Epic is a good helmet you
-    /// will own several of in a match, and painting it the same purple a game
-    /// normally reserves for its second-best item oversells it. Shifted down, blue
-    /// means Epic, purple means Legendary, orange means Mythical, and gold is
-    /// Cosmic and nothing else - the one thing on the ladder you cannot find, only
-    /// buy, and most matches nobody has.
+    /// The gear ladders map straight across, at last. A helmet's tier IS its rung,
+    /// a blaster is paired with the helmet it turns up beside, and Cosmic is the
+    /// only thing wearing gold - the one rung you cannot find, only buy, and most
+    /// matches nobody has.
     ///
-    /// The supplies are judged by what it takes to get one and what it does. A
-    /// bandage and a chest are things you trip over; a medkit is a whole health bar
-    /// in one press; a machine is the most expensive thing anybody buys.
+    /// The supplies moved UP rather than down when the middle rungs went. They were
+    /// sitting on the two that were deleted, and the choice was between pushing
+    /// them to the bottom - where a medkit on the grass would look exactly like a
+    /// bandage, which is a real thing lost - or letting them climb into the green
+    /// and blue. Climbing is right: those colours are about what a thing is WORTH
+    /// picking up, and a medkit is a whole health bar in one press. It does mean
+    /// green now covers both a good helmet and a good supply, which is the honest
+    /// cost of a shorter ladder and a smaller one than losing the medkit.
     var rarity: Rarity {
         switch self {
+        // The things you trip over.
         case .bandage: return .common
         case .chest:   return .common
-        case .bomb:    return .uncommon
+
+        // A whole health bar in one press, and the only reason to keep a slot free
+        // on the way home.
+        case .medkit:  return .epic
+
+        // The key to somebody else's base, and the entire second half of the game
+        // is behind that door. Worth crossing a map for in a way no helmet is.
+        case .bomb:    return .epic
+
         // A rung above a bomb: rarer in every table it appears in, and the only
         // thing in the game that takes ground away from somebody without taking
         // any of the map with it.
-        case .stink:   return .rare
-        case .medkit:  return .uncommon
-        case .arcade:  return .epic
+        case .stink:   return .legendary
+
+        // The most expensive thing anybody buys, and the safest income on the map
+        // once it is standing behind a wall.
+        case .arcade:  return .mythical
 
         // The power-up carries its own rung - see Perk.rarity - rather than being
-        // given one here. There is one perk and it is Epic, so this line could say
-        // so directly and be correct today; asking the perk keeps the rung a fact
-        // about the ITEM, which is where it was already being read from by the
-        // loot table and the glow.
+        // given one here. There is one perk and it is Mythical, so this line could
+        // say so directly and be correct today; asking the perk keeps the rung a
+        // fact about the ITEM, which is where the loot table and the glow were
+        // already reading it from.
         case .perk(let which): return which.rarity
 
+        // Bare-headed and a Common helmet are the same rung deliberately. There is
+        // no colour below grey, and a helmet nobody would cross a tile for should
+        // not be the thing that introduces one.
         case .helmet(let tier):
             switch tier {
-            case .none, .common, .uncommon: return .common
-            case .rare:      return .uncommon
-            case .epic:      return .rare
-            case .legendary: return .epic
-            case .mythical:  return .legendary
-            case .cosmic:    return .mythical
+            case .none, .common: return .common
+            case .epic:          return .epic
+            case .legendary:     return .legendary
+            case .mythical:      return .mythical
+            case .cosmic:        return .cosmic
             }
 
         // Paired with the helmets rung for rung, the same way the loot tables pair
-        // them - a Blaster 4 turns up alongside an Epic, so they wear the same
+        // them - a Blaster 3 turns up alongside an Epic, so they wear the same
         // colour and a glance at somebody tells you both.
+        //
+        // Six blasters against five rungs, so one rung takes two of them, and it is
+        // the bottom one: Blaster 1 is what everybody respawns holding and Blaster 2
+        // is the first thing any crate hands out. Neither is worth a colour of its
+        // own, and doubling up anywhere higher would have cost a real distinction.
         case .blaster(let tier):
             switch tier {
             case .one, .two: return .common
-            case .three:     return .uncommon
-            case .four:      return .rare
-            case .five:      return .epic
-            case .six:       return .legendary
+            case .three:     return .epic
+            case .four:      return .legendary
+            case .five:      return .mythical
+            case .six:       return .cosmic
             }
         }
     }

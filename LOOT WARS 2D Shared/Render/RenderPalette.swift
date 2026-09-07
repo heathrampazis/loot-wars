@@ -77,32 +77,45 @@ enum RenderPalette {
     static let countBadge = rgb(0xFF, 0x51, 0x7B)
     static let ammoBar   = rgb(0x3E, 0xA1, 0x80)
 
-    // Loot rarity. The convention rather than an invention - grey, green, blue,
-    // purple, orange, gold have meant the same thing in every game with loot in it
-    // for fifteen years, and a player who has seen a purple item knows it beats a
-    // green one without being told.
+    // Loot rarity: grey, green, blue, purple, gold, in that order and no other.
     //
-    // Pitched bright enough to read at hotbar size against a dark slot AND on grass
-    // as a glow under a dropped item, which is why the greens and blues are lifted
-    // off their usual values: the map is already green, and a green that works on
-    // black is invisible on a lawn.
+    // The convention rather than an invention. Those five have meant the same thing
+    // in every game with loot in it for fifteen years, and a player who has seen a
+    // purple item knows it beats a green one without being told.
+    //
+    // There were six, and the two that went were the warm ones. Orange and red are
+    // the hues this map cannot hold - the grass is warm green, the tokens are gold,
+    // a blast is pink-white - so a warm pool under an item landed in the middle of
+    // colours it half matched and read as an effect rather than as a rating. The
+    // ladder is shorter for it and says more.
+    //
+    // Every one of these is pitched to survive a pale yellow-green lawn, which is
+    // not where these colours are usually asked to work. Measured against the floor
+    // tile: green 1.9, blue 1.9, purple 2.6. The greens and blues are lifted well
+    // off their conventional values because a green that reads on a black inventory
+    // screen is invisible on grass.
     private static let rarities: [SKColor] = [
-        rgb(0xC2, 0xC9, 0xCE),   // common - pale steel
-        // Muted on purpose. A saturated green is the brightest thing on a map made
-        // of grass and reads as "look at this", which is the opposite of what the
-        // second rung is for - uncommon should look like something you would pick
-        // up and not think about again.
-        rgb(0x8E, 0xC2, 0x76),   // uncommon - sage
-        rgb(0x46, 0xB1, 0xFF),   // rare - blue
-        rgb(0xB9, 0x6B, 0xFF),   // epic - light violet
-        // Legendary was orange, and orange is the one hue this map cannot hold: the
-        // grass is warm green, the tokens are gold and a blast is pink-white, so an
-        // orange pool under an item sat in the middle of colours it half matched.
-        // A deep violet has the ladder climbing INTO its own colour - epic is the
-        // pale version of it - and it is the only strong shade the map has not
-        // already spent.
-        rgb(0x7A, 0x2B, 0xD1),   // legendary - deep violet
-        rgb(0xFF, 0xD6, 0x3A)    // mythical - gold, and Cosmic gear alone wears it
+        // Pale steel, and deliberately the quietest thing on the map. It barely
+        // separates from the grass, which is the correct amount of attention for a
+        // rung that means "you will find another one in a minute".
+        rgb(0xC2, 0xC9, 0xCE),   // common
+
+        // An emerald rather than the lime the artwork wears. A lime pool sat within
+        // a hair of the floor tile on every measure and vanished under the item it
+        // was meant to be advertising; pulling the hue cool and the value down puts
+        // it at 1.9 against the grass while still reading as the green everybody
+        // expects on the second rung.
+        rgb(0x22, 0xB0, 0x4E),   // epic
+        rgb(0x2E, 0x9B, 0xFF),   // legendary
+        rgb(0xA8, 0x55, 0xF7),   // mythical
+
+        // Gold, and the weakest hue here against this particular map - a yellow
+        // pool on yellow-green grass is the one fight a colour cannot win. That is
+        // exactly why the top rung is also the rung that SPARKLES: Cosmic is found
+        // by its twinkle and confirmed by its colour, rather than the other way
+        // round. Pulled deeper than the token gold for the same reason, and kept as
+        // its own value so the two can drift apart without either being dragged.
+        rgb(0xF5, 0xA3, 0x10)    // cosmic
     ]
 
     static func colour(of rarity: Rarity) -> SKColor {

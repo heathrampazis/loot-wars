@@ -348,9 +348,19 @@ enum GameConfig {
         ///
         /// And every rung is lost on death, which is what stops a bought Cosmic from
         /// simply deciding the match. It is a lead to hold on to, not a purchase.
+        /// Repriced so that the cumulative cost of REACHING each tier is exactly
+        /// what it was: 3 to a Common, 29 to an Epic, 49 to a Legendary, 77 to a
+        /// Mythical, 115 for the whole climb. You buy one rung at a time, so with
+        /// two rungs deleted the survivors have to absorb the prices of the rungs
+        /// they swallowed - an Epic costs 26 rather than 13 because it is now the
+        /// jump that used to be Uncommon, Rare and Epic together.
+        ///
+        /// Doing it this way means the economy did not move at all. The arcade
+        /// payouts, the sell-back share, the bots' saving behaviour and every "is
+        /// this worth it" judgement in the shop were all tuned against those
+        /// cumulative figures, and none of them had to be retuned.
         static let helmetPrices: [HelmetTier: Int] = [
-            .common: 3, .uncommon: 5, .rare: 8,
-            .epic: 13, .legendary: 20, .mythical: 28, .cosmic: 38
+            .common: 3, .epic: 26, .legendary: 20, .mythical: 28, .cosmic: 38
         ]
 
         static let blasterPrices: [BlasterTier: Int] = [
@@ -523,11 +533,16 @@ enum GameConfig {
         /// the last minute filling up with free kills.
         static let respawnFloor: [(progress: Double, helmet: HelmetTier, blaster: BlasterTier)] = [
             (0.50, .common,    .two),
-            (0.70, .uncommon,  .three),
-            // Epic rather than Rare at the top. The floor is what somebody who has
-            // just died fights the last forty seconds in, and a Rare against a map
-            // full of Epics and Legendaries is a spectator.
-            (0.85, .epic,      .four)
+            (0.70, .epic,      .three),
+            // The floor is what somebody who has just died fights the last forty
+            // seconds in, and it has to be measured against what the map is WEARING
+            // by then rather than against a tier name. It used to top out at Epic,
+            // three fifths of the way up a seven-rung ladder; Legendary is three
+            // fifths of the way up a five-rung one. Same floor, renamed by the
+            // ladder underneath it - and still well under what the shop and the
+            // chests are handing out at that point, which is what keeps it a way
+            // back into the fight rather than a reward for dying.
+            (0.85, .legendary, .four)
         ]
 
         /// What a respawn is worth right now, or nil in the opening half when it is
@@ -660,10 +675,14 @@ enum GameConfig {
         /// the shop sells.
         ///
         /// Set at exactly where the loot table stops. Buying a Common for three
-        /// tokens is three tokens not spent on an Epic, and a bot would have found
-        /// that Common in a crate within the minute anyway - so below this line
-        /// spending is worse than saving. Above it there is no other way up.
-        static let buysHelmetsAbove: HelmetTier = .rare
+        /// tokens is three tokens not spent on a Legendary, and a bot would have
+        /// found that Common in a crate within the minute anyway - so below this
+        /// line spending is worse than saving. Above it there is no other way up.
+        ///
+        /// Epic now rather than Rare, and it is the same line in the new ladder's
+        /// terms: the late crate band tops out at Legendary, so Legendary is the
+        /// first rung worth a token.
+        static let buysHelmetsAbove: HelmetTier = .epic
         static let buysBlastersAbove: BlasterTier = .three
 
         /// Seconds before a bot with no bombs left is handed one.
@@ -1199,7 +1218,22 @@ enum GameConfig {
 
         /// Added per tier above that, so the good stuff is likelier to survive -
         /// which is what makes hunting a well-equipped actor worth the risk.
-        static let chancePerTier = 0.08
+        ///
+        /// Up from 0.08 because the helmet ladder lost two rungs, and left alone
+        /// that would have quietly dropped the best helmet in the game from an 80%
+        /// chance of surviving its owner to 67% - the top of the ladder no longer
+        /// reaching the cap simply because there were fewer steps up to it.
+        ///
+        /// The number is what makes both ladders top out AT the cap, and it can be
+        /// one number for both because they are finally the same shape. A helmet
+        /// spans five droppable rungs, Common through Cosmic; a blaster spans five
+        /// droppable rungs, Blaster 2 through Blaster 6. Nobody starts holding a
+        /// Common and everybody starts holding a Blaster 1, which is why the two
+        /// ladders have different lengths on paper and the same length here. The
+        /// old 0.08 hid that: it was sized for the helmet ladder and left the best
+        /// blaster in the game surviving a death two thirds of the time while the
+        /// best helmet managed four fifths, for no reason anybody had chosen.
+        static let chancePerTier = 0.115
 
         static let maximumChance = 0.80
 
@@ -1528,12 +1562,12 @@ enum GameConfig {
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
                 (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
-                (.helmet(.common), 11), (.helmet(.rare), 6),
+                (.helmet(.common), 11), (.helmet(.epic), 6),
                 (.blaster(.two),   11), (.blaster(.three), 6)
             ]),
             (0.35, [
                 (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
-                (.helmet(.rare), 11), (.helmet(.epic), 6),
+                (.helmet(.common), 6), (.helmet(.epic), 11),
                 (.blaster(.three), 11), (.blaster(.four), 6)
             ]),
             (0.65, [

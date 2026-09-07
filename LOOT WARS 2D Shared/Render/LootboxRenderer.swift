@@ -69,7 +69,7 @@ final class LootboxRenderer {
         if box.rare {
             let glow = SKSpriteNode(texture: GlowArt.pool)
             glow.size = CGSize(width: size.width * 2.1, height: size.height * 2.1)
-            glow.color = RenderPalette.colour(of: .rare)
+            glow.color = RenderPalette.colour(of: .legendary)
             glow.colorBlendFactor = 1
             glow.alpha = 0.7
             glow.zPosition = -1

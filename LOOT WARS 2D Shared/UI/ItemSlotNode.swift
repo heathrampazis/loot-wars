@@ -230,15 +230,21 @@ final class ItemSlotNode: SKNode {
     /// The top two rungs breathe. Nothing else does.
     ///
     /// A hotbar where every slot pulses is a hotbar nobody can read, and this game
-    /// has already been through one round of too much animation. But a Legendary
+    /// has already been through one round of too much animation. But a Mythical
     /// turning up is the best thing that happens to anybody in a match, and a
     /// still gold glow says exactly as much as a still grey one. So the movement is
     /// reserved for the two rarities that have earned it, and it is slow - nearly
     /// three seconds a cycle - so it reads as something alight rather than as a
     /// notification asking to be dismissed.
+    ///
+    /// Mythical rather than Legendary, and it is the same two rungs it always was.
+    /// The ladder lost its two middle rungs and the gear names slid up to meet the
+    /// colours, so the top pair is now called Mythical and Cosmic. Left at
+    /// Legendary this would have been three rungs plus the stink bomb - which is
+    /// the "every slot pulses" failure it exists to prevent.
     private func breathe(for rarity: Rarity, dimmed: Bool) {
         glow.removeAction(forKey: "rare")
-        guard rarity >= .legendary, !dimmed else { return }
+        guard rarity >= .mythical, !dimmed else { return }
 
         glow.run(.repeatForever(.sequence([
             .group([.fadeAlpha(to: 1.0, duration: 1.4), .scale(to: 1.12, duration: 1.4)]),
