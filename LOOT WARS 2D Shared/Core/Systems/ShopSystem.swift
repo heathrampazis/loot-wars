@@ -208,24 +208,40 @@ enum ShopSystem {
     static func quickOffer(for actor: Actor, in world: World) -> GameConfig.Shop.Item? {
         guard actor.isAlive else { return nil }
 
-        // Only when it is actually going badly - see GameConfig.Shop.quickHealBelow
-        // for why a scratch is not enough to spend this prompt on.
-        if Double(actor.health) < Double(actor.maxHealth) * GameConfig.Shop.quickHealBelow {
-            let healing = GameConfig.Shop.tabs
-                .flatMap { tab -> [GameConfig.Shop.Item] in
-                    if case .shelf(let items) = tab.stock { return items }
-                    return []
-                }
-                .filter { $0.type.isHealing && canBuy($0.type, actor: actor, in: world) }
+        let shelf = GameConfig.Shop.tabs
+            .flatMap { tab -> [GameConfig.Shop.Item] in
+                if case .shelf(let items) = tab.stock { return items }
+                return []
+            }
+            .filter { canBuy($0.type, actor: actor, in: world) }
 
-            // The biggest one affordable, not the cheapest: this fires when you are
-            // already hurt, and it is offering to fix that.
-            if let best = healing.max(by: { $0.price < $1.price }) { return best }
+        // Hurt, and it is offering to fix that. The biggest healing item you can
+        // afford rather than the cheapest, because this fires when you are already
+        // losing and half a solution is what gets you killed holding change.
+        if Double(actor.health) < Double(actor.maxHealth) * GameConfig.Shop.quickHealBelow,
+           let best = shelf.filter({ $0.type.isHealing }).max(by: { $0.price < $1.price }) {
+            return best
         }
 
-        return upgradeOffers(for: actor)
-            .filter { canBuy($0.type, actor: actor, in: world) }
-            .min { $0.price < $1.price }
+        // Otherwise the ladder, cheapest rung first. This is the purchase people
+        // forget - healing is remembered because bleeding is loud, and a rung is
+        // remembered only if something says so.
+        if let rung = upgradeOffers(for: actor)
+            .filter({ canBuy($0.type, actor: actor, in: world) })
+            .min(by: { $0.price < $1.price }) {
+            return rung
+        }
+
+        // And failing both, anything at all off the shelf, cheapest first.
+        //
+        // This last line is most of why the prompt is ever on screen. A rung costs
+        // between 9 and 40 and a bandage costs 6, so for most of a match the honest
+        // answer to "can I afford the next rung" is no while the answer to "can I
+        // afford anything" is yes - and the prompt used to say nothing through all
+        // of it. Saving towards a rung is a real choice, but it has to be a choice
+        // somebody makes rather than one the interface makes for them by going
+        // quiet.
+        return shelf.min(by: { $0.price < $1.price })
     }
 
     private static func buy(_ type: ItemType, by id: ActorID, in world: World) {

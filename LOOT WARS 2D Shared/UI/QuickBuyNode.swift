@@ -16,10 +16,19 @@
 //  which is what the shop is for. Which offer is Core's answer, not this file's:
 //  see ShopSystem.quickOffer.
 //
-//  It also shows itself only on a CHANGE. Left to appear whenever something was
-//  affordable it would be permanently on screen, which is the same mistake the
-//  greyed-out hotbar made in the other direction: a signal that is always on stops
-//  being a signal.
+//  It STAYS UP for as long as there is something you can afford, and that is a
+//  reversal. The first version appeared for six seconds on a change and then hid
+//  for twenty, on the theory that a signal which is always on stops being a signal.
+//  True of a warning; not true of a shop. Nobody ignores a price tag for being
+//  permanently attached to the thing it is pricing - they ignore it until they want
+//  the thing, which is exactly the moment it has to still be there. The timed
+//  version was reliably absent at that moment, and the tokens went unspent.
+//
+//  What keeps it from becoming wallpaper is that it is never idle: the offer
+//  changes as the match does. It is a rung of the ladder while you are healthy and
+//  the biggest healing item you can afford the moment you drop below the line the
+//  hotbar uses for the same word, so a glance at it answers "what should I do with
+//  my tokens right now" rather than "what is for sale".
 //
 
 import SpriteKit
@@ -59,11 +68,13 @@ final class QuickBuyNode: SKNode {
     /// prompt that is already leaving.
     private(set) var awaiting = false
 
-    /// True for a while after you take an offer.
+    /// True for a moment after you take an offer.
     ///
-    /// Without it, buying the bandage you were offered while still hurt and still
-    /// able to afford another one puts the same prompt straight back on screen -
-    /// the prompt pestering you for having done what it asked.
+    /// Just long enough for the green confirmation to be seen. It used to be twelve
+    /// seconds, to stop the prompt pestering you for having done what it asked;
+    /// with a prompt that stays up anyway, re-offering is not pestering, it is the
+    /// prompt doing its job - if you are still hurt and can still afford a bandage,
+    /// a bandage is still the right answer.
     private var cooling = false
 
     override init() {
@@ -234,43 +245,54 @@ final class QuickBuyNode: SKNode {
         dismiss()
         cooling = true
         run(.sequence([
-            .wait(forDuration: GameConfig.Shop.quickBuySeconds * 2),
+            .wait(forDuration: GameConfig.Shop.quickBuySettle),
             .run { [weak self] in self?.cooling = false }
         ]), withKey: "cooling")
     }
 
     private func show(_ item: GameConfig.Shop.Item) {
+        // Already up, and the offer has simply changed underneath it - which
+        // happens every time your health crosses the line or you climb a rung. The
+        // card is re-dressed in place rather than popped again: a prompt that
+        // jumps every time the answer changes reads as a notification arriving,
+        // and this one has not gone anywhere.
+        let swapping = !isHidden && live
+
         offer = item.type
         live = true
 
+        removeAction(forKey: "life")
+        isHidden = false
+
+        guard swapping else {
+            dress(item)
+            alpha = 0
+            setScale(0.9)
+            run(.group([.fadeIn(withDuration: 0.14), .scale(to: 1, duration: 0.14)]),
+                withKey: "life")
+            return
+        }
+
+        // Through the middle rather than a cut, so the eye follows one card
+        // changing its mind instead of catching two.
+        icon.removeAction(forKey: "swap")
+        icon.run(.sequence([
+            .fadeAlpha(to: 0, duration: 0.09),
+            .run { [weak self] in self?.dress(item) },
+            .fadeAlpha(to: 1, duration: 0.12)
+        ]), withKey: "swap")
+    }
+
+    /// The picture, the price and the colour behind them. Split out of show()
+    /// because a swap has to change all three halfway through a fade, and an
+    /// arrival has to change them before one.
+    private func dress(_ item: GameConfig.Shop.Item) {
         glow.color = RenderPalette.colour(of: item.type.rarity)
 
         let texture = ItemArt.texture(for: item.type)
         icon.texture = texture
         icon.size = ItemArt.size(of: texture, fittingInto: 34)
         price.text = "\(item.price)"
-
-        removeAction(forKey: "life")
-        isHidden = false
-        alpha = 0
-        setScale(0.9)
-
-        // Up quickly, held, then away by itself. The wait comes out of the config
-        // so the prompt and the button that nudges alongside it are tuned together.
-        run(.sequence([
-            .group([.fadeIn(withDuration: 0.14), .scale(to: 1, duration: 0.14)]),
-            .wait(forDuration: GameConfig.Shop.quickBuySeconds),
-            .run { [weak self] in self?.live = false },
-            .fadeOut(withDuration: 0.25),
-            .hide(),
-
-            // And then it is forgotten, so the same offer counts as new again and
-            // is put back in front of you. An upgrade you have been able to afford
-            // for half a minute is one you have not noticed - see
-            // GameConfig.Shop.quickBuyReappear.
-            .wait(forDuration: GameConfig.Shop.quickBuyReappear),
-            .run { [weak self] in self?.offer = nil }
-        ]), withKey: "life")
     }
 
 }

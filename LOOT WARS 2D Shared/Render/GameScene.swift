@@ -603,9 +603,15 @@ final class GameScene: SKScene {
     ///
     /// Both hang off the same question - ShopSystem.quickOffer - so the prompt and
     /// the nudge can never disagree about whether there is anything to buy. The
-    /// prompt appears on a CHANGE and goes by itself; the button waves on a timer,
-    /// and only while the shop is shut and something is affordable, so neither is
-    /// on screen often enough to become wallpaper.
+    /// prompt now STAYS while the answer is yes, changing what it offers as the
+    /// match changes; the button waves on a timer, and only while the shop is shut.
+    ///
+    /// Which is why the wave now holds off while the prompt is up. They were tuned
+    /// as a pair when the prompt came and went - the button covered the gaps. With
+    /// the prompt permanent the button waving at it every fourteen seconds is the
+    /// same message twice, and the quieter of the two is the one that should give
+    /// way. The wave is left for the case it is actually needed in: something
+    /// affordable that the prompt is not showing, because a panel is open over it.
     private func updateQuickBuy(with world: World) {
         guard !world.isOver,
               !shopPanel.isOpen,
@@ -619,6 +625,8 @@ final class GameScene: SKScene {
         quickBuy.update(with: offer)
 
         guard offer != nil else { return }
+        guard quickBuy.isHidden else { return }
+
         if lastUpdateTime >= nextNudge {
             nextNudge = lastUpdateTime + GameConfig.Shop.nudgeInterval
             shopButton.nudge()

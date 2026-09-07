@@ -260,29 +260,35 @@ enum GameConfig {
             }
         }
 
-        /// How long the quick-buy prompt stays up before getting out of the way.
-        static let quickBuySeconds: Double = 6
+        /// How long the quick-buy prompt sits still after a purchase before it is
+        /// allowed to offer something else.
+        ///
+        /// The prompt no longer times out - it stays up for as long as there is
+        /// something you can afford - so this is not a lifespan any more, it is
+        /// just long enough for the green confirmation to be seen. Without it,
+        /// buying a bandage swaps the card to the next offer on the following
+        /// frame and the celebration plays on an item you did not buy.
+        static let quickBuySettle: Double = 0.9
 
-        /// How hurt you have to be before the prompt offers a bandage instead of a
+        /// How hurt you have to be before the prompt offers healing instead of a
         /// rung of the ladder.
         ///
-        /// Half a bar, not a scratch. The prompt exists to push the LADDER - that
-        /// is the thing people forget to spend on, and the thing that decides
-        /// fights - and offering a bandage the moment anybody grazes you would
-        /// spend the prompt's whole budget of attention on the one purchase you
-        /// were always going to remember to make while bleeding.
-        static let quickHealBelow: Double = 0.5
-
-        /// How long before an offer you ignored is put in front of you again.
+        /// The same seven tenths as Player.tapHealBelow, and they should never
+        /// drift apart: that is the line where the hotbar starts ringing the heal
+        /// in your bag green, and this is the line where the shop starts offering
+        /// to sell you one. Two different numbers for "you are low" is the game
+        /// disagreeing with itself about the only thing the player is thinking
+        /// about at that moment.
         ///
-        /// It comes BACK, and that is the point. An upgrade you cannot afford yet
-        /// is announced once and forgotten; one you have been able to afford for
-        /// half a minute is one you have not noticed, and noticing is the entire
-        /// job of this prompt.
-        static let quickBuyReappear: Double = 20
+        /// It was half a bar, chosen to protect the prompt's budget of attention
+        /// back when the prompt appeared for six seconds at a time and had a budget
+        /// to protect. It does not any more.
+        static let quickHealBelow: Double = 0.7
 
         /// How often the shop button nudges itself while you can afford something
-        /// and have not been in. Long enough not to nag.
+        /// and have not been in. Long enough not to nag - and it now holds off
+        /// entirely while the quick-buy prompt is up, since the prompt is saying
+        /// the same thing in more detail.
         static let nudgeInterval: Double = 14
 
         /// What things NOT on the shelf are notionally worth, for selling back.
