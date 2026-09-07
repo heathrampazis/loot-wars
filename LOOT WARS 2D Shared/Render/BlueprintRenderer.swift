@@ -26,9 +26,18 @@
 //  so nothing hops, and what you see is the piece of wall you could actually reach
 //  from where you are standing.
 //
-//  It is drawn as the wall it would become, because a stand-in shape teaches a
-//  player to look for something the game never puts down. A tap pictogram was tried
-//  on top of it and came off again: on a screen this busy it was a third thing to
+//  A DARK SQUARE, not a ghost of the wall. It was drawn as the block it would
+//  become, on the argument that a stand-in shape teaches a player to look for
+//  something the game never puts down - which is a fair argument for one tile and
+//  falls apart at nine. A row of translucent team-coloured blocks reads as a row of
+//  blocks that are already there and slightly broken, so the base looks finished
+//  and faulty rather than unfinished. It also put a second saturated version of the
+//  team colour on ground that is already tinted in it.
+//
+//  A square a shade darker than the claim it sits on has no such problem: it is
+//  plainly a HOLE rather than a thing, it cannot be mistaken for masonry, and nine
+//  of them in a row read as the gap the wall has not filled yet. A tap pictogram was
+//  tried on top and came off again - on a screen this busy it was a third thing to
 //  read on a tile that already had two.
 //
 //  The breathing is arithmetic rather than SKActions, and it has to be. These nodes
@@ -45,10 +54,16 @@ final class BlueprintRenderer {
     /// On the ground with the claim tint, under everything that stands on it.
     let node = SKNode()
 
-    /// How faint a ghost gets at the bottom and the top of its breath, before the
+    /// How faint a marker gets at the bottom and the top of its breath, before the
     /// distance fade is applied on top.
-    private static let dimmest: CGFloat = 0.26
-    private static let brightest: CGFloat = 0.60
+    ///
+    /// Lower than the old team-coloured ghost needed, because this is a dark square
+    /// rather than a bright one: black at 0.4 over a tinted claim is about as much
+    /// of a step down from the ground as the ground's own checkerboard is, which is
+    /// the level where it reads as a shadow on the grass rather than as an object
+    /// lying on it.
+    private static let dimmest: CGFloat = 0.16
+    private static let brightest: CGFloat = 0.40
 
     /// How far from your feet a tile is still worth showing, in tiles.
     ///
@@ -141,6 +156,10 @@ final class BlueprintRenderer {
     }
 
     /// Built once per team, on the first frame anybody needs it.
+    /// Keyed on the team even though nothing about the drawing depends on it any
+    /// more - a black square is a black square. Kept because the team is still what
+    /// decides the pool has to be thrown away and rebuilt, and because a colourless
+    /// marker is a decision that could be reversed.
     private func build(for team: TeamID) {
         guard builtFor != team else { return }
         builtFor = team
@@ -151,12 +170,14 @@ final class BlueprintRenderer {
         let side = GridGeometry.tileSize
 
         for _ in 0..<BlueprintRenderer.maximum {
-            let wall = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
-                                    size: CGSize(width: side, height: side))
-            wall.zPosition = 1
-            wall.isHidden = true
-            node.addChild(wall)
-            pool.append(wall)
+            // Inset by a point, so a run of them reads as separate squares rather
+            // than as one dark band with a wall-shaped hole in the middle.
+            let slot = SKSpriteNode(color: .black,
+                                    size: CGSize(width: side - 2, height: side - 2))
+            slot.zPosition = 1
+            slot.isHidden = true
+            node.addChild(slot)
+            pool.append(slot)
         }
     }
 
@@ -177,6 +198,11 @@ final class BlueprintRenderer {
         guard let team = builtFor else { return }
 
         let side = GridGeometry.tileSize
+
+        // The real block, briefly, growing out of where the dark square was. The
+        // marker is a hole and the wall is the thing that fills it, so the flourish
+        // has to be the WALL - popping another dark square would animate the
+        // absence rather than the arrival.
         let flourish = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
                                     size: CGSize(width: side, height: side))
 
