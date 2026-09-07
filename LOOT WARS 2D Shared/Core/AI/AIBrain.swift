@@ -1168,9 +1168,16 @@ enum AIBrain {
 
     /// A tile to stand a carried chest on, right now, from where the bot stands.
     private static func chestToPlace(actor: Actor, in world: World) -> GridPoint? {
-        // Not until the wall is shut. Anything standing in a half-built base is free
-        // loot for whoever wanders past, and nobody should be able to help
-        // themselves to a base they have not had to break into.
+        // Not until the wall is shut, and this is now the ONLY place that rule
+        // lives. ChestSystem will happily stand a chest up in an open base - it is
+        // the player's base and their decision - but a bot doing it would be
+        // leaving free loot for whoever wandered past, and a map where you can walk
+        // into a half-built base and help yourself is a map with no reason to own
+        // a bomb.
+        //
+        // A preference rather than a law is the right shape for it: the rule that
+        // protects the raiding loop is about what the seven bots DO, not about what
+        // the rules permit.
         guard !world.baseIsBreached(actor.team) else { return nil }
         guard let tile = world.nextChestTile(for: actor.team,
                                              near: actor.position) else { return nil }

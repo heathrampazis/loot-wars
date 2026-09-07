@@ -185,6 +185,24 @@ enum CombatSystem {
                  at: actor.position, in: world)
         }
 
+        // And half the purse hits the grass.
+        //
+        // Spilled rather than deleted, which is the whole point of it - see
+        // GameConfig.Drops.tokenShare. It pays the person who killed you, it is
+        // visible to both of you, and it turns unspent tokens into something you
+        // are carrying rather than something you have. Bank it by spending it.
+        //
+        // One purse rather than a scatter: a pile of coins where a person was
+        // reads as what it is, and the ground-item renderer already draws anything
+        // worth five or more as a golden token, so a rich death looks rich.
+        let spilled = Int((Double(actor.tokens) * GameConfig.Drops.tokenShare)
+            .rounded(.down))
+
+        if spilled > 0 {
+            actor.tokens -= spilled
+            drop(.token(spilled), chance: 1, at: actor.position, in: world)
+        }
+
         // The bag goes with the body.
         //
         // Everything carried is lost, and only SOME of it lands where somebody can

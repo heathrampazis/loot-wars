@@ -43,15 +43,17 @@ enum ChestSystem {
     static func canPlace(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
         guard actor.inventory.firstSlot(holding: .chest) != nil else { return false }
 
-        // Not until the wall is shut, and this is the rule the whole raiding loop
-        // rests on. Furniture standing in a half-built base is loot anybody can
-        // walk up to without spending a bomb on it, which makes the wall
-        // decorative and the bomb pointless. Build it, THEN fill it.
+        // No requirement that the wall be shut, and that is a deliberate reversal.
         //
-        // It holds for a hole as well as for a base that was never finished: a
-        // raid is only worth running if what it opens cannot simply be topped up
-        // while it is still open.
-        guard !world.baseIsBreached(actor.team) else { return false }
+        // It was a hard rule here for one commit, to stop anybody strolling into a
+        // half-built base and helping themselves. But the thing that actually stops
+        // that is the BOTS not putting furniture out early - which is where the rule
+        // now lives, in AIBrain, as a preference rather than a law. Down here it was
+        // also telling the player what to do with their own base, and refusing to
+        // let somebody set a chest down in a base they have chosen not to finish is
+        // a rule protecting them from a decision that is theirs to make. Leave it
+        // out in the open and somebody will take it; that is the deal, and it is a
+        // legible one.
 
         // The same ground rules a wall answers to: your own claim, nothing already
         // there. A chest is furniture in your base, not something you leave lying
@@ -103,13 +105,20 @@ enum ChestSystem {
             //
             // The owner has to shut the base before it starts paying again, which
             // is what stops a raider standing in a broken base collecting an item
-            // every half minute forever. Repair is now the thing that turns the
-            // supply back on, rather than a chore with no reward attached.
-            guard !world.baseIsBreached(chest.owner) else {
-                chest.restockTimer = GameConfig.Chest.restockInterval
-                world.chests[id] = chest
-                continue
-            }
+            // every half minute forever. Repair is the thing that turns the supply
+            // back on, rather than a chore with no reward attached.
+            //
+            // PAUSED, not reset, and that one word was the whole "enemy bases never
+            // have anything in them" problem. This used to shove the timer back up
+            // to the full restockInterval on every frame the wall was open - so
+            // restockAfterRaid, the short wait a robbed chest is supposed to get,
+            // was overwritten before it could ever tick. It was unreachable by
+            // construction: you cannot empty a chest without breaching the base
+            // that holds it, so the short clock never once ran in a real match. The
+            // actual turnaround was the grace period, plus the walk home, plus the
+            // repair, plus a full 28 seconds - and then another 28 for the second
+            // item, and another for the third.
+            guard !world.baseIsBreached(chest.owner) else { continue }
 
             chest.restockTimer -= dt
 
@@ -128,6 +137,14 @@ enum ChestSystem {
 
                 if held < GameConfig.Chest.restockCeiling {
                     add(oneItemTo: &chest, in: world)
+
+                    // A chest stripped to the boards puts back TWO on its first
+                    // tick rather than one. One item in a chest is not a reason to
+                    // cross a map and blow a hole in something, so a base coming
+                    // back from a raid one item at a time spent most of its
+                    // recovery not being worth raiding - which is the same as still
+                    // being empty, just with a longer wait attached.
+                    if held == 0 { add(oneItemTo: &chest, in: world) }
                 } else {
                     refresh(&chest, in: world)
                 }

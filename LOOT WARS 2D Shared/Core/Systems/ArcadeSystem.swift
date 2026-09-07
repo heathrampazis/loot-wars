@@ -30,15 +30,17 @@ enum ArcadeSystem {
     /// ones where the spawn tile sits in the only gap.
     static func canPlace(at origin: GridPoint, by actor: Actor, in world: World) -> Bool {
 
-        // Not until the wall is shut, and this is the rule the whole raiding loop
-        // rests on. Furniture standing in a half-built base is loot anybody can
-        // walk up to without spending a bomb on it, which makes the wall
-        // decorative and the bomb pointless. Build it, THEN fill it.
+        // No requirement that the wall be shut, and that is a deliberate reversal.
         //
-        // It holds for a hole as well as for a base that was never finished: a
-        // raid is only worth running if what it opens cannot simply be topped up
-        // while it is still open.
-        guard !world.baseIsBreached(actor.team) else { return false }
+        // It was a hard rule here for one commit, to stop anybody strolling into a
+        // half-built base and helping themselves. But the thing that actually stops
+        // that is the BOTS not putting furniture out early - which is where the rule
+        // now lives, in AIBrain, as a preference rather than a law. Down here it was
+        // also telling the player what to do with their own base, and refusing to
+        // let somebody set a chest down in a base they have chosen not to finish is
+        // a rule protecting them from a decision that is theirs to make. Leave it
+        // out in the open and somebody will take it; that is the deal, and it is a
+        // legible one.
         guard actor.inventory.firstSlot(holding: .arcade) != nil else { return false }
 
         // One to a base. Two machines in the same walls would double an income that

@@ -1286,9 +1286,46 @@ enum GameConfig {
         /// minute to an engaged player and a full one to a strong player - and it
         /// WIDENS the gap between them, because it lets people keep what they
         /// earned rather than handing anybody anything.
+        /// Steeper now, on both ladders. Two rungs off a seven-rung helmet ladder
+        /// was 29% of the climb; the ladder is five rungs and the same two would
+        /// have been 40%, so the setback had already grown without anybody choosing
+        /// it - and the complaint is that dying still does not cost enough. Three
+        /// early and two late puts a Cosmic back to an Epic for a death in the
+        /// opening two thirds, and the blaster now goes with it rather than trailing
+        /// a rung behind: the two ladders are the same length and the same price, so
+        /// there is no longer any reason for them to be lost at different rates.
+        ///
+        /// The taper stays, and it is not softness. Late deaths are the ones there
+        /// is no time to recover from, and a match whose last minute is fought by
+        /// people who have just been knocked to the bottom of the ladder gets less
+        /// interesting exactly as it should be getting more so.
         static func rungsLost(at progress: Double) -> (helmet: Int, blaster: Int) {
-            progress >= 0.70 ? (helmet: 1, blaster: 1) : (helmet: 2, blaster: 1)
+            progress >= 0.70 ? (helmet: 2, blaster: 1) : (helmet: 3, blaster: 2)
         }
+
+        /// The share of your unspent tokens that spills on the ground when you die.
+        ///
+        /// Half, and it SPILLS rather than evaporating. Tokens that simply vanished
+        /// would be a punishment nobody sees land - a number in the corner quietly
+        /// halving while you are watching the respawn clock - and a punishment you
+        /// cannot see teaches nothing. A purse on the grass is legible from both
+        /// ends: the person who killed you gets paid for it, and you get to watch
+        /// somebody else pick your money up.
+        ///
+        /// Half rather than all of it. The full wipe is the version worth trying if
+        /// this is not enough - it is this one number - but it has a failure mode
+        /// worth naming first: with nothing left to lose, the correct play after
+        /// every death is to spend down to zero the moment you have five tokens,
+        /// and the ladder stops being something anybody saves for. Half keeps
+        /// saving towards a Cosmic a real option and still makes carrying forty
+        /// tokens into a fight a decision rather than an oversight.
+        ///
+        /// Points are deliberately NOT touched. Score is the win condition, and
+        /// taking it away on death compounds in the wrong direction: whoever is
+        /// losing dies most, so they would lose most score, and the match would be
+        /// decided in its first two minutes. It also punishes fighting, in a game
+        /// whose whole second half is meant to be fighting.
+        static let tokenShare: Double = 0.5
 
         /// The odds that one item off a carried healing stack lands on the ground.
         ///
@@ -1552,15 +1589,24 @@ enum GameConfig {
         /// keep happening is bases being worth a second visit, and both the old
         /// rules pushed the other way - one removed the chest, the other made the
         /// wait long enough that nobody would have come back for what was in it.
-        static let restockAfterRaid: Double = 11
+        static let restockAfterRaid: Double = 8
 
         /// Seconds between a raided bot chest putting one item back.
         ///
         /// Slow enough that emptying one still means something - a raider gets the
         /// lot and the next caller finds bare boards - and quick enough that the
-        /// same base is worth a second visit later in a match. At this rate a
-        /// stripped chest is back to a useful two items after about a minute.
-        static let restockInterval: Double = 28
+        /// same base is worth a second visit later in a match.
+        ///
+        /// Halved to 14, and the honest note is that this number was never the one
+        /// doing the damage: the restock clock was being reset every frame while
+        /// the wall was open, so a raided chest waited a full interval AFTER the
+        /// repair no matter what this said. With that fixed, 28 would have been
+        /// about right - but the raid loop wants to turn over faster than that, so
+        /// it is 14 and the first tick after a raid puts back two items rather than
+        /// one. A robbed base is worth calling on again about half a minute later
+        /// instead of ninety seconds later, which is the difference between a map
+        /// with places to break into and a map of empty rooms.
+        static let restockInterval: Double = 14
 
         /// The most a chest will refill itself to. Still under what a fresh one
         /// holds, so the first raid on a base is always the best one.
