@@ -229,6 +229,20 @@ final class World {
 
     func claim(for team: TeamID) -> BaseClaim? { claims[team] }
 
+    /// Every tile of a team's own claim, for when there is no enclosure to search.
+    private func claimTiles(of team: TeamID) -> Set<GridPoint> {
+        guard let claim = claims[team] else { return [] }
+
+        var tiles: Set<GridPoint> = []
+        for col in 0..<claim.size {
+            for row in 0..<claim.size {
+                tiles.insert(GridPoint(col: claim.origin.col + col,
+                                       row: claim.origin.row + row))
+            }
+        }
+        return tiles
+    }
+
     /// The next wall this team should lay, or nil once the base is finished.
     ///
     /// Walks the plan in order and takes the first tile that is still free, so a
@@ -425,17 +439,22 @@ final class World {
     /// wall is not a placement. Walks the region in a fixed order so the same seed
     /// puts machines in the same places.
     func nextArcadeOrigin(for team: TeamID, near position: Vec2) -> GridPoint? {
-        guard let layout = baseLayouts[team] else { return nil }
+        // The same two-step as nextChestTile, and for the same reason: inside the
+        // walls once there are walls, anywhere on your own ground before that.
+        let room = enclosure(of: team).room
+        let ground = room.isEmpty
+            ? (baseLayouts[team]?.region ?? claimTiles(of: team))
+            : room
 
         var best: GridPoint?
         var shortest = Double.greatestFiniteMagnitude
 
-        for origin in layout.region.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
+        for origin in ground.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
             let machine = Arcade(id: ArcadeID(-1), origin: origin, owner: team, emitTimer: 0)
 
             var fits = true
             for tile in machine.tiles {
-                guard layout.region.contains(tile),
+                guard ground.contains(tile),
                       tile != claims[team]?.centreTile,
                       map[tile] == .floor,
                       !structureIntersects(Box(tile: tile)),
@@ -503,14 +522,22 @@ final class World {
     /// walls. Searching the claim put chests on that ground - protected by nothing,
     /// free to anyone who strolled past, and no reason to raid anybody.
     func nextChestTile(for team: TeamID, near position: Vec2) -> GridPoint? {
-        guard let layout = baseLayouts[team] else { return nil }
+        // Inside the walls if there are any, anywhere on your own ground if not.
+        //
+        // The fallback is not a nicety. Chests and machines can be set down in an
+        // unfinished base on purpose - it is your base and your risk - so a search
+        // that only ever answered with enclosed ground would refuse to suggest
+        // anywhere at all until the wall was shut, which is the rule that was
+        // deliberately removed.
+        let room = enclosure(of: team).room
+        let ground = room.isEmpty ? claimTiles(of: team) : room
 
         var best: GridPoint?
         var shortest = Double.greatestFiniteMagnitude
 
         // Sorted, because Set iteration order is not stable and two runs of the
         // same seed have to put the chest in the same place.
-        for tile in layout.region.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
+        for tile in ground.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
             guard tile != claims[team]?.centreTile else { continue }
             guard map[tile] == .floor else { continue }
             guard !structureIntersects(Box(tile: tile)) else { continue }
@@ -553,6 +580,9 @@ final class World {
     /// one-off award is paid once and repairs are paid as repairs.
     private var haveSealed: Set<TeamID> = []
 
+    /// One enclosure per team, good until the map changes under it.
+    private var enclosures: [TeamID: (revision: Int, value: BaseEnclosure)] = [:]
+
     /// Called when a team's wall goes from having a hole in it to not having one.
     ///
     /// The award lives here rather than in BuildSystem because it is about the
@@ -581,9 +611,14 @@ final class World {
     ///   to what was actually won.
     @discardableResult
     private func furnish(_ team: TeamID) -> Int {
-        guard let layout = baseLayouts[team] else { return 0 }
+        // Sized on the room that was actually walled in, not on the plan's. A
+        // player who built their own smaller shape gets the chests that room is
+        // worth, and one who walled in more than the plan asked for gets paid for
+        // it - which is the whole point of letting anybody build any shape.
+        let room = enclosure(of: team).room
+        guard !room.isEmpty else { return 0 }
 
-        let wanted = GameConfig.Base.chestsOnSeal(forRoomOf: layout.region.count)
+        let wanted = GameConfig.Base.chestsOnSeal(forRoomOf: room.count)
         let centre = claims[team]?.centreTile.center ?? .zero
         var placed = 0
 
@@ -667,8 +702,43 @@ final class World {
     /// unfinished base and a bombed one look identical from here. Telling them
     /// apart needs to know the base was once finished, and that is a thing a bot
     /// remembers - see AIState.baseWasComplete.
+    /// Whether this team's base is open.
+    ///
+    /// Asked of the WALLS now rather than of the generated plan - see BaseEnclosure
+    /// for why the plan was the wrong authority. The plan is still what the bots
+    /// build towards and still what nextBuildTile walks; it is simply no longer
+    /// what decides whether anybody succeeded.
     func baseIsBreached(_ team: TeamID) -> Bool {
-        nextBuildTile(for: team) != nil
+        !enclosure(of: team).isSealed
+    }
+
+    /// The flood fill, cached against the map.
+    ///
+    /// Asked several times a frame per team - by the arcade for its rate, its bank
+    /// and its token lifetime, by every chest deciding whether to restock, by the
+    /// bots, by the build markers - so it is worked out once per change to the map
+    /// and handed out until something is built or blown up. mapRevision is a
+    /// complete key for it: the only inputs are tiles and trees, and trees do not
+    /// move.
+    func enclosure(of team: TeamID) -> BaseEnclosure {
+        if let held = enclosures[team], held.revision == mapRevision { return held.value }
+
+        guard let claim = claims[team] else {
+            return BaseEnclosure(room: [], wall: [], frontier: [])
+        }
+
+        let found = BaseEnclosure.compute(
+            claim: claim,
+            solid: { [self] point in
+                guard map.contains(point) else { return true }
+                if map.isOccupied(point) { return true }
+                return trees.contains { $0.overlaps(point) }
+            },
+            ownWall: { [self] point in map[point].blockOwner == team }
+        )
+
+        enclosures[team] = (mapRevision, found)
+        return found
     }
 
     /// Counts down to the next payment for standing bases - see VaultSystem.

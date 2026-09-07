@@ -17,6 +17,13 @@
 //  your side, as it is in the first. A tutorial that expires takes the map away
 //  with it.
 //
+//  IT FOLLOWS WHAT YOU BUILT, not a plan you never agreed to. The generated
+//  rectangle is a suggestion for somebody who has laid nothing yet; the moment
+//  there is a wall of your own on the ground, the markers point at the tiles that
+//  CONTINUE it - see BaseEnclosure.frontier. A base is now whatever shape actually
+//  encloses ground, so there is no longer a correct outline to be shown, and the
+//  next-best thing is honest: here is where a block would extend what you have.
+//
 //  A RUN, NOT AN OUTLINE. Every buildable tile within a few paces, and no further,
 //  which is the difference between the two failures this has already been through.
 //  Outlining the whole plan draws a box round the base that reads as scenery: it is
@@ -101,16 +108,33 @@ final class BlueprintRenderer {
             return
         }
 
+        // Nothing to point at once the base is shut, and this is what makes the
+        // markers adaptive rather than merely permanent. A sealed base has no gap,
+        // so any tile touching its wall is on the OUTSIDE of it - marking those
+        // would be inviting the player to build a second wall round the first.
+        // Blow a hole in it and the hole is a gap again, and the markers come back
+        // exactly where the repair is needed.
+        let base = world.enclosure(of: player.team)
+        guard !base.isSealed else {
+            retire()
+            return
+        }
+
         build(for: player.team)
         phase += dt
 
-        // Every tile of the plan still waiting for a wall, near enough to walk to.
+        // Where a block would extend your wall - or, before there is a wall, the
+        // generated rectangle as a first suggestion.
         //
         // Sorted by distance only to decide what to drop when there are more than
         // the pool holds; the SET is chosen by the radius, which is what stops the
         // run reshuffling itself under your feet as you move.
-        let plan = world.baseLayouts[player.team]?.tiles ?? []
-        let near = plan
+        let frontier = base.frontier
+        let candidates = frontier.isEmpty
+            ? (world.baseLayouts[player.team]?.tiles ?? [])
+            : Array(frontier)
+
+        let near = candidates
             .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
             .map { (tile: $0, away: distance(from: player.feet, to: $0)) }
             .filter { $0.away <= BlueprintRenderer.reach }

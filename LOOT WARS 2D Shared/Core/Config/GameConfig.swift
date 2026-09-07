@@ -408,6 +408,22 @@ enum GameConfig {
         static let sealedTokens = 8
         static let resealed = 20
 
+        /// The least ground a wall has to enclose before it counts as a base.
+        ///
+        /// The only thing standing between free-form building and a nine-wall phone
+        /// box. A three-by-three ring encloses one tile for eight blocks, which
+        /// would be a third of the cost of a real base for all of the income, so
+        /// there has to be a floor somewhere.
+        ///
+        /// Sixteen - a four-by-four room - because the generated plans enclose 25
+        /// to 49 and the point of allowing any shape at all is that somebody can
+        /// build SMALLER and stranger than the plan if they want to. Sixteen is
+        /// meaningfully cheaper than the plan and still unmistakably a base. What
+        /// stops small being strictly better is the chest count below: a room that
+        /// size gets one chest where a seven-by-seven gets three, so building small
+        /// buys you a quicker wall and less to put in it.
+        static let minimumRoom = 16
+
         /// How many chests appear the moment a wall closes, by the size of the room
         /// it closed round.
         ///

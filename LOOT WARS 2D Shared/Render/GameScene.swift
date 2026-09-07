@@ -745,6 +745,26 @@ final class GameScene: SKScene {
     ///
     /// Note what is NOT here: the money. The token counter animates on any change
     /// it sees, so the price leaving your purse is already drawn.
+    /// A ring of tiles put into the order light should travel round them.
+    ///
+    /// By angle from the middle, which is the one ordering that works for a shape
+    /// nobody specified: a rectangle, an L, a room with a tree for one side. Sorted
+    /// rather than walked, so a wall that is two tiles thick somewhere - or that has
+    /// an awkward spur - still sweeps once round instead of stalling where the
+    /// walk would have had to choose a direction.
+    private static func sweptRound(_ ring: Set<GridPoint>) -> [GridPoint] {
+        let count = Double(ring.count)
+        let mid = ring.reduce(Vec2.zero) { running, tile in
+            Vec2(x: running.x + Double(tile.col) / count,
+                 y: running.y + Double(tile.row) / count)
+        }
+
+        return ring.sorted {
+            atan2(Double($0.row) - mid.y, Double($0.col) - mid.x)
+                < atan2(Double($1.row) - mid.y, Double($1.col) - mid.x)
+        }
+    }
+
     private func dispatch(_ events: [WorldEvent], in world: World) {
         for event in events {
             switch event {
@@ -778,8 +798,12 @@ final class GameScene: SKScene {
                 // seeing somebody else's light go round is the game telling you
                 // where to take your next bomb, which is information rather than
                 // noise. It is off-camera most of the time anyway.
-                guard let plan = world.baseLayouts[team]?.tiles else { break }
-                effectsRenderer.seal(plan, chests: chests)
+                // The wall AS BUILT, swept round in ring order rather than in the
+                // order a plan would have had it laid - because with any shape
+                // allowed there may not have been a plan involved at all.
+                let ring = world.enclosure(of: team).wall
+                guard !ring.isEmpty else { break }
+                effectsRenderer.seal(GameScene.sweptRound(ring), chests: chests)
 
             case .vault(let points, let team, let position):
                 // Only your own base, and only when you can see it. Somebody else's
