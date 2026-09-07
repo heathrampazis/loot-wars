@@ -772,6 +772,15 @@ final class GameScene: SKScene {
                 // burst that says it arrived, which state alone cannot show.
                 effectsRenderer.burst(at: position)
 
+            case .sealed(let team, let chests):
+                // Everybody's, not only yours. Eight bases close over a match and
+                // each one is a place that has just become worth breaking into -
+                // seeing somebody else's light go round is the game telling you
+                // where to take your next bomb, which is information rather than
+                // noise. It is off-camera most of the time anyway.
+                guard let plan = world.baseLayouts[team]?.tiles else { break }
+                effectsRenderer.seal(plan, chests: chests)
+
             case .vault(let points, let team, let position):
                 // Only your own base, and only when you can see it. Somebody else's
                 // wall paying out is a number over a base you are not standing in,
@@ -1603,8 +1612,10 @@ extension GameScene {
             hasBuilt = true
             wallsBuilt += 1
 
-            // Learned. The ghosts read this the next frame and stand down, and it
-            // is remembered, so a second match never teaches building again.
+            // The ghosts themselves no longer stand down - see BlueprintRenderer,
+            // which shows where the wall goes for the whole match rather than for
+            // the first three taps. What is still learned once is the TEXT hint
+            // above them, which is a sentence and only worth reading once.
             if wallsBuilt >= GameScene.wallsToLearn { Prefs.taughtBuilding = true }
             return
         }

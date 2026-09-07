@@ -161,7 +161,7 @@ enum ChestSystem {
     /// that is worth breaking into before anybody has done anything.
     ///
     /// Draws from world.rng in a fixed order, so a seed still replays exactly.
-    private static func stock(_ id: ChestID, in world: World) {
+    static func stock(_ id: ChestID, in world: World) {
         guard var chest = world.chests[id] else { return }
 
         chest.selfStocking = true

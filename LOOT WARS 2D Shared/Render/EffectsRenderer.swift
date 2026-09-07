@@ -284,6 +284,90 @@ final class EffectsRenderer {
         }
     }
 
+    // MARK: - A base closing
+
+    /// The moment a wall goes all the way round, run once round the wall.
+    ///
+    /// Building is the slowest, least dramatic thing this game asks of anybody:
+    /// twenty-odd taps spread over minutes, each one indistinguishable from the
+    /// last, and at the end of it the only thing that happened was that a gap
+    /// stopped being there. Somebody who has just finished should be in no doubt
+    /// that they finished.
+    ///
+    /// So the light travels the plan IN BUILD ORDER, which is the order the tiles
+    /// were laid, so the flourish traces the same path round the base the player
+    /// walked to make it - and it arrives back where it started, which is the one
+    /// thing a wall does that a row of bricks does not.
+    ///
+    /// Then a chest lands, and this fires just before the chests appear, so the
+    /// sweep is what hands over to them: the wall closes, the light goes round, the
+    /// loot is there. That is the payoff for the whole errand, and until now the
+    /// payoff was a number changing in the corner of the screen.
+    func seal(_ tiles: [GridPoint], chests: Int) {
+        guard !tiles.isEmpty else { return }
+
+        // A fixed budget rather than a fixed delay per tile: the plan is between
+        // 24 and 32 tiles depending on the size of the base, and a per-tile stagger
+        // would make the big base's celebration a third longer than the small one's
+        // for no reason anybody would enjoy.
+        let lap = 0.85
+        let step = lap / Double(tiles.count)
+        let side = GridGeometry.tileSize
+
+        for (index, tile) in tiles.enumerated() {
+            let spark = SKSpriteNode(texture: GlowArt.pool)
+            spark.size = CGSize(width: side * 1.7, height: side * 1.7)
+            spark.color = RenderPalette.sealLight
+            spark.colorBlendFactor = 1
+            spark.position = GridGeometry.pointAtCentre(of: tile)
+            spark.alpha = 0
+            spark.zPosition = 9
+            node.addChild(spark)
+
+            spark.run(.sequence([
+                .wait(forDuration: Double(index) * step),
+                .group([
+                    .sequence([.fadeAlpha(to: 0.9, duration: 0.09),
+                               .fadeOut(withDuration: 0.42)]),
+                    .sequence([.scale(to: 1.25, duration: 0.12),
+                               .scale(to: 0.7, duration: 0.39)])
+                ]),
+                .removeFromParent()
+            ]))
+        }
+
+        // And a ring off the middle once the lap is done, sized to the haul. One
+        // chest gets a ring, three get a ring you cannot miss - so the reward for
+        // having walled in a big awkward yard is legible in the moment it pays out
+        // rather than only when you next open the thing.
+        let centre = tiles.reduce(CGPoint.zero) { running, tile in
+            let point = GridGeometry.pointAtCentre(of: tile)
+            return CGPoint(x: running.x + point.x / CGFloat(tiles.count),
+                           y: running.y + point.y / CGFloat(tiles.count))
+        }
+
+        for index in 0..<max(1, chests) {
+            let ring = SKShapeNode(circleOfRadius: side * 0.9)
+            ring.position = centre
+            ring.fillColor = .clear
+            ring.strokeColor = RenderPalette.sealLight
+            ring.lineWidth = 3
+            ring.alpha = 0
+            ring.zPosition = 9
+            node.addChild(ring)
+
+            ring.run(.sequence([
+                .wait(forDuration: lap + Double(index) * 0.11),
+                .group([
+                    .sequence([.fadeAlpha(to: 0.85, duration: 0.1),
+                               .fadeOut(withDuration: 0.44)]),
+                    .scale(to: 3.4, duration: 0.54)
+                ]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     // MARK: - Footfalls
 
     /// A tuft of grass, put down on the same beat the figure lands on.

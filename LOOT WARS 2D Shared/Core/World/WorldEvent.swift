@@ -60,6 +60,14 @@ enum WorldEvent {
     /// Carries where, because the number belongs over the base that earned it
     /// rather than over the player - who is usually somewhere else entirely, which
     /// is the whole point of owning a base that earns without you.
+    /// A base just closed for the first time, and what it was furnished with.
+    ///
+    /// State cannot show this. A finished wall is a fact the renderers can read any
+    /// frame they like; the INSTANT it became finished is gone by the next one, and
+    /// that instant is the only moment worth celebrating - it is the payoff for the
+    /// thing this game has the hardest time getting anybody to do.
+    case sealed(TeamID, chests: Int)
+
     case vault(points: Int, for: TeamID, at: Vec2)
 
     /// Somebody sold something, out of which slot, and what it paid.

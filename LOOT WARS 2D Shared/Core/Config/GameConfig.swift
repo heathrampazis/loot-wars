@@ -407,6 +407,28 @@ enum GameConfig {
         static let sealed = 60
         static let sealedTokens = 8
         static let resealed = 20
+
+        /// How many chests appear the moment a wall closes, by the size of the room
+        /// it closed round.
+        ///
+        /// The plan is a random rectangle between five and seven tiles a side, so
+        /// enclosed floor runs from 25 tiles to 49 - near enough double. One chest
+        /// in a five-by-five is a furnished room; one chest in a seven-by-seven is
+        /// somebody who has moved out. Paying by area means the big awkward base
+        /// that took longer to wall in is also the one worth breaking into, which
+        /// is the right way round: the reward for the work is that other people
+        /// want what you built.
+        ///
+        ///     25-29 tiles   1 chest
+        ///     30-44 tiles   2 chests
+        ///     45+ tiles     3 chests
+        static func chestsOnSeal(forRoomOf tiles: Int) -> Int {
+            switch tiles {
+            case ..<30: return 1
+            case ..<45: return 2
+            default:    return 3
+            }
+        }
     }
 
     enum Match {
@@ -1485,7 +1507,15 @@ enum GameConfig {
         /// Four or five is still not one each. Whoever has one has something worth
         /// defending, everybody else has somewhere worth going, and that gap is the
         /// part that matters.
-        static let rareArcadeWeight = 90
+        /// 150, and it is no longer the only source - see the arcade rows in the
+        /// ordinary mid and late bands. Between them a map turns up about four and
+        /// a third machines for eight teams, against one and a half before, so most
+        /// bases have one by the end and none of them start with one.
+        ///
+        /// Still worth being the rare crate's headline. Whoever opens one gets the
+        /// machine early, which is the whole difference between owning the economy
+        /// and catching up with it.
+        static let rareArcadeWeight = 150
 
         /// Share of crates on the map that are the good ones.
         ///

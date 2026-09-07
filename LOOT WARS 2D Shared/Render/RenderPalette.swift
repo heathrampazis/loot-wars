@@ -231,6 +231,12 @@ enum RenderPalette {
     /// power-up" while the tint under them says which one.
     static let perkSpark = rgb(0xFF, 0xF2, 0xE4)
 
+    /// A base closing. A warm near-white, so the lap of light round a finished
+    /// wall reads as the wall being lit rather than as another coloured effect on a
+    /// map that already has plenty - and so it cannot be mistaken for a rarity, a
+    /// team, a power-up or money, which is every other colour in this file.
+    static let sealLight = rgb(0xFF, 0xF3, 0xD2)
+
     /// The colour of yes, and the colour of no, for anything you press.
     ///
     /// One pair, used by the sell button, the shop's price pills and the buy

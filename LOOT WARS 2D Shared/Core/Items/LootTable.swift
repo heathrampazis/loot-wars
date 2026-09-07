@@ -111,7 +111,24 @@ enum LootTable {
             (.item(.helmet(.common)),    16),
             (.item(.helmet(.epic)),      26),
             (.item(.blaster(.three)),    26),
-            (.item(.blaster(.four)),     12)
+            (.item(.blaster(.four)),     12),
+
+            // A machine, from an ORDINARY crate, and this row is the whole fix for
+            // "bases never have an arcade in them".
+            //
+            // It was rare-crate-only, and no weight in that table could ever have
+            // solved it: rare crates are one in eight of forty-two boxes, so there
+            // are about five of them in a match, and even handing out a machine on
+            // three rare crates in five only reaches three machines between eight
+            // teams. The supply was capped by the number of rare crates rather than
+            // by the odds inside one - the same shape of fault as the chest clock,
+            // where the dial everybody would have reached for was not connected to
+            // the thing being complained about.
+            //
+            // Nothing early. The opening minutes are for bombs and walls, and a
+            // machine handed out before there is anywhere to stand it is a machine
+            // carried around until somebody kills you for it.
+            (.item(.arcade),             26)
         ]),
         (0.70, [
             (.item(.bandage), 96),
@@ -127,7 +144,8 @@ enum LootTable {
             (.item(.helmet(.epic)),      20),
             (.item(.helmet(.legendary)), 10),
             (.item(.blaster(.four)),     16),
-            (.item(.blaster(.five)),      6)
+            (.item(.blaster(.five)),      6),
+            (.item(.arcade),             34)
         ])
     ]
 

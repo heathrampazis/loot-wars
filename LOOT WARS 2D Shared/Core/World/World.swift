@@ -223,34 +223,6 @@ final class World {
         self.actors = spawned
         self.localPlayerID = local
         self.rng = rng
-
-        dealStartingChests()
-    }
-
-    /// Everybody starts holding a chest.
-    ///
-    /// The version before this STOOD one in every base at generation, which was the
-    /// right diagnosis and the wrong cure: a base has nothing worth raiding for
-    /// most of a match. But a chest standing in a base that has no wall round it
-    /// yet is loot anybody can stroll up to in the first minute, without a bomb,
-    /// which is worse than the problem.
-    ///
-    /// Carried, it cannot be taken until it has been PUT somewhere, and it can only
-    /// be put down inside a finished wall - so the sequence the game wants is the
-    /// sequence it enforces: build the base, then it is worth something, then
-    /// somebody needs a bomb to get at it. What is removed is only the lottery in
-    /// the middle, where a base's entire reason to exist depended on a one-in-ten
-    /// crate roll surviving a full bag and the walk home.
-    ///
-    /// Everybody, including you, because a match starts identical for everyone -
-    /// and because a chest in your bag on the first morning is the clearest
-    /// possible hint about what a base is for.
-    private func dealStartingChests() {
-        for id in actors.keys.sorted(by: { $0.raw < $1.raw }) {
-            guard var actor = actors[id] else { continue }
-            _ = actor.acquire(.chest)
-            actors[id] = actor
-        }
     }
 
     var localPlayer: Actor? { actors[localPlayerID] }
@@ -588,6 +560,50 @@ final class World {
     /// the one that happened to be laid last, and the same closing can be reached
     /// by two bots laying different halves. One question, asked in one place, after
     /// any change to the map.
+    /// Chests, stood up the moment the wall closes round them.
+    ///
+    /// This replaces two earlier attempts and is the one the shape of the game
+    /// actually asks for. Standing them up at map generation put loot in a base
+    /// before there was a wall round it, which anybody could stroll into. Dealing
+    /// everyone a chest to CARRY fixed that and left the whole thing hanging on a
+    /// bot remembering to run an errand - which it did, eventually, some of the
+    /// time. Sealing is the moment that deserves the payoff anyway: it is the exact
+    /// instant the base stops being a building site and starts being a place worth
+    /// breaking into, and tying the reward to it is what makes finishing a wall
+    /// mean something rather than being the point at which nothing more happens.
+    ///
+    /// How many depends on how big the base is, because the plan is a random
+    /// rectangle between five and seven tiles a side and a seven-by-seven yard with
+    /// one chest in it looks like somebody moved out. Bots get theirs stocked;
+    /// yours arrive empty, because a player's chest is theirs to fill.
+    ///
+    /// - Returns: how many went up, for the event - so the celebration can be sized
+    ///   to what was actually won.
+    @discardableResult
+    private func furnish(_ team: TeamID) -> Int {
+        guard let layout = baseLayouts[team] else { return 0 }
+
+        let wanted = GameConfig.Base.chestsOnSeal(forRoomOf: layout.region.count)
+        let centre = claims[team]?.centreTile.center ?? .zero
+        var placed = 0
+
+        for _ in 0..<wanted {
+            // Re-asked each time rather than gathered up front: a chest occupies
+            // the tile it lands on, so the next call answers with the next nearest
+            // free one and they end up clustered round the middle rather than
+            // stacked.
+            guard let tile = nextChestTile(for: team, near: centre) else { break }
+
+            let id = spawnChest(at: tile, owner: team)
+            if actors.values.contains(where: { $0.team == team && $0.ai != nil }) {
+                ChestSystem.stock(id, in: self)
+            }
+            placed += 1
+        }
+
+        return placed
+    }
+
     func recordSealIfNeeded(for team: TeamID) {
         guard !baseIsBreached(team) else { return }
 
@@ -600,6 +616,7 @@ final class World {
         } else {
             haveSealed.insert(team)
             award(GameConfig.Base.sealed, to: team)
+            record(.sealed(team, chests: furnish(team)))
 
             // Paid to whoever is standing in it, which for a bot's base is the bot
             // that built it and for yours is you.

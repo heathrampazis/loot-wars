@@ -2,38 +2,40 @@
 //  BlueprintRenderer.swift
 //  Loot Wars
 //
-//  One ghost wall, with a tap on it, that goes away once you can build.
+//  The stretch of wall in front of you, drawn as ghosts you can tap.
 //
-//  This is a TUTORIAL, not a build interface, and every wrong version of it came
-//  from forgetting that. Building used to be the most invisible thing in the game -
-//  you may build inside your own claim, on a free tile, while standing on your own
-//  ground, and not for a few seconds after being bombed, and a tap that missed any
-//  of those did nothing at all, which looks exactly like the game ignoring your
-//  finger. The fix is not an overlay of everywhere you could ever build. It is
-//  showing somebody, once, that tapping the ground puts up a wall.
+//  Building is the most invisible thing in this game. You may build inside your own
+//  claim, on a free tile, while standing on your own ground, and not for a few
+//  seconds after being bombed - and a tap that misses any of those does nothing at
+//  all, which looks exactly like the game ignoring your finger. Every version of
+//  this file has been an answer to that, and the earlier ones were all too shy.
 //
-//  ONE, AND IT STAYS PUT. Two ghosts chosen fresh every frame followed the player
-//  around the base like a shoal - each step re-sorted the plan by distance and the
-//  pair hopped to different tiles, which reads as something alive to be watched
-//  rather than a square to be pressed. A target is picked once and held until it is
-//  built or something else takes the tile, so the instruction stops moving while
-//  you walk towards it.
+//  IT IS NOT A TUTORIAL ANY MORE. It used to be one ghost that retired after three
+//  walls, on the theory that the lesson only had to land once. But the thing it
+//  shows is not a lesson, it is INFORMATION - where the wall goes next - and that
+//  is worth as much in the fourth minute, patching a hole somebody just blew in
+//  your side, as it is in the first. A tutorial that expires takes the map away
+//  with it.
+//
+//  A RUN, NOT AN OUTLINE. Every buildable tile within a few paces, and no further,
+//  which is the difference between the two failures this has already been through.
+//  Outlining the whole plan draws a box round the base that reads as scenery: it is
+//  always there, none of it is nearer than any other, and none of it invites a
+//  finger. One ghost re-chosen every frame followed the player around like a shoal.
+//  A radius does neither - tiles enter and leave by distance rather than by ranking,
+//  so nothing hops, and what you see is the piece of wall you could actually reach
+//  from where you are standing.
 //
 //  It is drawn as the wall it would become, because a stand-in shape teaches a
 //  player to look for something the game never puts down. A tap pictogram was tried
-//  on top of it - a ring going out of a dot - and came off again: on a screen this
-//  busy it was a third thing to read on a tile that already had two, and a wall
-//  fading in and out on a piece of ground you are standing next to is an invitation
-//  on its own.
+//  on top of it and came off again: on a screen this busy it was a third thing to
+//  read on a tile that already had two.
 //
-//  It retires after three walls, remembered by Prefs, and not after a match count:
-//  somebody whose first five minutes were spent being shot at in a field has not
-//  learned anything, and a tutorial that expires on a clock is a tutorial for
-//  whoever happened to have a quiet first match.
-//
-//  What is left behind afterwards is the part that was never a lesson: a refused
-//  tap flashes the tile red, so "you cannot build there" stops being
-//  indistinguishable from "the game did not see you".
+//  The breathing is arithmetic rather than SKActions, and it has to be. These nodes
+//  are a pool - the same sprite is a different tile a second later as you walk - so
+//  an action running on one would carry the last tile's phase to the next one and
+//  the run would shimmer at random. Phase comes from the TILE, so a given square
+//  always breathes the same way no matter which node happens to be drawing it.
 //
 
 import SpriteKit
@@ -43,28 +45,39 @@ final class BlueprintRenderer {
     /// On the ground with the claim tint, under everything that stands on it.
     let node = SKNode()
 
-    /// How faint the ghost wall is, at the bottom and the top of its breath.
-    private static let dimmest: CGFloat = 0.3
-    private static let brightest: CGFloat = 0.62
+    /// How faint a ghost gets at the bottom and the top of its breath, before the
+    /// distance fade is applied on top.
+    private static let dimmest: CGFloat = 0.26
+    private static let brightest: CGFloat = 0.60
 
-    /// Everything that marks the tile: the ghost wall and the tap on top of it.
-    private let marker = SKNode()
+    /// How far from your feet a tile is still worth showing, in tiles.
+    ///
+    /// Four and a half is most of a base's side, so walking one edge lights that
+    /// edge and little else. Wider and it becomes the box round the whole plan that
+    /// reads as scenery; narrower and you are standing on the only ghost you can
+    /// see, which teaches the tile rather than the shape.
+    private static let reach: Double = 4.5
 
-    private var shownFor: TeamID?
+    /// The most ghosts drawn at once. A cap rather than a limit that ever really
+    /// bites - a radius of four and a half over a plan's perimeter is about nine
+    /// tiles - but a pool with no ceiling is a pool that can surprise you on a map
+    /// nobody has drawn yet.
+    private static let maximum = 14
 
-    /// The tile being pointed at. Held rather than recomputed, which is the whole
-    /// difference between an instruction and a distraction.
-    private var target: GridPoint?
+    private var pool: [SKSpriteNode] = []
+    private var builtFor: TeamID?
 
-    /// Whether the marker is standing anywhere - the scene asks before spending the
+    /// Advanced by the frame rather than by the clock, so a paused game holds still.
+    private var phase: Double = 0
+
+    /// Whether anything is being pointed at - the scene asks before spending the
     /// text hint, so nobody is told to tap something that is not there.
     private(set) var hasSlots = false
 
     // MARK: - Drawing
 
     func sync(with world: World, dt: TimeInterval) {
-        guard !Prefs.taughtBuilding,
-              let player = world.localPlayer, player.isAlive, !world.isOver,
+        guard let player = world.localPlayer, player.isAlive, !world.isOver,
               world.canBuild(player.team),
               world.claim(for: player.team)?
                   .contains(GridPoint(containing: player.feet)) == true
@@ -74,103 +87,82 @@ final class BlueprintRenderer {
         }
 
         build(for: player.team)
+        phase += dt
 
-        // Keep the tile it is already pointing at. It is only re-chosen when it
-        // stops being a place a wall can go - because it just became one, or
-        // because a chest landed on it.
-        if let held = target,
-           BuildSystem.isBuildableTile(held, for: player.team, in: world) {
-            place(at: held)
-            return
-        }
-
+        // Every tile of the plan still waiting for a wall, near enough to walk to.
+        //
+        // Sorted by distance only to decide what to drop when there are more than
+        // the pool holds; the SET is chosen by the radius, which is what stops the
+        // run reshuffling itself under your feet as you move.
         let plan = world.baseLayouts[player.team]?.tiles ?? []
-        let free = plan.filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+        let near = plan
+            .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+            .map { (tile: $0, away: distance(from: player.feet, to: $0)) }
+            .filter { $0.away <= BlueprintRenderer.reach }
+            .sorted { $0.away < $1.away }
+            .prefix(BlueprintRenderer.maximum)
 
-        // On the OUTSIDE of the plan, not simply the nearest tile.
-        //
-        // The nearest one is usually behind you or beside your own chest, which
-        // teaches "tapping the ground makes a wall" and nothing else. A wall is not
-        // a wall until it goes round something, and the thing this tutorial is
-        // actually for is the shape: the first tile it points at should be one a
-        // player would recognise as the EDGE of their base, so the wall they build
-        // next to it continues an outline rather than starting a stump in the
-        // middle of their own yard.
-        //
-        // So: the ring of tiles furthest from the middle of the claim, and the one
-        // of those nearest the player - out on the perimeter, but the part of the
-        // perimeter they are already standing by.
-        let centre = world.claim(for: player.team)?.centreTile
-        let outermost = free.map { edginess(of: $0, from: centre) }.max() ?? 0
+        hasSlots = !near.isEmpty
 
-        let next = free
-            .filter { edginess(of: $0, from: centre) >= outermost - 0.75 }
-            .min { distance(from: player.feet, to: $0) < distance(from: player.feet, to: $1) }
+        for (index, ghost) in pool.enumerated() {
+            guard index < near.count else {
+                ghost.isHidden = true
+                continue
+            }
 
-        target = next
+            let entry = near[near.startIndex + index]
+            ghost.isHidden = false
+            ghost.position = GridGeometry.pointAtCentre(of: entry.tile)
 
-        guard let next else {
-            hasSlots = false
-            marker.isHidden = true
-            return
+            // Breath, and a fade towards the edge of the reach. The fade is what
+            // makes this a run rather than a border: the tile at your feet is the
+            // one asking to be tapped and the far end of the row is a hint about
+            // where the wall goes after it.
+            let beat = sin(phase * 1.9 + tilePhase(of: entry.tile))
+            let breathe = BlueprintRenderer.dimmest
+                + (BlueprintRenderer.brightest - BlueprintRenderer.dimmest)
+                * CGFloat(beat * 0.5 + 0.5)
+
+            let closeness = 1 - min(1, entry.away / BlueprintRenderer.reach)
+            ghost.alpha = breathe * CGFloat(0.35 + 0.65 * closeness)
+            ghost.setScale(0.9 + 0.1 * CGFloat(beat * 0.5 + 0.5))
         }
-
-        place(at: next)
     }
 
-    private func place(at tile: GridPoint) {
-        hasSlots = true
-        marker.isHidden = false
-        marker.position = GridGeometry.pointAtCentre(of: tile)
-    }
-
-    /// How far out towards the edge of the claim a tile sits. Chebyshev rather than
-    /// straight-line distance, because a claim is a square and its edge is a square:
-    /// by this measure every tile on the same ring scores the same, which is what
-    /// makes "the outer ring" a set rather than four corners.
-    private func edginess(of tile: GridPoint, from centre: GridPoint?) -> Double {
-        guard let centre else { return 0 }
-        return Double(max(abs(tile.col - centre.col), abs(tile.row - centre.row)))
+    /// A phase that belongs to the SQUARE rather than to the node drawing it, so a
+    /// tile keeps its own rhythm as the pool shuffles underneath it and no two
+    /// neighbours ever pulse together.
+    private func tilePhase(of tile: GridPoint) -> Double {
+        Double((tile.col &* 7 &+ tile.row &* 13) % 16) * (.pi / 8)
     }
 
     private func distance(from feet: Vec2, to tile: GridPoint) -> Double {
         (Vec2(x: Double(tile.col) + 0.5, y: Double(tile.row) + 0.5) - feet).length
     }
 
-    /// Built once, on the first frame anybody needs it, because the team is not
-    /// known before that.
+    /// Built once per team, on the first frame anybody needs it.
     private func build(for team: TeamID) {
-        guard shownFor != team else { return }
-        shownFor = team
+        guard builtFor != team else { return }
+        builtFor = team
 
-        marker.removeAllChildren()
-        marker.removeFromParent()
-        node.addChild(marker)
+        pool.forEach { $0.removeFromParent() }
+        pool.removeAll()
 
         let side = GridGeometry.tileSize
 
-        // The wall it would become.
-        let wall = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
-                                size: CGSize(width: side, height: side))
-        wall.zPosition = 1
-        wall.alpha = BlueprintRenderer.dimmest
-        wall.setScale(0.9)
-
-        wall.run(.repeatForever(.sequence([
-            .group([.fadeAlpha(to: BlueprintRenderer.brightest, duration: 0.55),
-                    .scale(to: 1.0, duration: 0.55)]),
-            .group([.fadeAlpha(to: BlueprintRenderer.dimmest, duration: 0.65),
-                    .scale(to: 0.9, duration: 0.65)])
-        ])))
-
-        marker.addChild(wall)
-
+        for _ in 0..<BlueprintRenderer.maximum {
+            let wall = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
+                                    size: CGSize(width: side, height: side))
+            wall.zPosition = 1
+            wall.isHidden = true
+            node.addChild(wall)
+            pool.append(wall)
+        }
     }
 
-    /// Off, and off for good once the lesson is learned.
     private func retire() {
         hasSlots = false
-        marker.isHidden = true
+        pool.forEach { $0.isHidden = true }
     }
 
     // MARK: - Answering a tap
@@ -182,11 +174,7 @@ final class BlueprintRenderer {
     /// the ghost itself is about to be moved to the next tile, and something that
     /// animates and then jumps somewhere else is a glitch.
     func fill(at tile: GridPoint) {
-        guard let team = shownFor, !marker.isHidden else { return }
-
-        // The tile it was pointing at is about to have a wall on it, so the next
-        // frame picks the next one.
-        if target == tile { target = nil }
+        guard let team = builtFor else { return }
 
         let side = GridGeometry.tileSize
         let flourish = SKSpriteNode(texture: BlockRenderer.ghostTexture(for: team),
