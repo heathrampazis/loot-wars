@@ -320,52 +320,69 @@ enum GameConfig {
         /// out came to about a quarter of everything else earned put together, in
         /// a game whose difficulty complaint is that the player has it too easy.
         ///
-        /// At a fifth a spare Rare pays 1, a spare Epic 2 and a Legendary 4, which
-        /// is what this was always meant to be: not money, but the difference
-        /// between litter and a small consolation. The margin also stops the shop
+        /// At a fifth a spare Epic pays 1, a Legendary 3, a Mythical 5 and a
+        /// Cosmic 8, which is what this was always meant to be: not money, but the
+        /// difference between litter and a small consolation. The margin also stops the shop
         /// being a laundry - at anything near full price you could buy a bomb,
         /// think better of it, sell it back, and every price in here would stop
         /// meaning anything.
         static let sellShare: Double = 0.20
 
-        /// What it costs to step UP to each tier.
+        /// What it costs to step UP one rung. One ladder of prices, and BOTH gear
+        /// ladders use it.
         ///
-        /// EVERY rung is priced, not just the ones crates no longer carry. The
-        /// first version only listed Epic upwards, which left anyone below Rare
-        /// staring at an empty tab - correct, in that the floor is where they should
-        /// be looking, and indistinguishable from a broken shop.
+        /// They are the same ladder now. Five rungs of helmet, Common to Cosmic;
+        /// five rungs of blaster, Blaster 2 to Blaster 6; the loot tables have
+        /// always dealt them out in pairs and the rarity colours now say so out
+        /// loud - a Blaster 3 and an Epic helmet are both green. Two cards sitting
+        /// side by side on one page, wearing the same colour, at two prices was the
+        /// shop contradicting the ladder it was selling from.
         ///
-        /// So the low rungs are here and they are nearly free. A Common is three
-        /// tokens because a Common is nearly worthless: the shop is topping you up,
-        /// not selling you a shortcut past the crates. The shape is what matters -
-        /// cheap at the bottom, steep at the top, so the shop's real value is
-        /// exactly where the crates now stop.
+        /// The previous attempt kept the CUMULATIVE cost of reaching each surviving
+        /// tier identical to what it was before two rungs were deleted, which was
+        /// arithmetically neat and produced a shop that looked broken: an Epic at
+        /// 26 and then a Legendary at 20, because Epic had swallowed two deleted
+        /// rungs and Legendary had swallowed none. Nobody reads a cumulative total.
+        /// What a player reads is the number on the card in front of them, and that
+        /// number going DOWN as the gear gets better is the shop telling them the
+        /// ladder is nonsense. Monotonic beats neat.
+        ///
+        /// EVERY rung is priced, not just the ones crates no longer carry. An
+        /// earlier version only listed the top of the ladder, which left anyone
+        /// near the bottom staring at an empty tab - correct, in that the floor is
+        /// where they should be looking, and indistinguishable from a broken shop.
+        /// So the first rung is here and it costs less than a bandage: the shop is
+        /// topping you up, not selling you a shortcut past the crates. The shape is
+        /// what matters - cheap at the bottom, steep at the top, about 1.7x a rung -
+        /// so the shop's real value is exactly where the crates stop.
         ///
         /// Priced against a match: a balanced player collects about 25 tokens in
-        /// five minutes and somebody working the arcades about 42. Epic is half a
-        /// match, Cosmic is a match and a half, and the whole climb from bare-headed
-        /// is 190 - six or seven matches. Nobody tops out in one, which is the point.
+        /// five minutes and somebody working the arcades about 42. Reaching an Epic
+        /// is half a match, a Cosmic on its own is a match and a half, and one full
+        /// ladder is 96 - both of them 192, six or seven matches. Nobody tops out in
+        /// one, which is the point. Those three figures are what the arcade payouts
+        /// and the sell-back share were tuned against, and all three still hold.
+        ///
+        /// Equal rather than merely similar, and the bots are the reason it has to
+        /// be exact. A bot buys whichever offer is cheaper, so a ladder that was
+        /// dearer at every rung would never be bought at all - seven bots would
+        /// climb one ladder to the top and ignore the other. Priced level, the tie
+        /// goes to the helmet, which puts the bot a rung ahead on that ladder, which
+        /// makes the blaster cheaper next time. They alternate, for free, because
+        /// the numbers are equal rather than because anybody wrote a rule.
         ///
         /// And every rung is lost on death, which is what stops a bought Cosmic from
         /// simply deciding the match. It is a lead to hold on to, not a purchase.
-        /// Repriced so that the cumulative cost of REACHING each tier is exactly
-        /// what it was: 3 to a Common, 29 to an Epic, 49 to a Legendary, 77 to a
-        /// Mythical, 115 for the whole climb. You buy one rung at a time, so with
-        /// two rungs deleted the survivors have to absorb the prices of the rungs
-        /// they swallowed - an Epic costs 26 rather than 13 because it is now the
-        /// jump that used to be Uncommon, Rare and Epic together.
-        ///
-        /// Doing it this way means the economy did not move at all. The arcade
-        /// payouts, the sell-back share, the bots' saving behaviour and every "is
-        /// this worth it" judgement in the shop were all tuned against those
-        /// cumulative figures, and none of them had to be retuned.
+        static let gearPrices: [Int] = [5, 9, 16, 26, 40]
+
         static let helmetPrices: [HelmetTier: Int] = [
-            .common: 3, .epic: 26, .legendary: 20, .mythical: 28, .cosmic: 38
+            .common: gearPrices[0], .epic: gearPrices[1], .legendary: gearPrices[2],
+            .mythical: gearPrices[3], .cosmic: gearPrices[4]
         ]
 
         static let blasterPrices: [BlasterTier: Int] = [
-            .two: 3, .three: 6,
-            .four: 13, .five: 21, .six: 32
+            .two: gearPrices[0], .three: gearPrices[1], .four: gearPrices[2],
+            .five: gearPrices[3], .six: gearPrices[4]
         ]
     }
 
