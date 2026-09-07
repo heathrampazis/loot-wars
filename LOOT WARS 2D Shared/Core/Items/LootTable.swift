@@ -83,7 +83,6 @@ enum LootTable {
             (.item(.medkit),  22),
             (.item(.bomb),    92),
             (.item(.stink),   18),
-            (.item(.chest),   34),
 
             // Three helmet rows became two, at the same total weight, so gear is
             // exactly as likely to come out of an early crate as it was - there is
@@ -98,7 +97,6 @@ enum LootTable {
             (.item(.medkit),  24),
             (.item(.bomb),    78),
             (.item(.stink),   16),
-            (.item(.chest),   34),
 
             // The Blaster 2 is gone: by now everybody has better, so that row was a
             // roll that produced nothing.
@@ -135,7 +133,6 @@ enum LootTable {
             (.item(.medkit),  34),
             (.item(.bomb),    52),
             (.item(.stink),   14),
-            (.item(.chest),   28),
 
             // Legendary is where the crates stop, and everything above it is bought.
             // Same shape as before - the top natural roll is three fifths of the way
@@ -221,12 +218,15 @@ enum LootTable {
 
         // A rare crate cannot hand you a bandage.
         //
-        // This is what makes opening one worth the walk. The bandage and the chest
-        // rows come out entirely - they are the two things you trip over anywhere
-        // on the map, and finding one inside something that had been glowing at you
-        // from forty tiles away is the single most deflating thing this game can
-        // do. What is left is gear, which the upgrade below then bumps a rung, a
-        // medkit, and bombs nudged up a little further, because bombs are the
+        // This is what makes opening one worth the walk. The bandage row comes out
+        // entirely - it is the thing you trip over anywhere on the map, and finding
+        // one inside something that had been glowing at you from forty tiles away
+        // is the single most deflating thing this game can do. (The chest row used
+        // to come out here too, and now there is no chest row anywhere: a base
+        // furnishes itself when the wall shuts, so a chest in a crate was a spare
+        // for a room that already had all it was getting.) What is left is gear,
+        // which the upgrade below then bumps a rung, a medkit, and bombs nudged up
+        // a little further, because bombs are the
         // supply line for raiding and were rationed by one row in a table shared
         // with the supplies.
         //
@@ -239,7 +239,7 @@ enum LootTable {
         if rare {
             rows = rows.compactMap { row in
                 switch row.pickup {
-                case .item(.bandage), .item(.chest):
+                case .item(.bandage):
                     return nil
                 case .item(.bomb):
                     return (pickup: row.pickup,

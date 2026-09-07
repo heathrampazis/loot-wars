@@ -949,32 +949,6 @@ enum GameConfig {
         /// something in it is the only thing on the map that repays crossing it.
         static let robRange: Double = 40
 
-        /// How much a target's standing pulls a bot towards them, 0 to 1.
-        ///
-        /// A bot picks the nearest enemy it can see. At 0.4 the team top of the
-        /// leaderboard reads as 40% closer than it is, so a bot will walk past
-        /// somebody nearer to go after the leader - without ever ignoring a threat
-        /// standing next to it, because the pull scales distance rather than
-        /// replacing it.
-        ///
-        /// How many chests a bot wants standing in its base.
-        ///
-        /// Bots no longer BUY these - the shop stopped selling them when it became
-        /// two cards - so they come out of crates, which is what the measurement
-        /// behind this number was originally warning about: at one drop in eleven,
-        /// surviving a full bag and every death between finding it and the wall
-        /// closing, 200,000 simulated matches left 58% of bases with nothing in
-        /// them to raid.
-        ///
-        /// Two things carry it now instead of a purchase. The chest row in the
-        /// crate tables is heavier, and a stripped chest is no longer destroyed -
-        /// so a base needs to get lucky ONCE rather than once per raid, which is a
-        /// completely different bet.
-        ///
-        /// Two, not more. A base is a place worth two visits; a base with five
-        /// chests in it is a warehouse, and raiding stops being a raid.
-        static let chestsWanted = 2
-
         /// How far into a match a bot will still spend on furniture rather than on
         /// gear. Past this everything goes on the ladder - see
         /// AIBrain.purchaseToMake for why an investment made this late is just
@@ -1102,18 +1076,31 @@ enum GameConfig {
         /// that are never finished, which is the same as no bases, which is nothing
         /// to raid. The gap is what balances the two: walls have to arrive faster
         /// than bombs take them away.
-        static let urgeInterval: ClosedRange<Double> = 5...8
+        /// Down to 3...5. Walls are FREE - there is no material, no cost, nothing
+        /// a bot has to go and fetch first - so the only thing that was ever making
+        /// a base take four minutes to go up was this timer, and a bot dawdling
+        /// over a job that costs it nothing is a bot that looks like it forgot.
+        static let urgeInterval: ClosedRange<Double> = 3...5
 
         /// Walls laid per trip.
         ///
         /// More walls per trip rather than more trips: the walk home is what a trip
         /// actually costs, so a bigger armful finishes the base faster without
         /// eating into the time a bot spends out on the map looting.
-        static let blocksPerVisit: ClosedRange<Int> = 8...12
+        /// 12...16, up from 8...12. The walk home is what a trip actually costs,
+        /// so a bigger armful finishes the base sooner without adding a single
+        /// extra commute - and with the urge timer shortened as well, the two
+        /// together roughly halve the time a base spends unfinished.
+        static let blocksPerVisit: ClosedRange<Int> = 12...16
 
         /// Seconds between individual walls. Quick enough to read as somebody
         /// laying a run of them, slow enough that you can still see it happen.
-        static let placeInterval: Double = 0.32
+        /// 0.22, quicker but still one at a time. This is the number to be careful
+        /// with: the run of blocks appearing is the only part of base-building
+        /// anybody actually watches, and at much under a fifth of a second it stops
+        /// reading as somebody laying them and starts reading as a wall being
+        /// switched on.
+        static let placeInterval: Double = 0.22
 
         /// How close a bot must be to the tile it is laying, in tiles.
         static let reach: Double = 2.2
@@ -1148,7 +1135,7 @@ enum GameConfig {
         /// Quicker again now that every base has something in it worth breaking
         /// into from the first minute: holes are commoner, so a hole has to be a
         /// wound rather than a condition.
-        static let repairInterval: Double = 0.11
+        static let repairInterval: Double = 0.08
 
         /// How long after being bombed before a team may lay walls again.
         ///
@@ -1178,7 +1165,7 @@ enum GameConfig {
         /// ones, and an armful sized for yesterday's hole is how a base ends up
         /// permanently half open - at which point nobody needs a bomb to get in and
         /// the whole exchange stops being a raid.
-        static let blocksWhenBreached: ClosedRange<Int> = 13...17
+        static let blocksWhenBreached: ClosedRange<Int> = 16...20
 
         /// Walls laid per trip by a bot that is behind.
         ///
@@ -1187,7 +1174,7 @@ enum GameConfig {
         /// because the urge timer was never what was holding a laggard back. Being
         /// interrupted was. A bot that is pulled away from home constantly gets few
         /// chances, so the fix is not more chances, it is making each one count.
-        static let blocksWhenBehind: ClosedRange<Int> = 14...20
+        static let blocksWhenBehind: ClosedRange<Int> = 18...24
     }
 
     /// The stink bomb, and what it leaves behind.

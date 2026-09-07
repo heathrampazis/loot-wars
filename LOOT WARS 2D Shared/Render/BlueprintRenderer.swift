@@ -17,12 +17,26 @@
 //  your side, as it is in the first. A tutorial that expires takes the map away
 //  with it.
 //
-//  IT FOLLOWS WHAT YOU BUILT, not a plan you never agreed to. The generated
-//  rectangle is a suggestion for somebody who has laid nothing yet; the moment
-//  there is a wall of your own on the ground, the markers point at the tiles that
-//  CONTINUE it - see BaseEnclosure.frontier. A base is now whatever shape actually
-//  encloses ground, so there is no longer a correct outline to be shown, and the
-//  next-best thing is honest: here is where a block would extend what you have.
+//  IT RECOMMENDS A SQUARE, drawn round whatever you have already built.
+//
+//  A base can be any shape that encloses ground, and the first attempt at showing
+//  that marked every tile touching one of your walls - which is honest and useless.
+//  It is a halo, not an outline: it grows on both sides of every run, it has no
+//  direction, and it answers "where COULD a wall go" when the only question worth
+//  answering is "where should the next one go".
+//
+//  So the markers commit to a shape. The bounding box of everything you have laid,
+//  grown to the smallest square that can hold a legal base and clamped inside your
+//  claim, and the markers are the gaps left in that box's outline. Build the
+//  generated rectangle and the box IS that rectangle, so it behaves exactly as it
+//  always did. Lay a wall somewhere else and the box stretches to take it in, and
+//  the recommendation redraws round your idea rather than the game's.
+//
+//  A guess, and it says so by being a square: nobody has told the game what they
+//  are building, and a rectangle round the evidence is the most useful thing that
+//  can be inferred from it. What makes the guess cheap to be wrong about is that
+//  it costs nothing to ignore - the markers are a suggestion on ground you can
+//  build on anywhere.
 //
 //  A RUN, NOT AN OUTLINE. Every buildable tile within a few paces, and no further,
 //  which is the difference between the two failures this has already been through.
@@ -80,11 +94,20 @@ final class BlueprintRenderer {
     /// see, which teaches the tile rather than the shape.
     private static let reach: Double = 4.5
 
-    /// The most ghosts drawn at once. A cap rather than a limit that ever really
-    /// bites - a radius of four and a half over a plan's perimeter is about nine
-    /// tiles - but a pool with no ceiling is a pool that can surprise you on a map
-    /// nobody has drawn yet.
-    private static let maximum = 14
+    /// The most markers drawn at once.
+    ///
+    /// Eight, down from fourteen. With a halo the cap was the only thing keeping
+    /// the screen readable and it was not enough; with an outline it is a stretch
+    /// of wall running away from you, and eight of those is a clear instruction
+    /// where fourteen is a boundary fence.
+    private static let maximum = 8
+
+    /// The shortest side a recommended base can have.
+    ///
+    /// Six, because the smallest legal base encloses sixteen tiles - a four-by-four
+    /// room - and the outline round a four-by-four is six by six. Anything smaller
+    /// would be recommending a shape that does not count when it is finished.
+    private static let smallestSide = 6
 
     private var pool: [SKSpriteNode] = []
     private var builtFor: TeamID?
@@ -129,13 +152,7 @@ final class BlueprintRenderer {
         // Sorted by distance only to decide what to drop when there are more than
         // the pool holds; the SET is chosen by the radius, which is what stops the
         // run reshuffling itself under your feet as you move.
-        let frontier = base.frontier
-        let candidates = frontier.isEmpty
-            ? (world.baseLayouts[player.team]?.tiles ?? [])
-            : Array(frontier)
-
-        let near = candidates
-            .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+        let near = recommendation(for: player, walls: base.ownWalls, in: world)
             .map { (tile: $0, away: distance(from: player.feet, to: $0)) }
             .filter { $0.away <= BlueprintRenderer.reach }
             .sorted { $0.away < $1.away }
@@ -166,6 +183,63 @@ final class BlueprintRenderer {
             ghost.alpha = breathe * CGFloat(0.35 + 0.65 * closeness)
             ghost.setScale(0.9 + 0.1 * CGFloat(beat * 0.5 + 0.5))
         }
+    }
+
+    /// The gaps in the square this player looks like they are building.
+    ///
+    /// With nothing laid there is no evidence, so the generated plan stands in -
+    /// which is also what makes a first base feel like the game had a plan for it.
+    /// From the first wall onwards the recommendation is drawn round the walls
+    /// themselves, so it follows whoever is not following the plan.
+    private func recommendation(for player: Actor,
+                                walls: Set<GridPoint>,
+                                in world: World) -> [GridPoint] {
+        guard let claim = world.claim(for: player.team) else { return [] }
+
+        guard !walls.isEmpty else {
+            return (world.baseLayouts[player.team]?.tiles ?? [])
+                .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+        }
+
+        var lowCol = walls.map(\.col).min() ?? 0
+        var highCol = walls.map(\.col).max() ?? 0
+        var lowRow = walls.map(\.row).min() ?? 0
+        var highRow = walls.map(\.row).max() ?? 0
+
+        // Grown to the smallest legal base, symmetrically, then pushed back inside
+        // the claim if that took it over the edge. Growing first and clamping after
+        // is what keeps a base started in a corner square rather than squashed
+        // against the boundary.
+        let limitLow = claim.origin
+        let limitHigh = GridPoint(col: claim.origin.col + claim.size - 1,
+                                  row: claim.origin.row + claim.size - 1)
+
+        func stretch(_ low: inout Int, _ high: inout Int, min lowest: Int, max highest: Int) {
+            while high - low + 1 < BlueprintRenderer.smallestSide {
+                if high < highest { high += 1 }
+                else if low > lowest { low -= 1 }
+                else { break }
+            }
+            low = max(lowest, low)
+            high = min(highest, high)
+        }
+
+        stretch(&lowCol, &highCol, min: limitLow.col, max: limitHigh.col)
+        stretch(&lowRow, &highRow, min: limitLow.row, max: limitHigh.row)
+
+        // The outline of that box, and only the parts of it still missing.
+        var outline: [GridPoint] = []
+
+        for col in lowCol...highCol {
+            outline.append(GridPoint(col: col, row: lowRow))
+            outline.append(GridPoint(col: col, row: highRow))
+        }
+        for row in (lowRow + 1)..<highRow {
+            outline.append(GridPoint(col: lowCol, row: row))
+            outline.append(GridPoint(col: highCol, row: row))
+        }
+
+        return outline.filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
     }
 
     /// A phase that belongs to the SQUARE rather than to the node drawing it, so a

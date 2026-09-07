@@ -44,16 +44,11 @@ struct BaseEnclosure {
     /// particular order. Whoever wants to draw it decides what order means.
     let wall: Set<GridPoint>
 
-    /// Open tiles still reachable from outside that sit against one of this team's
-    /// own walls: the places a block would extend what they have already built.
+    /// Every wall this team has actually put down inside its own claim.
     ///
-    /// This is what the build markers point at, and it is the honest answer to a
-    /// question that has no exact one. With a free-form base the game cannot know
-    /// what shape somebody intends, so it cannot show them the tiles that would
-    /// finish it. What it can show is the tiles that CONTINUE it, which is the same
-    /// thing for anybody building an outline and no worse than a guess for anybody
-    /// who is not.
-    let frontier: Set<GridPoint>
+    /// Kept because the build markers need to know what shape somebody is aiming
+    /// at, and the only evidence of that is what they have already laid.
+    let ownWalls: Set<GridPoint>
 
     var isSealed: Bool { room.count >= GameConfig.Base.minimumRoom }
 
@@ -107,27 +102,18 @@ struct BaseEnclosure {
         }
 
         var room: Set<GridPoint> = []
-        var frontier: Set<GridPoint> = []
+        var ownWalls: Set<GridPoint> = []
 
         for col in low.col...high.col {
             for row in low.row...high.row {
                 let p = GridPoint(col: col, row: row)
-                guard !solid(p) else { continue }
 
-                if open.contains(p) {
-                    // Reachable from outside, so it is a way IN. Worth marking only
-                    // if it touches something this team built - otherwise it is just
-                    // open field and every empty claim would light up whole.
-                    let touching = [GridPoint(col: p.col + 1, row: p.row),
-                                    GridPoint(col: p.col - 1, row: p.row),
-                                    GridPoint(col: p.col, row: p.row + 1),
-                                    GridPoint(col: p.col, row: p.row - 1)]
-                        .contains { inside($0) && ownWall($0) }
-
-                    if touching { frontier.insert(p) }
-                } else {
-                    room.insert(p)
+                guard !solid(p) else {
+                    if ownWall(p) { ownWalls.insert(p) }
+                    continue
                 }
+
+                if !open.contains(p) { room.insert(p) }
             }
         }
 
@@ -144,6 +130,6 @@ struct BaseEnclosure {
             }
         }
 
-        return BaseEnclosure(room: room, wall: wall, frontier: frontier)
+        return BaseEnclosure(room: room, wall: wall, ownWalls: ownWalls)
     }
 }

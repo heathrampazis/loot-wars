@@ -724,7 +724,7 @@ final class World {
         if let held = enclosures[team], held.revision == mapRevision { return held.value }
 
         guard let claim = claims[team] else {
-            return BaseEnclosure(room: [], wall: [], frontier: [])
+            return BaseEnclosure(room: [], wall: [], ownWalls: [])
         }
 
         let found = BaseEnclosure.compute(
