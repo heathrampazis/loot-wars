@@ -166,36 +166,36 @@ enum RenderPalette {
     /// not-of-that-system, which is exactly what the only item that does four
     /// things at once should look like.
     ///
-    /// Eight hues, solved for one perceived lightness rather than picked by eye.
+    /// Eight hues, solved for the most colour that stays legible on grass.
     ///
-    /// A cycle through a naive rainbow pulses. Yellow is roughly twice as light as
-    /// violet at the same saturation, so a wash walking the ring gets visibly
-    /// brighter and dimmer twice a turn, and the eye reads that throb as the effect
-    /// doing something - flashing on and off - rather than as one steady thing
-    /// changing colour. These eight sit at CIE L* 64 to a tenth of a point, so the
-    /// only thing that changes as it turns is the hue.
+    /// The first version of this ring flattened perceived lightness to a tenth of a
+    /// point - every hue at exactly CIE L* 64 - which killed the pulse it was
+    /// meant to kill and drained the colour with it. Holding L* rigid forces the
+    /// saturation down on every hue that is naturally light or naturally dark, and
+    /// a rainbow at 0.59 mean chroma is a rainbow of dusty pastels. It read as
+    /// dull, which for the one item in the game that does everything is the worst
+    /// thing it could read as.
     ///
-    /// L* rather than plain relative luminance, which was the first attempt and is
-    /// the wrong measure here: flattening luminance instead pushes yellow down into
-    /// a dark olive to match violet, and a rainbow whose yellow has gone brown is
-    /// not a rainbow. L* flattens what the eye actually reports, which leaves gold
-    /// looking like gold.
+    /// So the constraint is a BAND rather than a point: L* 53 to 67, and inside it
+    /// take the most saturated colour each hue can give. Mean chroma goes 0.59 to
+    /// 0.84 - a little over 40% more colour - while the lightness swing stays 13
+    /// points, which is under what the eye reads as flashing. The throb the first
+    /// version was avoiding needs a swing more like the 24 points an unconstrained
+    /// vivid ring gives; 13 is movement in the colour and not in the brightness.
     ///
-    /// One yellow-adjacent hue, and it is a gold rather than a true yellow. The map
-    /// is pale yellow-green: a real yellow lands within a hair of the grass on
-    /// every measure and disappears the moment a mote leaves the figure. At L* 64
-    /// every one of these reads at about 1.8 against the floor, which is the number
-    /// that matters, because these are drawn as pigment on grass rather than as
-    /// light.
+    /// Every hue still clears 1.7 against the floor tile, which is the floor that
+    /// matters: these are drawn as pigment on a pale yellow-green lawn, not as
+    /// light on a dark screen. Gold is the one that has to give ground, because
+    /// gold is the hue nearest the grass and always will be.
     static let spectrum: [SKColor] = [
-        rgb(0xF0, 0x75, 0x80),
-        rgb(0xF3, 0x78, 0x3B),
-        rgb(0xC9, 0x91, 0x16),
-        rgb(0x0C, 0xB4, 0x17),
-        rgb(0x14, 0xAC, 0xB0),
-        rgb(0x6F, 0x99, 0xF6),
-        rgb(0xBE, 0x7F, 0xF7),
-        rgb(0xEF, 0x6C, 0xBE)
+        rgb(0xFF, 0x00, 0x17),   // red
+        rgb(0xFF, 0x4D, 0x00),   // orange
+        rgb(0xC9, 0x9B, 0x00),   // gold
+        rgb(0x1A, 0xBA, 0x00),   // green
+        rgb(0x00, 0xB2, 0xB8),   // cyan
+        rgb(0x3B, 0x78, 0xFF),   // blue
+        rgb(0xAF, 0x4A, 0xFF),   // violet
+        rgb(0xFF, 0x00, 0xA8)    // magenta
     ]
 
     /// One hue off the ring, counted round rather than clamped.

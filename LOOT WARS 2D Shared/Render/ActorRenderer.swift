@@ -95,6 +95,27 @@ final class ActorRenderer {
         let figure = SKNode()
 
         let sprite: SKSpriteNode
+
+        /// A tinted copy of the figure laid over the figure, for as long as a
+        /// power-up is running.
+        ///
+        /// A COPY rather than a tint on the sprite itself, and the reason is that
+        /// the sprite's colour is already spoken for: the flinch, the heal and the
+        /// activation flash all colorize it, all under one key, all of them brief.
+        /// A permanent cycle sharing that channel would either be interrupted every
+        /// time somebody was shot or would eat the flinch, and being hit while
+        /// powered up has to still look like being hit.
+        ///
+        /// Laid on at partial alpha rather than replacing anything, so the artwork
+        /// underneath keeps its own shading and its own silhouette. At full strength
+        /// this would be a coloured cut-out of a person; at a third it is a person
+        /// lit by something.
+        let star: SKSpriteNode
+
+        /// Whether a power-up was running last frame, so the overlay can be started
+        /// and stopped by NOTICING rather than by being told.
+        var starRunning = false
+
         let healthFill: SKShapeNode
         let blaster: SKSpriteNode
         let goalLabel: SKLabelNode?
@@ -140,10 +161,12 @@ final class ActorRenderer {
         var lastShotCooldown: Double = 0
 
         init(sprite: SKSpriteNode,
+             star: SKSpriteNode,
              healthFill: SKShapeNode,
              blaster: SKSpriteNode,
              goalLabel: SKLabelNode?) {
             self.sprite = sprite
+            self.star = star
             self.healthFill = healthFill
             self.blaster = blaster
             self.goalLabel = goalLabel
@@ -247,12 +270,28 @@ final class ActorRenderer {
 
             nodes.goalLabel?.text = actor.ai?.goal.debugName
 
+            // The power-up overlay, started and stopped from the world's own state.
+            // Nothing announces it: a running perk is a fact about the actor, so a
+            // bot that drinks one wears the same star the player does without a
+            // line of code saying so - and somebody who dies holding it loses it in
+            // the same frame the perk does.
+            let starring = actor.perk != nil && actor.isAlive
+            if starring != nodes.starRunning {
+                nodes.starRunning = starring
+                starring ? startStar(on: nodes) : stopStar(on: nodes)
+            }
+
             // Re-dress when the helmet changes. Picking one up has to be visible
             // instantly - it is the main way anybody can tell how dangerous the
             // actor coming at them is.
             if nodes.lastHelmet != actor.helmet {
                 nodes.lastHelmet = actor.helmet
                 nodes.sprite.texture = texture(for: actor.helmet)
+
+                // The overlay is a copy, so it has to be re-dressed too. Picking up
+                // a helmet mid-power-up otherwise leaves last match's silhouette
+                // glowing over this one's.
+                nodes.star.texture = nodes.sprite.texture
             }
 
             if nodes.lastBlaster != actor.blaster {
@@ -339,7 +378,18 @@ final class ActorRenderer {
         blaster.anchorPoint = CGPoint(x: 0.30, y: 0.32)
         blaster.zPosition = 1
 
+        // Matched to the sprite in every respect but colour, and parented to it, so
+        // it inherits the facing mirror for free - a star that did not flip with the
+        // figure would slide off it the moment anybody turned round.
+        let star = SKSpriteNode(texture: sprite.texture, size: size)
+        star.anchorPoint = sprite.anchorPoint
+        star.colorBlendFactor = 1
+        star.alpha = 0
+        star.isHidden = true
+        star.zPosition = 1
+
         let nodes = ActorNodes(sprite: sprite,
+                               star: star,
                                healthFill: fill,
                                blaster: blaster,
                                goalLabel: goalLabel)
@@ -358,6 +408,7 @@ final class ActorRenderer {
         nodes.muzzle.alpha = 0
         nodes.muzzle.zPosition = 2
 
+        sprite.addChild(star)
         nodes.figure.addChild(sprite)
         nodes.body.addChild(nodes.figure)
         nodes.body.addChild(blaster)
@@ -572,6 +623,54 @@ final class ActorRenderer {
                     .moveTo(y: 0, duration: 0.16)]),
             .scaleX(to: 1, y: 1, duration: 0.12)
         ]), withKey: "react")
+    }
+
+    /// The overlay running, for as long as the power-up is.
+    ///
+    /// Deliberately quicker than anything else wearing this rainbow. The item in a
+    /// slot walks the ring in six seconds, because it is sitting still and being
+    /// looked at; a person running one covers it in under two, because they are
+    /// moving and because the whole claim is that something is happening to them
+    /// right now. Same eight hues, so it is recognisably the same power - only the
+    /// tempo says which of the two you are looking at.
+    ///
+    /// And kept deliberately weak. The alpha breathes between about a fifth and a
+    /// third, so at its strongest two thirds of what you see is still the figure's
+    /// own artwork: enough that somebody powered up is unmistakable across the map,
+    /// short of the point where they stop reading as a person and start reading as
+    /// a coloured shape. The breath is on a different period from the colour walk
+    /// on purpose - the two drift against each other rather than pulsing together,
+    /// which is what stops it looking like a blinking light.
+    private func startStar(on nodes: ActorNodes) {
+        nodes.star.isHidden = false
+        nodes.star.removeAllActions()
+
+        let hues = RenderPalette.spectrum.indices.map { index -> SKAction in
+            .colorize(with: RenderPalette.hue(at: index),
+                      colorBlendFactor: 1, duration: 0.22)
+        }
+
+        nodes.star.run(.repeatForever(.sequence(hues)), withKey: "starHue")
+        nodes.star.run(.sequence([
+            .fadeAlpha(to: 0.33, duration: 0.14),
+            .repeatForever(.sequence([
+                .fadeAlpha(to: 0.19, duration: 0.37),
+                .fadeAlpha(to: 0.33, duration: 0.37)
+            ]))
+        ]), withKey: "starPulse")
+    }
+
+    /// Faded out rather than switched off, because a perk ends on a timer and a
+    /// thing that vanishes on a timer looks like a dropped frame.
+    private func stopStar(on nodes: ActorNodes) {
+        nodes.star.removeAction(forKey: "starPulse")
+        nodes.star.run(.sequence([
+            .fadeOut(withDuration: 0.28),
+            .run { [weak nodes] in
+                nodes?.star.removeAllActions()
+                nodes?.star.isHidden = true
+            }
+        ]), withKey: "starPulse")
     }
 
     private func setHealth(_ fraction: Double, on nodes: ActorNodes) {

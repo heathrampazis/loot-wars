@@ -1149,9 +1149,9 @@ enum GameConfig {
     /// The stink bomb, and what it leaves behind.
     ///
     /// Priced as a way of taking GROUND rather than as a second way of taking
-    /// health. Stand in it for the full nine seconds and it costs about 54 - half a
-    /// bar - which is enough that nobody walks through casually and not so much
-    /// that being caught in one is the end of your match. What it is really for is
+    /// health. Stand in it for the full nine seconds and it costs about four fifths
+    /// of a bar - whatever helmet you are wearing - which is enough that nobody
+    /// walks through casually and still short of ending your match on its own. What it is really for is
     /// making two tiles unusable: a doorway, the gap you were about to break
     /// through, or the ground under somebody who has nowhere good to go.
     enum Stink {
@@ -1183,21 +1183,31 @@ enum GameConfig {
         /// barely see from still taking your health.
         static let bitingDensity: Double = 0.35
 
-        /// Damage per dose, and seconds between doses.
+        /// Damage per dose as a SHARE of the victim's health bar, and seconds
+        /// between doses.
         ///
-        /// Portions rather than a trickle - see GasSystem. The first pass at this
-        /// was eight every half second, which the arithmetic caught before anybody
-        /// played it: seven biting seconds at sixteen a second is 112 damage, and a
-        /// cloud that kills a full-health player outright is not a piece of ground
-        /// to avoid, it is a death sentence with a radius.
+        /// A share rather than a flat six, and this is the whole reason nobody had
+        /// any use for a stink bomb. Six a dose was written when a health bar was a
+        /// health bar; the helmet ladder runs to 3.57 times a bare head, so the
+        /// same cloud that took half a bar off somebody bare-headed took a seventh
+        /// of one off a Cosmic. It got weaker exactly as the match got more
+        /// dangerous, which meant that by the time you had a stink bomb and a
+        /// target worth using it on, it did nothing to them.
         ///
-        /// Six every three quarters of a second is about 54 over a full stay -
-        /// roughly half a bar - and six to twelve for crossing one, which is the
-        /// shape this wants: walking through costs something you can shrug off,
-        /// standing in it is a decision you regret in instalments, and it is the
-        /// GROUND being taken away rather than your health.
-        static let dose = 6
-        static let doseInterval: Double = 0.75
+        /// Seven per cent a dose, every 0.7 seconds. Over a full stay in a cloud
+        /// that is about 80% of a bar - against ANY helmet - and around 15% for
+        /// walking through one. So the shape it always wanted is finally the shape
+        /// it has: crossing costs something you can shrug off, standing in it is a
+        /// decision you regret in instalments, and being held in it is fatal.
+        ///
+        /// Deliberately still short of a kill on its own. The first pass at this
+        /// was eight every half second, and the arithmetic caught it before anybody
+        /// played it: a cloud that kills a full-health player outright is not a
+        /// piece of ground to avoid, it is a death sentence with a radius. 80% is
+        /// the number that makes a stink bomb decisive WITH one shot behind it and
+        /// never on its own.
+        static let doseShare: Double = 0.07
+        static let doseInterval: Double = 0.7
     }
 
     enum Bomb {
@@ -1666,16 +1676,28 @@ enum GameConfig {
 
         /// A golden token, and how often one comes out instead of an ordinary one.
         ///
-        /// Ten tokens is most of a rung of the ladder from a single pickup, so the
-        /// point of it is the moment you see one lying there and change your route -
-        /// and a windfall that arrives on schedule is just a bigger number on the
-        /// counter.
+        /// Five, down from ten, and the number it is now equal to is the point: the
+        /// first rung of the gear ladder costs five. One golden token is exactly one
+        /// step up, which is a relationship a player can feel without being told,
+        /// where ten was "most of a rung and change" and meant nothing in
+        /// particular.
         ///
-        /// One payout in twelve or so, which is the third value this has had and
-        /// the one between the other two. One in fifteen was a thing you heard
-        /// about; one in ten was often enough that a golden token stopped being a
-        /// find and became part of the rate.
-        static let goldenValue = 10
+        /// Ten was also too much money. It made the expected value of a payout 1.72
+        /// tokens against a face value of 1, so most of what the arcades paid came
+        /// from the windfall rather than from the machine - and the windfall is
+        /// rolled per token, so it favoured whoever stood at a cabinet longest. At
+        /// five the expected value is 1.32, which narrows the gap between playing
+        /// the match and guarding a machine by about a fifth. That gap is the thing
+        /// this economy has always had to watch: an arcade is meant to reward
+        /// holding ground, not sitting on it.
+        ///
+        /// The chance is unchanged at one payout in twelve or so, which is the
+        /// third value it has had and the one between the other two. One in fifteen
+        /// was a thing you heard about; one in ten was often enough that a golden
+        /// token stopped being a find and became part of the rate. Halving the
+        /// PRIZE rather than thinning the odds keeps it a thing you spot on the
+        /// grass and change your route for, which is the whole reason it exists.
+        static let goldenValue = 5
         static let goldenChance = 0.08
 
         /// A jackpot: how long one lasts, how often each map machine rolls for one,

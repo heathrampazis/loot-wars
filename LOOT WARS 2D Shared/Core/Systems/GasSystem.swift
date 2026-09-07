@@ -62,8 +62,19 @@ enum GasSystem {
             // standing in it rather than somebody whose head is over it.
             guard cloud.contains(actor.feet) else { continue }
 
+            // A share of THEIR bar, not a flat number off it. A cloud is a piece
+            // of ground being taken away, and ground does not care what helmet is
+            // standing on it - see GameConfig.Stink.doseShare for why a flat six
+            // meant a stink bomb quietly stopped working on exactly the people
+            // worth throwing one at.
+            //
+            // Never less than one. A dose that rounded to nothing would leave the
+            // cloud drawn, hissing and completely harmless, which is worse than
+            // having no cloud at all.
+            let portion = Double(actor.maxHealth) * GameConfig.Stink.doseShare
+
             CombatSystem.damage(id,
-                                amount: GameConfig.Stink.dose,
+                                amount: max(1, Int(portion.rounded())),
                                 from: cloud.owner,
                                 in: world)
         }
