@@ -137,6 +137,22 @@ enum LootSystem {
             // Gear you already beat stays on the grass - see Actor.wantsFromGround.
             guard actor.wantsFromGround(type) else { return false }
 
+            // And a machine you have nowhere to put stays there too.
+            //
+            // One to a base, so a second is unplaceable the moment it is picked up
+            // - it would ride around in a slot until it was sold. That was merely
+            // untidy while everybody had to find their own; now that bots are
+            // issued one when their wall shuts, seven actors who cannot use a
+            // machine would still have been sweeping every one off the map before
+            // the player reached it, and the player is the only one who still has
+            // to FIND theirs. Left where it fell, it is still there when they get
+            // to it.
+            //
+            // Asked of the world rather than the actor because it is a fact about
+            // the base, not about the bag - which is why it lives here rather than
+            // in wantsFromGround with the rest.
+            if case .arcade = type, world.hasArcade(actor.team) { return false }
+
             // Worn if it beats what is on, bagged if it does not - and that rule
             // lives on the Actor, so walking over a helmet and pulling one out of a
             // chest cannot come to different conclusions.
@@ -149,11 +165,17 @@ enum LootSystem {
         }
     }
 
-    /// Whether this actor is standing on something the sweep below is refusing.
+    /// Whether this actor is standing on something their BAG has no room for.
     ///
-    /// The same two questions the sweep asks, in the same order - the hitbox, then
-    /// whether the item can be taken - so a screen that says "you cannot pick that
-    /// up" can never say it about something that is quietly being picked up.
+    /// Deliberately narrower than the sweep's own test, and the difference is the
+    /// hint it drives: "hold an item to sell it", which is advice about a full bag
+    /// and nothing else. The sweep refuses items for two other reasons - gear you
+    /// have already beaten, a machine you have nowhere to put - and neither is
+    /// fixed by selling something, so widening this to match the sweep exactly
+    /// would make the screen give the wrong advice more often rather than less.
+    ///
+    /// It can still never claim a refusal about something being quietly collected:
+    /// a full bag is a strict subset of what the sweep turns down.
     ///
     /// A token is excluded because a token is never refused: it goes to a counter
     /// rather than into a pocket, so it cannot be the thing somebody is standing

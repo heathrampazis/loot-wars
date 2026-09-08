@@ -620,6 +620,7 @@ final class World {
 
         let wanted = GameConfig.Base.chestsOnSeal(forRoomOf: room.count)
         let centre = claims[team]?.centreTile.center ?? .zero
+        let ownedByABot = actors.values.contains { $0.team == team && $0.ai != nil }
         var placed = 0
 
         // Topped UP rather than counted out, because this runs on every reseal now.
@@ -634,24 +635,31 @@ final class World {
             guard let tile = nextChestTile(for: team, near: centre) else { break }
 
             let id = spawnChest(at: tile, owner: team)
-            if actors.values.contains(where: { $0.team == team && $0.ai != nil }) {
-                ChestSystem.stock(id, in: self)
-            }
+            if ownedByABot { ChestSystem.stock(id, in: self) }
             placed += 1
         }
 
-        // And a machine, if the base has not got one.
+        // And a machine, if it is a BOT'S base and it has not got one.
         //
-        // Issued rather than found, which is a reversal worth being plain about.
-        // Machines used to come only out of crates, and the supply was capped by
-        // how many crates existed rather than by how many bases wanted one - so
-        // most bases never had the thing that makes them worth raiding twice. A
-        // base that is finished should be furnished, and a machine is furniture.
+        // The asymmetry is deliberate and it is the same shortcut the chests take
+        // three lines up: bots do not spend a match hunting for a machine, carrying
+        // it home and finding a spot for it, so they are credited with having done
+        // it. Without that, machines went only to whoever opened the right crate,
+        // which meant most bases never had the thing that makes them worth raiding
+        // twice - and a raiding loop that depends on the victim having got lucky is
+        // not a loop.
         //
-        // It still cannot be held: one to a base, destroyed when somebody shoots it
-        // apart, and back only when the wall goes up again. That is what keeps it a
-        // thing to defend rather than a thing you own.
-        if !hasArcade(team), let origin = nextArcadeOrigin(for: team, near: centre) {
+        // You still have to find yours. That is the half worth keeping: crossing
+        // the map for a rare crate, carrying the thing home, and choosing where it
+        // goes is a real errand with a real payoff, and handing it over for nothing
+        // would delete an errand rather than fix one. What the bots' free machine
+        // buys is that there is always somewhere worth taking a bomb - which is a
+        // fact about THEIR bases, and no reason to do your work for you.
+        //
+        // It still cannot be hoarded: one to a base, destroyed when somebody shoots
+        // it apart, and back only when the wall goes up again.
+        if ownedByABot, !hasArcade(team),
+           let origin = nextArcadeOrigin(for: team, near: centre) {
             _ = spawnArcade(at: origin, owner: team)
         }
 
