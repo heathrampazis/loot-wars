@@ -105,6 +105,18 @@ struct AIState {
     /// Spaces out the individual walls within a trip.
     var placeTimer: Double = 0
 
+    /// Stops a bot re-committing to standing something down after it has just
+    /// failed to.
+    ///
+    /// Its own timer rather than a reuse, and the reason is the bug it exists to
+    /// prevent. The stash errand used to back off by resetting buildUrgeTimer,
+    /// which worked exactly as long as the errand was gated on buildUrgeTimer -
+    /// and then that gate was removed to stop finished bases standing empty, and
+    /// nobody noticed that the escape hatch had been unplugged from the door. A
+    /// timer that is only ever read by the branch that sets it cannot come apart
+    /// that way.
+    var stashCooldown: Double = 0
+
     /// A small fixed error added to this bot's aim, re-rolled whenever it changes
     /// its mind. Perfect aim is what makes bots unbeatable and unfun.
     var aimNoise: Double = 0

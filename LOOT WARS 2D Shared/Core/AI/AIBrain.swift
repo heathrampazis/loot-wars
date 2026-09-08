@@ -29,6 +29,7 @@ enum AIBrain {
         state.lootCooldown = max(0, state.lootCooldown - dt)
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
         state.raidUrgeTimer = max(0, state.raidUrgeTimer - dt)
+        state.stashCooldown = max(0, state.stashCooldown - dt)
         state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
 
@@ -257,8 +258,7 @@ enum AIBrain {
         case .stash:
             // Backs off exactly as a build trip does when something is in the way.
             if state.goalAge > GameConfig.Build.patience {
-                state.buildUrgeTimer = Double.random(in: GameConfig.Build.urgeInterval,
-                                                     using: &world.rng)
+                state.stashCooldown = GameConfig.Build.patience
             }
         case .build:
             if state.goalAge > GameConfig.Build.patience {
@@ -551,7 +551,8 @@ enum AIBrain {
         // of it. All the gate ever did was leave a finished base standing empty for
         // up to eight seconds at a time while its owner carried the reason to raid
         // it around the map.
-        if let spot = chestSpotWanted(for: actor, in: world) {
+        if state.stashCooldown <= 0,
+           let spot = chestSpotWanted(for: actor, in: world) {
             return .stash(spot)
         }
 
@@ -1149,6 +1150,11 @@ enum AIBrain {
             steer(&state, actor: actor, to: chest.position)
 
         case .stash(let tile):
+            // Walks at the spot, and the spot is guaranteed not to be under its own
+            // feet - see World.nextChestTile, which is where this was fixed. There
+            // is no stopping here because there is no stopping anywhere: a bot's
+            // command is always .move(heading) at full speed, so "stand still" is
+            // not a thing this brain can express.
             steer(&state, actor: actor, to: tile.center)
 
         case .wreck(let id):

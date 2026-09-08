@@ -145,7 +145,15 @@ enum ShopSystem {
         // And not one your walls have no room for. A machine needs a clear 2 x 3
         // inside the base, and about one base in seven is a small enough rectangle
         // that a chest already leaves it without one.
-        return world.nextArcadeOrigin(for: actor.team, near: actor.position) == nil
+        //
+        // Asked WITHOUT the standing-actor rule, because this is a question about
+        // the walls rather than about the moment. The search skips spots somebody
+        // is standing in - it has to, or a bot would try to drop a machine on its
+        // own head - and reusing that answer here would tell a player their base
+        // was full while they were the only thing filling it.
+        return world.nextArcadeOrigin(for: actor.team,
+                                      near: actor.position,
+                                      avoidingActors: false) == nil
     }
 
     /// What the shop pays for something out of your bag.

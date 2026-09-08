@@ -438,7 +438,14 @@ final class World {
     /// Six tiles rather than one, checked as a block - a footprint half inside a
     /// wall is not a placement. Walks the region in a fixed order so the same seed
     /// puts machines in the same places.
-    func nextArcadeOrigin(for team: TeamID, near position: Vec2) -> GridPoint? {
+    /// - Parameter avoidingActors: whether spots somebody is standing in count as
+    ///   taken. True for anybody about to PUT a machine down, since a solid six
+    ///   tiles cannot appear on top of a person; false for anybody asking the
+    ///   different question of whether the base has room for one at all, which is a
+    ///   fact about the walls and not about where its owner happens to be standing.
+    func nextArcadeOrigin(for team: TeamID,
+                          near position: Vec2,
+                          avoidingActors: Bool = true) -> GridPoint? {
         // The same two-step as nextChestTile, and for the same reason: inside the
         // walls once there are walls, anywhere on your own ground before that.
         let room = enclosure(of: team).room
@@ -451,6 +458,12 @@ final class World {
 
         for origin in ground.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
             let machine = Arcade(id: ArcadeID(-1), origin: origin, owner: team, emitTimer: 0)
+
+            // Six tiles of solid machine, so the same rule as a chest: not on top
+            // of anybody, the placer included.
+            if avoidingActors, actors.values.contains(where: {
+                $0.isAlive && $0.hitbox.intersects(machine.hitbox)
+            }) { continue }
 
             var fits = true
             for tile in machine.tiles {
@@ -542,6 +555,23 @@ final class World {
             guard map[tile] == .floor else { continue }
             guard !structureIntersects(Box(tile: tile)) else { continue }
             guard !trees.contains(where: { $0.overlaps(tile) }) else { continue }
+
+            // Nobody standing on it, and this is the line that stops a bot locking
+            // itself in its own base forever.
+            //
+            // A chest is solid, so ChestSystem.canPlace refuses to drop one where a
+            // living actor is - the placer included. This search did not know that,
+            // so it kept answering with the tile nearest the bot, which after the
+            // walk was the tile the bot was standing on. It arrived, was refused,
+            // re-picked the spot under its own feet, and stayed there.
+            //
+            // Excluded here rather than guarded at the call site because every
+            // caller wants the same thing: the AI errand, the player's placement
+            // preview, and World.furnish, which spawns chests directly and would
+            // otherwise drop one on somebody's head the moment their wall shut.
+            guard !actors.values.contains(where: {
+                $0.isAlive && $0.hitbox.intersects(Box(tile: tile))
+            }) else { continue }
 
             let distance = (tile.center - position).length
             guard distance < shortest else { continue }
