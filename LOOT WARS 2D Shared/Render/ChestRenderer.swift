@@ -40,17 +40,24 @@ final class ChestRenderer {
     }
 
     private func make(_ chest: Chest) {
-        // Sized so the CHEST covers its collision box, not so the exported canvas
-        // does - the picture carries an eighth of its height as empty space, and
-        // drawing to the canvas left the chest visibly smaller than the thing you
-        // bump into.
-        let fit = ArtFit.covering("Chest", GameConfig.Chest.size)
+        // As wide as the box it stands on, and as tall as the art says - measured,
+        // so the exported canvas's transparent margin does not shrink the chest
+        // inside its own footprint.
+        //
+        // Not stretched to the box, which is what it was for one commit. The box is
+        // shorter than the picture on purpose now (see GameConfig.Chest.size), so
+        // covering it squashed the chest by a sixth. Instead the chest STANDS on the
+        // box - its base on the box's base - and the lid overhangs the top, which is
+        // both what a chest looks like and what keeps the gap behind it walkable.
+        let fit = ArtFit.spanning("Chest", width: GameConfig.Chest.size.x)
 
         let sprite = SKSpriteNode(texture: texture, size: fit.size)
 
         let standing = GridGeometry.point(for: chest.position)
+        let footing = standing.y - GridGeometry.length(ofTiles: GameConfig.Chest.size.y / 2)
+
         sprite.position = CGPoint(x: standing.x - fit.content.midX,
-                                  y: standing.y - fit.content.midY)
+                                  y: footing - fit.content.minY)
         sprite.zPosition = 3    // with the crates: above trees, below walls and actors
 
         // A short landing, so a chest you just put down reads as having arrived

@@ -1766,20 +1766,24 @@ enum GameConfig {
             stockTables.last { progress >= $0.from }?.rows ?? stockTables[0].rows
         }
 
-        /// Footprint in tiles, shaped to the artwork rather than the other way
-        /// round: the picture is 462 x 399 of opaque pixels, so 1.158 wide to tall,
-        /// and 0.95 x 0.82 is that shape. ChestRenderer sizes the sprite so the
-        /// chest covers exactly this - the chest you see is the chest you bump into.
+        /// What you BUMP INTO, which is no longer the same as what you see.
         ///
-        /// It was 1.05 x 0.70, a hair under 3:2, because the art used to be. When
-        /// the art was redrawn taller the box did not follow and every chest on the
-        /// map was squashed by a third. Re-export the chest at a different shape and
-        /// these two numbers are what needs to change; nothing else measures it.
+        /// The drawn chest follows the artwork's shape; this does not, and the
+        /// difference is deliberate. A figure is 1.72 tiles tall, so the gap between
+        /// a chest and the wall behind it is the tightest space in the game - see
+        /// MovementSystem.push, which exists because actors wedge in it. Shaping
+        /// this box to a redrawn, taller chest took the height from 0.70 to 0.82 and
+        /// closed every one of those gaps by another eighth of a tile, which put the
+        /// bots straight back to standing in their own furniture.
         ///
-        /// Slightly narrower than it was, deliberately. A chest is furniture in a
-        /// room bots have to walk around, and they have form about getting wedged on
-        /// their own - taller was unavoidable, wider was not.
-        static let size = Vec2(x: 0.95, y: 0.82)
+        /// So the height is the number the wedging was solved against and the art
+        /// does not get a vote in it. ChestRenderer draws the picture at its true
+        /// shape, standing on the bottom of this box, and the lid overhangs by about
+        /// a tenth of a tile - which is what a chest lid does.
+        ///
+        /// The width came down from 1.05 and can stay down: narrower only ever
+        /// widens the gap it has to be walked past in.
+        static let size = Vec2(x: 0.95, y: 0.70)
 
         /// How far past your own hitbox you can reach to open one. Small, because a
         /// chest is solid and you are already touching it when you are beside it.

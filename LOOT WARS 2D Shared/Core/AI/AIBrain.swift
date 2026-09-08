@@ -560,7 +560,17 @@ enum AIBrain {
         // It ends the moment the gear is out of the chest - reArmWanted stops
         // answering once the bot is carrying better than the chest holds - so it
         // cannot become a bot that lives at home.
-        if let chest = reArmWanted(for: actor, in: world) {
+        //
+        // The cooldown gate is not decoration. changeOfMind has always set a loot
+        // cooldown when a re-arm runs past its patience, and for two commits nothing
+        // read it on this path: a bot that could SEE gear in its own chest and not
+        // reach it - wedged between the chest and the wall of a small base, which is
+        // where chests get put - re-picked the same errand every tick and spent the
+        // rest of the match walking into its own furniture. Exactly the failure the
+        // comment above unfinishedBusiness describes, in the one goal that had no
+        // gate. Patience that nothing checks is not patience.
+        if state.lootCooldown <= 0,
+           let chest = reArmWanted(for: actor, in: world) {
             return .rearm(chest.id)
         }
 
