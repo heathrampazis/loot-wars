@@ -932,19 +932,67 @@ enum AIBrain {
                                      in world: World) -> GridPoint? {
         guard let chest = world.chests[chestID] else { return nil }
 
-        var closest: GridPoint?
-        var shortest = GameConfig.Bomb.throwRange
+        // The wall as BUILT, not the plan. A base is whatever encloses ground now,
+        // so a player who walled their own shape has a plan full of empty tiles and
+        // a real wall the raider has to get through - and the plan was what this
+        // aimed at.
+        let ring = world.enclosure(of: chest.owner).wall
+        let candidates = ring.isEmpty
+            ? Set(world.baseLayouts[chest.owner]?.tiles ?? [])
+            : ring
 
-        for tile in world.baseLayouts[chest.owner]?.tiles ?? [] {
-            guard world.map[tile].blockOwner != nil else { continue }
-
-            let distance = (tile.center - actor.position).length
-            guard distance < shortest else { continue }
-            shortest = distance
-            closest = tile
+        func isWall(_ point: GridPoint) -> Bool {
+            world.map[point].blockOwner == chest.owner
         }
 
-        return closest
+        var straight: GridPoint?
+        var straightAway = GameConfig.Bomb.throwRange
+        var anyTile: GridPoint?
+        var anyAway = GameConfig.Bomb.throwRange
+
+        // Sorted, because this picks where a bomb goes.
+        for tile in candidates.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
+            guard isWall(tile) else { continue }
+
+            let distance = (tile.center - actor.position).length
+            guard distance < GameConfig.Bomb.throwRange else { continue }
+
+            if distance < anyAway {
+                anyAway = distance
+                anyTile = tile
+            }
+
+            // A tile in the MIDDLE of a straight run, which is the only kind of
+            // hole worth making.
+            //
+            // Bots were bombing corners, because a corner is what is nearest when
+            // you walk up to a base diagonally and nearest was the whole test. A
+            // corner is the one place on a wall where a blast does not make a
+            // doorway: it takes out the turn and leaves an opening facing two ways
+            // at once, with the standing wall of both arms pinching the diagonal
+            // the raider then has to walk. They would spend the bomb, fail to get
+            // in, and stand outside the hole they had paid for.
+            //
+            // Neighbours on exactly one axis is the whole test. Both axes is a
+            // junction, one of each is a corner, neither is a stub - and none of
+            // the three is a run.
+            let horizontal = isWall(GridPoint(col: tile.col - 1, row: tile.row))
+                && isWall(GridPoint(col: tile.col + 1, row: tile.row))
+            let vertical = isWall(GridPoint(col: tile.col, row: tile.row - 1))
+                && isWall(GridPoint(col: tile.col, row: tile.row + 1))
+
+            guard horizontal != vertical else { continue }
+
+            if distance < straightAway {
+                straightAway = distance
+                straight = tile
+            }
+        }
+
+        // A straight run if there is one in range, and the nearest wall otherwise -
+        // because refusing to raid at all is worse than an awkward hole, and a base
+        // small enough to be all corners is a base worth getting into anyway.
+        return straight ?? anyTile
     }
 
     /// Whether this fight is worth having.
@@ -966,7 +1014,7 @@ enum AIBrain {
         if actor.secondsSinceHit < GameConfig.AI.combatRecency { return true }
 
         let distance = (enemy.position - actor.position).length
-        if distance <= fightRanges(against: enemy, in: world).pressing { return true }
+        if distance <= fightRanges(for: actor, against: enemy, in: world).pressing { return true }
 
         // In its base. Whatever they came for, they are not getting it.
         if world.claim(for: actor.team)?
@@ -982,7 +1030,7 @@ enum AIBrain {
         // further away they are the more they have to be worth. Somebody a step
         // outside arm's length is worth going for; the same person at the edge of
         // vision is somebody else's problem.
-        let ranges = fightRanges(against: enemy, in: world)
+        let ranges = fightRanges(for: actor, against: enemy, in: world)
         let band = max(0.001, ranges.engage - ranges.pressing)
         let reach = min(1, (distance - ranges.pressing) / band)
 
@@ -1182,7 +1230,7 @@ enum AIBrain {
         // fight and they would both wander off.
         guard let enemy = world.actors[id], enemy.isAlive,
               (enemy.position - actor.position).length
-                <= fightRanges(against: enemy, in: world).disengage else {
+                <= fightRanges(for: actor, against: enemy, in: world).disengage else {
             state.goal = .wander
             state.goalAge = 0
             return
@@ -1196,7 +1244,7 @@ enum AIBrain {
 
         // Too close, or nothing loaded: give ground. Backing off no longer costs a
         // bot its shot, so this is a reposition rather than a surrender.
-        let ranges = fightRanges(against: enemy, in: world)
+        let ranges = fightRanges(for: actor, against: enemy, in: world)
 
         if gap < ranges.minimum || actor.ammo <= 0 {
             let escape = breakOffPoint(for: actor, awayFrom: enemy, in: world) - actor.position
@@ -1265,8 +1313,10 @@ enum AIBrain {
         let pressing: Double
     }
 
-    static func fightRanges(against target: Actor?, in world: World) -> FightRanges {
-        let engage = engageLimit(against: target, in: world)
+    static func fightRanges(for actor: Actor,
+                            against target: Actor?,
+                            in world: World) -> FightRanges {
+        let engage = engageLimit(for: actor, against: target, in: world)
 
         return FightRanges(engage: engage,
                            preferred: engage * GameConfig.AI.preferredFraction,
@@ -1287,13 +1337,25 @@ enum AIBrain {
     /// tiles to the side, in plain view, because somebody ten tiles ABOVE would
     /// have been off screen. Now the limit is the distance to the screen edge along
     /// the line to the target: nearly eleven tiles sideways, five straight up.
-    private static func engageLimit(against target: Actor?, in world: World) -> Double {
+    private static func engageLimit(for actor: Actor,
+                                    against target: Actor?,
+                                    in world: World) -> Double {
         let ceiling = GameConfig.AI.engageRange
 
         guard let target, target.id == world.localPlayerID,
               let player = world.actors[world.localPlayerID] else { return ceiling }
 
-        let towards = target.position - player.position
+        // From the camera to the BOT, which is the question this was always meant
+        // to be asking and never was. It measured player-to-target - and the target
+        // IS the player in the only branch that gets here, so the vector was
+        // identically zero and the fallback direction took over every single time.
+        //
+        // That fallback is (1, 0), so the answer was always the horizontal
+        // half-extent. On a phone in landscape that is the LONG axis: a bot
+        // directly above or below the player was cleared to open fire from about
+        // eleven tiles when the screen shows four and a half that way. Being shot
+        // by something you cannot see was never fixed, it was only fixed sideways.
+        let towards = actor.position - player.position
         let direction = towards.length > 0.001 ? towards.normalized() : Vec2(x: 1, y: 0)
 
         let half = world.visibleHalfExtent
@@ -1784,7 +1846,7 @@ enum AIBrain {
         guard away.length > 0.01 else { return home }
 
         let escape = actor.position + away.normalized() * GameConfig.AI.breakOffDistance
-        let urgency = max(0, min(1, 1 - away.length / fightRanges(against: threat, in: world).engage))
+        let urgency = max(0, min(1, 1 - away.length / fightRanges(for: actor, against: threat, in: world).engage))
 
         return escape * urgency + home * (1 - urgency)
     }
@@ -1802,7 +1864,7 @@ enum AIBrain {
                     && $0.isAlive
                     && $0.invulnerability <= 0
                     && ($0.position - actor.position).length
-                        < fightRanges(against: $0, in: world).engage
+                        < fightRanges(for: actor, against: $0, in: world).engage
             }
             // Nearest first - but weighted by standing, so a bot will walk past
             // somebody nearer to go after whoever is winning. Ties broken by id, so

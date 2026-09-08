@@ -852,15 +852,22 @@ enum GameConfig {
         /// uncertain by about one body width wherever it is standing - which is
         /// what 0.12 radians used to work out at, at the range fights used to
         /// happen at.
-        /// Down from 1.0, and the arithmetic is worth stating because this is the
-        /// single number that decides how hard the game is. The noise is uniform
-        /// across the spread and the target is 0.9 tiles wide, so an aim-limited
-        /// hit rate is 0.45 / spread: 45% at 1.0, and 54% at 0.83. A fifth more of
-        /// their shots landing is what "too easy" was asking for, and it is a fifth
-        /// rather than a half because doubling a bot's accuracy does not make a
-        /// game harder, it makes it unfair - the player still has to be able to
-        /// cross open ground.
-        static let aimSpread: Double = 0.83
+        /// The arithmetic is worth stating because this is the single number that
+        /// decides how hard the game is. The noise is uniform across the spread and
+        /// the target is 0.9 tiles wide, so an aim-limited hit rate is 0.45 /
+        /// spread: 54% at 0.83, 45% at 1.0, 35% at 1.3.
+        ///
+        /// 1.3, up from 0.83. It went DOWN to 0.83 when the complaint was that the
+        /// game was too easy, and that was the right move against the game as it
+        /// was then - but a bot at 54% is a bot that wins nearly every exchange it
+        /// starts, and everything since has quietly made losing one cost more:
+        /// death takes all your gear now, not two rungs of it.
+        ///
+        /// Fixed the other way round, this is also the number to be most careful
+        /// with. Doubling a bot's accuracy does not make a game harder, it makes it
+        /// unfair - the player still has to be able to cross open ground - and the
+        /// same is true in reverse, so this is a third off rather than a half.
+        static let aimSpread: Double = 1.3
 
         /// Chance, at each change of mind, that a bot reverses the way it is
         /// circling. Never reversing reads as a machine on rails; reversing every
