@@ -805,19 +805,6 @@ final class World {
     /// purpose: this answers "is now a bad moment", which wants to be true a little
     /// too often rather than a little too rarely. Something that is deciding
     /// whether to interrupt the player should err towards not.
-    /// Whether somebody who is not on this team is standing inside its claim.
-    ///
-    /// The claim rather than the walls, so it is true while they are still picking
-    /// their way in through the hole as well as once they are at the chest - by the
-    /// time somebody is standing ON your chest, being told about it is a postmortem.
-    func intruderInBase(of team: TeamID) -> Bool {
-        guard let claim = claims[team] else { return false }
-
-        return actors.values.contains {
-            $0.isAlive && $0.team != team && claim.contains(GridPoint(containing: $0.feet))
-        }
-    }
-
     func enemyNear(_ actor: Actor, within reach: Double) -> Bool {
         actors.values.contains {
             $0.isAlive && $0.team != actor.team
