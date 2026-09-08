@@ -593,17 +593,17 @@ enum GameConfig {
         /// Everybody respawns to the same floor, bots included, which is what stops
         /// the last minute filling up with free kills.
         static let respawnFloor: [(progress: Double, helmet: HelmetTier, blaster: BlasterTier)] = [
-            (0.50, .common,    .two),
-            (0.70, .epic,      .three),
-            // The floor is what somebody who has just died fights the last forty
-            // seconds in, and it has to be measured against what the map is WEARING
-            // by then rather than against a tier name. It used to top out at Epic,
-            // three fifths of the way up a seven-rung ladder; Legendary is three
-            // fifths of the way up a five-rung one. Same floor, renamed by the
-            // ladder underneath it - and still well under what the shop and the
-            // chests are handing out at that point, which is what keeps it a way
-            // back into the fight rather than a reward for dying.
-            (0.85, .legendary, .four)
+            // Cut right back, because death now takes everything and a generous
+            // floor would hand most of it straight back. What is left is the
+            // anti-spectator valve and nothing more: enough that somebody killed in
+            // the last minute is not walking into gunfire bare-headed with no time
+            // to do anything about it, and far short of a rebuild.
+            //
+            // The real floor is your own chest, which is the entire point. This one
+            // exists for the player who has no base left to go back to - and it is
+            // deliberately worse than what one trip home would give them.
+            (0.60, .common, .two),
+            (0.85, .epic,   .three)
         ]
 
         /// What a respawn is worth right now, or nil in the opening half when it is
@@ -1295,38 +1295,6 @@ enum GameConfig {
 
         static let maximumChance = 0.80
 
-        /// How many rungs death costs, per ladder, and it EASES as the clock runs
-        /// down.
-        ///
-        /// Two helmet rungs and one blaster rung to start with, rather than
-        /// everything - see CombatSystem.kill for why stripping the lot did not set
-        /// a player back so much as take them out of the match.
-        ///
-        /// One helmet rung in the closing third, because that is where the
-        /// complaint actually lives: late deaths are the ones there is no time to
-        /// recover from, and a match whose last minute is fought by people who have
-        /// been knocked back down the ladder is a match that gets less interesting
-        /// exactly as it should be getting more so. Simulated across 30,000
-        /// matches, the taper is worth about half a rung of gear in the closing
-        /// minute to an engaged player and a full one to a strong player - and it
-        /// WIDENS the gap between them, because it lets people keep what they
-        /// earned rather than handing anybody anything.
-        /// Steeper now, on both ladders. Two rungs off a seven-rung helmet ladder
-        /// was 29% of the climb; the ladder is five rungs and the same two would
-        /// have been 40%, so the setback had already grown without anybody choosing
-        /// it - and the complaint is that dying still does not cost enough. Three
-        /// early and two late puts a Cosmic back to an Epic for a death in the
-        /// opening two thirds, and the blaster now goes with it rather than trailing
-        /// a rung behind: the two ladders are the same length and the same price, so
-        /// there is no longer any reason for them to be lost at different rates.
-        ///
-        /// The taper stays, and it is not softness. Late deaths are the ones there
-        /// is no time to recover from, and a match whose last minute is fought by
-        /// people who have just been knocked to the bottom of the ladder gets less
-        /// interesting exactly as it should be getting more so.
-        static func rungsLost(at progress: Double) -> (helmet: Int, blaster: Int) {
-            progress >= 0.70 ? (helmet: 2, blaster: 1) : (helmet: 3, blaster: 2)
-        }
 
         /// The share of your unspent tokens that spills on the ground when you die.
         ///

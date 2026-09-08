@@ -180,6 +180,18 @@ enum AIBrain {
             commands.append(.takeItem(chest: chest.id, slot: slot))
         }
 
+        // Standing at its OWN chest under-equipped: take the gear back out.
+        //
+        // Bots only ever emptied chests belonging to somebody else, which was fine
+        // while dying cost a rung or two. It takes everything now, so a bot with a
+        // stocked chest ten tiles away and nothing on its head has to be able to do
+        // the obvious thing - and it is the same obvious thing the player has to
+        // learn to do, demonstrated seven times a match.
+        if let chest = world.reachableChest(for: actor), chest.owner == actor.team,
+           let slot = gearWorthTaking(from: chest, actor: actor) {
+            commands.append(.takeItem(chest: chest.id, slot: slot))
+        }
+
         if world.reachableLootbox(for: actor) != nil {
             commands.append(.openLootbox)
 
@@ -222,6 +234,13 @@ enum AIBrain {
             } ?? true
 
             if arrived || state.goalAge > GameConfig.AI.lootPatience {
+                state.lootCooldown = GameConfig.AI.lootCooldown
+            }
+        case .rearm:
+            // The same clock a crate gets. A bot that cannot reach its own chest
+            // has usually had its base taken apart around it, and standing in the
+            // rubble is not the answer.
+            if state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
             }
         case .stash:
@@ -337,7 +356,7 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash:
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm:
             // All interruptible. A bot laying bricks - or lining up a throw, or
             // waiting on a payout - while somebody shoots at it is not a bot
             // anyone believes in.
@@ -440,6 +459,19 @@ enum AIBrain {
            state.blocksLeftToLay > 0,
            let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
+        }
+
+        // Nothing on its head and a chest at home that has something. Above every
+        // other errand and all of the aggression, because a bot that has just
+        // respawned bare is not going to win the fight it is walking into, and the
+        // whole reason this game asks anybody to keep a base is that it is the
+        // thing you come back to.
+        //
+        // It ends the moment the gear is out of the chest - reArmWanted stops
+        // answering once the bot is carrying better than the chest holds - so it
+        // cannot become a bot that lives at home.
+        if let chest = reArmWanted(for: actor, in: world) {
+            return .rearm(chest.id)
         }
 
         // A chest in the bag and a base to put it in. Above the aggression list
@@ -908,6 +940,18 @@ enum AIBrain {
         case .stash(let tile):
             steer(&state, actor: actor, to: tile.center)
 
+        case .rearm(let id):
+            // Emptied, or taken while the bot was walking. Re-decide immediately
+            // rather than standing at a bare chest waiting out a timer.
+            guard let chest = world.chests[id],
+                  gearWorthTaking(from: chest, actor: actor) != nil else {
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+                return
+            }
+            steer(&state, actor: actor, to: chest.position)
+
         case .build(let tile):
             steer(&state, actor: actor,
                   to: standingSpot(for: tile, team: actor.team, in: world))
@@ -1204,6 +1248,61 @@ enum AIBrain {
     ///
     /// Takes the biggest heal it can hold first, then anything else - a raider
     /// with one trip's worth of pockets should leave with the good stuff.
+    /// The slot in a chest holding gear this actor would rather be wearing.
+    ///
+    /// Gear only, and strictly an upgrade. A bot emptying its own chest of bandages
+    /// would be a bot undoing the thing it built the chest for, and a bot swapping
+    /// its Legendary for the Epic it stored last minute would be worse than useless.
+    private static func gearWorthTaking(from chest: Chest, actor: Actor) -> Int? {
+        var best: Int?
+        var bestGain = 0
+
+        for (index, slot) in chest.contents.slots.enumerated() {
+            guard let stack = slot, actor.canAcquire(stack.type) else { continue }
+
+            var gain = 0
+
+            switch stack.type {
+            case .helmet(let tier) where tier > actor.helmet:
+                gain = tier.rawValue - actor.helmet.rawValue
+            case .blaster(let tier) where tier > actor.blaster:
+                gain = tier.rawValue - actor.blaster.rawValue
+            default:
+                continue
+            }
+
+            // The biggest jump first, so a bot standing at a chest holding both a
+            // helmet and a gun reaches for whichever it is further behind on.
+            guard gain > bestGain else { continue }
+            bestGain = gain
+            best = index
+        }
+
+        return best
+    }
+
+    /// Its own chest, if going home would put it back in the fight.
+    ///
+    /// Nearest first rather than best-stocked: a bot deciding between two of its own
+    /// chests should walk to the near one, and by the time it gets there the far one
+    /// is a second trip it can decide on separately.
+    private static func reArmWanted(for actor: Actor, in world: World) -> Chest? {
+        var best: Chest?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for id in world.chests.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let chest = world.chests[id], chest.owner == actor.team else { continue }
+            guard gearWorthTaking(from: chest, actor: actor) != nil else { continue }
+
+            let distance = (chest.position - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = chest
+        }
+
+        return best
+    }
+
     private static func slotWorthRobbing(from chest: Chest, actor: Actor) -> Int? {
         var best: Int?
         var bestValue = -1
@@ -1342,7 +1441,7 @@ enum AIBrain {
             target = tile
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
-        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash:
+        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash, .rearm:
             target = nil
         }
 
@@ -1574,7 +1673,7 @@ enum AIBrain {
         switch state.goal {
         case .fight(let id):   targetID = id
         case .retreat(let id): targetID = id
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash:
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm:
             targetID = nil
         }
 

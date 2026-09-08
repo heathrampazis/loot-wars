@@ -151,24 +151,30 @@ enum CombatSystem {
         // three tiers up, and no time left to climb again. The closing minutes were
         // decided by who had most recently died.
         //
-        // Two helmet rungs and one blaster rung. Enough to be a real loss - a
-        // Legendary comes back an Epic, and being killed twice in a row genuinely
-        // hurts - without ending anyone's match, and it stacks correctly with the
-        // respawn floor, which catches whatever is left at the bottom.
+        // EVERYTHING. You stand up bare-headed with a starter blaster, whatever
+        // you were wearing and whenever it happened.
         //
-        // What DROPS is the rung you lost, at the odds that rung has always
+        // This is the third setting for this and the only one that makes a base
+        // mean anything. Losing a rung or two was a setback you walked off; the
+        // gear you were wearing was still most of the gear you had, so there was
+        // never a reason to put a spare anywhere. A chest was a thing you filled
+        // for other people to steal.
+        //
+        // Now the only gear that survives your death is gear you were not carrying,
+        // which is to say gear in a chest, which is to say gear behind a wall you
+        // built. Dying costs you everything you had on you and nothing you put
+        // away, and that sentence is the whole loop this game has been missing:
+        // build, bank, and try not to die.
+        //
+        // What DROPS is what you were wearing, at the odds that rung has always
         // carried. That is what keeps a well-equipped actor worth hunting rather
-        // than merely worth avoiding: killing somebody in a Legendary is still how
-        // you get one. The chance keeps it a gamble rather than a transaction, and
-        // it rises with tier, so the good stuff is still the stuff worth chasing.
-        // How much a death costs eases as the clock runs down - see
-        // GameConfig.Drops.rungsLost.
-        let cost = GameConfig.Drops.rungsLost(at: world.matchProgress)
-
+        // than merely worth avoiding - killing somebody in a Cosmic is still how
+        // you get one - and it is also what stops the strip being pure destruction:
+        // the gear does not evaporate, it changes hands.
         let hadHelmet = actor.helmet
-        actor.helmet = HelmetTier(rawValue: max(0, hadHelmet.rawValue - cost.helmet)) ?? .none
+        actor.helmet = .none
 
-        if hadHelmet != actor.helmet {
+        if hadHelmet > .none {
             drop(.item(.helmet(hadHelmet)), chance: hadHelmet.dropChance,
                  at: actor.position, in: world)
         }
@@ -176,11 +182,9 @@ enum CombatSystem {
         // A starter blaster never drops - everybody already has one, so scattering
         // them would only be a way of finding nothing. dropChance answers that.
         let hadBlaster = actor.blaster
-        actor.blaster = BlasterTier(rawValue: max(BlasterTier.starting.rawValue,
-                                                  hadBlaster.rawValue - cost.blaster))
-            ?? .starting
+        actor.blaster = .starting
 
-        if hadBlaster != actor.blaster {
+        if hadBlaster > .starting {
             drop(.item(.blaster(hadBlaster)), chance: hadBlaster.dropChance,
                  at: actor.position, in: world)
         }

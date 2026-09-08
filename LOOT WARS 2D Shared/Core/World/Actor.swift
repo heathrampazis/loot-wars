@@ -229,9 +229,29 @@ struct Actor {
     /// chest is a decision somebody made on purpose, and a raider standing in an
     /// enemy base looking at a Rare helmet they cannot use may still want it for
     /// the tokens - see ChestSystem, which asks canAcquire.
+    /// Whether walking over this is worth stopping for.
+    ///
+    /// An upgrade always is. A SPARE now is too, and that is a reversal: gear worse
+    /// than what you had on used to be left on the grass, because picking it up was
+    /// clutter with nothing to spend it on - the bag filled with helmets nobody had
+    /// a use for.
+    ///
+    /// There is a use for them now. Dying takes everything, so a spare in a chest
+    /// is the difference between coming back and starting again, and a rule that
+    /// refuses to let you carry one home is a rule against the whole point of
+    /// owning a base.
+    ///
+    /// Everything except the bottom rung. A Common helmet and a Blaster 2 are what
+    /// the crates hand out in the first minute and what the respawn floor gives
+    /// away for free, so banking one is banking nothing - and those two are exactly
+    /// the items that would otherwise fill four slots with litter on the walk home.
     func wantsFromGround(_ type: ItemType) -> Bool {
-        if case .helmet(let tier) = type { return tier > helmet }
-        if case .blaster(let tier) = type { return tier > blaster }
+        if case .helmet(let tier) = type {
+            return tier > helmet || (tier > .common && canAcquire(type))
+        }
+        if case .blaster(let tier) = type {
+            return tier > blaster || (tier > .two && canAcquire(type))
+        }
         return canAcquire(type)
     }
 

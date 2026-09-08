@@ -28,6 +28,8 @@ enum AIGoal: Equatable {
     case robChest(ChestID)
     /// Walk home to stand a carried chest up.
     case stash(GridPoint)
+    /// Walk home to take gear back OUT of your own chest.
+    case rearm(ChestID)
 
     var isBuild: Bool {
         if case .build = self { return true }
@@ -54,6 +56,7 @@ enum AIGoal: Equatable {
 
     var debugName: String {
         switch self {
+        case .rearm: return "re-arm"
         case .wander: return "roam"
         case .loot: return "loot"
         case .collect: return "grab"
