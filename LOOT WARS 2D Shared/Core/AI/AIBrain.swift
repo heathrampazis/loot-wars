@@ -293,7 +293,9 @@ enum AIBrain {
             // armful, and not the priority bump, is what closes that gap.
             let armful: ClosedRange<Int>
 
-            if world.baseIsBreached(actor.team) {
+            if !state.baseWasComplete {
+                armful = GameConfig.Build.blocksWhenUnsealed
+            } else if world.baseIsBreached(actor.team) {
                 armful = GameConfig.Build.blocksWhenBreached
             } else if world.isFallingBehind(actor.team) {
                 armful = GameConfig.Build.blocksWhenBehind
@@ -420,6 +422,29 @@ enum AIBrain {
         // not the slow business of building - it is a door standing open, and the
         // chest behind it is being emptied while the bot thinks about it.
         if state.baseWasComplete, world.baseIsBreached(actor.team),
+           let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
+        }
+
+        // The FIRST wall, before anything but a fight.
+        //
+        // Walls cost nothing. There is no material to fetch, nothing spent, no
+        // reason on earth for a bot to have an unfinished base four minutes in -
+        // and every version of "make them build faster" so far has been a rate,
+        // when the thing actually holding them up was the queue. Below this line
+        // sit gear detours, raiding, errands and shopping, and each of them fires
+        // readily enough that the build urge underneath rarely got its turn.
+        //
+        // Only until the base has closed ONCE. After that building goes back to
+        // its usual place on the urge timer, and a hole in a finished base is
+        // handled above this anyway. So it is not a rule that turns bots into
+        // bricklayers - it is a rule that says the opening two minutes are for
+        // getting the thing up, which is what the opening two minutes are for.
+        //
+        // Still on the urge timer, so a bot lays an armful, goes and does
+        // something else for three or four seconds, and comes back. It builds fast
+        // without going deaf to the rest of the match.
+        if !state.baseWasComplete, state.buildUrgeTimer <= 0,
            let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
         }
@@ -632,10 +657,30 @@ enum AIBrain {
     /// shoots at this bot.
     private static func upgradeWorthTheDetour(for actor: Actor,
                                               in world: World) -> GroundItem? {
+        // A genuine upgrade, which this did not check.
+        //
+        // The filter was "is it a helmet, a blaster or a perk" - any tier, any
+        // rung - while the comment above claimed it only ever answered with an
+        // upgrade. A bot in a Cosmic would set off across fourteen tiles for a
+        // Common, and this branch sits above the build urge, so it fired on nearly
+        // every decision and building never got its turn.
+        //
+        // Harmless once, and then two things made it the reason bases stopped
+        // going up. Death started stripping ALL gear, so every kill scatters a
+        // helmet and a blaster at up to four-in-five odds and the map is now
+        // carpeted in the stuff; and spares became worth picking up, so the bot
+        // that walked over the Common took it as well. Between them there was
+        // always some gear within range, and a bot with a base to build spent the
+        // opening two minutes shopping.
         let candidate = nearestItem(to: actor, in: world, include: { pickup in
-            switch pickup {
-            case .item(.helmet), .item(.blaster), .item(.perk): return true
-            case .item, .token: return false
+            guard case .item(let type) = pickup else { return false }
+
+            switch type {
+            case .helmet(let tier):  return tier > actor.helmet
+            case .blaster(let tier): return tier > actor.blaster
+            // Always worth the walk: one perk is one perk whatever you are wearing.
+            case .perk:              return true
+            case .bandage, .medkit, .bomb, .stink, .chest, .arcade: return false
             }
         })
 

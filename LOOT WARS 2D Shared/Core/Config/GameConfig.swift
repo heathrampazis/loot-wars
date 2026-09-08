@@ -1175,6 +1175,17 @@ enum GameConfig {
         /// ones, and an armful sized for yesterday's hole is how a base ends up
         /// permanently half open - at which point nobody needs a bomb to get in and
         /// the whole exchange stops being a raid.
+        /// Walls laid per trip on a base that has never been shut.
+        ///
+        /// The biggest armful there is, because the first wall is the only one
+        /// where finishing it is worth more than anything else the bot could be
+        /// doing - until it is up there is no chest, no machine, no income and
+        /// nothing for anybody to raid, which is three quarters of the game
+        /// waiting on a job that costs nothing to do.
+        ///
+        /// A plan is 24 to 32 tiles, so at this size a base is two trips.
+        static let blocksWhenUnsealed: ClosedRange<Int> = 16...22
+
         static let blocksWhenBreached: ClosedRange<Int> = 16...20
 
         /// Walls laid per trip by a bot that is behind.
