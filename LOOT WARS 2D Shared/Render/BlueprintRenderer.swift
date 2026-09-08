@@ -88,19 +88,20 @@ final class BlueprintRenderer {
 
     /// How far from your feet a tile is still worth showing, in tiles.
     ///
-    /// Four and a half is most of a base's side, so walking one edge lights that
-    /// edge and little else. Wider and it becomes the box round the whole plan that
-    /// reads as scenery; narrower and you are standing on the only ghost you can
-    /// see, which teaches the tile rather than the shape.
-    private static let reach: Double = 4.5
+    /// Three and a half rather than four and a half. Most of a base's side was
+    /// still too much: a run that long reaches the corner, and once you can see the
+    /// corner you are reading a shape rather than being shown a next move. This is
+    /// a couple of paces - what you could lay without walking anywhere.
+    private static let reach: Double = 3.5
 
     /// The most markers drawn at once.
     ///
-    /// Eight, down from fourteen. With a halo the cap was the only thing keeping
-    /// the screen readable and it was not enough; with an outline it is a stretch
-    /// of wall running away from you, and eight of those is a clear instruction
-    /// where fourteen is a boundary fence.
-    private static let maximum = 8
+    /// Four, down from eight and fourteen before that. Each cut has been the same
+    /// discovery: the markers are a SUGGESTION and a suggestion gets weaker the
+    /// more of it there is. Fourteen was a boundary fence, eight was a clear
+    /// instruction, and four is a hint - enough to say which way the wall is going
+    /// without drawing the wall for you.
+    private static let maximum = 4
 
     /// The shortest side a recommended base can have.
     ///

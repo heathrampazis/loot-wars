@@ -836,12 +836,22 @@ final class World {
             return BaseEnclosure(room: [], wall: [], ownWalls: [])
         }
 
+        func isWall(_ point: GridPoint) -> Bool {
+            guard map.contains(point) else { return true }
+            if map.isOccupied(point) { return true }
+            return trees.contains { $0.overlaps(point) }
+        }
+
         let found = BaseEnclosure.compute(
             claim: claim,
-            solid: { [self] point in
-                guard map.contains(point) else { return true }
-                if map.isOccupied(point) { return true }
-                return trees.contains { $0.overlaps(point) }
+            solid: isWall,
+
+            // Plus whatever is standing on the ground. A crate in the last gap is a
+            // gap nobody can walk through and nobody can build on, so it has to hold
+            // the base shut - see BaseEnclosure, where the two questions are why
+            // this takes two closures.
+            blocks: { [self] point in
+                isWall(point) || structureIntersects(Box(tile: point))
             },
             ownWall: { [self] point in map[point].blockOwner == team }
         )

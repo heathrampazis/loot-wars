@@ -26,10 +26,32 @@
 //  the one telling the truth about it.
 //
 //  Trees count as wall. They are permanent, they block, and building against one is
-//  the sort of thing a player should be rewarded for noticing. Furniture does not:
-//  a chest is what goes INSIDE a base, and letting one double as masonry would mean
-//  a base could seal because loot landed in the last gap - which, since chests
-//  arrive when a base seals, is a loop worth not opening.
+//  the sort of thing a player should be rewarded for noticing.
+//
+//  FURNITURE HOLDS THE WALL IN WITHOUT BEING PART OF IT, and the split is the fix
+//  for a base that could never be finished.
+//
+//  A crate, a chest or a machine stops a person walking onto its tile, and it also
+//  stops anyone BUILDING there - BuildSystem.isBuildableTile refuses a tile with a
+//  structure on it. So a crate sitting in the line somebody is walling along used to
+//  be a tile that could not be built on and did not count as wall: a permanent,
+//  unfixable hole. The player walls up to it on both sides, cannot walk through the
+//  result, sees a finished base, and the game quietly goes on saying the base is
+//  open - no chests, no income, no seal. There is no marker on that tile either,
+//  because the markers only show what can be built, so nothing on screen says which
+//  tile is the problem. Two rules disagreed about what a solid thing is, and the
+//  player was left in the gap between them.
+//
+//  So the fill is stopped by anything a PERSON cannot walk through, while the room
+//  is measured against the masonry alone. A crate in a gap seals a base; the tile it
+//  stands on is still floor inside that base.
+//
+//  Kept out of the room count deliberately, and this is the trap in the other
+//  direction. Counting furniture as solid for BOTH questions would take every chest
+//  and all six tiles of a machine out of the room - so a base near the size floor
+//  would UNSEAL itself the moment it was furnished, and since furnishing is what
+//  sealing does, a base could seal and unseal in the same frame. That is the loop
+//  worth not opening, and it is why these are two closures rather than one.
 //
 //  There is a floor on the size, and it is the only thing standing between this and
 //  a nine-wall phone box. See GameConfig.Base.minimumRoom.
@@ -53,12 +75,17 @@ struct BaseEnclosure {
     var isSealed: Bool { room.count >= GameConfig.Base.minimumRoom }
 
     /// - Parameters:
-    ///   - solid: whether a tile stops somebody walking through it.
+    ///   - solid: whether a tile is WALL - masonry, terrain or a tree. What holds
+    ///     the room in, and what is not counted as part of it.
+    ///   - blocks: whether a tile stops somebody walking onto it, which is the same
+    ///     thing plus the furniture standing on the ground. Only the fill asks this,
+    ///     so a crate can plug a gap without eating the floor it stands on.
     ///   - ownWall: whether a tile is a wall belonging to the team being asked
     ///     about, which is what separates "extend your base" from "there is a rock
     ///     here".
     static func compute(claim: BaseClaim,
                         solid: (GridPoint) -> Bool,
+                        blocks: (GridPoint) -> Bool,
                         ownWall: (GridPoint) -> Bool) -> BaseEnclosure {
         let low = claim.origin
         let high = GridPoint(col: low.col + claim.size - 1,
@@ -74,17 +101,22 @@ struct BaseEnclosure {
         var open: Set<GridPoint> = []
         var queue: [GridPoint] = []
 
+        // Reached, but not walked THROUGH. A tile with a crate on it can be stood
+        // next to from outside, so it is not enclosed and must not be counted as
+        // room - otherwise every crate lying loose on a claim would add a tile to
+        // the tally and enough of them would seal a base that has no walls at all.
+        // But nobody gets past it either, so the fill stops there.
+        func reach(_ p: GridPoint) {
+            guard !solid(p), open.insert(p).inserted else { return }
+            guard !blocks(p) else { return }
+            queue.append(p)
+        }
+
         for col in low.col...high.col {
-            for row in [low.row, high.row] {
-                let p = GridPoint(col: col, row: row)
-                if !solid(p), open.insert(p).inserted { queue.append(p) }
-            }
+            for row in [low.row, high.row] { reach(GridPoint(col: col, row: row)) }
         }
         for row in low.row...high.row {
-            for col in [low.col, high.col] {
-                let p = GridPoint(col: col, row: row)
-                if !solid(p), open.insert(p).inserted { queue.append(p) }
-            }
+            for col in [low.col, high.col] { reach(GridPoint(col: col, row: row)) }
         }
 
         var head = 0
@@ -96,8 +128,8 @@ struct BaseEnclosure {
                          GridPoint(col: p.col - 1, row: p.row),
                          GridPoint(col: p.col, row: p.row + 1),
                          GridPoint(col: p.col, row: p.row - 1)] {
-                guard inside(next), !solid(next) else { continue }
-                if open.insert(next).inserted { queue.append(next) }
+                guard inside(next) else { continue }
+                reach(next)
             }
         }
 
