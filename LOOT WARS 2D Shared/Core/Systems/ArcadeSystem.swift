@@ -98,8 +98,8 @@ enum ArcadeSystem {
     /// How many tokens this machine will let pile up before it stops.
     ///
     /// The anti-camping valve, and the answer to "why build a base" in one number.
-    /// A machine in the open holds four, so standing at one never beats moving
-    /// between them. A machine behind a wall that is STANDING holds eight, because
+    /// A machine in the open holds three, so standing at one never beats moving
+    /// between them. A machine behind a wall that is STANDING holds five, because
     /// nothing is going to walk off with them - which turns it from a thing you
     /// babysit into a thing that earns while you are out playing the match.
     ///
@@ -118,8 +118,8 @@ enum ArcadeSystem {
     ///
     /// Without this the bank above is a fiction. Tokens live ten seconds, which
     /// is the right number for a machine standing in the open - the pile is a thing
-    /// you catch, not a thing you find - but it means eight of them can never
-    /// coexist: at two seconds a token the first has expired before the fifth
+    /// you catch, not a thing you find - but it means a full bank can never
+    /// coexist: at 2.4 seconds a token the first has expired before the fifth
     /// exists, and a base that banks nothing is a base that pays nothing.
     ///
     /// Behind a shut wall they keep for the best part of a minute, which is the

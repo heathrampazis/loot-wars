@@ -166,9 +166,12 @@ enum GameConfig {
         /// A rare one is worth going out of your way for, and this is part of why.
         static let perRareLootbox = 4
 
-        /// Tokens for cracking somebody's chest. More than a rare crate, because a
-        /// rare crate does not shoot back.
-        static let perChestRaided = 7
+        /// Tokens for cracking somebody's chest. Still more than a rare crate,
+        /// because a rare crate does not shoot back.
+        ///
+        /// 3 rather than 7. The haul out of a chest is the ITEMS - two of them, and
+        /// they are the reason to go - so this is a tip on top rather than a wage.
+        static let perChestRaided = 3
     }
 
     /// What tokens buy.
@@ -984,17 +987,22 @@ enum GameConfig {
         /// The units are arbitrary and only the RATIO matters: at ten a point and a
         /// tile a point, an item is worth ten tiles of walking, so a four-item
         /// chest pulls a raider four times as far as a one-item chest. A machine
-        /// counts for more than any single item because blowing one up pays
-        /// twenty-five tokens on its own - it is the only thing in a base that is
-        /// worth raiding even when the chests are bare.
+        /// counts for more than any single item - it is the only thing in a base
+        /// that is worth raiding even when the chests are bare.
         static let chestItemWorth = 10
 
         /// What a standing machine adds to a base's worth as a target.
         ///
-        /// Two and a half items, which is about right against what wrecking one
-        /// actually pays: 40 points and 25 tokens, and it takes the owner's best
-        /// income away for as long as it takes them to rebuild. A base with a
-        /// machine in it is worth breaking into even if the chests are bare.
+        /// Two and a half items, and most of that is the DENIAL rather than the
+        /// take. Wrecking one pays 40 points and 5 tokens, and the bank standing
+        /// beside it is a handful more - but what it really does is remove the
+        /// owner's best income until they rebuild, and that is worth crossing a map
+        /// for whatever the chests hold.
+        ///
+        /// Unchanged when the wrecking reward was cut from 25 tokens to 5, because
+        /// the reward was never the reason: this number is about how attractive a
+        /// base LOOKS to a raider, and a base with a machine in it is exactly as
+        /// worth visiting as it was.
         static let arcadeWorth: Double = 25
 
         /// What a base gains as a target for every second nobody has touched it,
@@ -1755,11 +1763,18 @@ enum GameConfig {
     enum Arcade {
         /// Paid for blowing up somebody's machine.
         ///
-        /// More than it cost them, which is deliberate: raiding one has to beat
-        /// owning one or nobody would bother crossing the map for it. It is a lump
-        /// sum rather than a slow drip - the opposite of what the machine does for
-        /// its owner, and about a quarter of a match's income in one go.
-        static let destroyedReward = 25
+        /// 5, down from 25.
+        ///
+        /// It was priced when a machine was a thing one or two players on the map
+        /// had - "about a quarter of a match's income in one go" was the note, and
+        /// that was true. Every sealed base is issued one now, so the same lump sum
+        /// was payable eight times a match, and wrecking machines became 59% of what
+        /// a raid was worth. A raid should pay for what you carry out of it.
+        ///
+        /// It is not zero, because breaking one still has to beat ignoring it. Five
+        /// is a bandage - enough to be worth the seconds it costs, nowhere near
+        /// enough to be the reason you came.
+        static let destroyedReward = 5
 
         /// How much shooting a machine takes to break.
         ///
@@ -1806,12 +1821,19 @@ enum GameConfig {
 
         /// What a shut wall is worth, as a multiplier on the interval.
         ///
-        /// Kept, but it is the smaller half of the answer - see sealedUncollected
-        /// below, which is the half that actually pays. A faster interval only
-        /// helps somebody who visits often enough to outpace it, which at two
-        /// seconds a token means every eight seconds or so; anybody playing the
-        /// match rather than guarding a cabinet is limited by the CAP instead.
-        static let sealedInterval: Double = 0.62
+        /// The LARGER half of the answer now, which is a reversal. It used to be
+        /// the smaller one: a faster interval only helps somebody who visits often
+        /// enough to outpace it, while the bank paid everybody who came home at all,
+        /// so the pile was doing the work.
+        ///
+        /// That was the problem. A pile is collected whole on every visit, so income
+        /// scaled with nothing but how often you walked home, and with a machine now
+        /// standing in every sealed base that came to more tokens than anybody could
+        /// spend. The bank is smaller and this is slower in absolute terms but a
+        /// bigger share of the difference - a third faster than an open machine, at
+        /// 2.4 seconds a token against 3.2 - so the reward for owning one goes to
+        /// whoever is actually around to work it.
+        static let sealedInterval: Double = 0.75
 
         static let tokenValue = 1
 
@@ -1873,31 +1895,33 @@ enum GameConfig {
         /// impatience. Lifting the ceiling with the rate is what turns it into a
         /// pile worth sprinting for.
         static let jackpotRate = 0.22
-        static let jackpotBank = 12
+        static let jackpotBank = 8
 
         /// How many of its own tokens a machine will let pile up before it stops.
         ///
         /// This is the anti-camping valve, and it is the only reason standing at a
         /// machine does not beat moving between them. At three, a machine left
         /// alone is full in eighteen seconds and then pays nothing.
-        static let maxUncollected = 4
+        static let maxUncollected = 3
 
         /// And how many it will let pile up behind a wall that is standing.
         ///
-        /// THIS is why you build a base. A machine in the open stops at four,
-        /// because standing at one is not supposed to beat moving between them.
-        /// One behind your own shut wall banks eight, because nothing is going to
-        /// walk off with them - so the wall turns the machine from a thing you have
-        /// to babysit into a thing that earns while you are somewhere else.
+        /// Part of why you build a base, and it used to be most of it. A machine in
+        /// the open stops at three, because standing at one is not supposed to beat
+        /// moving between them; one behind your own shut wall banks five, because
+        /// nothing is going to walk off with them.
         ///
-        /// Modelled against a match: a machine bought at a minute pays 43 tokens to
-        /// somebody who passes it every 45 seconds, against 16 before. It costs 24.
-        /// That is the difference between an ornament and a reason.
+        /// 5, down from 8. Still more than a machine in the open holds, because a
+        /// base is still meant to be the better place to own one - but the pile is
+        /// no longer where most of that advantage lives. It moved to the two things
+        /// that cannot be carried off in one visit: the rate, which is a third
+        /// faster behind a shut wall, and the shelf life, where a token keeps for
+        /// 45 seconds against 10 in the open.
         ///
-        /// And it is exactly what a raider takes off you: breach the wall and the
-        /// bank drops back to four until it is repaired, which is worth more to
-        /// them than the twenty-five they get for blowing the machine up.
-        static let sealedUncollected = 8
+        /// The pile was the problem. A bank of 8 refilling in 16 seconds is a
+        /// machine that pays out its whole cap between visits however often you
+        /// call, so income scaled with nothing but how often you walked home.
+        static let sealedUncollected = 5
 
         /// How far out from the footprint a token still counts as this machine's,
         /// for the cap above. Just past the ring it drops them on.
