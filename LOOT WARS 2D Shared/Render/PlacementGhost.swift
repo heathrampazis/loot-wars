@@ -86,10 +86,12 @@ final class PlacementGhost {
 
         switch type {
         case .arcade:
+            let fit = ArcadeRenderer.fit()
             sprite.texture = ArcadeRenderer.machine
-            sprite.size = CGSize(width: width, height: height)
+            sprite.size = fit.size
             sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
-            sprite.position = CGPoint(x: width / 2, y: 0)
+            sprite.position = CGPoint(x: width / 2 - fit.content.midX,
+                                      y: -fit.size.height / 2 - fit.content.minY)
 
         default:
             let texture = ItemArt.texture(for: type)

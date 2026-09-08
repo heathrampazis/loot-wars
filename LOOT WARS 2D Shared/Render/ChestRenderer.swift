@@ -40,11 +40,17 @@ final class ChestRenderer {
     }
 
     private func make(_ chest: Chest) {
-        let sprite = SKSpriteNode(
-            texture: texture,
-            size: CGSize(width: GridGeometry.length(ofTiles: GameConfig.Chest.size.x),
-                         height: GridGeometry.length(ofTiles: GameConfig.Chest.size.y)))
-        sprite.position = GridGeometry.point(for: chest.position)
+        // Sized so the CHEST covers its collision box, not so the exported canvas
+        // does - the picture carries an eighth of its height as empty space, and
+        // drawing to the canvas left the chest visibly smaller than the thing you
+        // bump into.
+        let fit = ArtFit.covering("Chest", GameConfig.Chest.size)
+
+        let sprite = SKSpriteNode(texture: texture, size: fit.size)
+
+        let standing = GridGeometry.point(for: chest.position)
+        sprite.position = CGPoint(x: standing.x - fit.content.midX,
+                                  y: standing.y - fit.content.midY)
         sprite.zPosition = 3    // with the crates: above trees, below walls and actors
 
         // A short landing, so a chest you just put down reads as having arrived

@@ -25,26 +25,26 @@ final class ArcadeRenderer {
     private var lastTimers: [ArcadeID: Double] = [:]
     private var mapHeight = 0
 
-    /// The machine's opaque pixels within its canvas, measured from the artwork:
-    /// 496 x 808 at (215, 56) of a 926 x 928 image, with y flipped because texture
-    /// coordinates count up from the bottom.
-    ///
-    /// Cropping to this rather than trimming the asset means the sprite can be
-    /// drawn at exactly its 2 x 3 footprint - the machine you see is the machine
-    /// you walk into. Re-export the art and these five numbers need remeasuring.
-    private static let artwork = CGRect(x: 215.0 / 926.0,
-                                        y: 64.0 / 928.0,
-                                        width: 496.0 / 926.0,
-                                        height: 808.0 / 928.0)
-
     /// Shared, because the placement preview draws the same machine before it
-    /// exists. Two copies of the crop would be two chances to remeasure only one.
+    /// exists - and it is drawn WHOLE. This used to be cropped to five pixel
+    /// numbers measured off the art by hand, so the sprite could be sized to its
+    /// 2 x 3 footprint without the transparent margin pushing the machine in from
+    /// the edges. That survived exactly one re-export: the fractions were of a
+    /// 926 x 928 canvas, the new image is 818 x 1236, and the same fractions cut
+    /// the sides off the cabinet. ArtFit measures the margin instead, every launch.
     static let machine: SKTexture = {
-        let sheet = SKTexture(imageNamed: "Arcade")
-        let cropped = SKTexture(rect: ArcadeRenderer.artwork, in: sheet)
-        cropped.usesMipmaps = true
-        return cropped
+        let texture = SKTexture(imageNamed: "Arcade")
+        texture.usesMipmaps = true
+        return texture
     }()
+
+    /// How the machine is drawn, here and in the preview: the picture two tiles
+    /// wide, matching the footprint, and as tall as the art wants to be. The
+    /// footprint is three tiles and the cabinet comes out about three and a
+    /// quarter, which is right - you should pass behind the top of it.
+    static func fit() -> ArtFit.Fit {
+        ArtFit.spanning("Arcade", width: Double(Arcade.width))
+    }
 
     func build(mapHeight: Int) {
         self.mapHeight = mapHeight
@@ -120,16 +120,20 @@ final class ArcadeRenderer {
     }
 
     private func make(_ machine: Arcade) {
-        let sprite = SKSpriteNode(
-            texture: ArcadeRenderer.machine,
-            size: CGSize(width: GridGeometry.length(ofTiles: Double(Arcade.width)),
-                         height: GridGeometry.length(ofTiles: Double(Arcade.height))))
+        let fit = ArcadeRenderer.fit()
+
+        let sprite = SKSpriteNode(texture: ArcadeRenderer.machine, size: fit.size)
 
         // Anchored at its feet, so the sprite stands ON the footprint rather than
-        // being centred over it.
+        // being centred over it - and then dropped by the transparent strip below
+        // the cabinet, so it is the MACHINE standing on the footprint rather than
+        // the canvas it was exported on.
         sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
-        sprite.position = GridGeometry.point(
+
+        let footing = GridGeometry.point(
             for: Vec2(x: machine.centre.x, y: Double(machine.origin.row)))
+        sprite.position = CGPoint(x: footing.x - fit.content.midX,
+                                  y: footing.y - fit.size.height / 2 - fit.content.minY)
 
         // Sorted into the same band as the actors, by the line its base sits on. A
         // machine three tiles tall is the first thing in the game big enough for

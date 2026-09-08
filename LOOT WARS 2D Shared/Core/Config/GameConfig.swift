@@ -1766,10 +1766,20 @@ enum GameConfig {
             stockTables.last { progress >= $0.from }?.rows ?? stockTables[0].rows
         }
 
-        /// Footprint in tiles. The art is 1286 x 858 - a hair under 3:2 - and
-        /// ChestRenderer draws it at exactly this size, so the chest you see is the
-        /// chest you bump into.
-        static let size = Vec2(x: 1.05, y: 0.70)
+        /// Footprint in tiles, shaped to the artwork rather than the other way
+        /// round: the picture is 462 x 399 of opaque pixels, so 1.158 wide to tall,
+        /// and 0.95 x 0.82 is that shape. ChestRenderer sizes the sprite so the
+        /// chest covers exactly this - the chest you see is the chest you bump into.
+        ///
+        /// It was 1.05 x 0.70, a hair under 3:2, because the art used to be. When
+        /// the art was redrawn taller the box did not follow and every chest on the
+        /// map was squashed by a third. Re-export the chest at a different shape and
+        /// these two numbers are what needs to change; nothing else measures it.
+        ///
+        /// Slightly narrower than it was, deliberately. A chest is furniture in a
+        /// room bots have to walk around, and they have form about getting wedged on
+        /// their own - taller was unavoidable, wider was not.
+        static let size = Vec2(x: 0.95, y: 0.82)
 
         /// How far past your own hitbox you can reach to open one. Small, because a
         /// chest is solid and you are already touching it when you are beside it.
