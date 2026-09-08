@@ -216,15 +216,25 @@ final class EffectsRenderer {
         }
     }
 
-    /// Rainbow particles coming off somebody who has a perk running.
+    /// Sparkles coming off somebody who has a perk running.
     ///
-    /// Soft round motes rather than the sparkles the ITEM wears, and the two being
-    /// different is the point of the split. The sparkles say "this object is
-    /// enchanted" - they belong to a thing lying on the grass or sitting in a slot,
-    /// and they twinkle because a still object needs the movement to be noticed.
-    /// This says "this PERSON is powered up", and a person is already moving, so
-    /// what it needs instead is a haze: something the figure is inside rather than
-    /// something decorating it.
+    /// The same four-pointed spark an enchanted ITEM wears - EnchantArt.spark, the
+    /// one texture - and that is the change. This used to be soft round motes, on
+    /// the argument that the sparkles said "this object is enchanted" while a haze
+    /// said "this person is powered up", and that the two should not be confused.
+    /// It was a tidy distinction and it cost more than it bought: a player who has
+    /// learned that sparkles mean a power-up has learned the one thing this effect
+    /// needs to say, and teaching them a second vocabulary for the same fact only
+    /// gave them something else to learn. The bottle sparkles, and so does the
+    /// person who drank it.
+    ///
+    /// White in front, colour behind. The spark itself is always the same near-white
+    /// - it is a glint, and a glint is light rather than a hue - and the rainbow
+    /// lives entirely in the soft glow underneath it, which is what lets the ring
+    /// be as saturated as it now is without any single particle stopping reading as
+    /// a sparkle. The glow is drawn as pigment rather than added: this map is pale
+    /// green, and adding violet light to pale green gives white, which would take
+    /// the colour out of the very thing carrying it.
     ///
     /// Drawn on the map rather than parented to the figure, which is what makes a
     /// moving player leave a trail and a standing one wear a cloud - one behaviour
@@ -246,38 +256,55 @@ final class EffectsRenderer {
         // per beat came off the middle in a single file, which read as steam from a
         // kettle rather than as somebody surrounded by it.
         for index in 0..<2 {
-            let mote = SKSpriteNode(texture: GlowArt.pool)
-            let size = CGFloat.random(in: 9...15)
-
-            mote.size = CGSize(width: size, height: size)
-            mote.color = index == 0 ? colours.bright : colours.deep
-            mote.colorBlendFactor = 1
-            mote.alpha = 0.95
-
-            // Painted ON the map rather than added to it. Additive blending is what
-            // fire and muzzle flashes want, because those ARE light - but this map
-            // is pale green, and adding violet to pale green gives white. The whole
-            // point of the effect is the colour, so it is drawn as pigment.
-            mote.zPosition = 11
-
+            let sparkle = SKNode()
+            let size = CGFloat.random(in: 10...16)
             let side: CGFloat = index == 0 ? 1 : -1
-            mote.position = CGPoint(
+
+            // The colour, and only the colour. Wider than the spark and softer, so
+            // what reads at a distance is a coloured light with something bright in
+            // the middle of it.
+            let glow = SKSpriteNode(texture: GlowArt.pool)
+            glow.size = CGSize(width: size * 2.1, height: size * 2.1)
+            glow.color = index == 0 ? colours.bright : colours.deep
+            glow.colorBlendFactor = 1
+            glow.alpha = 0.9
+
+            // And the glint, which never takes a colour from anybody.
+            let spark = SKSpriteNode(texture: EnchantArt.spark)
+            spark.size = CGSize(width: size, height: size)
+            spark.color = RenderPalette.perkSpark
+            spark.colorBlendFactor = 1
+            spark.zPosition = 1
+
+            // Started at its own angle, so a trail is not a row of identical
+            // crosses - the eye finds a repeat like that immediately.
+            spark.zRotation = CGFloat.random(in: 0..<(.pi / 2))
+            spark.run(.rotate(byAngle: side * 1.1, duration: 0.75))
+
+            sparkle.addChild(glow)
+            sparkle.addChild(spark)
+
+            sparkle.zPosition = 11
+            sparkle.position = CGPoint(
                 x: origin.x + side * CGFloat.random(in: 2...14),
                 y: origin.y + CGFloat.random(in: -18...4)
             )
+            sparkle.setScale(0.35)
 
-            node.addChild(mote)
+            node.addChild(sparkle)
 
             // Up and slightly inward, which gathers them over the figure's head
-            // instead of letting them drift apart into a fog.
-            mote.run(.sequence([
+            // instead of letting them drift apart into a fog. It twinkles ON the
+            // way - snapping to full size and easing down - so each one has the
+            // beat an item's sparkle has rather than simply appearing.
+            sparkle.run(.sequence([
                 .group([
                     .moveBy(x: -side * CGFloat.random(in: 1...7),
                             y: CGFloat.random(in: 22...38), duration: 0.75),
-                    .sequence([.scale(to: 1.3, duration: 0.18),
-                               .scale(to: 0.35, duration: 0.57)]),
-                    .sequence([.wait(forDuration: 0.25),
-                               .fadeOut(withDuration: 0.5)])
+                    .sequence([.scale(to: 1.25, duration: 0.16),
+                               .scale(to: 0.4, duration: 0.59)]),
+                    .sequence([.wait(forDuration: 0.28),
+                               .fadeOut(withDuration: 0.47)])
                 ]),
                 .removeFromParent()
             ]))

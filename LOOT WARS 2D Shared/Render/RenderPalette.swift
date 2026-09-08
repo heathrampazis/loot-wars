@@ -166,36 +166,48 @@ enum RenderPalette {
     /// not-of-that-system, which is exactly what the only item that does four
     /// things at once should look like.
     ///
-    /// Eight hues, solved for the most colour that stays legible on grass.
+    /// Eight hues, solved for the most colour that will sit behind a white spark.
     ///
-    /// The first version of this ring flattened perceived lightness to a tenth of a
-    /// point - every hue at exactly CIE L* 64 - which killed the pulse it was
-    /// meant to kill and drained the colour with it. Holding L* rigid forces the
-    /// saturation down on every hue that is naturally light or naturally dark, and
-    /// a rainbow at 0.59 mean chroma is a rainbow of dusty pastels. It read as
-    /// dull, which for the one item in the game that does everything is the worst
-    /// thing it could read as.
+    /// The constraint used to be the LAWN. These were drawn as pigment straight
+    /// onto pale yellow-green, so every hue had to clear a contrast ratio against
+    /// the floor tile, which put a floor under how dark any of them could be and
+    /// took the colour out of blue and violet to get there. A first version went
+    /// further still and flattened perceived lightness to a tenth of a point - a
+    /// rainbow at 0.59 mean chroma, which is a rainbow of dusty pastels, and for
+    /// the one item in the game that does everything, dull is the worst thing it
+    /// could read as. A band of L* 53 to 67 got that back to 0.83.
     ///
-    /// So the constraint is a BAND rather than a point: L* 53 to 67, and inside it
-    /// take the most saturated colour each hue can give. Mean chroma goes 0.59 to
-    /// 0.84 - a little over 40% more colour - while the lightness swing stays 13
-    /// points, which is under what the eye reads as flashing. The throb the first
-    /// version was avoiding needs a swing more like the 24 points an unconstrained
-    /// vivid ring gives; 13 is movement in the colour and not in the brightness.
+    /// The rainbow no longer touches the grass. Every particle is now a white
+    /// sparkle with one of these behind it, so what a hue has to survive is the
+    /// WHITE in front of it, not the green underneath - a different and much
+    /// kinder question. The floor moves from "1.7 against the floor tile" to "2.3
+    /// against white", which lets blue and violet drop where they wanted to be all
+    /// along: blue gains a third of its chroma back, violet a fifth, and the mean
+    /// goes 0.83 to 0.89.
     ///
-    /// Every hue still clears 1.7 against the floor tile, which is the floor that
-    /// matters: these are drawn as pigment on a pale yellow-green lawn, not as
-    /// light on a dark screen. Gold is the one that has to give ground, because
-    /// gold is the hue nearest the grass and always will be.
+    /// The other half of the ask was contrast, and that was a SPACING problem
+    /// rather than a saturation one. Red at 354 degrees and orange at 18 were 24
+    /// apart, a difference of 18 dE - close enough that two consecutive puffs of
+    /// the trail read as one colour twice. Opening the warm end (orange to 28,
+    /// gold to 52) takes the closest neighbouring pair to 37 dE, which doubles the
+    /// worst step in the ring without moving a single hue far enough to stop being
+    /// the colour it is called.
+    ///
+    /// Lightness swings 28 points now rather than 13. That would once have been a
+    /// throb, and the whole reason the band existed was to avoid one - but the
+    /// thing that would have throbbed was the overlay worn by the player, which is
+    /// gone. Nothing wears a whole cycle on one object any more: an item walks the
+    /// ring over six seconds, and each puff of the trail is one fixed colour that
+    /// never changes after it is born.
     static let spectrum: [SKColor] = [
-        rgb(0xFF, 0x00, 0x17),   // red
-        rgb(0xFF, 0x4D, 0x00),   // orange
-        rgb(0xC9, 0x9B, 0x00),   // gold
-        rgb(0x1A, 0xBA, 0x00),   // green
-        rgb(0x00, 0xB2, 0xB8),   // cyan
-        rgb(0x3B, 0x78, 0xFF),   // blue
-        rgb(0xAF, 0x4A, 0xFF),   // violet
-        rgb(0xFF, 0x00, 0xA8)    // magenta
+        rgb(0xFF, 0x00, 0x22),   // red
+        rgb(0xFF, 0x77, 0x00),   // orange
+        rgb(0xC4, 0xAA, 0x00),   // gold
+        rgb(0x27, 0xC4, 0x00),   // green
+        rgb(0x06, 0xBC, 0xC2),   // cyan
+        rgb(0x00, 0x4C, 0xFF),   // blue
+        rgb(0xAA, 0x00, 0xFF),   // violet
+        rgb(0xFF, 0x0A, 0xB6)    // magenta
     ]
 
     /// One hue off the ring, counted round rather than clamped.
