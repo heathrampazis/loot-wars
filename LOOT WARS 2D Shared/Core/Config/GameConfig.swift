@@ -65,9 +65,15 @@ enum GameConfig {
 
         static let chestPlaced = 15
 
-        /// Per item lifted out of somebody else's chest. The best rate in the game,
-        /// deliberately - it sits at the end of the longest chain of work there is.
-        static let itemStolen = 20
+
+        /// Cracking somebody else's chest open. Paid once, for the whole act.
+        ///
+        /// Sized as roughly two items' worth of the old per-item rate plus the
+        /// price of getting there. It is the end of the longest chain of work in
+        /// the game - find a bomb, cross the map, breach a wall, survive the owner
+        /// - and it should read as the biggest single thing you can do that is not
+        /// a kill.
+        static let chestRaided = 55
 
         /// Zero, deliberately. A token is already its own reward - it buys the
         /// upgrade ladder - and paying score for it as well is the same act counted
@@ -159,6 +165,10 @@ enum GameConfig {
 
         /// A rare one is worth going out of your way for, and this is part of why.
         static let perRareLootbox = 4
+
+        /// Tokens for cracking somebody's chest. More than a rare crate, because a
+        /// rare crate does not shoot back.
+        static let perChestRaided = 7
     }
 
     /// What tokens buy.
@@ -1561,6 +1571,21 @@ enum GameConfig {
     }
 
     enum Chest {
+        /// How many items burst out of somebody else's chest when it is cracked.
+        ///
+        /// A raided chest is not opened, it is BROKEN - see ChestSystem.crack. So
+        /// this is not "how much can you carry away", it is how much of what was in
+        /// there survives being smashed. The rest is gone, for the same reason a
+        /// lootbox does not leave a pile: a container that gave up everything would
+        /// make one raid worth four crates and turn the rest of the map into
+        /// scenery.
+        ///
+        /// Two, and the number is deliberately smaller than a fresh chest holds.
+        /// The victim always loses more than the raider gains, which is what makes
+        /// a raid an attack rather than a transfer - and is the reason defending
+        /// one is worth doing.
+        static let raidSpill = 2
+
         /// What a bot's chest is holding the moment it goes down.
         ///
         /// A shortcut, and worth being honest about which one: bots do not hoard
@@ -1685,6 +1710,19 @@ enum GameConfig {
         /// sum rather than a slow drip - the opposite of what the machine does for
         /// its owner, and about a quarter of a match's income in one go.
         static let destroyedReward = 25
+
+        /// How much shooting a machine takes to break.
+        ///
+        /// 260, which is 22 shots from a starter blaster and 7 from a Blaster 6. A
+        /// deliberate act either way - you have to stand still in somebody's base
+        /// and empty a magazine into their furniture, which is exactly the window
+        /// the owner needs to come home and make you regret it.
+        ///
+        /// Not lower. At four or five shots a machine would be something you break
+        /// in passing, and the whole point of it being breakable is that it is a
+        /// CHOICE: the seconds you spend wrecking it are seconds you are not
+        /// spending on the chest, and both are on a clock.
+        static let health = 260
 
         /// Machines on the map. Deliberately few: an arcade you have to travel to
         /// is a place worth fighting over, one on every corner is furniture.

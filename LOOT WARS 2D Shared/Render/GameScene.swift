@@ -83,7 +83,10 @@ final class GameScene: SKScene {
     private enum CornerAction: Equatable {
         case aim
         case lootbox
+        /// Your own: opens the storage panel.
         case chest(ChestID)
+        /// Somebody else's: breaks it open where it stands.
+        case raid(ChestID)
     }
 
     private var cornerAction: CornerAction = .aim
@@ -792,6 +795,18 @@ final class GameScene: SKScene {
                 // burst that says it arrived, which state alone cannot show.
                 effectsRenderer.burst(at: position)
 
+            case .chestCracked(let position, let items):
+                // The same burst a crate gets, scaled by what came out of it.
+                effectsRenderer.jackpot(at: position)
+                bombRenderer.flash(at: position)
+                _ = items   // the pile that lands says how much better than this
+
+            case .machineHit(let position):
+                // Sparks off the casing rather than a hit marker: a machine being
+                // shot has to read differently from a person being shot, or the
+                // screen says somebody is in there taking it.
+                bombRenderer.flash(at: position)
+
             case .sealed(let team, let chests):
                 // Everybody's, not only yours. Eight bases close over a match and
                 // each one is a place that has just become worth breaking into -
@@ -972,7 +987,11 @@ final class GameScene: SKScene {
         // chest wins over a crate: it is inside your base, and it is yours.
         let wanted: CornerAction
         if let chest = world.reachableChest(for: player) {
-            wanted = .chest(chest.id)
+            // Yours is storage; anybody else's is a crate with a lid on it. Two
+            // different verbs from one button, decided by whose base you are
+            // standing in - which is the only thing a player needs to know about
+            // the difference.
+            wanted = chest.owner == player.team ? .chest(chest.id) : .raid(chest.id)
         } else if world.reachableLootbox(for: player) != nil {
             wanted = .lootbox
         } else {
@@ -991,6 +1010,11 @@ final class GameScene: SKScene {
             switch wanted {
             case .lootbox: openButton.setGlyph(Glyphs.lootbox)
             case .chest:   openButton.setGlyph(Glyphs.chest)
+            // The crate glyph, not the chest one, because the ACT is opening a
+            // crate. A button that looks like storage and behaves like a crowbar
+            // would be the interface lying about the only irreversible thing on
+            // this screen.
+            case .raid:    openButton.setGlyph(Glyphs.lootbox)
             case .aim:     break
             }
         }
@@ -1280,6 +1304,12 @@ extension GameScene {
                 switch cornerAction {
                 case .lootbox:
                     queuedCommands.append(.openLootbox)
+                case .raid(let id):
+                    // No panel and no choosing. It bursts, a couple of things land
+                    // on the grass, and picking them up is the ordinary business of
+                    // walking over loot while somebody shoots at you.
+                    queuedCommands.append(.raidChest(chest: id))
+
                 case .chest(let id):
                     selectedSlot = nil
                     chestPanel.open(id)

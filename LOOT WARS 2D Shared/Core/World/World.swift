@@ -622,7 +622,11 @@ final class World {
         let centre = claims[team]?.centreTile.center ?? .zero
         var placed = 0
 
-        for _ in 0..<wanted {
+        // Topped UP rather than counted out, because this runs on every reseal now.
+        // A base that lost one chest of two to a raid gets one back, not two.
+        let standing = chestCount(ownedBy: team)
+
+        for _ in standing..<max(standing, wanted) {
             // Re-asked each time rather than gathered up front: a chest occupies
             // the tile it lands on, so the next call answers with the next nearest
             // free one and they end up clustered round the middle rather than
@@ -634,6 +638,21 @@ final class World {
                 ChestSystem.stock(id, in: self)
             }
             placed += 1
+        }
+
+        // And a machine, if the base has not got one.
+        //
+        // Issued rather than found, which is a reversal worth being plain about.
+        // Machines used to come only out of crates, and the supply was capped by
+        // how many crates existed rather than by how many bases wanted one - so
+        // most bases never had the thing that makes them worth raiding twice. A
+        // base that is finished should be furnished, and a machine is furniture.
+        //
+        // It still cannot be held: one to a base, destroyed when somebody shoots it
+        // apart, and back only when the wall goes up again. That is what keeps it a
+        // thing to defend rather than a thing you own.
+        if !hasArcade(team), let origin = nextArcadeOrigin(for: team, near: centre) {
+            _ = spawnArcade(at: origin, owner: team)
         }
 
         return placed
@@ -648,6 +667,16 @@ final class World {
             guard sealPending.contains(team) else { return }
             sealPending.remove(team)
             award(GameConfig.Base.resealed, to: team)
+
+            // And it refurnishes. A raid destroys the chest it cracks, so shutting
+            // the wall again is what puts a new one in - which is the loop this
+            // whole half of the game turns on: break in, take what is there, and
+            // the owner rebuilds and restocks for the next person.
+            //
+            // Same event as a first seal, so it gets the same sweep of light round
+            // the wall. Somebody who has just patched a hole and got their base
+            // back deserves the same moment as somebody who has just finished one.
+            record(.sealed(team, chests: furnish(team)))
         } else {
             haveSealed.insert(team)
             award(GameConfig.Base.sealed, to: team)
@@ -1017,7 +1046,7 @@ final class World {
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
                      .placeChest, .placeArcade, .storeItem, .takeItem,
-                     .dropItem, .buyItem, .sellItem:
+                     .raidChest, .dropItem, .buyItem, .sellItem:
                     break   // other systems' business, not movement's
                 }
             }

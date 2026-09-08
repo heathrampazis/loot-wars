@@ -68,6 +68,12 @@ enum WorldEvent {
     /// thing this game has the hardest time getting anybody to do.
     case sealed(TeamID, chests: Int)
 
+    /// A machine taking a bullet and surviving it.
+    case machineHit(at: Vec2)
+
+    /// A chest broken open by somebody who did not own it.
+    case chestCracked(at: Vec2, items: Int)
+
     case vault(points: Int, for: TeamID, at: Vec2)
 
     /// Somebody sold something, out of which slot, and what it paid.

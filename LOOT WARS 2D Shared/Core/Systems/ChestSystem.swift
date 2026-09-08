@@ -29,6 +29,8 @@ enum ChestSystem {
                     store(from: slot, by: id, into: chest, in: world)
                 case .takeItem(let chest, let slot):
                     take(from: slot, of: chest, by: id, in: world)
+                case .raidChest(let chest):
+                    crack(chest, by: id, in: world)
                 case .move, .placeBlock, .removeBlock, .shoot,
                      .openLootbox, .useItem, .dropItem, .buyItem, .sellItem,
                      .placeArcade:
@@ -235,6 +237,51 @@ enum ChestSystem {
         if !chest.contents.add(item) { _ = chest.contents.add(removed) }
     }
 
+    /// Somebody else's chest, broken open.
+    ///
+    /// A raider does not OPEN a chest, and this is the change that finally makes a
+    /// raid feel like one. Standing in a base you bombed your way into, tapping
+    /// through a storage panel slot by slot to decide what to carry - with the
+    /// owner running home - was an inventory-management screen in the middle of the
+    /// most exciting thing this game does. Worse, it made the fight optional: you
+    /// could stand in the panel indefinitely.
+    ///
+    /// So it behaves like the crate it always should have been. One action, the
+    /// thing bursts, a couple of items land on the grass, and from there it is the
+    /// ordinary business of walking over loot while somebody shoots at you. Nothing
+    /// is decided in a menu.
+    ///
+    /// The chest itself is destroyed, which is what makes rebuilding a wall worth
+    /// doing: the base is not merely emptied, it is unfurnished, and it refurnishes
+    /// when the wall goes back up. See World.recordSealIfNeeded.
+    ///
+    /// The owner still opens their own normally - storing and retrieving is not
+    /// raiding, and it happens in your own base with nobody shooting at you.
+    private static func crack(_ chestID: ChestID, by id: ActorID, in world: World) {
+        guard let actor = world.actors[id], actor.isAlive,
+              let chest = world.chests[chestID],
+              chest.owner != actor.team,
+              canReach(chest, from: actor) else { return }
+
+        // What survives being smashed, taken from the front of the chest so the
+        // same chest in the same state always spills the same things.
+        let held = chest.contents.slots.compactMap { $0 }
+        let spill = held.prefix(GameConfig.Chest.raidSpill)
+
+        for stack in spill {
+            world.spawnGroundItem(.item(stack.type),
+                                  at: world.scatteredSpot(near: chest.position))
+        }
+
+        world.removeChest(chestID)
+
+        // Paid like the best crate on the map, because that is what it is: a rare
+        // lootbox you had to spend a bomb and cross somebody's base to reach.
+        world.award(GameConfig.Score.chestRaided, to: actor.team)
+        world.awardTokens(GameConfig.Tokens.perChestRaided, to: id)
+        world.record(.chestCracked(at: chest.position, items: spill.count))
+    }
+
     /// The slot worth replacing, or nil if the chest is already current.
     ///
     /// Gear the band has left behind goes first, and the two ladders are judged
@@ -335,8 +382,13 @@ enum ChestSystem {
     /// nothing to be for.
     private static func take(from slot: Int, of chestID: ChestID,
                              by id: ActorID, in world: World) {
+        // Your own only. Somebody else's is not opened, it is broken - see crack -
+        // so this whole path is now the owner's own housekeeping, which is why
+        // nothing here scores: taking your things back out of your own chest is
+        // not an achievement.
         guard var actor = world.actors[id],
               var chest = world.chests[chestID],
+              chest.owner == actor.team,
               canReach(chest, from: actor),
               let stack = chest.contents.stack(at: slot) else { return }
 
@@ -347,37 +399,18 @@ enum ChestSystem {
               chest.contents.consume(at: slot) != nil else { return }
         _ = actor.acquire(stack.type)
 
-        // Scored per item, and only when it is not yours. Taking your own things
-        // back out of your own chest is not an achievement.
-        if chest.owner != actor.team {
-            world.award(GameConfig.Score.itemStolen, to: actor.team)
-        }
-
         world.actors[id] = actor
 
-        // Stripped bare, and the chest STAYS. This is a reversal, and the reason is
-        // that the rule it replaces stopped making sense when the shop changed.
+        // Emptying your own chest puts it on the short restock clock.
         //
-        // Destroying an emptied chest was there to make a raid cost the victim
-        // something lasting: find another one, wait for the wall to shut, stand it
-        // up again. That worked while a chest was fourteen tokens away - the shop
-        // sold them, and a robbed bot bought a replacement on its next trip home.
-        // The shop is two cards of gear and healing now. Nothing sells chests, so
-        // "find another one" means opening crates until one turns up, which for a
-        // bot is minutes, and the result was a map of bases with nothing in them:
-        // one raid each, permanently stripped, and no reason for anybody to visit
-        // any of them again. A game about breaking into places had run out of
-        // places worth breaking into.
+        // This whole path is the owner's now - a raider breaks a chest rather than
+        // opening it, and the broken one is gone until the wall goes back up. So
+        // what this handles is a bot pulling its spare helmet out after respawning,
+        // and the right answer is that the chest starts refilling straight away
+        // rather than waiting out a full interval for a hole its owner made.
         //
-        // An empty chest that refills is the better trade in both directions. The
-        // victim still loses everything in it and the wait to get it back; the
-        // raider still gets the whole haul, and gets a reason to come back later.
-        // What nobody gets is a base that is finished for the rest of the match.
-        //
-        // The clock starts again rather than carrying on from wherever it had got
-        // to, so a raid always costs a full wait - but it is the SHORTER wait,
-        // because a base that has just been robbed should be worth calling on again
-        // before the whistle.
+        // The clock RESTARTS rather than carrying on, so taking two things in a row
+        // does not bank the wait.
         chest.restockTimer = GameConfig.Chest.restockAfterRaid
         world.chests[chestID] = chest
     }

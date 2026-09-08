@@ -32,6 +32,20 @@ struct Arcade {
     /// is the whole reason to buy one.
     var owner: TeamID?
 
+    /// How much punishment is left in it.
+    ///
+    /// Only an OWNED machine has any: the map's own are scenery, and a board whose
+    /// economy could be shot off it in the first minute is a board with no economy.
+    ///
+    /// Bullets rather than only bombs, because a bomb was the wrong and only key.
+    /// A bomb is the thing you spend to get INTO somebody's base, and spending the
+    /// same one thing on the wall and on what is behind it meant a raider had to
+    /// choose between opening the door and breaking the furniture - so the furniture
+    /// never got broken. A machine you can shoot is a machine an opportunist can
+    /// wreck on their way past, which makes owning one a thing you have to defend
+    /// rather than a thing you have to hide.
+    var health: Int = GameConfig.Arcade.health
+
     /// Counts down to the next token. Starts staggered, so several machines on
     /// one map do not pay out in lockstep.
     var emitTimer: Double

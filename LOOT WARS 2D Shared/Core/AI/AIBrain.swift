@@ -173,11 +173,16 @@ enum AIBrain {
         // Open whatever is within reach, whatever the bot was busy doing. Walking
         // past an open-able crate and ignoring it is the sort of thing that gives
         // a bot away.
-        // Standing at somebody else's chest with room in the bag: help yourself.
-        // Whatever the bot was busy doing - the same reasoning as the crate below.
+        // Standing at somebody else's chest: break it. Whatever the bot was busy
+        // doing - the same reasoning as the crate below.
+        //
+        // No bag-room check any more, and that is the point of the chest becoming a
+        // crate: what comes out lands on the GROUND, so a bot with four full slots
+        // can still crack one and pick up what it can carry. It used to walk away
+        // from a full chest because it had nowhere to put the first item.
         if let chest = world.reachableChest(for: actor), chest.owner != actor.team,
-           let slot = slotWorthRobbing(from: chest, actor: actor) {
-            commands.append(.takeItem(chest: chest.id, slot: slot))
+           chest.contents.slots.contains(where: { $0 != nil }) {
+            commands.append(.raidChest(chest: chest.id))
         }
 
         // Standing at its OWN chest under-equipped: take the gear back out.
@@ -743,7 +748,7 @@ enum AIBrain {
             // Legendary - gear goes ON, it does not need a slot - while waving
             // through a bot with room in its pockets and nothing in the chest but
             // the helmet it is already wearing.
-            guard slotWorthRobbing(from: chest, actor: actor) != nil else { continue }
+            guard chest.contents.slots.contains(where: { $0 != nil }) else { continue }
 
             let distance = (chest.position - actor.position).length
             guard distance < GameConfig.AI.robRange else { continue }
@@ -928,8 +933,12 @@ enum AIBrain {
             // out the timer: the bot is standing INSIDE a base it paid a bomb to
             // open, and there may well be another chest a few tiles away. Wandering
             // off for three seconds first is how a raid ended up half done.
-            guard let chest = world.chests[id],
-                  chest.contents.slots.contains(where: { $0 != nil }) else {
+            // Cracked, or gone. Re-decide on the very next tick rather than
+            // waiting out the timer: the bot is standing INSIDE a base it paid a
+            // bomb to open, with the contents lying on the grass around it, and
+            // wandering off for three seconds first is how a raid ended up half
+            // done.
+            guard let chest = world.chests[id] else {
                 state.goal = .wander
                 state.goalAge = 0
                 state.decisionTimer = 0
@@ -1303,21 +1312,6 @@ enum AIBrain {
         return best
     }
 
-    private static func slotWorthRobbing(from chest: Chest, actor: Actor) -> Int? {
-        var best: Int?
-        var bestValue = -1
-
-        for (index, slot) in chest.contents.slots.enumerated() {
-            guard let stack = slot, actor.canAcquire(stack.type) else { continue }
-
-            let value = stack.type.healAmount(of: actor.maxHealth)
-            guard value > bestValue else { continue }
-            bestValue = value
-            best = index
-        }
-
-        return best
-    }
 
     private static func wallToLay(_ state: inout AIState, actor: Actor, in world: World) -> GridPoint? {
         guard case .build = state.goal else { return nil }
