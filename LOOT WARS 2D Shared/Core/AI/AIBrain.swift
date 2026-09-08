@@ -241,6 +241,12 @@ enum AIBrain {
             if arrived || state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
             }
+        case .wreck:
+            // The same clock a crate gets. A machine that cannot be got at is
+            // usually one behind a wall the bot has no way through.
+            if state.goalAge > GameConfig.AI.lootPatience {
+                state.lootCooldown = GameConfig.AI.lootCooldown
+            }
         case .rearm:
             // The same clock a crate gets. A bot that cannot reach its own chest
             // has usually had its base taken apart around it, and standing in the
@@ -302,7 +308,7 @@ enum AIBrain {
         // a chest being emptied. Resetting on the ATTEMPT rather than on success is
         // what stops a bot that cannot reach anybody from trying every single tick
         // for the rest of the match.
-        if case .robChest = wanted, !state.goal.isRob {
+        if wanted.isRaiding, !state.goal.isRaiding {
             state.raidUrgeTimer = Double.random(in: GameConfig.AI.raidUrgeInterval,
                                                 using: &world.rng)
         }
@@ -361,7 +367,7 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm:
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm, .wreck:
             // All interruptible. A bot laying bricks - or lining up a throw, or
             // waiting on a payout - while somebody shoots at it is not a bot
             // anyone believes in.
@@ -449,9 +455,38 @@ enum AIBrain {
         // Only when it has what a raid needs, which chestWorthRobbing already
         // knows: supplies to travel on, a way in, and something at the far end
         // worth taking. When it does, it goes now rather than after the wall.
+        //
+        // FINISH THE JOB FIRST. Standing in a base that is already open, with
+        // anything left in it, beats setting out for a different one - and it beats
+        // the urge timer, because the timer is there to stop a bot re-deciding to
+        // BREAK IN every tick, and this bot is already in. Without it a raider
+        // cracked one chest and wandered off past the second one and the machine,
+        // which is how a base that had been broken into stayed worth breaking into.
+        //
+        // Behind the loot cooldown, which is the escape hatch. changeOfMind sets it
+        // when a rob or a wreck has run past its patience, and without it a bot
+        // that could see the last chest but not get to it would re-pick the same
+        // unreachable target every tick for the rest of the match, standing in
+        // somebody's base doing nothing at all.
+        if state.lootCooldown <= 0,
+           let next = unfinishedBusiness(for: actor, in: world) {
+            return next
+        }
+
         if state.raidUrgeTimer <= 0,
            let chest = chestWorthRobbing(for: actor, in: world) {
             return .robChest(chest.id)
+        }
+
+        // A machine standing in a base somebody has already opened.
+        //
+        // Below the chests, because loot you can carry beats loot you can only
+        // deny - but above everything else here, because an open base is a clock:
+        // the owner is on their way home to shut it, and after that the machine is
+        // behind a wall again.
+        if state.raidUrgeTimer <= 0,
+           let machine = machineWorthWrecking(for: actor, in: world) {
+            return .wreck(machine.id)
         }
 
         // A trip home is a commitment.
@@ -725,6 +760,80 @@ enum AIBrain {
     /// will not set out on a raid with an empty bag, so whenever this returns
     /// something, that branch was not going to fire anyway - they can never both
     /// want the bot at the same moment.
+    /// Anything left to take or break in a base this bot is already inside.
+    ///
+    /// The difference between a raid and a shoplifting trip. A break-in costs a
+    /// bomb, a walk and the owner's attention, and all of that is paid before the
+    /// first chest is opened - so leaving with one armful while a second chest and
+    /// a machine stand untouched is the worst possible use of the price already
+    /// paid. This is what makes a raid an EVENT for the victim: they come home to a
+    /// base that has been gone through, not to one drawer left open.
+    ///
+    /// Only while standing in it. The test is the claim, not the wall, so it holds
+    /// while a bot is in the doorway and stops the moment it leaves - which is what
+    /// keeps this from being a rule that drags bots back to bases they had given up
+    /// on. Whoever left is finished; whoever is still there is not.
+    ///
+    /// Chests before the machine: loot you can carry beats loot you can only deny.
+    private static func unfinishedBusiness(for actor: Actor, in world: World) -> AIGoal? {
+        let standing = GridPoint(containing: actor.feet)
+
+        guard let team = world.claims.first(where: { team, claim in
+            team != actor.team && claim.contains(standing)
+        })?.key else { return nil }
+
+        // And only somewhere that is actually open. A bot that walks into a claim
+        // whose wall is shut has not broken in, it is trespassing on the lawn.
+        guard world.baseIsBreached(team) else { return nil }
+
+        if let chest = world.chests(notOwnedBy: actor.team)
+            .filter({ $0.owner == team && $0.contents.slots.contains { $0 != nil } })
+            .min(by: { ($0.position - actor.position).length
+                     < ($1.position - actor.position).length }) {
+            return .robChest(chest.id)
+        }
+
+        // Sorted, because this picks a target and targets decide outcomes - even
+        // though one machine to a base makes the answer unique today.
+        if let machine = world.arcades.keys.sorted(by: { $0.raw < $1.raw })
+            .compactMap({ world.arcades[$0] })
+            .first(where: { $0.owner == team }) {
+            return .wreck(machine.id)
+        }
+
+        return nil
+    }
+
+    /// Somebody's machine, standing in a base that is already open.
+    ///
+    /// No bomb needed and none checked, which is the point of it: a base with a
+    /// hole in it is an invitation, and a bot that walks past one because it is not
+    /// carrying a key is a bot that cannot see. The wall being down is the only
+    /// permission required.
+    ///
+    /// Sorted, because this picks a target and targets decide outcomes.
+    private static func machineWorthWrecking(for actor: Actor, in world: World) -> Arcade? {
+        guard actor.inventory.totalHealing(of: actor.maxHealth)
+                >= GameConfig.AI.emergencyHealingStock else { return nil }
+
+        var best: Arcade?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for id in world.arcades.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let machine = world.arcades[id],
+                  let owner = machine.owner,
+                  owner != actor.team,
+                  world.baseIsBreached(owner) else { continue }
+
+            let distance = (machine.centre - actor.position).length
+            guard distance < GameConfig.AI.robRange, distance < shortest else { continue }
+            shortest = distance
+            best = machine
+        }
+
+        return best
+    }
+
     private static func chestWorthRobbing(for actor: Actor, in world: World) -> Chest? {
         // The healing gate stays exactly where it is, and it is not a raiding dial.
         // It is what lets this branch sit ABOVE the emergency supply run: a bot
@@ -948,6 +1057,23 @@ enum AIBrain {
 
         case .stash(let tile):
             steer(&state, actor: actor, to: tile.center)
+
+        case .wreck(let id):
+            // Gone already, or somebody else got it. Re-decide immediately: the
+            // bot is standing in a base it broke into and there is usually still
+            // something in there worth its time.
+            guard let machine = world.arcade(id) else {
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+                return
+            }
+
+            // Walk at it until there is a shot. shotToTake does the firing, the
+            // same way it does for a person - so a bot wrecking a machine still
+            // breaks off to deal with anybody who turns up, because the fight
+            // check sits above this.
+            steer(&state, actor: actor, to: machine.centre)
 
         case .rearm(let id):
             // Emptied, or taken while the bot was walking. Re-decide immediately
@@ -1435,7 +1561,7 @@ enum AIBrain {
             target = tile
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
-        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash, .rearm:
+        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash, .rearm, .wreck:
             target = nil
         }
 
@@ -1663,11 +1789,18 @@ enum AIBrain {
     private static func shotToTake(state: AIState, actor: Actor, in world: World) -> Vec2? {
         guard state.reactionTimer <= 0, actor.ammo > 0 else { return nil }
 
+        // A machine is shot at exactly the way a person is, and this is the only
+        // branch that leaves before the lead calculation below - because furniture
+        // does not move, so aiming ahead of it would miss on purpose.
+        if case .wreck(let id) = state.goal, let machine = world.arcade(id) {
+            return aimAtMachine(machine, from: actor, in: world)
+        }
+
         let targetID: ActorID?
         switch state.goal {
         case .fight(let id):   targetID = id
         case .retreat(let id): targetID = id
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm:
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm, .wreck:
             targetID = nil
         }
 
@@ -1715,6 +1848,36 @@ enum AIBrain {
     /// Samples along the line. Uses the same rules a bullet does - including that
     /// walls stop shots even when they are your own - so a bot never takes a shot
     /// the simulation would swallow.
+    /// The direction to fire at a machine, or nil if there is no shot yet.
+    ///
+    /// Line of sight is checked to a point short of the machine rather than to the
+    /// machine itself, and that is not a fudge - it is the only way to ask the
+    /// question correctly. blocksShot counts structures, and a machine IS a
+    /// structure, so a ray drawn to its middle is stopped by the thing it is aimed
+    /// at and every shot would be judged blocked. Backing off by more than its
+    /// largest half-extent puts the test point at or outside the face the bullet
+    /// will hit, which is exactly what needs to be clear.
+    private static func aimAtMachine(_ machine: Arcade,
+                                     from actor: Actor,
+                                     in world: World) -> Vec2? {
+        let towards = machine.centre - actor.position
+        let distance = towards.length
+
+        guard distance > 0.01, distance <= GameConfig.Blaster.range else { return nil }
+
+        let direction = towards * (1 / distance)
+        let face = machine.centre - direction * AIBrain.machineFaceInset
+
+        guard hasLineOfSight(from: actor.position, to: face, in: world) else { return nil }
+        return direction
+    }
+
+    /// How far back from a machine's centre its nearest face can be, in tiles.
+    ///
+    /// Its footprint is three by two, so the largest half-extent is 1.5 and this
+    /// clears it from any angle.
+    private static let machineFaceInset: Double = 1.6
+
     private static func hasLineOfSight(from start: Vec2, to end: Vec2, in world: World) -> Bool {
         let delta = end - start
         let distance = delta.length

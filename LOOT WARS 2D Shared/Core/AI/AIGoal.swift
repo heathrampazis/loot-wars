@@ -30,6 +30,8 @@ enum AIGoal: Equatable {
     case stash(GridPoint)
     /// Walk home to take gear back OUT of your own chest.
     case rearm(ChestID)
+    /// Stand in somebody's base and shoot their machine apart.
+    case wreck(ArcadeID)
 
     var isBuild: Bool {
         if case .build = self { return true }
@@ -49,6 +51,16 @@ enum AIGoal: Equatable {
         return false
     }
 
+    /// Whether this is business inside somebody else's base - emptying it or
+    /// breaking it. Used to tell "already raiding" from "thinking about raiding",
+    /// so the urge is spent once per break-in rather than once per thing broken.
+    var isRaiding: Bool {
+        switch self {
+        case .robChest, .wreck, .raid: return true
+        default: return false
+        }
+    }
+
     var isFight: Bool {
         if case .fight = self { return true }
         return false
@@ -57,6 +69,7 @@ enum AIGoal: Equatable {
     var debugName: String {
         switch self {
         case .rearm: return "re-arm"
+        case .wreck: return "wreck"
         case .wander: return "roam"
         case .loot: return "loot"
         case .collect: return "grab"
