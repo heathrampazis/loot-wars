@@ -18,12 +18,34 @@
 //  with a tree for one side - if a person cannot get in without breaking something,
 //  it is a base.
 //
-//  A FLOOD FILL FROM THE EDGE, four-way. Start from every open tile on the claim's
-//  border, spread through open tiles, and whatever is left unvisited is enclosed.
-//  Four-way rather than eight because the question is whether a person can walk in,
-//  and a diagonal pinch between two walls still leaves both of the tiles beside it
-//  wide open - that is a gap, and a fill that squeezed through diagonally would be
-//  the one telling the truth about it.
+//  A FLOOD FILL FROM OUTSIDE, four-way. Start from open ground beyond the base,
+//  spread through open tiles, and whatever is left unvisited is enclosed. Four-way
+//  rather than eight because the question is whether a person can walk in, and a
+//  diagonal pinch between two walls still leaves both of the tiles beside it wide
+//  open - that is a gap, and a fill that squeezed through diagonally would be the
+//  one telling the truth about it.
+//
+//  FROM BEYOND THE CLAIM, not from its border, and the difference is a whole class
+//  of base that could not be finished.
+//
+//  The fill used to seed from every open tile on the claim's own border ring, on
+//  the reasoning that the edge of your claim is where somebody walks in from. That
+//  holds for the shape the markers recommend, which is a square inset inside the
+//  claim - and it is exactly wrong for anyone who builds anything else. Wall off a
+//  corner of your claim against a rock that happens to sit just OUTSIDE it and the
+//  ground you have enclosed reaches the claim's own edge: those tiles get seeded as
+//  outside, the fill pours in from them, and a base with no way into it reports
+//  itself wide open. The player is not doing anything strange - they are doing the
+//  thing this file's own opening paragraph says a base is allowed to be, using the
+//  terrain for one side - and the game declines to notice.
+//
+//  So the fill runs over the claim grown by a margin and seeds from the border of
+//  THAT, which asks the honest question: can somebody standing well outside your
+//  base walk to this ground. Only tiles within the claim are counted as room, so
+//  growing the search does not grow anybody's base. The margin only has to beat the
+//  thickest barrier that could stand between a claim and open ground; past that the
+//  barrier is doing the enclosing itself, which is a fair answer rather than a
+//  wrong one.
 //
 //  Trees count as wall. They are permanent, they block, and building against one is
 //  the sort of thing a player should be rewarded for noticing.
@@ -74,6 +96,16 @@ struct BaseEnclosure {
 
     var isSealed: Bool { room.count >= GameConfig.Base.minimumRoom }
 
+    /// How far beyond the claim the search for a way in reaches.
+    ///
+    /// Four. A claim is nine across, so this is a seventeen-tile box - still a few
+    /// hundred tiles, worked out once per change to the map and shared by everything
+    /// that asks. It wants to be comfortably thicker than any single piece of
+    /// scenery: a barrier four tiles deep with open ground behind it is scenery that
+    /// has enclosed the claim on its own, and calling that a base is the right
+    /// answer rather than a mistaken one.
+    private static let margin = 4
+
     /// - Parameters:
     ///   - solid: whether a tile is WALL - masonry, terrain or a tree. What holds
     ///     the room in, and what is not counted as part of it.
@@ -91,13 +123,19 @@ struct BaseEnclosure {
         let high = GridPoint(col: low.col + claim.size - 1,
                              row: low.row + claim.size - 1)
 
+        // The claim, which is what can be room, and the wider box the fill runs
+        // over, which is only ever used to find a way in.
+        let outerLow = GridPoint(col: low.col - margin, row: low.row - margin)
+        let outerHigh = GridPoint(col: high.col + margin, row: high.row + margin)
+
         func inside(_ p: GridPoint) -> Bool {
-            p.col >= low.col && p.col <= high.col && p.row >= low.row && p.row <= high.row
+            p.col >= outerLow.col && p.col <= outerHigh.col
+                && p.row >= outerLow.row && p.row <= outerHigh.row
         }
 
-        // Seeded from the border ring: an open tile on the edge of the claim is a
-        // tile somebody can step onto from the map outside, so it is "outside" for
-        // this purpose and everything it connects to is too.
+        // Seeded from the border of the wider box: open ground that far out is
+        // ground somebody is standing on, so it is "outside" for this purpose and
+        // everything it connects to is too.
         var open: Set<GridPoint> = []
         var queue: [GridPoint] = []
 
@@ -112,11 +150,11 @@ struct BaseEnclosure {
             queue.append(p)
         }
 
-        for col in low.col...high.col {
-            for row in [low.row, high.row] { reach(GridPoint(col: col, row: row)) }
+        for col in outerLow.col...outerHigh.col {
+            for row in [outerLow.row, outerHigh.row] { reach(GridPoint(col: col, row: row)) }
         }
-        for row in low.row...high.row {
-            for col in [low.col, high.col] { reach(GridPoint(col: col, row: row)) }
+        for row in outerLow.row...outerHigh.row {
+            for col in [outerLow.col, outerHigh.col] { reach(GridPoint(col: col, row: row)) }
         }
 
         var head = 0
