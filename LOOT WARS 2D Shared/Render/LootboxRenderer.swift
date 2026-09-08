@@ -28,6 +28,17 @@ final class LootboxRenderer {
 
     private var nodesByBox: [LootboxID: SKSpriteNode] = [:]
 
+    /// Which crate is currently wearing the "you can open this" rim.
+    ///
+    /// Held so the rim is faded in and out on a CHANGE rather than re-run every
+    /// frame. sync is called sixty times a second, and an action started on each of
+    /// them never gets past its first frame - which is how you end up with an
+    /// outline that is permanently half visible and never animates.
+    private var lit: LootboxID?
+
+    private static let rimName = "reach"
+
+
     private lazy var ordinary: SKTexture = Self.load("LootboxRed")
     private lazy var rare: SKTexture = Self.load("LootboxRare")
 
@@ -46,6 +57,29 @@ final class LootboxRenderer {
             nodesByBox[id] = nil
             sprite.removeFromParent()
         }
+
+        // The one crate within arm's reach wears a rim, so "you can touch this"
+        // is answered by the thing itself rather than by a button somewhere else.
+        //
+        // Asked of the world with the same question the tap and the corner button
+        // both use, so the outline can never light up on something the simulation
+        // would then refuse to open.
+        let reachable = world.localPlayer.flatMap { player in
+            player.isAlive ? world.reachableLootbox(for: player)?.id : nil
+        }
+
+        guard reachable != lit else { return }
+
+        if let lit { setRim(on: nodesByBox[lit], showing: false) }
+        lit = reachable
+        if let reachable { setRim(on: nodesByBox[reachable], showing: true) }
+    }
+
+    private func setRim(on sprite: SKSpriteNode?, showing: Bool) {
+        guard let rim = sprite?.childNode(withName: LootboxRenderer.rimName) else { return }
+
+        rim.removeAllActions()
+        rim.run(.fadeAlpha(to: showing ? 0.85 : 0, duration: showing ? 0.12 : 0.18))
     }
 
     private func makeNode(for box: Lootbox) {
@@ -57,6 +91,29 @@ final class LootboxRenderer {
         let sprite = SKSpriteNode(texture: box.rare ? rare : ordinary, size: size)
         sprite.position = GridGeometry.point(for: box.position)
         sprite.zPosition = 3    // above trees, below walls and actors
+
+        // The rim that says it can be opened. Built with every crate and left
+        // invisible, because a node that already exists can be faded in on the
+        // frame it is wanted; one that has to be created first arrives late.
+        //
+        // White, and the only white outline in the game. Every other colour here
+        // means something already - rarity, teams, money, danger - so a plain white
+        // edge is the one that can mean "reachable" without being confused for any
+        // of them. It sits OUTSIDE the artwork rather than over it, so the crate
+        // still looks like itself and the rim reads as a highlight rather than as
+        // damage.
+        let rim = SKShapeNode(rect: CGRect(x: -size.width / 2 - 3,
+                                           y: -size.height / 2 - 3,
+                                           width: size.width + 6,
+                                           height: size.height + 6),
+                              cornerRadius: 6)
+        rim.name = LootboxRenderer.rimName
+        rim.strokeColor = .white
+        rim.lineWidth = 2
+        rim.fillColor = .clear
+        rim.alpha = 0
+        rim.zPosition = 2
+        sprite.addChild(rim)
 
         // A rare crate is lit from underneath, in the same blue the gear inside it
         // will be wearing - the same pool of light that sits under a dropped item,

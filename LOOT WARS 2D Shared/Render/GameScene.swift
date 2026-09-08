@@ -1651,7 +1651,36 @@ extension GameScene {
     /// like a coin flip - the footprint went up and to the right of the finger,
     /// nothing showed you where it would land, and a refusal looked exactly like
     /// the game ignoring you. That is a drag with an outline on it now, below.
+    /// How far outside a crate a tap still counts as being on it, in tiles.
+    ///
+    /// A crate is under a tile across and a fingertip is wider than that, so the
+    /// hitbox alone would refuse taps that visibly landed on the thing. Generous
+    /// enough to forgive a finger, small enough that it cannot swallow a tap meant
+    /// for a wall a tile away.
+    private static let tapSlop: Double = 0.35
+
     private func tapMap(at pointInWorld: CGPoint) {
+        // A crate you are standing at opens when you tap IT, not only when you find
+        // the button in the corner.
+        //
+        // The button is not going anywhere - it is faster once you know it is
+        // there, it works while your thumb is on the stick, and it is the only way
+        // to open something you cannot see. But "walk up to the thing and touch the
+        // thing" is what a person tries first, and until now that did nothing at
+        // all, which reads as the game ignoring the tap rather than as a control
+        // waiting to be discovered elsewhere.
+        //
+        // Checked before the build command below rather than after, because this
+        // function's first act is to queue one, and a crate standing on your own
+        // claim would otherwise eat the tap as a wall.
+        if let player = world.localPlayer, player.isAlive,
+           let box = world.reachableLootbox(for: player),
+           box.hitbox.expanded(by: GameScene.tapSlop)
+               .contains(GridGeometry.position(for: pointInWorld)) {
+            queuedCommands.append(.openLootbox)
+            return
+        }
+
         let tile = GridGeometry.gridPoint(for: pointInWorld)
         queuedCommands.append(.placeBlock(tile))
 
