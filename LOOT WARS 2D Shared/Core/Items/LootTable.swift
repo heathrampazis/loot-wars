@@ -108,8 +108,8 @@ enum LootTable {
             // is a coin toss rather than a table. It carries the smaller share.
             (.item(.helmet(.common)),    16),
             (.item(.helmet(.epic)),      26),
-            (.item(.blaster(.three)),    26),
-            (.item(.blaster(.four)),     12)
+            (.item(.blaster(.two)),      26),
+            (.item(.blaster(.three)),    12)
         ]),
         (0.70, [
             (.item(.bandage), 96),
@@ -118,13 +118,20 @@ enum LootTable {
             (.item(.stink),   14),
 
             // Legendary is where the crates stop, and everything above it is bought.
+            //
+            // The blaster rows sit on the matching rung, which they did not. They
+            // ran a rung ahead in every band but the first - a leftover from when
+            // the two ladders were different lengths - so a rare crate late in the
+            // match handed out Blaster 6 while the helmet rows stopped one short of
+            // Cosmic. Half of "the top rung is the one you cannot find, only buy"
+            // was simply not true.
             // Same shape as before - the top natural roll is three fifths of the way
             // up the ladder, and a rare crate's upgrade reaches one rung past it -
             // so Cosmic remains the one rung nobody finds.
             (.item(.helmet(.epic)),      20),
             (.item(.helmet(.legendary)), 10),
-            (.item(.blaster(.four)),     16),
-            (.item(.blaster(.five)),      6)
+            (.item(.blaster(.three)),    16),
+            (.item(.blaster(.four)),      6)
         ])
     ]
 

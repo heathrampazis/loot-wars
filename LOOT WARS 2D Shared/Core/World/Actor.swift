@@ -241,18 +241,22 @@ struct Actor {
     /// refuses to let you carry one home is a rule against the whole point of
     /// owning a base.
     ///
-    /// Everything except the bottom rung. A Common helmet and a Blaster 2 are what
-    /// the crates hand out in the first minute and what the respawn floor gives
-    /// away for free, so banking one is banking nothing - and those two are exactly
-    /// the items that would otherwise fill four slots with litter on the walk home.
+    /// Gear has no special case at all now, which is the third setting for this and
+    /// the first one that never refuses something a player is standing over.
+    ///
+    /// It used to skip the bottom rung - a Common helmet, a Blaster 2 - on the
+    /// argument that they are what the crates hand out in the first minute, so
+    /// banking one banks nothing. True of a crate, and wrong everywhere else: a
+    /// chest cracked in somebody's base spills two items, and if one of them was a
+    /// Common you stood on it and nothing happened. The reward for the longest
+    /// errand in the game silently declined to exist.
+    ///
+    /// So gear obeys the same rule as everything else: you take it if you can hold
+    /// it. Upgrades never need a slot, because they go ON you rather than in the
+    /// bag - see canAcquire - so the only thing that ever turns gear down now is a
+    /// genuinely full bag, which the hotbar hint already explains.
     func wantsFromGround(_ type: ItemType) -> Bool {
-        if case .helmet(let tier) = type {
-            return tier > helmet || (tier > .common && canAcquire(type))
-        }
-        if case .blaster(let tier) = type {
-            return tier > blaster || (tier > .two && canAcquire(type))
-        }
-        return canAcquire(type)
+        canAcquire(type)
     }
 
     /// Takes an item: worn if it beats what is on, bagged if it does not.

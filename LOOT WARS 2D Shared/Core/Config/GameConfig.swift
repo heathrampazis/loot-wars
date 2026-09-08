@@ -339,8 +339,8 @@ enum GameConfig {
         /// out came to about a quarter of everything else earned put together, in
         /// a game whose difficulty complaint is that the player has it too easy.
         ///
-        /// At a fifth a spare Epic pays 1, a Legendary 3, a Mythical 5 and a
-        /// Cosmic 8, which is what this was always meant to be: not money, but the
+        /// At a fifth a spare Epic pays 2, a Legendary 4, a Mythical 8 and a
+        /// Cosmic 14, which is what this was always meant to be: not money, but the
         /// difference between litter and a small consolation. The margin also stops the shop
         /// being a laundry - at anything near full price you could buy a bomb,
         /// think better of it, sell it back, and every price in here would stop
@@ -375,12 +375,28 @@ enum GameConfig {
         /// what matters - cheap at the bottom, steep at the top, about 1.7x a rung -
         /// so the shop's real value is exactly where the crates stop.
         ///
-        /// Priced against a match: a balanced player collects about 25 tokens in
-        /// five minutes and somebody working the arcades about 42. Reaching an Epic
-        /// is half a match, a Cosmic on its own is a match and a half, and one full
-        /// ladder is 96 - both of them 192, six or seven matches. Nobody tops out in
-        /// one, which is the point. Those three figures are what the arcade payouts
-        /// and the sell-back share were tuned against, and all three still hold.
+        /// Priced against a match, and repriced because the match changed. Every
+        /// sealed base now has a machine in it, so a player who raids collects
+        /// something like 136 tokens in five minutes and an ordinary one around 70
+        /// - against the 25 and 42 these prices were first written for.
+        ///
+        /// At 5/9/16/26/40 that made both full ladders 1.4 busy matches, and topping
+        /// one ladder 71% of a single match. "Nobody tops out in one" had stopped
+        /// being true, and the top of the ladder is supposed to be the thing most
+        /// matches nobody has.
+        ///
+        ///     rung          price   cumulative   of a busy match
+        ///     Common/Bl2        6           6         4%
+        ///     Epic/Bl3         12          18        13%
+        ///     Legendary/Bl4    22          40        29%
+        ///     Mythical/Bl5     40          80        59%
+        ///     Cosmic/Bl6       70         150       110%
+        ///
+        /// So one ladder is 150 and both are 300 - a bit over two busy matches, or
+        /// four ordinary ones. Reaching the top rung of ONE ladder costs more than a
+        /// good match earns, which is the line that was missing: a Cosmic has to be
+        /// something you save across matches rather than something a good afternoon
+        /// buys twice.
         ///
         /// Equal rather than merely similar, and the bots are the reason it has to
         /// be exact. A bot buys whichever offer is cheaper, so a ladder that was
@@ -392,7 +408,7 @@ enum GameConfig {
         ///
         /// And every rung is lost on death, which is what stops a bought Cosmic from
         /// simply deciding the match. It is a lead to hold on to, not a purchase.
-        static let gearPrices: [Int] = [5, 9, 16, 26, 40]
+        static let gearPrices: [Int] = [6, 12, 22, 40, 70]
 
         static let helmetPrices: [HelmetTier: Int] = [
             .common: gearPrices[0], .epic: gearPrices[1], .legendary: gearPrices[2],
@@ -1731,17 +1747,17 @@ enum GameConfig {
             (0.35, [
                 (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
                 (.helmet(.common), 6), (.helmet(.epic), 11),
-                (.blaster(.three), 11), (.blaster(.four), 6)
+                (.blaster(.two),   11), (.blaster(.three), 6)
             ]),
             (0.65, [
                 (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
                 (.helmet(.epic), 11), (.helmet(.legendary), 6),
-                (.blaster(.four), 11), (.blaster(.five), 6)
+                (.blaster(.three), 11), (.blaster(.four), 6)
             ]),
             (0.85, [
                 (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
                 (.helmet(.legendary), 11), (.helmet(.mythical), 6),
-                (.blaster(.five), 11), (.blaster(.six), 6)
+                (.blaster(.four), 11), (.blaster(.five), 6)
             ])
         ]
 

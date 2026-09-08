@@ -167,15 +167,18 @@ enum LootSystem {
 
     /// Whether this actor is standing on something their BAG has no room for.
     ///
-    /// Deliberately narrower than the sweep's own test, and the difference is the
-    /// hint it drives: "hold an item to sell it", which is advice about a full bag
-    /// and nothing else. The sweep refuses items for two other reasons - gear you
-    /// have already beaten, a machine you have nowhere to put - and neither is
-    /// fixed by selling something, so widening this to match the sweep exactly
-    /// would make the screen give the wrong advice more often rather than less.
+    /// Almost exactly the sweep's own test now, which it has not been for a while.
+    /// wantsFromGround used to turn gear down for being a rung you had already
+    /// beaten, and this did not - so a player could stand on a Common helmet, be
+    /// refused, and be told nothing. That special case is gone; gear is taken if it
+    /// can be held, like everything else.
     ///
-    /// It can still never claim a refusal about something being quietly collected:
-    /// a full bag is a strict subset of what the sweep turns down.
+    /// One refusal is still not covered: a machine when your base already has one.
+    /// That is deliberate, because the hint this drives says "hold an item to sell
+    /// it", and selling something does not help - you have nowhere to put a second
+    /// machine however much room is in the bag. A full bag remains a strict subset
+    /// of what the sweep turns down, so this can never claim a refusal about
+    /// something that is quietly being collected.
     ///
     /// A token is excluded because a token is never refused: it goes to a counter
     /// rather than into a pocket, so it cannot be the thing somebody is standing
