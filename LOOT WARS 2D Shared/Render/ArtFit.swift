@@ -49,6 +49,23 @@ enum ArtFit {
                    contentHeight: GridGeometry.length(ofTiles: tiles.y))
     }
 
+    /// The picture fits INSIDE this box, keeping its shape - as large as it can be
+    /// without any part of it crossing the edge.
+    ///
+    /// For anything standing on a grid footprint that it must not overflow. Art
+    /// narrower than its box gets a sliver of spare tile at the sides; art wider
+    /// gets it above and below. Either way what you see is inside what you
+    /// reserved, which is the promise a footprint makes.
+    static func contained(_ name: String, within tiles: Vec2) -> Fit {
+        let art = measurement(of: name)
+
+        // The art's own shape, in tiles, if it were one tile wide.
+        let shape = art.fill.y / art.fill.x * art.canvasHeightOverWidth
+
+        let width = min(tiles.x, tiles.y / shape)
+        return covering(name, Vec2(x: width, y: width * shape))
+    }
+
     /// The picture is this many tiles wide and however tall the art says. For
     /// things standing on a grid footprint, where the width is the part that has to
     /// agree with the tiles and the height is the artist's business.

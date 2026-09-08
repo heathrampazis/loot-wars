@@ -38,12 +38,17 @@ final class ArcadeRenderer {
         return texture
     }()
 
-    /// How the machine is drawn, here and in the preview: the picture two tiles
-    /// wide, matching the footprint, and as tall as the art wants to be. The
-    /// footprint is three tiles and the cabinet comes out about three and a
-    /// quarter, which is right - you should pass behind the top of it.
+    /// How the machine is drawn, here and in the preview: as big as it goes inside
+    /// its 2 x 3 footprint without crossing the edge.
+    ///
+    /// Inside rather than across. Sizing it to the footprint's WIDTH stood a
+    /// cabinet three and a quarter tiles tall on three tiles of ground, and a
+    /// machine that overhangs the space it reserved is a machine that looks like it
+    /// does not fit - which it does not. The art is drawn narrower than 2:3 for
+    /// exactly this reason, so it fills the height and leaves a sliver at the sides.
     static func fit() -> ArtFit.Fit {
-        ArtFit.spanning("Arcade", width: Double(Arcade.width))
+        ArtFit.contained("Arcade",
+                         within: Vec2(x: Double(Arcade.width), y: Double(Arcade.height)))
     }
 
     func build(mapHeight: Int) {

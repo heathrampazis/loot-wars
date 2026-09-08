@@ -433,6 +433,29 @@ final class World {
         arcades.values.contains { $0.owner == team }
     }
 
+    /// The ground this team may stand furniture on.
+    ///
+    /// Inside the walls once there are walls, anywhere on their own claim before
+    /// that - chests and machines can be set down in an unfinished base on purpose,
+    /// so a rule that only ever answered with enclosed ground would refuse until
+    /// the wall was shut, which is the rule that was deliberately removed.
+    ///
+    /// One definition, because there used to be two and they disagreed. The search
+    /// for somewhere to put a machine asked the ENCLOSURE - the room you actually
+    /// walled in - while ArcadeSystem.canPlace asked the LAYOUT, the rectangle the
+    /// generator picked for this claim and nobody is obliged to build to. Follow the
+    /// blueprint and the two agree; wander off it by a couple of tiles, as the
+    /// adaptive recommendation invites you to, and the game would suggest a spot
+    /// inside your own base and then refuse to let you use it. That is precisely the
+    /// disagreement PlacementSystem exists to make impossible, so it cannot be two
+    /// pieces of code that happen to match.
+    func baseGround(of team: TeamID) -> Set<GridPoint> {
+        let room = enclosure(of: team).room
+        guard room.isEmpty else { return room }
+
+        return baseLayouts[team]?.region ?? claimTiles(of: team)
+    }
+
     /// Where a machine could stand inside this team's walls, nearest to here.
     ///
     /// Six tiles rather than one, checked as a block - a footprint half inside a
@@ -446,12 +469,7 @@ final class World {
     func nextArcadeOrigin(for team: TeamID,
                           near position: Vec2,
                           avoidingActors: Bool = true) -> GridPoint? {
-        // The same two-step as nextChestTile, and for the same reason: inside the
-        // walls once there are walls, anywhere on your own ground before that.
-        let room = enclosure(of: team).room
-        let ground = room.isEmpty
-            ? (baseLayouts[team]?.region ?? claimTiles(of: team))
-            : room
+        let ground = baseGround(of: team)
 
         var best: GridPoint?
         var shortest = Double.greatestFiniteMagnitude

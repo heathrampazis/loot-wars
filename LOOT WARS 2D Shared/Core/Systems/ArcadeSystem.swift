@@ -47,7 +47,11 @@ enum ArcadeSystem {
         // is already the safest on the map, and the shop refuses to sell a second
         // for the same reason - this is the backstop for one found any other way.
         guard !world.hasArcade(actor.team) else { return false }
-        guard let layout = world.baseLayouts[actor.team] else { return false }
+
+        // The room you actually walled in, not the rectangle the generator drew for
+        // this claim. See World.baseGround: asking the plan here let the game
+        // suggest a spot inside your own base and then refuse to let you use it.
+        let ground = world.baseGround(of: actor.team)
 
         // Placed from inside, like everything else you build.
         guard world.claim(for: actor.team)?.contains(GridPoint(containing: actor.feet)) == true else {
@@ -57,7 +61,7 @@ enum ArcadeSystem {
         let machine = Arcade(id: ArcadeID(-1), origin: origin, owner: actor.team, emitTimer: 0)
 
         for tile in machine.tiles {
-            guard layout.region.contains(tile) else { return false }
+            guard ground.contains(tile) else { return false }
             guard tile != world.claim(for: actor.team)?.centreTile else { return false }
             guard world.map[tile] == .floor else { return false }
             guard !world.structureIntersects(Box(tile: tile)) else { return false }
