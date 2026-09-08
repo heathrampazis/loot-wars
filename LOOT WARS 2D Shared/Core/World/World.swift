@@ -738,7 +738,31 @@ final class World {
 
     /// Called when a wall tile is destroyed, so the repair is worth paying for -
     /// and so the raider gets long enough to actually raid.
+    /// When each team's base was last broken into. Match start counts as a raid,
+    /// so nobody is a magnet in the first minute.
+    private var lastRaid: [TeamID: Double] = [:]
+
+    /// How long this base has been left alone.
+    ///
+    /// The anti-turtle clock. A base nobody has touched is a base whose owner has
+    /// been banking loot and income unopposed, and the longer that goes on the more
+    /// it is worth somebody's bomb - see AIBrain.chestWorthRobbing, which adds this
+    /// to what a base is worth.
+    func secondsSinceRaid(of team: TeamID) -> Double {
+        elapsed - (lastRaid[team] ?? 0)
+    }
+
+    func recordRaid(of team: TeamID) {
+        lastRaid[team] = elapsed
+    }
+
     func recordBreach(of team: TeamID) {
+        // A hole in the wall is a raid whether or not anything is taken. Stamped
+        // here rather than only where a chest is cracked, because the pressure this
+        // feeds is about being LEFT ALONE, and somebody who has just had their wall
+        // opened has not been.
+        recordRaid(of: team)
+
         // The buffer applies to anybody who has been bombed, sealed base or not.
         // Being walled in by somebody finishing their base around you is the same
         // experience as being walled in by a repair.

@@ -275,10 +275,26 @@ enum ChestSystem {
 
         world.removeChest(chestID)
 
+        // Left alone no longer. Stamped here as well as on the breach, because a
+        // base standing open can be robbed without anybody putting a fresh hole in
+        // it, and the pressure this feeds is about being untouched rather than
+        // about being bombed. See World.secondsSinceRaid.
+        world.recordRaid(of: chest.owner)
+
         // Paid like the best crate on the map, because that is what it is: a rare
         // lootbox you had to spend a bomb and cross somebody's base to reach.
-        world.award(GameConfig.Score.chestRaided, to: actor.team)
-        world.awardTokens(GameConfig.Tokens.perChestRaided, to: id)
+        //
+        // And paid only if something came out. Breaking an empty chest is still
+        // worth doing - it costs the owner the chest - but it is not a haul, and a
+        // flat fee for opening a box that turned out to be bare is fifty-five
+        // points for walking into a room. That mattered little while an empty chest
+        // could not be a target; bases are now judged on more than their contents,
+        // so bare ones will genuinely get visited.
+        if !spill.isEmpty {
+            world.award(GameConfig.Score.chestRaided, to: actor.team)
+            world.awardTokens(GameConfig.Tokens.perChestRaided, to: id)
+        }
+
         world.record(.chestCracked(at: chest.position, items: spill.count))
     }
 

@@ -897,23 +897,35 @@ enum AIBrain {
         for chest in world.chests(notOwnedBy: actor.team) {
             guard carryingAWayIn || world.baseIsBreached(chest.owner) else { continue }
 
-            // Something in there this bot could actually leave with. This replaced
-            // a flat "bag is not full" test, which was both too strict and too
-            // loose: it turned away a fully laden bot standing in front of a
-            // Legendary - gear goes ON, it does not need a slot - while waving
-            // through a bot with room in its pockets and nothing in the chest but
-            // the helmet it is already wearing.
-            guard chest.contents.slots.contains(where: { $0 != nil }) else { continue }
-
             let distance = (chest.position - actor.position).length
             guard distance < GameConfig.AI.robRange else { continue }
 
-            // Worth what is in it, less the walk. This is the whole difference
-            // between robbing the nearest base and robbing the rich one: four
-            // items pull a raider four times as far as one does.
+            // What the BASE is worth, not what this chest holds.
+            //
+            // The contents used to be a hard gate - an empty chest disqualified the
+            // whole base - and that quietly made the player unraidable. Their chests
+            // are not stocked for them, because a player's chest is theirs to fill,
+            // so a player who banks nothing owns a base that scored zero and was
+            // never visited. Bots stock and restock their own, so bots spent every
+            // match raiding each other.
+            //
+            // Three things make a base worth the trip, and any of them will do it:
+            // what is in the chests, whether there is a machine to wreck, and how
+            // long its owner has been left alone. The third is the one that finds a
+            // turtle - see GameConfig.AI.raidPressurePerSecond.
             let items = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
-            let score = Double(items * GameConfig.AI.chestItemWorth)
-                - distance * GameConfig.AI.raidDistanceCost
+
+            var worth = Double(items * GameConfig.AI.chestItemWorth)
+
+            if world.hasArcade(chest.owner) { worth += GameConfig.AI.arcadeWorth }
+
+            worth += min(GameConfig.AI.raidPressureCap,
+                         world.secondsSinceRaid(of: chest.owner)
+                             * GameConfig.AI.raidPressurePerSecond)
+
+            // Less the walk, which is what keeps a raider robbing the rich base
+            // rather than merely the near one.
+            let score = worth - distance * GameConfig.AI.raidDistanceCost
 
             guard score > bestScore else { continue }
             bestScore = score

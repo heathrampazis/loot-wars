@@ -988,6 +988,38 @@ enum GameConfig {
         /// twenty-five tokens on its own - it is the only thing in a base that is
         /// worth raiding even when the chests are bare.
         static let chestItemWorth = 10
+
+        /// What a standing machine adds to a base's worth as a target.
+        ///
+        /// Two and a half items, which is about right against what wrecking one
+        /// actually pays: 40 points and 25 tokens, and it takes the owner's best
+        /// income away for as long as it takes them to rebuild. A base with a
+        /// machine in it is worth breaking into even if the chests are bare.
+        static let arcadeWorth: Double = 25
+
+        /// What a base gains as a target for every second nobody has touched it,
+        /// and the most it can gain.
+        ///
+        /// The anti-turtle clock, and it exists because of a specific hole: a
+        /// player's chests are not stocked for them - a player's chest is theirs to
+        /// fill - so a player who never stores anything owns a base with nothing in
+        /// it, and the raid test could not see a reason to go. Bots stock their own
+        /// chests and restock them, so bots raided each other all match and the
+        /// player was never once broken into.
+        ///
+        /// Making empty chests attractive would have been the wrong fix - there is
+        /// genuinely nothing in them. What IS true is that a base nobody has
+        /// touched for two minutes belongs to somebody who has been building,
+        /// banking and earning unopposed, and that is worth a bomb whatever is in
+        /// the chest. Half a point a second, capped at 60: after two quiet minutes
+        /// a base is worth six items more than it was, which will pull a raider
+        /// across most of a map.
+        ///
+        /// It applies to everybody. Bot bases get raided constantly and keep
+        /// resetting theirs, so in practice the pressure accumulates on whoever is
+        /// being left alone - which is the player, and which is the point.
+        static let raidPressurePerSecond: Double = 0.5
+        static let raidPressureCap: Double = 60
         static let machineWorth = 25
         static let raidDistanceCost: Double = 1.0
 
