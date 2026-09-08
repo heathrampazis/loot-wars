@@ -859,6 +859,34 @@ final class World {
     /// purpose: this answers "is now a bad moment", which wants to be true a little
     /// too often rather than a little too rarely. Something that is deciding
     /// whether to interrupt the player should err towards not.
+    /// Whoever is standing in this team's claim who should not be, nearest first.
+    ///
+    /// The claim rather than the walls, so it answers while somebody is still
+    /// picking their way in through the hole - which is the only part of a raid an
+    /// owner has any chance of arriving for.
+    ///
+    /// Sorted, because this decides who gets shot at.
+    func intruder(in team: TeamID) -> ActorID? {
+        guard let claim = claims[team] else { return nil }
+
+        var nearest: ActorID?
+        var shortest = Double.greatestFiniteMagnitude
+        let home = claim.centreTile.center
+
+        for id in actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let actor = actors[id], actor.isAlive, actor.team != team,
+                  actor.invulnerability <= 0,
+                  claim.contains(GridPoint(containing: actor.feet)) else { continue }
+
+            let distance = (actor.position - home).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            nearest = id
+        }
+
+        return nearest
+    }
+
     func enemyNear(_ actor: Actor, within reach: Double) -> Bool {
         actors.values.contains {
             $0.isAlive && $0.team != actor.team

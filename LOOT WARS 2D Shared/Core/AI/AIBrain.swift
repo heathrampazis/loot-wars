@@ -242,6 +242,12 @@ enum AIBrain {
             if arrived || state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
             }
+        case .defend:
+            // No patience at all, deliberately. Every other errand here can be
+            // given up on; this one ends when the intruder leaves or dies, and
+            // steerTowardsGoal drops it the moment either happens. A defender that
+            // times out is a defender somebody can outwait.
+            break
         case .wreck:
             // The same clock a crate gets. A machine that cannot be got at is
             // usually one behind a wall the bot has no way through.
@@ -318,7 +324,7 @@ enum AIBrain {
         if wanted != state.goal {
             // Only a NEW fight costs a reaction - a bot already shooting at someone
             // does not freeze up again every time it re-picks the same target.
-            if case .fight = wanted, !state.goal.isFight {
+            if wanted.isCombat, !state.goal.isCombat {
                 state.reactionTimer = Double.random(in: GameConfig.AI.reactionDelay,
                                                     using: &world.rng)
             }
@@ -369,7 +375,7 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm, .wreck:
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm, .wreck, .defend:
             // All interruptible. A bot laying bricks - or lining up a throw, or
             // waiting on a payout - while somebody shoots at it is not a bot
             // anyone believes in.
@@ -414,6 +420,25 @@ enum AIBrain {
             if shouldEngage(enemy, actor: actor, in: world) {
                 return .fight(enemy.id)
             }
+        }
+
+        // Somebody is standing in your base.
+        //
+        // Above the repair, above the raid, above the loot - above everything
+        // except not dying, which is the branch immediately overhead. This is the
+        // system that was simply missing: there was no concept of defending a base
+        // anywhere in this file, so a raid was a five-second errand run against an
+        // absent owner. The only reaction to being broken into was to walk home and
+        // REPAIR, and canBuild refuses for the twelve seconds of raid grace, so the
+        // owner arrived and stood in the doorway doing nothing at all while their
+        // chest was emptied in front of them.
+        //
+        // It answers on the claim rather than the wall, so it fires while the
+        // raider is still climbing through the hole. It is not gated on seeing
+        // them: your base being entered is not something you have to spot, and a
+        // defender who needed line of sight would be told about it after the raid.
+        if let intruder = world.intruder(in: actor.team) {
+            return .defend(intruder)
         }
 
         // Somebody has put a hole in a finished base. Everything else waits.
@@ -1169,6 +1194,19 @@ enum AIBrain {
             // not a thing this brain can express.
             steer(&state, actor: actor, to: tile.center)
 
+        case .defend(let id):
+            // Gone, dead, or driven off - and the claim is the test, not the
+            // distance, so chasing somebody out of your base ends at the fence
+            // rather than halfway across the map.
+            guard let enemy = world.actors[id], enemy.isAlive,
+                  world.intruder(in: actor.team) != nil else {
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+                return
+            }
+            steer(&state, actor: actor, to: enemy.position)
+
         case .wreck(let id):
             // Gone already, or somebody else got it. Re-decide immediately: the
             // bot is standing in a base it broke into and there is usually still
@@ -1686,7 +1724,7 @@ enum AIBrain {
             target = tile
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
-        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash, .rearm, .wreck:
+        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash, .rearm, .wreck, .defend:
             target = nil
         }
 
@@ -1925,7 +1963,8 @@ enum AIBrain {
         switch state.goal {
         case .fight(let id):   targetID = id
         case .retreat(let id): targetID = id
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm, .wreck:
+        case .defend(let id):  targetID = id
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm, .wreck, .defend:
             targetID = nil
         }
 

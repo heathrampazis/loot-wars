@@ -1778,16 +1778,28 @@ enum GameConfig {
 
         /// How much shooting a machine takes to break.
         ///
-        /// 260, which is 22 shots from a starter blaster and 7 from a Blaster 6. A
-        /// deliberate act either way - you have to stand still in somebody's base
-        /// and empty a magazine into their furniture, which is exactly the window
-        /// the owner needs to come home and make you regret it.
+        /// 520, doubled, because at 260 a Blaster 6 finished one in 1.6 seconds and
+        /// the whole "raiding is too easy" complaint lived in that number. The note
+        /// under the old value claimed it was a deliberate act that gave the owner
+        /// a window to come home and make you regret it. It was not. It was two
+        /// seconds.
         ///
-        /// Not lower. At four or five shots a machine would be something you break
-        /// in passing, and the whole point of it being breakable is that it is a
-        /// CHOICE: the seconds you spend wrecking it are seconds you are not
-        /// spending on the chest, and both are on a clock.
-        static let health = 260
+        ///     blaster        at 260      at 520
+        ///     Blaster 1     6.6s        19.2s
+        ///     Blaster 3     2.9s         8.3s
+        ///     Blaster 6     1.6s         2.9s
+        ///
+        /// A defender twenty tiles out needs about seven seconds to get home, so
+        /// this is the number that decides whether the trip is worth starting. Now
+        /// it is: anybody below the top of the ladder has to commit real time,
+        /// standing still, inside somebody's base, to break their machine - and a
+        /// starter blaster should not be doing it at all, which nineteen seconds
+        /// says clearly enough.
+        ///
+        /// It also restores the choice the old comment claimed and did not deliver:
+        /// the seconds spent wrecking are seconds not spent on the chest, and both
+        /// are on the clock the owner is walking home along.
+        static let health = 520
 
         /// Machines on the map. Deliberately few: an arcade you have to travel to
         /// is a place worth fighting over, one on every corner is furniture.

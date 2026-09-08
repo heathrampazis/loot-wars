@@ -32,6 +32,8 @@ enum AIGoal: Equatable {
     case rearm(ChestID)
     /// Stand in somebody's base and shoot their machine apart.
     case wreck(ArcadeID)
+    /// Get home, because somebody is in your base.
+    case defend(ActorID)
 
     var isBuild: Bool {
         if case .build = self { return true }
@@ -66,10 +68,22 @@ enum AIGoal: Equatable {
         return false
     }
 
+    /// Whether this is a bot trying to shoot a person - a chosen fight, a fighting
+    /// retreat, or somebody caught in your own base. They share the aiming code and
+    /// the reaction delay, and defending should not be the one that stands there
+    /// politely while it is robbed.
+    var isCombat: Bool {
+        switch self {
+        case .fight, .retreat, .defend: return true
+        default: return false
+        }
+    }
+
     var debugName: String {
         switch self {
         case .rearm: return "re-arm"
         case .wreck: return "wreck"
+        case .defend: return "defend"
         case .wander: return "roam"
         case .loot: return "loot"
         case .collect: return "grab"
