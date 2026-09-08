@@ -118,6 +118,9 @@ final class GameScene: SKScene {
     /// Teaches the one gesture nothing on screen suggests: hold a slot to drop it.
     private let hint = HintNode()
 
+    /// Which way home is, when home is off screen - see BaseCompassNode.
+    private let compass = BaseCompassNode()
+
     /// The hold hint's whole budget for a match.
     ///
     /// One showing, spent only on the moment that earns it: walking over something
@@ -347,6 +350,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(shopPanel)
         cameraController.node.addChild(quickBuy)
         cameraController.node.addChild(hint)
+        cameraController.node.addChild(compass)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -577,6 +581,10 @@ final class GameScene: SKScene {
         // The panel closes itself if the chest stops existing, or if you are moved
         // out of reach of it. Nothing else has to remember to do that.
         chestPanel.update(with: world)
+
+        // Given the screen size rather than reading it: this node lives in camera
+        // space and has no business knowing about the scene.
+        compass.update(with: world, screen: size)
 
         // Forget a selection whose slot has emptied - spent, dropped, or stored in
         // a chest. This is what takes the heal button away when the last dressing

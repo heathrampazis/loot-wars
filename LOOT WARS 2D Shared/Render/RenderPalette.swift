@@ -307,6 +307,15 @@ enum RenderPalette {
     static let placementValid   = rgb(0x6E, 0xF0, 0x6E)
     static let placementBlocked = rgb(0xFF, 0x4B, 0x54)
 
+    /// Something is wrong at home.
+    ///
+    /// Its own name rather than borrowing the refusal red above, because the two
+    /// say opposite things - one is "that did not work", the other is "look away
+    /// from what you are doing" - and a colour shared between them could not be
+    /// changed for one without lying about the other. Warmer and brighter than the
+    /// refusal, so it reads as an alarm rather than as a rejected tap.
+    static let alarm = rgb(0xFF, 0x3B, 0x30)
+
     // On-screen controls
     static let controlBackground = SKColor(white: 0.0, alpha: 0.18)
     static let controlForeground = SKColor(white: 0.0, alpha: 0.30)
