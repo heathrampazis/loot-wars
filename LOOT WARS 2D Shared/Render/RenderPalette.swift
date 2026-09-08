@@ -244,6 +244,15 @@ enum RenderPalette {
     /// which is the only way a colour ever comes to mean anything.
     static let sellButton = rgb(0x3F, 0xB9, 0x50)
 
+    /// The plate under an offer the game is making you.
+    ///
+    /// A darker relative of the yes-green above, chosen because the quick-buy
+    /// prompt used to be filled with hudPanel - the exact colour of the health
+    /// panel it sits under. It was not that players were ignoring it; it was
+    /// wearing the uniform of the furniture and reading as more of the same. White
+    /// text clears 4.3 to 1 on this, which is comfortable at that size.
+    static let offerPlate = rgb(0x2E, 0x8B, 0x47)
+
     /// The number thrown up when something sells.
     ///
     /// Much brighter than the sell button it comes from, and they are different on

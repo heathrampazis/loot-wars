@@ -87,7 +87,7 @@ final class QuickBuyNode: SKNode {
                                                 width: box.width, height: box.height),
                             cornerWidth: box.height / 2, cornerHeight: box.height / 2,
                             transform: nil)
-        plate.fillColor = RenderPalette.hudPanel
+        plate.fillColor = RenderPalette.offerPlate
         plate.strokeColor = RenderPalette.placementValid
         plate.lineWidth = 2
         addChild(plate)
@@ -215,6 +215,33 @@ final class QuickBuyNode: SKNode {
         answer(in: RenderPalette.placementBlocked, strength: 0.42)
     }
 
+    /// A small shake when the offer arrives or changes.
+    ///
+    /// Motion on a CHANGE rather than motion always, which is the distinction this
+    /// prompt got wrong in both directions. It used to appear for six seconds and
+    /// hide for twenty, so it was absent whenever you wanted it; then it became
+    /// permanent and completely still, and a thing that never moves in the corner
+    /// of a busy screen is furniture. Watching people play, nobody saw it at all.
+    ///
+    /// So it holds still while it is saying the same thing, and moves for a fifth
+    /// of a second whenever what it is saying changes. Rotation and scale only -
+    /// the POSITION belongs to the layout, and an interrupted move would leave the
+    /// prompt parked somewhere the layout never put it.
+    private func wiggle() {
+        removeAction(forKey: "shake")
+
+        // The same key the purchase shake uses, because both animate zRotation and
+        // two actions driving one property is a node that never settles. Whichever
+        // fires last wins, which is the right answer: a confirmation should cut off
+        // an arrival wiggle rather than fight it.
+        run(.sequence([
+            .rotate(toAngle: -0.07, duration: 0.05),
+            .rotate(toAngle: 0.07, duration: 0.08),
+            .rotate(toAngle: -0.04, duration: 0.06),
+            .rotate(toAngle: 0, duration: 0.05)
+        ]), withKey: "shake")
+    }
+
     private func answer(in colour: SKColor, strength: CGFloat) {
         flash.removeAllActions()
         flash.fillColor = colour
@@ -270,6 +297,7 @@ final class QuickBuyNode: SKNode {
             setScale(0.9)
             run(.group([.fadeIn(withDuration: 0.14), .scale(to: 1, duration: 0.14)]),
                 withKey: "life")
+            wiggle()
             return
         }
 
@@ -281,6 +309,8 @@ final class QuickBuyNode: SKNode {
             .run { [weak self] in self?.dress(item) },
             .fadeAlpha(to: 1, duration: 0.12)
         ]), withKey: "swap")
+
+        wiggle()
     }
 
     /// The picture, the price and the colour behind them. Split out of show()

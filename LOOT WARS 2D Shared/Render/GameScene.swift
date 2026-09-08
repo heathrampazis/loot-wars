@@ -609,12 +609,12 @@ final class GameScene: SKScene {
     /// prompt now STAYS while the answer is yes, changing what it offers as the
     /// match changes; the button waves on a timer, and only while the shop is shut.
     ///
-    /// Which is why the wave now holds off while the prompt is up. They were tuned
-    /// as a pair when the prompt came and went - the button covered the gaps. With
-    /// the prompt permanent the button waving at it every fourteen seconds is the
-    /// same message twice, and the quieter of the two is the one that should give
-    /// way. The wave is left for the case it is actually needed in: something
-    /// affordable that the prompt is not showing, because a panel is open over it.
+    /// The wave is back on whenever something is affordable, and stopping it was a
+    /// mistake worth naming. The argument was that a permanent prompt plus a button
+    /// waving at it every fourteen seconds is the same message twice - true, and
+    /// beside the point, because the prompt was the half nobody could see. Making
+    /// it permanent and silencing the button at the same time left NOTHING on that
+    /// side of the screen moving, and watching people play, they found neither.
     private func updateQuickBuy(with world: World) {
         guard !world.isOver,
               !shopPanel.isOpen,
@@ -628,7 +628,6 @@ final class GameScene: SKScene {
         quickBuy.update(with: offer)
 
         guard offer != nil else { return }
-        guard quickBuy.isHidden else { return }
 
         if lastUpdateTime >= nextNudge {
             nextNudge = lastUpdateTime + GameConfig.Shop.nudgeInterval
