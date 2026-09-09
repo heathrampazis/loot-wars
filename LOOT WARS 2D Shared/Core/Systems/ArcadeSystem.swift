@@ -64,8 +64,8 @@ enum ArcadeSystem {
             guard ground.contains(tile) else { return false }
             guard tile != world.claim(for: actor.team)?.centreTile else { return false }
             guard world.map[tile] == .floor else { return false }
-            guard !world.structureIntersects(Box(tile: tile)) else { return false }
-            guard !world.trees.contains(where: { $0.overlaps(tile) }) else { return false }
+            guard !world.structureOccupies(tile) else { return false }
+            guard !world.treeTiles.contains(tile) else { return false }
         }
 
         // Nothing standing where it would appear - it is solid, and six tiles of it.

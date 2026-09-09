@@ -33,6 +33,9 @@ final class BlockRenderer {
     private struct Wall {
         let sprite: SKSpriteNode
         let owner: TeamID
+        /// What the sprite is currently DRAWN as. Kept so a rebuild can tell the
+        /// walls that changed from the walls that merely still exist.
+        var mask: UInt8
     }
 
     private struct TextureKey: Hashable {
@@ -56,39 +59,103 @@ final class BlockRenderer {
 
     // MARK: - Building
 
+    /// Brings the drawing into line with the map, touching only what moved.
+    ///
+    /// This used to throw every wall away and build them all again, and it is
+    /// called every time a single tile changes - which is thirty or forty times a
+    /// second once seven bots are building and repairing. Two hundred SKSpriteNodes
+    /// destroyed and allocated afresh, thirty times a second, for one block: the
+    /// node churn alone was costing more than the whole simulation.
+    ///
+    /// Now it walks the map and compares. Scanning four thousand tiles is four
+    /// thousand integer reads, which is nothing; what is expensive is touching
+    /// nodes, and laying one block touches exactly the nine that can have changed
+    /// shape. The walk stays rather than being replaced by a list of changed tiles
+    /// from the world, because a full scan cannot drift out of step with the map
+    /// and a change list can.
     func build(from map: TileMap) {
-        node.removeAllChildren()
-        walls.removeAll()
-
         let size = CGSize(width: GridGeometry.tileSize, height: GridGeometry.tileSize)
+        var seen: Set<GridPoint> = []
+        seen.reserveCapacity(walls.count)
 
         for row in 0..<map.height {
             for col in 0..<map.width {
                 let point = GridPoint(col: col, row: row)
                 guard let owner = map[point].blockOwner else { continue }
 
-                let key = TextureKey(mask: mask(at: point, owner: owner, in: map),
-                                     team: owner)
-                let sprite = SKSpriteNode(texture: texture(for: key), size: size)
+                seen.insert(point)
+
+                let shape = mask(at: point, owner: owner, in: map)
+
+                // Already drawn, and drawn correctly. The common case by far - a
+                // block laid on one side of a base leaves every wall on the other
+                // three sides exactly as it was.
+                if let existing = walls[point], existing.owner == owner {
+                    guard existing.mask != shape else { continue }
+
+                    existing.sprite.texture = texture(for: TextureKey(mask: shape, team: owner))
+                    walls[point]?.mask = shape
+                    continue
+                }
+
+                // Changed hands, which means the old sprite is the wrong colour.
+                walls[point]?.sprite.removeFromParent()
+
+                let sprite = SKSpriteNode(texture: texture(for: TextureKey(mask: shape,
+                                                                          team: owner)),
+                                          size: size)
                 sprite.position = GridGeometry.pointAtCentre(of: point)
                 sprite.zPosition = 5     // above terrain and trees, below actors
 
                 node.addChild(sprite)
-                walls[point] = Wall(sprite: sprite, owner: owner)
+                walls[point] = Wall(sprite: sprite, owner: owner, mask: shape)
             }
+        }
+
+        // And whatever is no longer there - blown up, or taken back down.
+        for (point, wall) in walls where !seen.contains(point) {
+            wall.sprite.removeFromParent()
+            walls[point] = nil
         }
     }
 
     /// Fades a wall out while the team that owns it is standing in it, so you can
     /// see yourself passing through instead of vanishing behind your own base.
     func sync(with world: World) {
-        for (point, wall) in walls {
-            let ownerIsInside = world.actors.values.contains {
-                $0.team == wall.owner && $0.overlaps(point)
-            }
+        // Which tiles have somebody standing on them, worked out once.
+        //
+        // The question is asked of every wall on the map every frame, and it used
+        // to be answered by scanning all eight actors each time - two hundred walls
+        // times eight actors, sixty times a second, to find the one or two walls
+        // anybody is actually inside. Eight actors cover a couple of tiles each, so
+        // gathering them first turns the whole thing into a dictionary lookup.
+        var standing: [GridPoint: Set<TeamID>] = [:]
 
+        for actor in world.actors.values {
+            let box = actor.hitbox
+
+            for col in Int(box.lower.x.rounded(.down))...Int(box.upper.x.rounded(.down)) {
+                for row in Int(box.lower.y.rounded(.down))...Int(box.upper.y.rounded(.down)) {
+                    let tile = GridPoint(col: col, row: row)
+
+                    // Asked rather than assumed, so this stays the same question
+                    // Actor.overlaps asks - the bounds above are a candidate list.
+                    guard box.intersects(Box(tile: tile)) else { continue }
+                    standing[tile, default: []].insert(actor.team)
+                }
+            }
+        }
+
+        for (point, wall) in walls {
+            let ownerIsInside = standing[point]?.contains(wall.owner) == true
             let target: CGFloat = ownerIsInside ? BlockRenderer.passThroughAlpha : 1.0
-            wall.sprite.alpha += (target - wall.sprite.alpha) * BlockRenderer.fadeRate
+            let delta = target - wall.sprite.alpha
+
+            // Already there, which is true of every wall nobody is standing in -
+            // so the frame does no work at all for almost all of them.
+            guard abs(delta) > 0.001 else { continue }
+
+            wall.sprite.alpha += delta * BlockRenderer.fadeRate
         }
     }
 

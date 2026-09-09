@@ -109,15 +109,23 @@ struct BaseEnclosure {
     /// - Parameters:
     ///   - solid: whether a tile is WALL - masonry, terrain or a tree. What holds
     ///     the room in, and what is not counted as part of it.
-    ///   - blocks: whether a tile stops somebody walking onto it, which is the same
-    ///     thing plus the furniture standing on the ground. Only the fill asks this,
-    ///     so a crate can plug a gap without eating the floor it stands on.
+    ///   - furniture: whether a structure is standing on the tile. Stops the fill
+    ///     without being wall, so a crate can plug a gap without eating the floor
+    ///     it stands on.
     ///   - ownWall: whether a tile is a wall belonging to the team being asked
     ///     about, which is what separates "extend your base" from "there is a rock
     ///     here".
+    ///
+    /// Each of these is asked EXACTLY ONCE PER TILE, up front, and the fill then
+    /// runs over flat arrays. That is not a micro-optimisation, it is the
+    /// difference between this being free and this being the most expensive thing
+    /// in the game: the old version called `solid` from inside the neighbour loop,
+    /// so every wall tile was re-tested up to four times, and each test walked
+    /// forty-five tree clumps. Eight teams, recomputed on every block any of the
+    /// seven bots laid, sixty times a second.
     static func compute(claim: BaseClaim,
                         solid: (GridPoint) -> Bool,
-                        blocks: (GridPoint) -> Bool,
+                        furniture: (GridPoint) -> Bool,
                         ownWall: (GridPoint) -> Bool) -> BaseEnclosure {
         let low = claim.origin
         let high = GridPoint(col: low.col + claim.size - 1,
@@ -126,49 +134,68 @@ struct BaseEnclosure {
         // The claim, which is what can be room, and the wider box the fill runs
         // over, which is only ever used to find a way in.
         let outerLow = GridPoint(col: low.col - margin, row: low.row - margin)
-        let outerHigh = GridPoint(col: high.col + margin, row: high.row + margin)
+        let span = claim.size + margin * 2
 
-        func inside(_ p: GridPoint) -> Bool {
-            p.col >= outerLow.col && p.col <= outerHigh.col
-                && p.row >= outerLow.row && p.row <= outerHigh.row
+        func index(_ p: GridPoint) -> Int? {
+            let col = p.col - outerLow.col
+            let row = p.row - outerLow.row
+            guard col >= 0, col < span, row >= 0, row < span else { return nil }
+            return row * span + col
+        }
+
+        // One pass, two answers per tile.
+        var isWall = [Bool](repeating: false, count: span * span)
+        var isBlocked = [Bool](repeating: false, count: span * span)
+
+        for row in 0..<span {
+            for col in 0..<span {
+                let p = GridPoint(col: outerLow.col + col, row: outerLow.row + row)
+                let masonry = solid(p)
+
+                isWall[row * span + col] = masonry
+                isBlocked[row * span + col] = masonry || furniture(p)
+            }
         }
 
         // Seeded from the border of the wider box: open ground that far out is
         // ground somebody is standing on, so it is "outside" for this purpose and
         // everything it connects to is too.
-        var open: Set<GridPoint> = []
-        var queue: [GridPoint] = []
+        var open = [Bool](repeating: false, count: span * span)
+        var queue: [Int] = []
 
         // Reached, but not walked THROUGH. A tile with a crate on it can be stood
         // next to from outside, so it is not enclosed and must not be counted as
         // room - otherwise every crate lying loose on a claim would add a tile to
         // the tally and enough of them would seal a base that has no walls at all.
         // But nobody gets past it either, so the fill stops there.
-        func reach(_ p: GridPoint) {
-            guard !solid(p), open.insert(p).inserted else { return }
-            guard !blocks(p) else { return }
-            queue.append(p)
+        func reach(_ slot: Int) {
+            guard !isWall[slot], !open[slot] else { return }
+            open[slot] = true
+            guard !isBlocked[slot] else { return }
+            queue.append(slot)
         }
 
-        for col in outerLow.col...outerHigh.col {
-            for row in [outerLow.row, outerHigh.row] { reach(GridPoint(col: col, row: row)) }
+        for col in 0..<span {
+            reach(col)
+            reach((span - 1) * span + col)
         }
-        for row in outerLow.row...outerHigh.row {
-            for col in [outerLow.col, outerHigh.col] { reach(GridPoint(col: col, row: row)) }
+        for row in 0..<span {
+            reach(row * span)
+            reach(row * span + span - 1)
         }
 
         var head = 0
         while head < queue.count {
-            let p = queue[head]
+            let slot = queue[head]
             head += 1
 
-            for next in [GridPoint(col: p.col + 1, row: p.row),
-                         GridPoint(col: p.col - 1, row: p.row),
-                         GridPoint(col: p.col, row: p.row + 1),
-                         GridPoint(col: p.col, row: p.row - 1)] {
-                guard inside(next) else { continue }
-                reach(next)
-            }
+            let col = slot % span
+            let row = slot / span
+
+            if col > 0 { reach(slot - 1) }
+            if col < span - 1 { reach(slot + 1) }
+            if row > 0 { reach(slot - span) }
+            if row < span - 1 { reach(slot + span) }
         }
 
         var room: Set<GridPoint> = []
@@ -177,13 +204,14 @@ struct BaseEnclosure {
         for col in low.col...high.col {
             for row in low.row...high.row {
                 let p = GridPoint(col: col, row: row)
+                guard let slot = index(p) else { continue }
 
-                guard !solid(p) else {
+                guard !isWall[slot] else {
                     if ownWall(p) { ownWalls.insert(p) }
                     continue
                 }
 
-                if !open.contains(p) { room.insert(p) }
+                if !open[slot] { room.insert(p) }
             }
         }
 
@@ -196,7 +224,8 @@ struct BaseEnclosure {
                          GridPoint(col: p.col - 1, row: p.row),
                          GridPoint(col: p.col, row: p.row + 1),
                          GridPoint(col: p.col, row: p.row - 1)] {
-                if solid(next) { wall.insert(next) }
+                guard let slot = index(next) else { continue }
+                if isWall[slot] { wall.insert(next) }
             }
         }
 

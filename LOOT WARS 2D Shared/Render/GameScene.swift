@@ -307,6 +307,10 @@ final class GameScene: SKScene {
         let generated = MapFactory.generate(seed: seed)
         world = World(generated: generated)
 
+        // Before the first frame rather than on whichever frame first needs it -
+        // see ArtFit.warm.
+        ArtFit.warm(["Chest", "Arcade"])
+
         tileRenderer.build(from: generated.map)
         claimRenderer.build(claims: generated.claims)
         treeRenderer.build(patches: generated.trees)

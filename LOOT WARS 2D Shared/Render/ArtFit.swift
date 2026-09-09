@@ -37,6 +37,18 @@ enum ArtFit {
         let content: CGRect
     }
 
+    /// Measures a piece of art now, so nothing has to measure it later.
+    ///
+    /// The measurement is a pass over every pixel of the image - a million of them
+    /// for the machine - and it happens on whichever frame first asks. That frame
+    /// is the one where the first arcade appears, which is a visible hitch in the
+    /// middle of a match for work that has nothing to do with the moment. Called at
+    /// scene setup instead, it lands during loading where a few milliseconds cost
+    /// nothing. Everything after it is a dictionary hit.
+    static func warm(_ names: [String]) {
+        for name in names { _ = measurement(of: name) }
+    }
+
     /// The picture covers this box exactly. Stretches the art if the box is not
     /// the shape the art is, so it is for things whose box was chosen to match.
     static func covering(_ name: String, _ tiles: Vec2) -> Fit {

@@ -37,9 +37,12 @@ enum BuildSystem {
     static func isBuildableTile(_ point: GridPoint, for team: TeamID, in world: World) -> Bool {
         guard world.claim(for: team)?.contains(point) == true else { return false }
         guard !world.map.isOccupied(point) else { return false }
-        guard !world.trees.contains(where: { $0.overlaps(point) }) else { return false }
+        guard !world.treeTiles.contains(point) else { return false }
 
-        return !world.structureIntersects(Box(tile: point))
+        // The tile-sized lookups rather than a walk over every clump and every
+        // crate on the map. This is asked per tile of the blueprint's outline every
+        // frame, and by every bot that wants somewhere to put a wall.
+        return !world.structureOccupies(point)
     }
 
     static func canPlace(at point: GridPoint, by actor: Actor, in world: World) -> Bool {

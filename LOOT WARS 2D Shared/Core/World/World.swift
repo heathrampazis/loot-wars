@@ -57,10 +57,34 @@ final class World {
     /// last drew, which is far cheaper than diffing four thousand tiles a frame.
     private(set) var mapRevision: Int = 0
 
+    /// Bumped every time a crate, chest or machine starts or stops existing.
+    ///
+    /// Separate from mapRevision on purpose: the renderer redraws four thousand
+    /// tiles when THAT moves, and a crate being opened is not a reason to do it.
+    /// What this key covers is the enclosure, which cares whether a structure is
+    /// standing in a gap, and structureTiles, which is the lookup that answers it.
+    ///
+    /// Moving a structure would need this too, and nothing does - a crate, a chest
+    /// and a machine are each put down once and taken away once. Systems write
+    /// mutated copies back into these dictionaries constantly (timers, contents,
+    /// health) and none of those touch a position, which is why the write-backs do
+    /// not bump it. Anything that ever DOES move one has to.
+    private(set) var structureRevision: Int = 0
+
+    private func structuresChanged() { structureRevision &+= 1 }
+
     let claims: [TeamID: BaseClaim]
 
     /// Round obstacles. Not tiles - see TreePatch for why.
     let trees: [TreePatch]
+
+    /// Every tile a clump overlaps, worked out once at the start of the match.
+    ///
+    /// Forty-five clumps, and asking "is there a tree on this tile" used to walk
+    /// all of them. That is fine once and ruinous sixty times a second: the
+    /// enclosure fill alone asked it thousands of times a frame. Trees are declared
+    /// `let` a line above, so there is no version of this that can go stale.
+    let treeTiles: Set<GridPoint>
 
     let baseLayouts: [TeamID: BaseLayout]
 
@@ -178,6 +202,17 @@ final class World {
             crates[box.id] = box
         }
         self.lootboxes = crates
+
+        var wooded: Set<GridPoint> = []
+        for patch in generated.trees {
+            for col in (patch.origin.col - 1)...(patch.origin.col + patch.size) {
+                for row in (patch.origin.row - 1)...(patch.origin.row + patch.size) {
+                    let tile = GridPoint(col: col, row: row)
+                    if patch.overlaps(tile) { wooded.insert(tile) }
+                }
+            }
+        }
+        self.treeTiles = wooded
         self.nextLootboxID = generated.lootboxes.count
         var machines: [ArcadeID: Arcade] = [:]
         for machine in generated.arcades { machines[machine.id] = machine }
@@ -286,6 +321,7 @@ final class World {
     func removeLootbox(_ id: LootboxID) {
         guard let crate = lootboxes[id] else { return }
         lootboxes[id] = nil
+        structuresChanged()
 
         // Crates come back. Without that, seven bots strip the map bare within a
         // minute and there is nothing left to play around.
@@ -320,6 +356,7 @@ final class World {
 
             nextLootboxID += 1
             lootboxes[crate.id] = crate
+            structuresChanged()
         }
 
         pendingLootboxes = stillWaiting
@@ -341,6 +378,52 @@ final class World {
         return false
     }
 
+    /// Which whole tiles have something standing on them.
+    ///
+    /// The tile-sized version of structureIntersects, answered from a set instead
+    /// of by asking seventy-odd structures one at a time. Everything that reasons
+    /// about a GRID - can I build here, is this gap plugged, where does a chest go -
+    /// wants this one; structureIntersects stays for the callers with a real box.
+    func structureOccupies(_ tile: GridPoint) -> Bool {
+        structureTiles.contains(tile)
+    }
+
+    /// Every tile any crate, chest or machine covers, worked out once per change.
+    ///
+    /// Built by walking each structure's own bounds rather than by testing every
+    /// tile against every structure, so this costs about a hundred insertions
+    /// instead of the four thousand times seventy it would take the other way round.
+    private var structureTileCache: (revision: Int, value: Set<GridPoint>)?
+
+    var structureTiles: Set<GridPoint> {
+        if let held = structureTileCache, held.revision == structureRevision {
+            return held.value
+        }
+
+        var tiles: Set<GridPoint> = []
+
+        func cover(_ box: Box) {
+            for col in Int(box.lower.x.rounded(.down))...Int(box.upper.x.rounded(.down)) {
+                for row in Int(box.lower.y.rounded(.down))...Int(box.upper.y.rounded(.down)) {
+                    let tile = GridPoint(col: col, row: row)
+
+                    // Asked rather than assumed, so this agrees with
+                    // structureIntersects exactly - a box that only grazes the edge
+                    // of a tile does not cover it, and the bounds above are a
+                    // candidate list rather than an answer.
+                    if box.intersects(Box(tile: tile)) { tiles.insert(tile) }
+                }
+            }
+        }
+
+        for crate in lootboxes.values { cover(crate.hitbox) }
+        for machine in arcades.values { cover(machine.hitbox) }
+        for chest in chests.values { cover(chest.hitbox) }
+
+        structureTileCache = (structureRevision, tiles)
+        return tiles
+    }
+
     /// The same question asked of an area rather than a point, for the things that
     /// reason about whole tiles - building, and putting a chest down.
     func structureIntersects(_ box: Box) -> Bool {
@@ -357,6 +440,7 @@ final class World {
         let chest = Chest(id: ChestID(nextChestID), tile: tile, owner: owner)
         nextChestID += 1
         chests[chest.id] = chest
+        structuresChanged()
         return chest.id
     }
 
@@ -368,6 +452,7 @@ final class World {
     /// one answer rather than being reinvented at the call site.
     func removeChest(_ id: ChestID) {
         chests[id] = nil
+        structuresChanged()
     }
 
     @discardableResult
@@ -376,11 +461,13 @@ final class World {
                              owner: owner, emitTimer: GameConfig.Arcade.emitInterval)
         nextArcadeID += 1
         arcades[machine.id] = machine
+        structuresChanged()
         return machine.id
     }
 
     func removeArcade(_ id: ArcadeID) {
         arcades[id] = nil
+        structuresChanged()
     }
 
     /// What there is worth taking in this team's base.
@@ -488,8 +575,8 @@ final class World {
                 guard ground.contains(tile),
                       tile != claims[team]?.centreTile,
                       map[tile] == .floor,
-                      !structureIntersects(Box(tile: tile)),
-                      !trees.contains(where: { $0.overlaps(tile) }) else { fits = false; break }
+                      !structureOccupies(tile),
+                      !treeTiles.contains(tile) else { fits = false; break }
             }
             guard fits else { continue }
 
@@ -571,8 +658,8 @@ final class World {
         for tile in ground.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
             guard tile != claims[team]?.centreTile else { continue }
             guard map[tile] == .floor else { continue }
-            guard !structureIntersects(Box(tile: tile)) else { continue }
-            guard !trees.contains(where: { $0.overlaps(tile) }) else { continue }
+            guard !structureOccupies(tile) else { continue }
+            guard !treeTiles.contains(tile) else { continue }
 
             // Nobody standing on it, and this is the line that stops a bot locking
             // itself in its own base forever.
@@ -629,7 +716,7 @@ final class World {
     private var haveSealed: Set<TeamID> = []
 
     /// One enclosure per team, good until the map changes under it.
-    private var enclosures: [TeamID: (revision: Int, value: BaseEnclosure)] = [:]
+    private var enclosures: [TeamID: (map: Int, structures: Int, value: BaseEnclosure)] = [:]
 
     /// Called when a team's wall goes from having a hole in it to not having one.
     ///
@@ -830,33 +917,38 @@ final class World {
     /// complete key for it: the only inputs are tiles and trees, and trees do not
     /// move.
     func enclosure(of team: TeamID) -> BaseEnclosure {
-        if let held = enclosures[team], held.revision == mapRevision { return held.value }
+        if let held = enclosures[team],
+           held.map == mapRevision, held.structures == structureRevision {
+            return held.value
+        }
 
         guard let claim = claims[team] else {
             return BaseEnclosure(room: [], wall: [], ownWalls: [])
         }
 
-        func isWall(_ point: GridPoint) -> Bool {
-            guard map.contains(point) else { return true }
-            if map.isOccupied(point) { return true }
-            return trees.contains { $0.overlaps(point) }
-        }
+        // Hoisted out of the closures below rather than reached through self on
+        // every call. Both are dictionary-free lookups once they are here, which is
+        // the whole point: this used to walk forty-five tree clumps and seventy
+        // structures per tile visited, thousands of times a frame.
+        let wooded = treeTiles
+        let occupied = structureTiles
 
         let found = BaseEnclosure.compute(
             claim: claim,
-            solid: isWall,
-
-            // Plus whatever is standing on the ground. A crate in the last gap is a
-            // gap nobody can walk through and nobody can build on, so it has to hold
-            // the base shut - see BaseEnclosure, where the two questions are why
-            // this takes two closures.
-            blocks: { [self] point in
-                isWall(point) || structureIntersects(Box(tile: point))
+            solid: { [self] point in
+                guard map.contains(point) else { return true }
+                return map.isOccupied(point) || wooded.contains(point)
             },
+
+            // Whatever is standing on the ground. A crate in the last gap is a gap
+            // nobody can walk through and nobody can build on, so it has to hold the
+            // base shut - see BaseEnclosure, where the two questions are why this
+            // takes two closures.
+            furniture: { occupied.contains($0) },
             ownWall: { [self] point in map[point].blockOwner == team }
         )
 
-        enclosures[team] = (mapRevision, found)
+        enclosures[team] = (mapRevision, structureRevision, found)
         return found
     }
 
