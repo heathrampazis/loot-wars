@@ -549,6 +549,40 @@ final class World {
         return value
     }
 
+    /// What this base is worth GOING FOR, which is more than what is inside it.
+    ///
+    /// lootValue answers "what would I leave with". This answers "should I go",
+    /// and the difference is the two things that are true of a base rather than of
+    /// its contents: how long its owner has been left alone, and how well they are
+    /// doing. Both were already being added - by chestWorthRobbing, privately, on
+    /// its way to picking a chest - and the function that decides whether to open a
+    /// wall at all knew about neither.
+    ///
+    /// That split is why the player was never raided. It is not that their base
+    /// scored low: it is that the ONE path that opens a wall priced them at what
+    /// was provably in their chests, and a player who has not banked anything, or
+    /// whose chest was cracked and has not come back, prices at nothing. Meanwhile
+    /// the leader bonus and the untouched-for-minutes bonus sat in a different
+    /// function, behind a loop over chests that a player may not even own.
+    ///
+    /// So it is one price now, and lootValue's own comment finally holds: the bot
+    /// deciding whether to cross the map and the bot deciding which wall to open
+    /// cannot come to different conclusions about which base is the rich one.
+    func raidWorth(of team: TeamID) -> Double {
+        var worth = Double(lootValue(of: team))
+
+        // Left alone. What finds a turtle, and what makes a base that has already
+        // been emptied worth visiting again later.
+        worth += min(GameConfig.AI.raidPressureCap,
+                     secondsSinceRaid(of: team) * GameConfig.AI.raidPressurePerSecond)
+
+        // And winning. Whoever is out in front is worth breaking into whoever they
+        // are - see World.lead, which says the same of all eight teams.
+        worth += lead(of: team) * GameConfig.AI.leaderWorth
+
+        return worth
+    }
+
     /// Where that loot actually stands, so a hole can be made in front of it.
     ///
     /// A base is not a point: the wall worth opening is the one nearest the thing
@@ -571,6 +605,15 @@ final class World {
         for id in arcades.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let machine = arcades[id], machine.owner == team else { continue }
             spots.append(machine.centre)
+        }
+
+        // Nothing standing in there, which is not the same as nothing worth doing.
+        // A sealed base with an empty chest still pays its owner to hold, and
+        // breaking it costs them that - so the middle of the claim stands in, and a
+        // raider aims at the wall in front of it rather than not coming at all.
+        // Without this, emptying somebody's base made them permanently safe.
+        if spots.isEmpty, let claim = claims[team] {
+            spots.append(claim.centreTile.center)
         }
 
         return spots

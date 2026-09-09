@@ -832,7 +832,14 @@ enum GameConfig {
         /// out. This is the supply line for the whole activity, so it is the dial
         /// that moves it - about a third more bombs across a match, which is about
         /// a third more raids.
-        static let bombSupplyInterval: Double = 42
+        ///
+        /// Down again, from 42, and not simply because raiding should be commoner.
+        /// Taking a chest now costs two seconds stood still on it and starts over
+        /// if anybody lands a shot, so an attempt converts far less often than it
+        /// used to. More attempts is the counterweight to that rather than a buff
+        /// on top of it: about the same number of chests changing hands, arrived at
+        /// by trying more often and succeeding less.
+        static let bombSupplyInterval: Double = 32
 
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
@@ -1015,7 +1022,15 @@ enum GameConfig {
         ///
         /// Spent on the ATTEMPT rather than on success, so a bot that cannot reach
         /// anybody does not re-ask every tick for the rest of the match.
-        static let raidUrgeInterval: ClosedRange<Double> = 35...60
+        ///
+        /// Down to 26...45 alongside the bomb supply, and the pair is what moves
+        /// this: an urge with no bomb behind it is a bot standing at a wall it
+        /// cannot open, so shortening one without the other buys nothing. Together
+        /// they take a bot's ceiling from about six attempts a match to about eight
+        /// and a half. A ceiling rather than a count - most never find a target in
+        /// range, and of those that do, a good many now end with somebody putting a
+        /// shot into the raider two seconds from the chest.
+        static let raidUrgeInterval: ClosedRange<Double> = 26...45
 
         /// How far a bot will travel for an enemy chest it could get at.
         ///
@@ -1057,7 +1072,13 @@ enum GameConfig {
         /// the reward was never the reason: this number is about how attractive a
         /// base LOOKS to a raider, and a base with a machine in it is exactly as
         /// worth visiting as it was.
-        static let arcadeWorth: Double = 25
+        ///
+        /// One number now. There used to be two of these - this and a machineWorth
+        /// further down - because the chest search and the wall search had each
+        /// grown their own price for a base, which is the very thing lootValue's
+        /// comment says must not happen. They happened to agree at 25. Both paths
+        /// read World.raidWorth now, so this is the survivor.
+        static let machineWorth: Double = 25
 
         /// What a base gains as a target for every second nobody has touched it,
         /// and the most it can gain.
@@ -1082,7 +1103,6 @@ enum GameConfig {
         /// being left alone - which is the player, and which is the point.
         static let raidPressurePerSecond: Double = 0.5
         static let raidPressureCap: Double = 60
-        static let machineWorth = 25
         static let raidDistanceCost: Double = 1.0
 
         /// What a base has to be worth before a bot will cross the map to open it

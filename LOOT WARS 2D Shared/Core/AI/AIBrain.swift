@@ -70,7 +70,15 @@ enum AIBrain {
         // Looking where you are going happens every tick, not on the decision timer.
         // Waiting up to three seconds to notice a tree is how a bot ends up grinding
         // into one in full view.
-        steerAroundObstacles(&state, actor: actor, in: world)
+        //
+        // Except while breaking a chest open, where the chest IS the obstacle.
+        // Avoidance would steer the bot neatly around the one thing it crossed the
+        // map for, out of reach, and cancel the crack it was two seconds into - so
+        // a bot would have been unable to finish a raid at all now that finishing
+        // one means standing still next to something solid.
+        if actor.crackingChest == nil {
+            steerAroundObstacles(&state, actor: actor, in: world)
+        }
 
         // Gas is walked AROUND, whatever else the bot had in mind. Above the goal
         // list entirely rather than inside it, because no goal is worth standing in
@@ -378,7 +386,23 @@ enum AIBrain {
         switch state.goal {
         case .fight, .retreat:
             return
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm, .wreck, .defend:
+
+        case .raid, .robChest, .wreck:
+            // Mid-raid, and this is the one thing worth NOT reacting to.
+            //
+            // A raider has spent a bomb, crossed the map and is standing in
+            // somebody's base with their chest in front of it. Turning to fight the
+            // owner there is how a raid ends with nothing taken: the bomb is gone,
+            // the hole is made, and the bot spends the next twenty seconds circling
+            // a person instead of the two it needed for the chest. Seeing somebody
+            // is not a reason to stop. Being HIT by them is, and that is the test.
+            //
+            // It also makes the interrupt on cracking a chest mean something from
+            // the other side: a raider that refuses to be distracted is one the
+            // defender has to actually shoot rather than merely walk up to.
+            guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
+
+        case .wander, .loot, .collect, .build, .farm, .stash, .rearm, .defend:
             // All interruptible. A bot laying bricks - or lining up a throw, or
             // waiting on a payout - while somebody shoots at it is not a bot
             // anyone believes in.
@@ -420,7 +444,15 @@ enum AIBrain {
 
             // A fight it does not want simply falls through to the rest of the list,
             // and the bot gets on with looting, building or raiding instead.
-            if shouldEngage(enemy, actor: actor, in: world) {
+            //
+            // And it does not want one at all while it is mid-raid unless somebody
+            // is actually hitting it - the same rule reactToThreats applies, applied
+            // here too, or the decision timer would undo on its own clock what the
+            // threat scan had just declined to do.
+            let raiding = state.goal.isRaiding
+            let underFire = actor.secondsSinceHit < GameConfig.AI.combatRecency
+
+            if !(raiding && !underFire), shouldEngage(enemy, actor: actor, in: world) {
                 return .fight(enemy.id)
             }
         }
@@ -794,11 +826,14 @@ enum AIBrain {
 
         for (team, claim) in world.claims.sorted(by: { $0.key.raw < $1.key.raw })
         where team != actor.team {
-            let value = world.lootValue(of: team)
-            guard value > 0 else { continue }
-
+            // The whole price, standing and neglect included - see World.raidWorth.
+            // This used to ask lootValue, which is only what is in the chests, and
+            // then refuse outright on a base worth nothing. That is the line that
+            // made the player unraidable: their chest is theirs to fill, so an
+            // unbanked or already-cracked base priced at zero and was skipped
+            // before any of the reasons to go there were even considered.
             let toBase = (claim.centreTile.center - actor.position).length
-            let score = Double(value) - toBase * GameConfig.AI.raidDistanceCost
+            let score = world.raidWorth(of: team) - toBase * GameConfig.AI.raidDistanceCost
             guard score > bestScore else { continue }
 
             let spots = world.lootSpots(of: team)
@@ -951,28 +986,12 @@ enum AIBrain {
             // what is in the chests, whether there is a machine to wreck, and how
             // long its owner has been left alone. The third is the one that finds a
             // turtle - see GameConfig.AI.raidPressurePerSecond.
-            let items = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
-
-            var worth = Double(items * GameConfig.AI.chestItemWorth)
-
-            if world.hasArcade(chest.owner) { worth += GameConfig.AI.arcadeWorth }
-
-            worth += min(GameConfig.AI.raidPressureCap,
-                         world.secondsSinceRaid(of: chest.owner)
-                             * GameConfig.AI.raidPressurePerSecond)
-
-            // And the leader's base is worth breaking into whoever they are.
-            //
-            // The one that was missing. Bots already preferred to SHOOT whoever was
-            // winning - see shouldEngage and weightedDistance - and had no opinion
-            // at all about whose base to open, which is the half of the game a good
-            // player actually runs away with: raid, bank, repeat, while seven bots
-            // price your base exactly as they price each other's.
-            worth += world.lead(of: chest.owner) * GameConfig.AI.leaderWorth
-
             // Less the walk, which is what keeps a raider robbing the rich base
-            // rather than merely the near one.
-            let score = worth - distance * GameConfig.AI.raidDistanceCost
+            // rather than merely the near one. The base is priced in one place -
+            // World.raidWorth - so this and the wall-opening search above cannot
+            // come to different conclusions about who is worth robbing.
+            let score = world.raidWorth(of: chest.owner)
+                - distance * GameConfig.AI.raidDistanceCost
 
             guard score > bestScore else { continue }
             bestScore = score
@@ -2156,6 +2175,17 @@ enum AIBrain {
         if state.shoveFor > 0 {
             state.shoveFor -= dt
             state.desiredHeading = state.shoveHeading
+            return
+        }
+
+        // Pressed against a chest on purpose. Breaking one open means staying in
+        // reach of a solid object for two seconds, which looks exactly like being
+        // wedged and is the opposite of it - shoving off would cancel the raid this
+        // bot is most of the way through.
+        guard actor.crackingChest == nil else {
+            state.lastPosition = actor.position
+            state.stuckFor = 0
+            state.stuckDistance = 0
             return
         }
 
