@@ -29,7 +29,6 @@ enum Prefs {
         static let matchesStarted = "matchesStarted"
         static let matchesFinished = "matchesFinished"
         static let bestScore = "bestScore"
-        static let taughtBuilding = "taughtBuilding"
         static let taughtSelling  = "taughtSelling"
         static let taughtHolding  = "taughtHolding"
         static let lessonsVersion = "lessonsVersion"
@@ -44,7 +43,12 @@ enum Prefs {
     /// and the result was a tutorial that could never appear on the only device it
     /// had to appear on. A flag saying "already seen" is a claim about a version of
     /// a lesson, not about the player, and the version has to be part of it.
-    private static let lessons = 3
+    /// Two, down from three. The build lesson was retired - not learned, retired:
+    /// it became a standing reminder that a base has no walls in it, which is a
+    /// fact about the match rather than about the player, so there is nothing left
+    /// for a device to remember about it. Lowering the count is what wipes the old
+    /// flag off every device that already has one.
+    private static let lessons = 2
 
     /// How many matches this player has ever begun.
     ///
@@ -64,16 +68,11 @@ enum Prefs {
     /// It could not tell the difference between somebody who had built a wall and
     /// somebody who had spent their first match being shot at in a field - and it
     /// switched the tutorial off after one match either way. A lesson ends when the
-    /// player does the thing: three walls laid, one item sold. Until then it is
-    /// offered again next match, because it has not worked yet.
+    /// player does the thing: one item sold. Until then it is offered again next
+    /// match, because it has not worked yet.
     ///
     /// Every read runs the version check first, so a lesson that has been rewritten
     /// is offered again to everybody.
-    static var taughtBuilding: Bool {
-        get { migrateIfNeeded(); return store.bool(forKey: Key.taughtBuilding) }
-        set { store.set(newValue, forKey: Key.taughtBuilding) }
-    }
-
     static var taughtSelling: Bool {
         get { migrateIfNeeded(); return store.bool(forKey: Key.taughtSelling) }
         set { store.set(newValue, forKey: Key.taughtSelling) }
@@ -89,7 +88,6 @@ enum Prefs {
     private static func migrateIfNeeded() {
         guard store.integer(forKey: Key.lessonsVersion) != lessons else { return }
         store.set(lessons, forKey: Key.lessonsVersion)
-        store.set(false, forKey: Key.taughtBuilding)
         store.set(false, forKey: Key.taughtSelling)
         store.set(false, forKey: Key.taughtHolding)
     }
@@ -120,7 +118,6 @@ enum Prefs {
     /// For testing on a device, and for the day there is a settings screen with a
     /// "show me the tips again" line in it.
     static func forgetLessons() {
-        taughtBuilding = false
         taughtSelling = false
         taughtHolding = false
     }

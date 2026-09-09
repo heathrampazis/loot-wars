@@ -128,23 +128,15 @@ final class GameScene: SKScene {
     private var holdHintsLeft = 1
     private var hasUsedHold = false
 
-    /// The build hint's own budget, on the same terms.
+    /// Whether a wall has been laid THIS MATCH, which is the only thing the build
+    /// reminder asks about.
     ///
-    /// Spent when you arrive in your own base with somewhere to build and have not
-    /// built anything yet - the moment the outlines light up and the question "what
-    /// are those?" is actually being asked. ONE showing, and only ever on a first
-    /// match: see Prefs. A tip that keeps coming back is not teaching.
-    private var buildHintsLeft = 1
+    /// There used to be a budget beside this, and a count of walls laid, and a flag
+    /// in Prefs saying the gesture had been learned for good. All three existed to
+    /// retire a lesson, and the reminder is not a lesson - it is the answer to "why
+    /// is my base still open", which is a question a player can ask in their tenth
+    /// match as easily as their first.
     private var hasBuilt = false
-
-    /// Walls laid this match, and how many it takes to have learned the gesture.
-    ///
-    /// Three. One could be an accident, two is a habit forming, and by the third
-    /// the ghosts have said everything they have to say - so they go, and Prefs
-    /// keeps them gone for every match after this one. A tutorial that outstays
-    /// this is furniture.
-    private var wallsBuilt = 0
-    private static let wallsToLearn = 3
 
     /// Whether the player was standing in their own claim last frame, so the build
     /// hint fires on ARRIVING home rather than once per frame while standing there.
@@ -688,34 +680,42 @@ final class GameScene: SKScene {
             return
         }
 
-        // Early only. A lesson has a shelf life: somebody four minutes into a match
-        // has either worked the gesture out or settled into playing without it, and
-        // a tip arriving then is not teaching, it is interrupting.
-        guard world.matchProgress < GameScene.hintWindow else { return }
-
-        // Arriving home with a wall to lay and no idea that is a thing you can do.
+        // Standing in your own base with nothing built in it.
         //
-        // On the rising edge of being home, not while standing there: a hint is a
-        // reaction to a moment. Offered before the selling lesson because it is the
-        // one the game cannot teach any other way - selling at least has a hotbar
-        // you are already looking at, while building is a tap on a piece of ground.
+        // NOT a lesson any more, and that is the whole change. It used to be one:
+        // shown once, on a first match, retired for good once three walls were
+        // laid. Every one of those gates was about the PLAYER - what they had been
+        // told, what they had learned - and none of them about the thing actually
+        // in front of them, which is a base with no walls in it.
+        //
+        // So it is a fact about the match now. You are home, you have built
+        // nothing, there is somewhere to build: it says so. It says so on the first
+        // frame of the match, because you spawn in your own claim and spawning
+        // there is arriving there - which is why there is no separate opening
+        // message. It says so again the next time you walk back in having still
+        // built nothing. And it stops the moment you lay one, for the rest of the
+        // match, because then it is not true any more.
+        //
+        // On the rising edge of being home rather than while standing there, so it
+        // is a reaction to a moment rather than a sign hung over the base.
         let home = world.claim(for: player.team)?
             .contains(GridPoint(containing: player.feet)) == true
 
         let arrivedHome = home && !wasHome
         wasHome = home
 
-        if arrivedHome, !hasBuilt, buildHintsLeft > 0, !Prefs.taughtBuilding,
-           blueprint.hasSlots, world.canBuild(player.team) {
-            buildHintsLeft -= 1
-
-            // The words name what the ghosts are doing; they do not end the lesson.
-            // Building three walls does that - see tapMap - because the lesson is
-            // over when the player can do the thing, not when they have been told
-            // about it.
-            hint.show("TAP THE WALLS TO BUILD", seconds: 1.6)
+        if arrivedHome, !hasBuilt, blueprint.hasSlots, world.canBuild(player.team) {
+            hint.show("TAP BASE TILES TO PLACE WALLS", seconds: 2.2)
             return
         }
+
+        // Early only, and only from here down. A lesson has a shelf life: somebody
+        // four minutes into a match has either worked the gesture out or settled
+        // into playing without it, and a tip arriving then is not teaching, it is
+        // interrupting. The build reminder above is not subject to it, because it
+        // is not a lesson - a base with no walls in it at four minutes is more
+        // worth mentioning than it was at thirty seconds, not less.
+        guard world.matchProgress < GameScene.hintWindow else { return }
 
         guard stepped, !hasUsedHold, holdHintsLeft > 0, !hint.isShowing,
               !Prefs.taughtSelling else { return }
@@ -1847,14 +1847,12 @@ extension GameScene {
 
         if BuildSystem.canPlace(at: tile, by: player, in: world) {
             blueprint.fill(at: tile)
-            hasBuilt = true
-            wallsBuilt += 1
 
-            // The ghosts themselves no longer stand down - see BlueprintRenderer,
-            // which shows where the wall goes for the whole match rather than for
-            // the first three taps. What is still learned once is the TEXT hint
-            // above them, which is a sentence and only worth reading once.
-            if wallsBuilt >= GameScene.wallsToLearn { Prefs.taughtBuilding = true }
+            // One wall is all it takes to stop the reminder for this match. Not
+            // three: three was the number for having LEARNED the gesture, and this
+            // no longer asks that question - somebody who has laid a wall does not
+            // need to be told they can lay walls.
+            hasBuilt = true
             return true
         }
 
