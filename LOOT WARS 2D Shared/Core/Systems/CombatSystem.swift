@@ -189,7 +189,7 @@ enum CombatSystem {
                  at: actor.position, in: world)
         }
 
-        // And half the purse hits the grass.
+        // And the whole purse hits the grass.
         //
         // Spilled rather than deleted, which is the whole point of it - see
         // GameConfig.Drops.tokenShare. It pays the person who killed you, it is

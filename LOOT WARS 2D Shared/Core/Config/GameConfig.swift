@@ -1507,27 +1507,40 @@ enum GameConfig {
 
         /// The share of your unspent tokens that spills on the ground when you die.
         ///
-        /// Half, and it SPILLS rather than evaporating. Tokens that simply vanished
-        /// would be a punishment nobody sees land - a number in the corner quietly
-        /// halving while you are watching the respawn clock - and a punishment you
-        /// cannot see teaches nothing. A purse on the grass is legible from both
-        /// ends: the person who killed you gets paid for it, and you get to watch
-        /// somebody else pick your money up.
+        /// All of it, and it SPILLS rather than evaporating. Tokens that simply
+        /// vanished would be a punishment nobody sees land - a number in the corner
+        /// quietly emptying while you are watching the respawn clock - and a
+        /// punishment you cannot see teaches nothing. A purse on the grass is
+        /// legible from both ends: the person who killed you gets paid for it, and
+        /// you get to watch somebody else pick your money up.
         ///
-        /// Half rather than all of it. The full wipe is the version worth trying if
-        /// this is not enough - it is this one number - but it has a failure mode
-        /// worth naming first: with nothing left to lose, the correct play after
-        /// every death is to spend down to zero the moment you have five tokens,
-        /// and the ladder stops being something anybody saves for. Half keeps
-        /// saving towards a Cosmic a real option and still makes carrying forty
-        /// tokens into a fight a decision rather than an oversight.
+        /// It was a half, and the note here said the full wipe was the version
+        /// worth trying if that was not enough. It was not enough. It also brings
+        /// tokens into line with everything else death takes: your gear goes
+        /// completely, your bag goes completely, and a purse that survived at
+        /// fifty per cent was the one thing dying was gentle about.
+        ///
+        /// The failure mode named when this was a half is now live and worth
+        /// watching for: with nothing left to lose, the correct play after every
+        /// death is to spend down to zero the moment you can afford anything, and
+        /// the cheapest rung is six tokens. If saving towards a Cosmic stops
+        /// happening at all, this is the number that did it.
+        ///
+        /// What softens it is that the money is not gone, it is on the floor where
+        /// you died. Whether that matters depends on two numbers in other enums: a
+        /// purse lives Arcade.tokenLifetime (10s) and respawning costs
+        /// Player.respawnDelay (3s), so you have about seven seconds to get back to
+        /// your own body from wherever your base is. Across a sixty-four tile map
+        /// that usually means the killer gets it. Lengthening the purse's life is
+        /// the dial that turns a death into a race for your own money rather than a
+        /// transfer, and it is deliberately NOT touched here - one change at a time.
         ///
         /// Points are deliberately NOT touched. Score is the win condition, and
         /// taking it away on death compounds in the wrong direction: whoever is
         /// losing dies most, so they would lose most score, and the match would be
         /// decided in its first two minutes. It also punishes fighting, in a game
         /// whose whole second half is meant to be fighting.
-        static let tokenShare: Double = 0.5
+        static let tokenShare: Double = 1.0
 
         /// The odds that one item off a carried healing stack lands on the ground.
         ///
