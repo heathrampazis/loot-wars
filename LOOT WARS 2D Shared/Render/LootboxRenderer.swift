@@ -55,8 +55,7 @@ final class LootboxRenderer {
 
         for (id, sprite) in Array(nodesByBox) where world.lootboxes[id] == nil {
             nodesByBox[id] = nil
-            if lit == id { lit = nil }
-            burst(sprite)
+            sprite.removeFromParent()
         }
 
         // The one crate within arm's reach wears a rim, so "you can touch this"
@@ -74,38 +73,6 @@ final class LootboxRenderer {
         if let lit { setRim(on: nodesByBox[lit], showing: false) }
         lit = reachable
         if let reachable { setRim(on: nodesByBox[reachable], showing: true) }
-    }
-
-    /// The lid goes, for a crate somebody has just opened.
-    ///
-    /// It used to be removeFromParent, which is the one thing a crate must not do:
-    /// forty-two of them spend the match rocking and knocking to say there is
-    /// something inside, and then the moment somebody finds out what, the box
-    /// blinks out of existence. The items land on the grass with nothing to say
-    /// where they came from.
-    ///
-    /// So it shudders once - the same knock the idle has been making all match,
-    /// harder, and now with a reason - and comes apart upwards. Two tenths of a
-    /// second, because whatever fell out of it is the thing worth looking at and
-    /// this must not still be going when the player reaches for it.
-    private func burst(_ sprite: SKSpriteNode) {
-        // The idle owns this sprite's rotation, scale and position, and it runs
-        // forever. Nothing else can move any of them until it is stopped.
-        sprite.removeAllActions()
-        sprite.childNode(withName: LootboxRenderer.rimName)?.removeFromParent()
-
-        sprite.run(.sequence([
-            .group([.scaleX(to: 1.20, y: 0.80, duration: 0.05),
-                    .rotate(toAngle: 0.09, duration: 0.05)]),
-            .group([.scaleX(to: 0.86, y: 1.24, duration: 0.06),
-                    .rotate(toAngle: -0.12, duration: 0.06),
-                    .moveBy(x: 0, y: 6, duration: 0.06)]),
-            .group([.scale(to: 0.18, duration: 0.19),
-                    .rotate(byAngle: 0.7, duration: 0.19),
-                    .moveBy(x: 0, y: 12, duration: 0.19),
-                    .fadeOut(withDuration: 0.19)]),
-            .removeFromParent()
-        ]))
     }
 
     private func setRim(on sprite: SKSpriteNode?, showing: Bool) {
