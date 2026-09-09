@@ -1078,7 +1078,7 @@ enum GameConfig {
         /// grown their own price for a base, which is the very thing lootValue's
         /// comment says must not happen. They happened to agree at 25. Both paths
         /// read World.raidWorth now, so this is the survivor.
-        static let machineWorth: Double = 25
+        static let machineWorth = 25
 
         /// What a base gains as a target for every second nobody has touched it,
         /// and the most it can gain.
