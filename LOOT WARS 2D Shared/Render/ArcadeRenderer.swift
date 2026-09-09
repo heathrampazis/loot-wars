@@ -25,6 +25,18 @@ final class ArcadeRenderer {
     private var lastTimers: [ArcadeID: Double] = [:]
     private var mapHeight = 0
 
+    /// The damage bar over each machine, and what it is currently drawn at.
+    ///
+    /// Held so the path is rebuilt on a CHANGE rather than sixty times a second,
+    /// the same reason the rims are held elsewhere in this folder.
+    private var bars: [ArcadeID: SKShapeNode] = [:]
+    private var drawnHealth: [ArcadeID: Int] = [:]
+
+    /// How wide the bar is, in tiles. The footprint is two, and the bar sits just
+    /// inside it so it reads as belonging to the machine rather than as a label
+    /// laid over the ground beside it.
+    private static let barWidthInTiles: Double = 1.7
+
     /// Shared, because the placement preview draws the same machine before it
     /// exists - and it is drawn WHOLE. This used to be cropped to five pixel
     /// numbers measured off the art by hand, so the sprite could be sized to its
@@ -70,6 +82,7 @@ final class ArcadeRenderer {
             // going - the event only says when to CELEBRATE, and arriving late to
             // a jackpot should still look like arriving at a jackpot.
             setJackpot(machine.isJackpot, on: sprite)
+            setHealth(of: machine, on: sprite)
 
             if let previous = lastTimers[id], machine.emitTimer > previous {
                 payOut(sprite)
@@ -79,6 +92,8 @@ final class ArcadeRenderer {
         for (id, sprite) in Array(nodesByArcade) where world.arcades[id] == nil {
             nodesByArcade[id] = nil
             lastTimers[id] = nil
+            bars[id] = nil
+            drawnHealth[id] = nil
 
             // Blown apart rather than switched off.
             sprite.run(.sequence([
@@ -87,6 +102,81 @@ final class ArcadeRenderer {
                 .removeFromParent()
             ]))
         }
+    }
+
+    /// The bar over a machine somebody is shooting.
+    ///
+    /// Only once it has been hit, and gone again if it is ever repaired. A machine
+    /// at full health has nothing to say, and eight of them wearing a full bar all
+    /// match would be eight more things on a screen that already has plenty - the
+    /// bar is news rather than a label.
+    ///
+    /// Built on first damage rather than with the machine, for the same reason: the
+    /// map's own machines cannot be damaged at all, so most of them never need one.
+    ///
+    /// In the owner's colour, like the bar over a person, because that is already
+    /// the question you are asking when you see one - whose is this.
+    private func setHealth(of machine: Arcade, on sprite: SKSpriteNode) {
+        guard machine.owner != nil else { return }
+        guard drawnHealth[machine.id] != machine.health else { return }
+        drawnHealth[machine.id] = machine.health
+
+        let share = min(1, max(0, Double(machine.health) / Double(GameConfig.Arcade.health)))
+        let full = GridGeometry.length(ofTiles: ArcadeRenderer.barWidthInTiles)
+
+        guard share < 1 else {
+            bars[machine.id]?.parent?.isHidden = true
+            return
+        }
+
+        let fill = bars[machine.id] ?? makeBar(for: machine, on: sprite, full: full)
+        fill.parent?.isHidden = false
+
+        // Never shorter than it is tall, or the last sliver of health draws as a
+        // rounded rectangle smaller than its own corner radius - which is to say,
+        // as nothing, on the one machine you most want to see is nearly gone.
+        fill.path = BarArt.path(full: full,
+                                filled: max(BarArt.height, full * CGFloat(share)))
+    }
+
+    private func makeBar(for machine: Arcade, on sprite: SKSpriteNode, full: CGFloat) -> SKShapeNode {
+        let colour = machine.owner.map { RenderPalette.colour(for: $0) } ?? .white
+        let (bar, fill) = BarArt.make(full: full, colour: colour)
+
+        // Above the cabinet, in the scene rather than on the sprite: the sprite is
+        // shoved about by the payout squash and the jackpot flash, and a bar riding
+        // on it would bounce every time the machine paid out.
+        let footing = GridGeometry.point(
+            for: Vec2(x: machine.centre.x, y: Double(machine.origin.row)))
+
+        bar.position = CGPoint(
+            x: footing.x,
+            y: footing.y + GridGeometry.length(ofTiles: Double(Arcade.height) + 0.3))
+        bar.zPosition = sprite.zPosition + 0.5
+
+        node.addChild(bar)
+        bars[machine.id] = fill
+        return fill
+    }
+
+    /// Shot, rather than blown up.
+    ///
+    /// A machine taking a bullet used to play the BOMB's flash, which is a blast:
+    /// it says the cabinet has just been destroyed, every time, and then the
+    /// cabinet is still standing there. This is the casing being struck instead -
+    /// the machine flinches and rings white for a moment, and EffectsRenderer
+    /// throws the sparks off it.
+    func hit(_ id: ArcadeID) {
+        guard let sprite = nodesByArcade[id] else { return }
+
+        sprite.removeAction(forKey: "hit")
+        sprite.run(.sequence([
+            .group([.colorize(with: .white, colorBlendFactor: 0.85, duration: 0.04),
+                    .scaleX(to: 1.05, y: 0.95, duration: 0.04)]),
+            .group([.scaleX(to: 0.98, y: 1.02, duration: 0.06)]),
+            .group([.colorize(withColorBlendFactor: 0, duration: 0.16),
+                    .scaleX(to: 1, y: 1, duration: 0.16)])
+        ]), withKey: "hit")
     }
 
     /// A shove and a flash of white, on the beat a token appears.

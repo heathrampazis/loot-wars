@@ -76,7 +76,7 @@ enum ProjectileSystem {
 
             guard machine.health <= 0 else {
                 world.arcades[id] = machine
-                world.record(.machineHit(at: machine.centre))
+                world.record(.machineHit(id, at: machine.centre))
                 return true
             }
 

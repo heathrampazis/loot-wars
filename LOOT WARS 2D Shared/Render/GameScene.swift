@@ -821,11 +821,14 @@ final class GameScene: SKScene {
                 bombRenderer.flash(at: position)
                 _ = items   // the pile that lands says how much better than this
 
-            case .machineHit(let position):
+            case .machineHit(let id, let position):
                 // Sparks off the casing rather than a hit marker: a machine being
                 // shot has to read differently from a person being shot, or the
-                // screen says somebody is in there taking it.
-                bombRenderer.flash(at: position)
+                // screen says somebody is in there taking it. It used to borrow the
+                // BOMB's flash, which said the cabinet had just been destroyed and
+                // then left it standing.
+                arcadeRenderer.hit(id)
+                effectsRenderer.machineStruck(at: position)
 
             case .sealed(let team, let chests):
                 // Everybody's, not only yours. Eight bases close over a match and

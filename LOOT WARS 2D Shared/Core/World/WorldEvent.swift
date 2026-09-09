@@ -69,7 +69,7 @@ enum WorldEvent {
     case sealed(TeamID, chests: Int)
 
     /// A machine taking a bullet and surviving it.
-    case machineHit(at: Vec2)
+    case machineHit(ArcadeID, at: Vec2)
 
     /// A chest broken open by somebody who did not own it.
     case chestCracked(at: Vec2, items: Int)

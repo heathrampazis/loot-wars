@@ -84,6 +84,10 @@ enum AIBrain {
             curveAwayFromEdges(&state, actor: actor, in: world)
         }
 
+        // Last, and over the top of everything above: a bot that is not moving is a
+        // bot that has to stop doing whatever it is doing.
+        shoveOffIfStuck(&state, actor: actor, dt: dt, in: world)
+
         // Turn towards the desired heading rather than snapping to it.
         state.heading = turn(state.heading,
                              towards: state.desiredHeading,
@@ -2104,6 +2108,58 @@ enum AIBrain {
         state.desiredHeading = Vec2.fromAngle(base + .pi)
     }
 
+    /// Backs out of somewhere the bot has got itself wedged.
+    ///
+    /// The safety net under isClear, and it is worth having both. A wider probe
+    /// stops a bot choosing a gap it cannot fit through; nothing stops the gap
+    /// closing after it is already in there - a teammate lays a wall behind it, a
+    /// chest is stood down beside it, a machine appears where it was standing. And
+    /// MovementSystem.push deliberately leaves a genuinely wedged actor where it is
+    /// rather than pinning it between two solids, on the reasoning that they can
+    /// walk out. A person can. A bot walks back into it, sixty times a second,
+    /// because full speed at its goal is the only thing it knows how to do.
+    ///
+    /// So: measure. Distance covered over a window rather than speed on one tick,
+    /// because a bot squeezing along a wall genuinely does crawl and should not be
+    /// mistaken for a stuck one. Then turn most of the way round and hold it long
+    /// enough to actually get out - the turn rate means a reversal takes half a
+    /// second before the bot has even started moving the other way.
+    ///
+    /// It drops the goal too. Backing out of a corner and then aiming straight back
+    /// into it is the same bot stuck twice.
+    private static func shoveOffIfStuck(_ state: inout AIState,
+                                        actor: Actor,
+                                        dt: Double,
+                                        in world: World) {
+        if state.shoveFor > 0 {
+            state.shoveFor -= dt
+            state.desiredHeading = state.shoveHeading
+            return
+        }
+
+        let moved = state.lastPosition.map { (actor.position - $0).length } ?? 0
+        state.lastPosition = actor.position
+
+        state.stuckFor += dt
+        state.stuckDistance += moved
+
+        guard state.stuckFor >= GameConfig.AI.stuckWindow else { return }
+
+        let wentNowhere = state.stuckDistance < GameConfig.AI.stuckDistance
+        state.stuckFor = 0
+        state.stuckDistance = 0
+
+        guard wentNowhere else { return }
+
+        state.shoveFor = GameConfig.AI.shoveDuration
+        state.shoveHeading = Vec2.fromAngle(state.heading.angle
+                                            + .pi * 0.8 * state.turnPreference)
+
+        state.goal = .wander
+        state.goalAge = 0
+        state.decisionTimer = GameConfig.AI.shoveDuration
+    }
+
     /// A soft nudge back towards the middle when a bot gets close to the map edge.
     ///
     /// Plain obstacle avoidance turns a bot to run PARALLEL to a wall, which is why
@@ -2133,12 +2189,55 @@ enum AIBrain {
         }
     }
 
+    /// Whether the bot could actually walk this way - at its own WIDTH, not down a
+    /// line drawn through the middle of it.
+    ///
+    /// A single line of probe points calls a gap clear when the gap is narrower
+    /// than the bot. The figure is nine tenths of a tile across and one and three
+    /// quarters deep, which is most of a tile and nearly two, so there are a great
+    /// many holes its centre fits through and it does not: between a chest and the
+    /// wall behind it, past the corner of a machine, through a doorway a teammate
+    /// half filled.
+    ///
+    /// It walks in and wedges, and MovementSystem.push then declines to shove it
+    /// anywhere at all - by design, see the reasoning there - so a person walks out
+    /// under their own steam and a bot, whose heading is still pointed at whatever
+    /// it was going to, does not. That is the bot standing motionless by its own
+    /// chest until somebody bumps into it, and it was never really about chests.
+    ///
+    /// Three points across rather than one, offset along the direction's own
+    /// perpendicular by how far the figure reaches that way.
     private static func isClear(_ direction: Vec2, from actor: Actor, in world: World) -> Bool {
+        let side = Vec2(x: -direction.y, y: direction.x)
+
+        // How far the box reaches along that perpendicular - its support in that
+        // direction. Sideways travel is checked against the figure's width and
+        // up-and-down travel against its depth, which is the axis that actually
+        // catches: it is nearly twice the other one.
+        let reach = (abs(side.x) * GameConfig.Player.halfWidth
+                     + abs(side.y) * GameConfig.Player.halfDepth)
+            * GameConfig.AI.probeWidthShare
+
         for distance in GameConfig.AI.probeDistances {
-            if !isOpen(actor.position + direction * distance, for: actor.team, in: world) {
-                return false
+            let ahead = actor.position + direction * distance
+
+            if !isOpen(ahead, for: actor.team, in: world) { return false }
+
+            // Only close in. The far probes are about which way to head, and asking
+            // for a body's worth of clearance three tiles out has a bot refusing
+            // directions it would have been fine in by the time it got there - so
+            // it stands turning on the spot in its own base, which is the failure
+            // this is meant to end rather than a second flavour of it. Wedging
+            // happens where the bot already is, so that is where the width matters.
+            guard distance <= GameConfig.AI.probeWidthRange else { continue }
+
+            for offset in [reach, -reach] {
+                if !isOpen(ahead + side * offset, for: actor.team, in: world) {
+                    return false
+                }
             }
         }
+
         return true
     }
 

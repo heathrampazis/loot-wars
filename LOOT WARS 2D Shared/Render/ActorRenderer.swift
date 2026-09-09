@@ -23,8 +23,8 @@ final class ActorRenderer {
 
     // Measured off the reference art: the overhead bar is exactly one tile wide.
     private static let barWidthInTiles: Double = 1.0
-    private static let barHeightInTiles: Double = 0.224
-    private static let barOutlineInTiles: Double = 0.075
+    private static let barHeightInTiles = BarArt.heightInTiles
+    private static let barOutlineInTiles = BarArt.outlineInTiles
     private static let barGapInTiles: Double = 0.08
 
     /// How far you walk per step, in tiles, and how high the figure rises on one.
@@ -589,22 +589,10 @@ final class ActorRenderer {
             outerWidth: max(height, full * CGFloat(clamped)))
     }
 
-    /// Same construction as the HUD bars: the path is inset by half the stroke, so
-    /// the outline's outer edge lands exactly on the stated width.
+    /// The one drawing, shared with the bar over a machine - see BarArt.
     private static func barPath(outerWidth: CGFloat) -> CGPath {
-        let full = GridGeometry.length(ofTiles: barWidthInTiles)
-        let stroke = GridGeometry.length(ofTiles: barOutlineInTiles)
-        let height = GridGeometry.length(ofTiles: barHeightInTiles) - stroke
-
-        let rect = CGRect(x: -full / 2 + stroke / 2,
-                          y: -height / 2,
-                          width: outerWidth - stroke,
-                          height: height)
-
-        return CGPath(roundedRect: rect,
-                      cornerWidth: height / 2,
-                      cornerHeight: height / 2,
-                      transform: nil)
+        BarArt.path(full: GridGeometry.length(ofTiles: barWidthInTiles),
+                    filled: outerWidth)
     }
 
     // MARK: - Textures

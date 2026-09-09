@@ -117,6 +117,20 @@ struct AIState {
     /// that way.
     var stashCooldown: Double = 0
 
+    /// Where the bot was last tick, and how far it has got since the window opened.
+    ///
+    /// The pair is the whole of "am I stuck": a bot's only command is .move at full
+    /// speed, so one that has covered almost no ground is one something is holding.
+    /// Distance over a window rather than speed on a tick, because a bot squeezing
+    /// past a chest genuinely does crawl for a moment and is not stuck at all.
+    var lastPosition: Vec2?
+    var stuckFor: Double = 0
+    var stuckDistance: Double = 0
+
+    /// While this runs the bot is backing out of somewhere and its goal is ignored.
+    var shoveFor: Double = 0
+    var shoveHeading: Vec2 = Vec2(x: 1, y: 0)
+
     /// A small fixed error added to this bot's aim, re-rolled whenever it changes
     /// its mind. Perfect aim is what makes bots unbeatable and unfun.
     var aimNoise: Double = 0

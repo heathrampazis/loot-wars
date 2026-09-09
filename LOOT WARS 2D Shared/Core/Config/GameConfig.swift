@@ -714,6 +714,44 @@ enum GameConfig {
         /// bot starts easing away early rather than turning at the last moment.
         static let probeDistances: [Double] = [1.0, 2.0, 3.2]
 
+        /// How much of the figure's own half-width the probe reaches out to on each
+        /// side of the direction it is checking.
+        ///
+        /// Nine tenths rather than all of it. Probing the exact silhouette makes a
+        /// bot refuse gaps it would fit through by a hair and stand outside its own
+        /// doorway; a shade under leaves it willing to try a tight one, and the
+        /// wedge check will get it out again if the try was wrong.
+        static let probeWidthShare: Double = 0.9
+
+        /// How far ahead the width is checked for, in tiles.
+        ///
+        /// Only the near probe. Beyond about a tile and a half the question stops
+        /// being "do I fit" and becomes "which way should I go", and demanding a
+        /// whole body's clearance three tiles out has a bot rejecting directions
+        /// that would have been perfectly clear by the time it arrived - which is a
+        /// bot turning on the spot in its own base, the very thing this is here to
+        /// stop. A wedge happens where the bot already is.
+        static let probeWidthRange: Double = 1.5
+
+        /// How long a stretch of going nowhere counts as being stuck, and how far a
+        /// bot has to cover in it to prove otherwise.
+        ///
+        /// Three quarters of a second and a third of a tile. Both deliberately
+        /// generous: a bot pressed against a wall at a shallow angle really does
+        /// crawl, and calling that stuck would have bots abandoning perfectly good
+        /// errands every time they brushed past something. A genuinely wedged one
+        /// covers no ground at all, so there is a wide gap between the two and the
+        /// threshold can sit in the middle of it.
+        static let stuckWindow: Double = 0.75
+        static let stuckDistance: Double = 0.33
+
+        /// How long it backs out for once it has decided it is stuck.
+        ///
+        /// A second. The turn alone eats half of it - four fifths of a half-turn at
+        /// the turn rate above - so anything much shorter and the bot is still
+        /// swinging round when it goes back to walking at whatever wedged it.
+        static let shoveDuration: Double = 1.0
+
         /// Angles to try when the way ahead is blocked, in radians, smallest first,
         /// so a bot takes the gentlest turn that works.
         static let avoidanceAngles: [Double] = [0.45, 0.9, 1.5, 2.1, 2.7, 3.14]
