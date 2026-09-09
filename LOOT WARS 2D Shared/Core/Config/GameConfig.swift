@@ -1095,6 +1095,73 @@ enum GameConfig {
         /// bounty worth having.
         static let leaderPull: Double = 0.4
 
+        /// How big a lead over the field counts as running away with it.
+        ///
+        /// The scale behind World.lead and World.behind, and the single number that
+        /// decides who the adaptive difficulty touches. Everything below reads one
+        /// of those two, so this is where "how good do you have to be" is set.
+        ///
+        /// Seven hundred, modelled against what a match actually pays. A bot that
+        /// seals its base, lays a couple of dozen walls, opens a dozen crates and
+        /// gets a kill or two finishes around 420; seven of them land in a 350 to
+        /// 500 spread. A player doing the same finishes level with them. A player
+        /// who has learned the raid loop - bomb the wall, crack the chest, wreck the
+        /// machine, bank it, repeat - finishes near 1,200, because a single raid
+        /// pays 55 plus 40 plus the items and takes under a minute.
+        ///
+        /// Against that, seven hundred gives: an ordinary player 0.01, a decent one
+        /// 0.40, an expert 1.00 - and about 0.11 among the bots when no player is
+        /// running away with anything, which is to say none of this fires in an
+        /// ordinary match. Half way through, the same expert is at 0.54, so it
+        /// arrives as a ramp rather than a switch.
+        ///
+        /// That shape is the requirement. Somebody learning the game must never
+        /// meet any of it; the whole point is that the difficulty is not a setting
+        /// but an answer to what you are actually doing to the other seven teams.
+        static let leadScale: Double = 700
+
+        /// What a full leader's base is worth on top of what is in it.
+        ///
+        /// Forty-five, read against the other terms in chestWorthRobbing: a stocked
+        /// chest is 30 to 40, a machine 25, an unraided base builds up to 60, and a
+        /// tile of walking costs 1. So a runaway leader's base outweighs an equally
+        /// stocked one forty-five tiles further off - most of the width of the map,
+        /// which makes them the target - while a bot standing next to a rich base
+        /// still opens the one in front of it rather than trekking across the world.
+        static let leaderWorth: Double = 45
+
+        /// The lead at which somebody is worth chasing wherever they are.
+        ///
+        /// Was a cliff: level with the best score at all, which made the leader
+        /// worth crossing the map for and the team one point behind them worth
+        /// ignoring - a coin toss on a scoreboard that moves in fifties. At 0.35 it
+        /// is a judgement instead, and one nobody in an ordinary match ever trips.
+        static let leaderChaseAt: Double = 0.35
+
+        /// How much of its aim wobble a bot being left behind gets back.
+        ///
+        /// A third, and no more. Tightening aim is the crudest difficulty dial
+        /// there is and the least pleasant to play against - a bot that cannot miss
+        /// is not a better opponent, it is a wall - so this is deliberately the
+        /// smallest of the three levers. Most of the answer to a dominant player is
+        /// meant to be seven bots turning up at their base, not seven bots shooting
+        /// straighter.
+        static let pressureAim: Double = 0.35
+
+        /// How much quicker a bot that is losing looks up.
+        ///
+        /// Moves the reaction draw towards the bottom of its range without ever
+        /// reaching it: the floor stays, because a bot that reacts instantly reads
+        /// as a machine however far behind it is.
+        static let pressureReaction: Double = 0.6
+
+        /// How far behind a bot has to be before it stops saving for the best gear.
+        ///
+        /// Below this it holds out for a rung the shop is the only way to reach.
+        /// Past it the bar drops by one, which is the difference between saving for
+        /// an upgrade and having a gun now - the right call for somebody losing.
+        static let pressureBuysAt: Double = 0.45
+
         /// How far away a bot will notice a crate worth walking to, in tiles.
         static let lootSearchRange: Double = 26
 

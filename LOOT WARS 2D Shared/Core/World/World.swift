@@ -143,6 +143,49 @@ final class World {
     /// target's standing against when deciding who is worth going after.
     var bestScore: Int { scores.values.max() ?? 0 }
 
+    /// How far clear of the field a team is, from nothing to running away with it.
+    ///
+    /// The one definition of "who is winning", because there were two ad-hoc ones
+    /// and the bots read them differently: shouldEngage asked whether a target was
+    /// level with the best score at all, and weightedDistance took a share of it.
+    /// One was a cliff and the other a slope, and neither knew anything about
+    /// raiding - which is the half of the game somebody good actually dominates.
+    ///
+    /// Measured against the AVERAGE of everyone else rather than against the
+    /// runner-up. One other team having a good match should not make a runaway
+    /// leader read as ordinary, and in an eight-way free-for-all the field is the
+    /// thing you are ahead OF.
+    ///
+    /// It applies to bots exactly as it applies to the player. A rule that only
+    /// pointed at whoever was holding the phone would be the game cheating; this
+    /// one says that in a free-for-all the leader is everybody's problem, which is
+    /// a fact about the shape of the match and true of all eight teams.
+    func lead(of team: TeamID) -> Double {
+        let mine = score(for: team)
+        guard mine > 0 else { return 0 }
+
+        var total = 0
+        var count = 0
+        for other in TeamID.all where other != team {
+            total += score(for: other)
+            count += 1
+        }
+        guard count > 0 else { return 0 }
+
+        let average = Double(total) / Double(count)
+        return min(1, max(0, (Double(mine) - average) / GameConfig.AI.leadScale))
+    }
+
+    /// How far behind the leader a team is, on the same scale.
+    ///
+    /// What a bot is measured by when it decides how hard to try. A bot at the top
+    /// is under no pressure and plays as it always has; one being left behind
+    /// sharpens up. Same number seen from the other end, so a match cannot be in a
+    /// state where nobody is ahead and everybody is behind.
+    func behind(_ team: TeamID) -> Double {
+        min(1, max(0, Double(bestScore - score(for: team)) / GameConfig.AI.leadScale))
+    }
+
     /// Adds to a team's score.
     ///
     /// Called from wherever the thing actually happened, which is why there is no

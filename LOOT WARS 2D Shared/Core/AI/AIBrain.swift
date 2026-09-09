@@ -329,8 +329,7 @@ enum AIBrain {
             // Only a NEW fight costs a reaction - a bot already shooting at someone
             // does not freeze up again every time it re-picks the same target.
             if wanted.isCombat, !state.goal.isCombat {
-                state.reactionTimer = Double.random(in: GameConfig.AI.reactionDelay,
-                                                    using: &world.rng)
+                state.reactionTimer = reactionDelay(for: actor, in: world)
             }
             state.goal = wanted
             state.goalAge = 0
@@ -400,7 +399,7 @@ enum AIBrain {
         }
 
         state.goalAge = 0
-        state.reactionTimer = Double.random(in: GameConfig.AI.reactionDelay, using: &world.rng)
+        state.reactionTimer = reactionDelay(for: actor, in: world)
     }
 
     /// Priority order: staying alive, then fighting, then loot, then roaming.
@@ -962,6 +961,15 @@ enum AIBrain {
                          world.secondsSinceRaid(of: chest.owner)
                              * GameConfig.AI.raidPressurePerSecond)
 
+            // And the leader's base is worth breaking into whoever they are.
+            //
+            // The one that was missing. Bots already preferred to SHOOT whoever was
+            // winning - see shouldEngage and weightedDistance - and had no opinion
+            // at all about whose base to open, which is the half of the game a good
+            // player actually runs away with: raid, bank, repeat, while seven bots
+            // price your base exactly as they price each other's.
+            worth += world.lead(of: chest.owner) * GameConfig.AI.leaderWorth
+
             // Less the walk, which is what keeps a raider robbing the rich base
             // rather than merely the near one.
             let score = worth - distance * GameConfig.AI.raidDistanceCost
@@ -1073,10 +1081,11 @@ enum AIBrain {
             .contains(GridPoint(containing: enemy.feet)) == true { return true }
 
         // Whoever is winning is worth stopping, wherever they are and whatever they
-        // happen to be wearing.
-        if world.bestScore > 0, world.score(for: enemy.team) >= world.bestScore {
-            return true
-        }
+        // happen to be wearing. A slope rather than the cliff this used to be:
+        // "level with the best score" made the leader worth chasing and the team
+        // one point behind them worth ignoring, which on a scoreboard that moves in
+        // fifties is a coin toss rather than a judgement.
+        if world.lead(of: enemy.team) >= GameConfig.AI.leaderChaseAt { return true }
 
         // Otherwise the target has to be worth the ground between them, and the
         // further away they are the more they have to be worth. Somebody a step
@@ -1107,12 +1116,7 @@ enum AIBrain {
                                          to target: Actor,
                                          in world: World) -> Double {
         let distance = (target.position - actor.position).length
-
-        let best = world.bestScore
-        guard best > 0 else { return distance }
-
-        let standing = Double(world.score(for: target.team)) / Double(best)
-        return distance * (1 - GameConfig.AI.leaderPull * standing)
+        return distance * (1 - GameConfig.AI.leaderPull * world.lead(of: target.team))
     }
 
     private static func nearestArcade(to actor: Actor, in world: World) -> Arcade? {
@@ -1484,17 +1488,28 @@ enum AIBrain {
 
     private static func upgradeToBuy(actor: Actor, in world: World) -> ItemType? {
         ShopSystem.upgradeOffers(for: actor)
-            .filter { worthBuying($0.type) && ShopSystem.canBuy($0.type, actor: actor, in: world) }
+            .filter { worthBuying($0.type, for: actor, in: world)
+                      && ShopSystem.canBuy($0.type, actor: actor, in: world) }
             .min { $0.price < $1.price }?
             .type
     }
 
     /// Whether this is a rung the shop is the only way to reach.
-    private static func worthBuying(_ type: ItemType) -> Bool {
+    ///
+    /// A bot that is losing drops the bar by one rung, which is the difference
+    /// between saving for an upgrade and having a gun now. The thresholds exist so
+    /// bots do not spend a match's tokens on things crates hand out for free; that
+    /// reasoning is about the ordinary case, and a bot being left behind is not it.
+    private static func worthBuying(_ type: ItemType, for actor: Actor, in world: World) -> Bool {
+        let impatient = world.behind(actor.team) >= GameConfig.AI.pressureBuysAt ? 1 : 0
+
         switch type {
-        case .helmet(let tier):  return tier > GameConfig.AI.buysHelmetsAbove
-        case .blaster(let tier): return tier > GameConfig.AI.buysBlastersAbove
-        case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .perk: return false
+        case .helmet(let tier):
+            return tier.rawValue > GameConfig.AI.buysHelmetsAbove.rawValue - impatient
+        case .blaster(let tier):
+            return tier.rawValue > GameConfig.AI.buysBlastersAbove.rawValue - impatient
+        case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .perk:
+            return false
         }
     }
 
@@ -2019,7 +2034,14 @@ enum AIBrain {
         // is the range known. A fixed angle would make a bot deadlier the closer it
         // got, which is not how missing works and would have made bringing fights
         // into view a straight buff to the people shooting at you.
-        let wobble = atan(GameConfig.AI.aimSpread / max(towards.length, 0.5))
+        // Tighter the further behind this bot is - see GameConfig.AI.pressureAim.
+        // Deliberately a small share of the spread rather than a march towards
+        // perfect: a bot that cannot miss is the least enjoyable opponent there is,
+        // and the point of this is to be competitive rather than to be a wall.
+        let spread = GameConfig.AI.aimSpread
+            * (1 - world.behind(actor.team) * GameConfig.AI.pressureAim)
+
+        let wobble = atan(spread / max(towards.length, 0.5))
         return Vec2.fromAngle((leadPoint - actor.position).angle + state.aimNoise * wobble)
     }
 
@@ -2250,6 +2272,21 @@ enum AIBrain {
         guard !world.structureBlocks(point) else { return false }
 
         return true
+    }
+
+    /// How long this bot takes to notice somebody, given how the match is going.
+    ///
+    /// Nobody reacts instantly and a bot that does feels like a machine, so the
+    /// floor stays: even a bot being thrashed takes a fraction of a second. What
+    /// changes is how much of the top of the range it draws from - a bot that is
+    /// losing is paying attention.
+    private static func reactionDelay(for actor: Actor, in world: World) -> Double {
+        let range = GameConfig.AI.reactionDelay
+        let keen = world.behind(actor.team) * GameConfig.AI.pressureReaction
+        let upper = range.upperBound - (range.upperBound - range.lowerBound) * keen
+
+        return Double.random(in: range.lowerBound...max(range.lowerBound, upper),
+                             using: &world.rng)
     }
 
     /// Rotates one heading towards another by at most `limit` radians.
