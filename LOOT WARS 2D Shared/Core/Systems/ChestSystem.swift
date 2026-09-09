@@ -14,6 +14,7 @@ enum ChestSystem {
 
     static func update(_ world: World, commands: [ActorID: [Command]], dt: Double) {
         restock(world, dt: dt)
+        advanceCracks(world, dt: dt)
 
         for (id, list) in commands {
             for command in list {
@@ -30,7 +31,7 @@ enum ChestSystem {
                 case .takeItem(let chest, let slot):
                     take(from: slot, of: chest, by: id, in: world)
                 case .raidChest(let chest):
-                    crack(chest, by: id, in: world)
+                    beginCrack(chest, by: id, in: world)
                 case .move, .placeBlock, .removeBlock, .shoot,
                      .openLootbox, .useItem, .dropItem, .buyItem, .sellItem,
                      .placeArcade:
@@ -257,6 +258,83 @@ enum ChestSystem {
     ///
     /// The owner still opens their own normally - storing and retrieving is not
     /// raiding, and it happens in your own base with nobody shooting at you.
+    /// Starts breaking a chest open, which used to BE breaking it open.
+    ///
+    /// A raid was: throw a bomb, walk in, tap, walk out. Under five seconds, and
+    /// the tap was instant - so the owner racing home to defend their base arrived
+    /// to find the chest already gone, every time, however fast they ran. Defence
+    /// existed and could not matter, because there was no moment during which it
+    /// could happen.
+    ///
+    /// Now there is one. It is short - see GameConfig.Chest.crackTime - and the
+    /// only things that end it early are being shot and walking away. Not a hold:
+    /// you tap once and commit, and the commitment is the cost. Standing still in
+    /// somebody's base for two seconds is a completely different proposition from
+    /// touching a box on your way past, and it is the same two seconds for the
+    /// seven bots who are on their way.
+    ///
+    /// Idempotent, because a bot issues this every tick it can reach the chest and
+    /// restarting the count each time would mean it never finished.
+    private static func beginCrack(_ chestID: ChestID, by id: ActorID, in world: World) {
+        guard var actor = world.actors[id], actor.isAlive,
+              let chest = world.chests[chestID],
+              chest.owner != actor.team,
+              canReach(chest, from: actor) else { return }
+
+        guard actor.crackingChest != chestID else { return }
+
+        actor.crackingChest = chestID
+        actor.crackProgress = 0
+        world.actors[id] = actor
+    }
+
+    /// Carries every attempt forward one tick, and drops the ones that have lost
+    /// their claim to continue.
+    private static func advanceCracks(_ world: World, dt: Double) {
+        // Sorted, because this finishes chests and finishing a chest scores.
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var actor = world.actors[id], let target = actor.crackingChest else { continue }
+
+            // Dead, gone, out of reach, or somehow now yours: all the same answer.
+            guard actor.isAlive,
+                  let chest = world.chests[target],
+                  chest.owner != actor.team,
+                  canReach(chest, from: actor) else {
+                actor.crackingChest = nil
+                actor.crackProgress = 0
+                world.actors[id] = actor
+                continue
+            }
+
+            // Shot at, so back to the start. THIS is the whole mechanism: it is
+            // what turns an owner running home into something that can actually
+            // stop a raid rather than something that arrives to watch one.
+            //
+            // A reset rather than a pause, and the crack is kept short to pay for
+            // it. Somebody who clears the defenders first still gets the chest in
+            // under two seconds; somebody standing in a firefight does not get it
+            // at all, which is the correct answer to both.
+            if actor.secondsSinceHit < GameConfig.Chest.crackInterrupt {
+                actor.crackProgress = 0
+                world.actors[id] = actor
+                continue
+            }
+
+            actor.crackProgress += dt
+
+            guard actor.crackProgress >= GameConfig.Chest.crackTime else {
+                world.actors[id] = actor
+                continue
+            }
+
+            actor.crackingChest = nil
+            actor.crackProgress = 0
+            world.actors[id] = actor
+
+            crack(target, by: id, in: world)
+        }
+    }
+
     private static func crack(_ chestID: ChestID, by id: ActorID, in world: World) {
         guard let actor = world.actors[id], actor.isAlive,
               let chest = world.chests[chestID],

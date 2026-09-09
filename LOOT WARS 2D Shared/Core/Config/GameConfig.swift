@@ -1765,6 +1765,36 @@ enum GameConfig {
         /// one is worth doing.
         static let raidSpill = 2
 
+        /// How long somebody has to stay on a chest to break it open.
+        ///
+        /// Two seconds, and the number is the entire point of the change rather
+        /// than a detail of it. A raid used to be: throw, walk in, tap, walk out -
+        /// under five seconds, with the tap instant. Defence existed and could not
+        /// matter, because there was no window in which it could happen. The owner
+        /// sprinting home arrived to find the chest already gone, every time.
+        ///
+        /// Two rather than four. The cost is meant to be the COMMITMENT, not the
+        /// wait: standing still in somebody's base is a completely different
+        /// proposition from touching a box on your way past, and the difference is
+        /// made by the interrupt below rather than by the duration. Long enough for
+        /// somebody who heard the bomb to cross their own base and get a shot off,
+        /// short enough that a raider who has already cleared the defenders is not
+        /// standing about being bored.
+        static let crackTime: Double = 2.0
+
+        /// How recently shot counts as interrupted.
+        ///
+        /// Being hit sends the count back to the start, so a raid is now: breach,
+        /// deal with whoever comes, THEN take the chest. A quarter of a second, so
+        /// one shot costs a raider that plus the progress they had - enough that a
+        /// single defender firing steadily can hold a chest indefinitely, which is
+        /// exactly what defending a base should mean.
+        ///
+        /// A reset rather than a pause, deliberately, and crackTime is short to pay
+        /// for it. The pair says: you can have the chest, once nobody is shooting
+        /// at you.
+        static let crackInterrupt: Double = 0.25
+
         /// What a bot's chest is holding the moment it goes down.
         ///
         /// A shortcut, and worth being honest about which one: bots do not hoard

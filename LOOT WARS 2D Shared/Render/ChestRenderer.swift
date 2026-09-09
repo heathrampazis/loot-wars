@@ -29,6 +29,14 @@ final class ChestRenderer {
 
     private static let rimName = "reach"
 
+    /// The bar shown while a chest is being broken open, and how full it was drawn.
+    private var cracks: [ChestID: SKShapeNode] = [:]
+    private var drawnCrack: [ChestID: Double] = [:]
+
+    /// Narrower than the chest, so it reads as a thing happening TO the chest
+    /// rather than as a label sitting beside it.
+    private static let crackBarInTiles: Double = 0.8
+
     func sync(with world: World) {
         for (id, chest) in world.chests where nodesByChest[id] == nil {
             make(chest)
@@ -37,7 +45,14 @@ final class ChestRenderer {
         for (id, sprite) in Array(nodesByChest) where world.chests[id] == nil {
             nodesByChest[id] = nil
             if lit == id { lit = nil }
+            cracks[id]?.parent?.removeFromParent()
+            cracks[id] = nil
+            drawnCrack[id] = nil
             smash(sprite)
+        }
+
+        for (id, sprite) in nodesByChest {
+            setCracking(world.crackShare(of: id), of: id, on: sprite)
         }
 
         // The chest within arm's reach wears a rim, exactly as a crate does.
@@ -65,6 +80,63 @@ final class ChestRenderer {
 
         rim.removeAllActions()
         rim.run(.fadeAlpha(to: showing ? 0.85 : 0, duration: showing ? 0.12 : 0.18))
+    }
+
+    /// A chest with somebody working on it.
+    ///
+    /// Two things at once, and they are saying different halves of it. The bar is
+    /// how far through they are; the shudder is that it is happening at all, which
+    /// has to be readable from across a base by the person sprinting home. Both
+    /// come off the world's own state rather than from an event, because a crack
+    /// starting, being interrupted and resuming are all just that number moving -
+    /// an interrupt is the bar dropping to nothing, which says it better than any
+    /// announcement would.
+    private func setCracking(_ share: Double?, of id: ChestID, on sprite: SKSpriteNode) {
+        guard drawnCrack[id] != share else { return }
+        let was = drawnCrack[id]
+        drawnCrack[id] = share
+
+        guard let share else {
+            cracks[id]?.parent?.isHidden = true
+            sprite.removeAction(forKey: "cracking")
+            sprite.run(.group([.rotate(toAngle: 0, duration: 0.12),
+                               .scaleX(to: 1, y: 1, duration: 0.12)]))
+            cracks[id] = nil
+            return
+        }
+
+        let full = GridGeometry.length(ofTiles: ChestRenderer.crackBarInTiles)
+        let fill = cracks[id] ?? makeCrackBar(for: id, on: sprite, full: full)
+        fill.parent?.isHidden = false
+        fill.path = BarArt.path(full: full,
+                                filled: max(BarArt.height, full * CGFloat(share)))
+
+        // Starting, or starting again after somebody put a shot into them.
+        guard was == nil || share < (was ?? 0) else { return }
+
+        sprite.removeAction(forKey: "cracking")
+        sprite.run(.repeatForever(.sequence([
+            .group([.rotate(toAngle: 0.045, duration: 0.05),
+                    .scaleX(to: 1.03, y: 0.97, duration: 0.05)]),
+            .group([.rotate(toAngle: -0.045, duration: 0.05),
+                    .scaleX(to: 0.98, y: 1.02, duration: 0.05)])
+        ])), withKey: "cracking")
+    }
+
+    private func makeCrackBar(for id: ChestID, on sprite: SKSpriteNode, full: CGFloat) -> SKShapeNode {
+        // In the raider's red rather than a team colour: this is not information
+        // about whose chest it is - the base around it already said that - it is a
+        // countdown to losing it.
+        let (bar, fill) = BarArt.make(full: full, colour: RenderPalette.placementBlocked)
+
+        // In the scene rather than on the sprite, which is shaking.
+        bar.position = CGPoint(x: sprite.position.x,
+                               y: sprite.position.y + GridGeometry.length(ofTiles: 0.75))
+        bar.zPosition = sprite.zPosition + 0.5
+
+        node.addChild(bar)
+        cracks[id] = fill
+        return fill
     }
 
     /// The lid knocked open, for a chest you are looking into.
@@ -97,6 +169,8 @@ final class ChestRenderer {
     /// happen to it, and a fade would say the chest was switched off rather than
     /// taken apart. It shakes hard first, twice, and only then comes apart.
     private func smash(_ sprite: SKSpriteNode) {
+        // Whatever was shaking it has had its answer.
+        sprite.removeAction(forKey: "cracking")
         sprite.childNode(withName: ChestRenderer.rimName)?.removeFromParent()
 
         sprite.run(.sequence([
