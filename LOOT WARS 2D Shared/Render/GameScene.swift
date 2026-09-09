@@ -246,6 +246,23 @@ final class GameScene: SKScene {
     /// is not a gesture anybody wants to discover by accident.
     private var placingTouch: UITouch?
 
+    /// The finger painting a run of wall, and the tiles it has already put one on.
+    ///
+    /// Not a PendingPress either, and for the same reason placingTouch is not: this
+    /// IS the drag a pending press treats as a cancellation. A press on the map has
+    /// meant two things - tap to build one, hold to take one down - and a wandering
+    /// finger meant neither, which is a whole gesture spent on nothing.
+    ///
+    /// The set is what keeps a slow finger from queueing the same tile sixty times.
+    /// BuildSystem would refuse all but the first, so this is about the commands
+    /// and the pops rather than about the walls.
+    private var paintTouch: UITouch?
+    private var painted: Set<GridPoint> = []
+
+    /// Where the painting finger was last seen, so the gap between two touch
+    /// events can be filled in rather than skipped over.
+    private var paintedFrom: CGPoint?
+
     /// A finger that has not yet decided whether it is a tap or a hold.
     ///
     /// One at a time, deliberately. Tapping and holding are opposite meanings of
@@ -1365,12 +1382,22 @@ extension GameScene {
             aimPlacement(at: active.location(in: worldLayer))
         }
 
-        // A finger that wanders was neither a tap nor a hold.
+        // A finger that wanders was neither a tap nor a hold. On the map it is now
+        // a third thing - a run of wall - and everywhere else it is still nothing.
         if let press = pending, touches.contains(press.touch) {
             let moved = press.touch.location(in: self) - press.screenOrigin
             if hypot(moved.x, moved.y) > tapSlop {
+                if case .map = press.target, !press.fired { beginPainting(from: press) }
                 cancelPress()
             }
+        }
+
+        // Deliberately after the block above, so the tile the finger STARTED on and
+        // the tile it has reached are both laid on the frame the drag is recognised.
+        // Beginning a run and then waiting for the next touch event to lay anything
+        // reads as the wall lagging a tile behind the finger.
+        if let active = paintTouch, touches.contains(active) {
+            paint(at: active.location(in: worldLayer))
         }
     }
 
@@ -1500,6 +1527,15 @@ extension GameScene {
         if let active = itemTouch, touches.contains(active) {
             itemButton.end()
             itemTouch = nil
+        }
+
+        // Nothing is committed when a run ends - every wall in it was laid as the
+        // finger crossed the tile - so unlike placingTouch this is safe to clear
+        // here, where the rest of the finger bookkeeping lives.
+        if let active = paintTouch, touches.contains(active) {
+            paintTouch = nil
+            paintedFrom = nil
+            painted.removeAll()
         }
     }
 
@@ -1674,6 +1710,82 @@ extension GameScene {
         moveTouch = nil
     }
 
+    /// What a touch at this point would OPEN, if anything.
+    ///
+    /// Nil means the touch is about the GROUND, which is the whole reason this is
+    /// its own question: a run of wall may only begin on ground. Start a drag on a
+    /// crate you are standing at and it stays what it has always been - a slightly
+    /// sloppy tap on the crate - because somebody reaching for a crate and moving
+    /// their thumb a few points should not get a wall for it.
+    ///
+    /// Asked once and used twice, so what the tap opens and what the drag refuses
+    /// to start on cannot come apart.
+    private enum Touchable {
+        case lootbox
+        case chest(ChestID)
+        case raid(ChestID)
+    }
+
+    private func touchable(at pointInWorld: CGPoint) -> Touchable? {
+        guard let player = world.localPlayer, player.isAlive else { return nil }
+        let touched = GridGeometry.position(for: pointInWorld)
+
+        // Your own chest before a crate, which is the order the corner button uses
+        // - it is inside your base and it is yours.
+        if let chest = world.reachableChest(for: player),
+           chest.hitbox.expanded(by: GameScene.tapSlop).contains(touched) {
+            return chest.owner == player.team ? .chest(chest.id) : .raid(chest.id)
+        }
+
+        if let box = world.reachableLootbox(for: player),
+           box.hitbox.expanded(by: GameScene.tapSlop).contains(touched) {
+            return .lootbox
+        }
+
+        return nil
+    }
+
+    /// Starts a run of wall from the tile the press landed on.
+    private func beginPainting(from press: PendingPress) {
+        guard touchable(at: press.worldOrigin) == nil else { return }
+
+        paintTouch = press.touch
+        paintedFrom = nil
+        painted.removeAll()
+        paint(at: press.worldOrigin)
+    }
+
+    /// Lays wall along everything the finger has crossed since it was last seen.
+    ///
+    /// Along, rather than at the point itself, and that is the difference between
+    /// this working and this being infuriating. A quick swipe reports a handful of
+    /// positions a tile or more apart, and building only the tiles those positions
+    /// happen to land in leaves a wall with holes in it - which does not read as
+    /// "you moved too fast", it reads as the game dropping half your inputs.
+    private func paint(at pointInWorld: CGPoint) {
+        let previous = paintedFrom ?? pointInWorld
+        paintedFrom = pointInWorld
+
+        let delta = pointInWorld - previous
+
+        // Half a tile, so no step can straddle a whole one.
+        let steps = max(1, Int((hypot(delta.x, delta.y)
+                                / (GridGeometry.tileSize / 2)).rounded(.up)))
+
+        for step in 0...steps {
+            let along = CGFloat(step) / CGFloat(steps)
+            let tile = GridGeometry.gridPoint(for: CGPoint(x: previous.x + delta.x * along,
+                                                           y: previous.y + delta.y * along))
+
+            guard painted.insert(tile).inserted else { continue }
+
+            // Silently, because a run crosses whatever is in its path. A finger
+            // swept over a tree, a crate and somebody else's wall would set off
+            // three red flashes for tiles it was only passing over - see build.
+            build(at: tile, explainRefusals: false)
+        }
+    }
+
     private func tapMap(at pointInWorld: CGPoint) {
         // A crate or a chest you are standing at opens when you tap IT, not only
         // when you find the button in the corner.
@@ -1685,44 +1797,50 @@ extension GameScene {
         // all, which reads as the game ignoring the tap rather than as a control
         // waiting to be discovered elsewhere.
         //
-        // Checked before the build command below rather than after, because this
-        // function's first act is to queue one, and a crate standing on your own
-        // claim would otherwise eat the tap as a wall.
-        let touched = GridGeometry.position(for: pointInWorld)
-
-        // Your own chest before a crate, which is the order the corner button uses
-        // - it is inside your base and it is yours. Anybody else's is not opened at
-        // all: it is broken, and what falls out is picked up off the grass.
-        //
-        // Deliberately the same two verbs from the same question, so the thing you
-        // tap and the button in the corner can never disagree about what touching a
-        // chest means.
-        if let player = world.localPlayer, player.isAlive,
-           let chest = world.reachableChest(for: player),
-           chest.hitbox.expanded(by: GameScene.tapSlop).contains(touched) {
-            if chest.owner == player.team {
-                openOwnChest(chest.id)
-            } else {
-                queuedCommands.append(.raidChest(chest: chest.id))
-            }
+        // Checked before the build below rather than after, because a crate
+        // standing on your own claim would otherwise eat the tap as a wall.
+        switch touchable(at: pointInWorld) {
+        case .chest(let id):
+            openOwnChest(id)
             return
-        }
 
-        if let player = world.localPlayer, player.isAlive,
-           let box = world.reachableLootbox(for: player),
-           box.hitbox.expanded(by: GameScene.tapSlop).contains(touched) {
+        case .raid(let id):
+            // Anybody else's is not opened at all: it is broken, and what falls out
+            // is picked up off the grass.
+            queuedCommands.append(.raidChest(chest: id))
+            return
+
+        case .lootbox:
             queuedCommands.append(.openLootbox)
             return
+
+        case nil:
+            break
         }
 
-        let tile = GridGeometry.gridPoint(for: pointInWorld)
+        build(at: GridGeometry.gridPoint(for: pointInWorld), explainRefusals: true)
+    }
+
+    /// Puts a wall on one tile, and says what happened.
+    ///
+    /// Shared by the tap and the drag, so a run of walls painted with one finger is
+    /// the same act as nine separate taps - same command, same rules, same pop.
+    ///
+    /// - Parameter explainRefusals: whether a tile that will not take a wall should
+    ///   flash red and, when the reason is temporary, say so. True for a tap, which
+    ///   is one deliberate act at one place and deserves an answer. False for a
+    ///   drag, which crosses whatever is in its path - a finger swept over a tree,
+    ///   a crate and a chest would set off three red flashes and a line of text for
+    ///   tiles the player was only passing over.
+    @discardableResult
+    private func build(at tile: GridPoint, explainRefusals: Bool) -> Bool {
         queuedCommands.append(.placeBlock(tile))
 
         // And then say what will happen to it, which the map never used to. The
         // answer comes from BuildSystem rather than from a copy of its rules kept
         // here, so the outline that lights up, the brick that pops and the wall
         // that appears are all one decision seen three times.
-        guard let player = world.localPlayer else { return }
+        guard let player = world.localPlayer else { return false }
 
         if BuildSystem.canPlace(at: tile, by: player, in: world) {
             blueprint.fill(at: tile)
@@ -1734,12 +1852,14 @@ extension GameScene {
             // the first three taps. What is still learned once is the TEXT hint
             // above them, which is a sentence and only worth reading once.
             if wallsBuilt >= GameScene.wallsToLearn { Prefs.taughtBuilding = true }
-            return
+            return true
         }
+
+        guard explainRefusals else { return false }
 
         // Only inside your own ground. A red flash out on the open map would be the
         // game telling you off for tapping the scenery.
-        guard world.claim(for: player.team)?.contains(tile) == true else { return }
+        guard world.claim(for: player.team)?.contains(tile) == true else { return false }
 
         blueprint.refuse(at: tile)
 
@@ -1749,6 +1869,8 @@ extension GameScene {
         if !world.canBuild(player.team) {
             hint.show("WALLS ARE DOWN FOR A MOMENT")
         }
+
+        return false
     }
 
     // MARK: - Aiming something onto the map
