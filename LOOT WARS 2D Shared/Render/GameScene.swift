@@ -1314,17 +1314,7 @@ extension GameScene {
                     queuedCommands.append(.raidChest(chest: id))
 
                 case .chest(let id):
-                    selectedSlot = nil
-                    chestPanel.open(id)
-
-                    // Let go of the walking thumb. The move stick is about to be
-                    // hidden, and a finger still tracked against a hidden stick
-                    // kept driving it - walking the player straight out of range
-                    // of the chest they had just opened. That is what made this
-                    // look like a fault in the panel rather than in a touch that
-                    // outlived its control.
-                    moveStick.end()
-                    moveTouch = nil
+                    openOwnChest(id)
                 case .aim:
                     break
                 }
@@ -1662,9 +1652,31 @@ extension GameScene {
     /// for a wall a tile away.
     private static let tapSlop: Double = 0.35
 
+    /// Look into a chest of your own - from the corner button or from the chest.
+    ///
+    /// Shared because the two ways in have to do the same things, and one of them
+    /// is not obvious: letting go of the walking thumb. The move stick is about to
+    /// be hidden, and a finger still tracked against a hidden stick kept driving
+    /// it, walking the player straight out of range of the chest they had just
+    /// opened - which looked like a fault in the panel rather than in a touch that
+    /// outlived its control.
+    ///
+    /// It raises no Command. Looking into a chest changes nothing about the world,
+    /// only what this screen is showing, so there is nothing for the simulation to
+    /// hear about and nothing for a renderer to notice - which is why the chest is
+    /// told to move rather than left to work it out.
+    private func openOwnChest(_ id: ChestID) {
+        selectedSlot = nil
+        chestPanel.open(id)
+        chestRenderer.nudge(id)
+
+        moveStick.end()
+        moveTouch = nil
+    }
+
     private func tapMap(at pointInWorld: CGPoint) {
-        // A crate you are standing at opens when you tap IT, not only when you find
-        // the button in the corner.
+        // A crate or a chest you are standing at opens when you tap IT, not only
+        // when you find the button in the corner.
         //
         // The button is not going anywhere - it is faster once you know it is
         // there, it works while your thumb is on the stick, and it is the only way
@@ -1676,10 +1688,29 @@ extension GameScene {
         // Checked before the build command below rather than after, because this
         // function's first act is to queue one, and a crate standing on your own
         // claim would otherwise eat the tap as a wall.
+        let touched = GridGeometry.position(for: pointInWorld)
+
+        // Your own chest before a crate, which is the order the corner button uses
+        // - it is inside your base and it is yours. Anybody else's is not opened at
+        // all: it is broken, and what falls out is picked up off the grass.
+        //
+        // Deliberately the same two verbs from the same question, so the thing you
+        // tap and the button in the corner can never disagree about what touching a
+        // chest means.
+        if let player = world.localPlayer, player.isAlive,
+           let chest = world.reachableChest(for: player),
+           chest.hitbox.expanded(by: GameScene.tapSlop).contains(touched) {
+            if chest.owner == player.team {
+                openOwnChest(chest.id)
+            } else {
+                queuedCommands.append(.raidChest(chest: chest.id))
+            }
+            return
+        }
+
         if let player = world.localPlayer, player.isAlive,
            let box = world.reachableLootbox(for: player),
-           box.hitbox.expanded(by: GameScene.tapSlop)
-               .contains(GridGeometry.position(for: pointInWorld)) {
+           box.hitbox.expanded(by: GameScene.tapSlop).contains(touched) {
             queuedCommands.append(.openLootbox)
             return
         }
