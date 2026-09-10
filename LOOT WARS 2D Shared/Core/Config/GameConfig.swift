@@ -144,9 +144,19 @@ enum GameConfig {
     /// reaches the third rung of seven. These two sources and the faster machines
     /// take that to about 89, which reaches the sixth.
     enum Tokens {
-        /// Paid to whoever got the kill. The largest single source, because a kill
-        /// is the hardest thing on this list to arrange.
-        static let perKill = 8
+        /// Paid to whoever got the kill, ON TOP of what the victim was carrying.
+        ///
+        /// That second half is new and is why this number is half what it was. A
+        /// kill used to pay this bounty plus half the victim's purse; it now pays
+        /// this plus ALL of it - see Drops.tokenShare - so the flat fee is stacked
+        /// on a variable reward that roughly doubled underneath it without anybody
+        /// touching the fee. Against a victim carrying fifteen, a kill was paying
+        /// twenty-six.
+        ///
+        /// Four, plus a token a tier, so a bare kill on somebody with nothing still
+        /// clears the cheapest rung in the shop at six. What it no longer does is
+        /// pay for two rungs before the purse is even counted.
+        static let perKill = 4
 
         /// And more for a better-equipped victim, on the same nought-to-twelve scale
         /// the score bounty uses. Somebody fully kitted pays 20 tokens against a
@@ -2001,7 +2011,15 @@ enum GameConfig {
 
         /// Machines on the map. Deliberately few: an arcade you have to travel to
         /// is a place worth fighting over, one on every corner is furniture.
-        static let count = 5
+        ///
+        /// Four rather than five. A small cut on purpose - map machines are only
+        /// about six per cent of what a player earns in a match, so this is worth
+        /// roughly a rung of the ladder over five minutes. It is here for the
+        /// crowding rather than the economy: five on a map whose bases already sit
+        /// on a ring of radius eighteen meant there was usually one within a few
+        /// seconds of wherever you were standing, and a machine you stumble over is
+        /// not a place worth fighting over.
+        static let count = 4
 
         /// Footprint in tiles. The art measures 496 x 808 opaque pixels - a ratio
         /// of 0.61 against the 0.67 of a 2 x 3 block, close enough to sit on the
