@@ -349,6 +349,59 @@ final class EffectsRenderer {
         ]))
     }
 
+    /// A bullet off the casing of a machine.
+    ///
+    /// Deliberately not the knock a PERSON gets, and deliberately not the bomb's
+    /// flash it used to borrow. The flash was a blast: it said the cabinet had just
+    /// been destroyed, every single time, and then the cabinet was still standing
+    /// there. The knock is the other mistake in the other direction - a shower of
+    /// yellow stars off a machine reads as somebody inside it taking a hit.
+    ///
+    /// So: fewer, smaller, whiter, and thrown back the way the shot came rather
+    /// than fanned round the whole circle. Sparks off metal, which is a thing
+    /// everybody has seen and nobody has to be taught.
+    func machineStruck(at position: Vec2) {
+        let origin = GridGeometry.point(for: position)
+
+        for _ in 0..<3 {
+            let spark = SKSpriteNode(texture: ImpactArt.star)
+            let side = GridGeometry.length(ofTiles: Double.random(in: 0.16...0.24))
+
+            spark.size = CGSize(width: side, height: side)
+            spark.color = .white
+            spark.colorBlendFactor = 0.75
+            spark.zPosition = 12
+            spark.position = CGPoint(x: origin.x + CGFloat.random(in: -6...6),
+                                     y: origin.y + CGFloat.random(in: -4...8))
+            spark.zRotation = CGFloat.random(in: 0...(.pi / 2))
+            spark.setScale(0.5)
+
+            node.addChild(spark)
+
+            // Up and out, and dropping - a spark has weight, unlike the stars a
+            // person throws off, which is most of what makes this read as metal.
+            let angle = Double.random(in: 0.5...2.6)
+            let reach = CGFloat.random(in: 9...18)
+
+            spark.run(.sequence([
+                .group([
+                    .sequence([
+                        .moveBy(x: cos(angle) * Double(reach),
+                                y: sin(angle) * Double(reach), duration: 0.12),
+                        .moveBy(x: cos(angle) * Double(reach) * 0.4,
+                                y: -6, duration: 0.14)
+                    ]),
+                    .rotate(byAngle: CGFloat.random(in: -1.6...1.6), duration: 0.26),
+                    .sequence([.scale(to: 1, duration: 0.07),
+                               .scale(to: 0.3, duration: 0.19)]),
+                    .sequence([.wait(forDuration: 0.1),
+                               .fadeOut(withDuration: 0.16)])
+                ]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     // MARK: - A base closing
 
     /// The moment a wall goes all the way round, run once round the wall.
