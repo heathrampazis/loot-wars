@@ -46,8 +46,16 @@ final class EffectsRenderer {
     /// countdown that decides WHEN a mote is thrown decides which hue it is.
     private var lastPerk: [ActorID: Double] = [:]
 
-    /// Seconds between motes coming off somebody running a perk.
-    private static let auraInterval: Double = 0.17
+    /// Seconds between glints coming off somebody running a perk.
+    ///
+    /// Was 0.17, throwing two each time, which is nearly twelve a second - and at
+    /// three quarters of a second each that is about NINE of them alive at once,
+    /// all rising. That is not somebody who is enchanted, it is somebody who is on
+    /// fire. One every 0.4 seconds keeps about one and a half in the air, which is
+    /// what an enchanted ITEM carries: EnchantArt gives a power-up four stars on a
+    /// staggered two-second loop and one or two of them are showing at any moment.
+    /// Same look, borrowed on purpose.
+    private static let auraInterval: Double = 0.40
 
     // MARK: - Noticing
 
@@ -205,12 +213,16 @@ final class EffectsRenderer {
         ]))
 
         // Handing over to the aura, which takes it from here - already partway
-        // round the ring, so the first steady motes carry on from the column
+        // round the ring, so the first steady glints carry on from the column
         // rather than snapping back to where it started.
-        for index in 0..<6 {
-            let step = Double(index) * 0.05
+        //
+        // Three rather than six, and spread over twice as long. Six at a twentieth
+        // of a second apart was a handover to an aura that threw twelve a second;
+        // against one that throws two and a half it would be the flood moved from
+        // the whole perk to the front of it.
+        for index in 0..<3 {
             node.run(.sequence([
-                .wait(forDuration: step),
+                .wait(forDuration: Double(index) * 0.11),
                 .run { [weak self] in self?.aura(at: position, step: index, perk: perk) }
             ]))
         }
@@ -255,116 +267,74 @@ final class EffectsRenderer {
         // - see RenderPalette.colours(for:at:).
         let colours = RenderPalette.colours(for: perk, at: step)
 
-        // Two at a time, on opposite sides of the figure more often than not. One
-        // per beat came off the middle in a single file, which read as steam from a
-        // kettle rather than as somebody surrounded by it.
-        for index in 0..<2 {
-            let sparkle = SKNode()
-            let size = CGFloat.random(in: 10...16)
-            let side: CGFloat = index == 0 ? 1 : -1
+        // ONE, somewhere on a ring around the figure.
+        //
+        // It used to be two a beat thrown up from around the feet, and the thing
+        // that made it read as a plume of smoke was not the count on its own - it
+        // was that every one of them went UP, twenty to forty points of it. A dozen
+        // particles all travelling the same way is a jet however few you make it.
+        //
+        // So they barely travel at all now. Each one appears somewhere on the
+        // outline of the person, twinkles where it is, and goes. That is how an
+        // enchanted item reads - the stars do not stream off a bottle, they arrive
+        // at a place, flash and leave - and it is the same drawing, so the two are
+        // recognisably one idea.
+        //
+        // Stepped round by the golden angle rather than at random or in even
+        // fractions. Random clusters; even fractions make a visible rhythm you
+        // start counting; this never repeats and never bunches.
+        let angle = Double(step) * 2.39996
+        let size = CGFloat.random(in: 11...16)
 
-            // The colour, and only the colour. Wider than the spark and softer, so
-            // what reads at a distance is a coloured light with something bright in
-            // the middle of it.
-            let glow = SKSpriteNode(texture: GlowArt.pool)
-            glow.size = CGSize(width: size * 2.1, height: size * 2.1)
-            glow.color = index == 0 ? colours.bright : colours.deep
-            glow.colorBlendFactor = 1
-            glow.alpha = 0.9
+        // An ellipse rather than a circle, because a person is not one: the figure
+        // is nine tenths of a tile across and one and three quarters deep, so a
+        // circle would put half the glints inside the silhouette and half a long
+        // way off the sides of it.
+        let ring = CGPoint(x: origin.x + CGFloat(cos(angle)) * CGFloat.random(in: 18...27),
+                           y: origin.y + CGFloat(sin(angle)) * CGFloat.random(in: 22...32))
 
-            // And the glint, which never takes a colour from anybody.
-            let spark = SKSpriteNode(texture: EnchantArt.spark)
-            spark.size = CGSize(width: size, height: size)
-            spark.color = RenderPalette.perkSpark
-            spark.colorBlendFactor = 1
-            spark.zPosition = 1
+        let sparkle = SKNode()
 
-            // Started at its own angle, so a trail is not a row of identical
-            // crosses - the eye finds a repeat like that immediately.
-            spark.zRotation = CGFloat.random(in: 0..<(.pi / 2))
-            spark.run(.rotate(byAngle: side * 1.1, duration: 0.75))
+        // The colour, and only the colour. Wider than the spark and softer, so what
+        // reads at a distance is a coloured light with something bright in it.
+        let glow = SKSpriteNode(texture: GlowArt.pool)
+        glow.size = CGSize(width: size * 2.1, height: size * 2.1)
+        glow.color = step % 2 == 0 ? colours.bright : colours.deep
+        glow.colorBlendFactor = 1
+        glow.alpha = 0.9
 
-            sparkle.addChild(glow)
-            sparkle.addChild(spark)
+        // And the glint, which never takes a colour from anybody.
+        let spark = SKSpriteNode(texture: EnchantArt.spark)
+        spark.size = CGSize(width: size, height: size)
+        spark.color = RenderPalette.perkSpark
+        spark.colorBlendFactor = 1
+        spark.zPosition = 1
+        spark.zRotation = CGFloat.random(in: 0..<(.pi / 2))
+        spark.run(.rotate(byAngle: CGFloat.random(in: -0.7...0.7), duration: 0.62))
 
-            sparkle.zPosition = 11
-            sparkle.position = CGPoint(
-                x: origin.x + side * CGFloat.random(in: 2...14),
-                y: origin.y + CGFloat.random(in: -18...4)
-            )
-            sparkle.setScale(0.35)
+        sparkle.addChild(glow)
+        sparkle.addChild(spark)
 
-            node.addChild(sparkle)
+        sparkle.zPosition = 11
+        sparkle.position = ring
+        sparkle.setScale(0.3)
 
-            // Up and slightly inward, which gathers them over the figure's head
-            // instead of letting them drift apart into a fog. It twinkles ON the
-            // way - snapping to full size and easing down - so each one has the
-            // beat an item's sparkle has rather than simply appearing.
-            sparkle.run(.sequence([
-                .group([
-                    .moveBy(x: -side * CGFloat.random(in: 1...7),
-                            y: CGFloat.random(in: 22...38), duration: 0.75),
-                    .sequence([.scale(to: 1.25, duration: 0.16),
-                               .scale(to: 0.4, duration: 0.59)]),
-                    .sequence([.wait(forDuration: 0.28),
-                               .fadeOut(withDuration: 0.47)])
-                ]),
-                .removeFromParent()
-            ]))
-        }
-    }
+        node.addChild(sparkle)
 
-    /// A bullet off the casing of a machine.
-    ///
-    /// Deliberately not the knock a PERSON gets, and deliberately not the bomb's
-    /// flash it used to borrow. The flash was a blast: it said the cabinet had just
-    /// been destroyed, every single time, and then the cabinet was still standing
-    /// there. The knock is the other mistake in the other direction - a shower of
-    /// yellow stars off a machine reads as somebody inside it taking a hit.
-    ///
-    /// So: fewer, smaller, whiter, and thrown back the way the shot came rather
-    /// than fanned round the whole circle. Sparks off metal, which is a thing
-    /// everybody has seen and nobody has to be taught.
-    func machineStruck(at position: Vec2) {
-        let origin = GridGeometry.point(for: position)
-
-        for _ in 0..<3 {
-            let spark = SKSpriteNode(texture: ImpactArt.star)
-            let side = GridGeometry.length(ofTiles: Double.random(in: 0.16...0.24))
-
-            spark.size = CGSize(width: side, height: side)
-            spark.color = .white
-            spark.colorBlendFactor = 0.75
-            spark.zPosition = 12
-            spark.position = CGPoint(x: origin.x + CGFloat.random(in: -6...6),
-                                     y: origin.y + CGFloat.random(in: -4...8))
-            spark.zRotation = CGFloat.random(in: 0...(.pi / 2))
-            spark.setScale(0.5)
-
-            node.addChild(spark)
-
-            // Up and out, and dropping - a spark has weight, unlike the stars a
-            // person throws off, which is most of what makes this read as metal.
-            let angle = Double.random(in: 0.5...2.6)
-            let reach = CGFloat.random(in: 9...18)
-
-            spark.run(.sequence([
-                .group([
-                    .sequence([
-                        .moveBy(x: cos(angle) * Double(reach),
-                                y: sin(angle) * Double(reach), duration: 0.12),
-                        .moveBy(x: cos(angle) * Double(reach) * 0.4,
-                                y: -6, duration: 0.14)
-                    ]),
-                    .rotate(byAngle: CGFloat.random(in: -1.6...1.6), duration: 0.26),
-                    .sequence([.scale(to: 1, duration: 0.07),
-                               .scale(to: 0.3, duration: 0.19)]),
-                    .sequence([.wait(forDuration: 0.1),
-                               .fadeOut(withDuration: 0.16)])
-                ]),
-                .removeFromParent()
-            ]))
-        }
+        // A drift of a few points outward, which is enough to stop them looking
+        // pinned and not enough to become a direction. The twinkle is the whole
+        // animation: snap up, ease down, and out.
+        sparkle.run(.sequence([
+            .group([
+                .moveBy(x: CGFloat(cos(angle)) * 5, y: CGFloat(sin(angle)) * 5 + 4,
+                        duration: 0.62),
+                .sequence([.scale(to: 1.15, duration: 0.14),
+                           .scale(to: 0.45, duration: 0.48)]),
+                .sequence([.wait(forDuration: 0.22),
+                           .fadeOut(withDuration: 0.40)])
+            ]),
+            .removeFromParent()
+        ]))
     }
 
     // MARK: - A base closing
