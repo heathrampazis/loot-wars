@@ -25,6 +25,16 @@ final class ArcadeRenderer {
     private var lastTimers: [ArcadeID: Double] = [:]
     private var mapHeight = 0
 
+    /// Whether this renderer has ever caught up with the world.
+    ///
+    /// A machine that APPEARS is normally one somebody has just stood up, and that
+    /// is worth an animation - but on the very first sync every machine on the map
+    /// appears at once, and eight of them thumping down together would look like a
+    /// bug. The map's own machines are all unowned, so today the ownership test
+    /// below would have covered it on its own; this is here so that stays true if
+    /// this renderer is ever rebuilt mid-match.
+    private var hasSynced = false
+
     /// The damage bar over each machine, and what it is currently drawn at.
     ///
     /// Held so the path is rebuilt on a CHANGE rather than sixty times a second,
@@ -70,7 +80,17 @@ final class ArcadeRenderer {
     func sync(with world: World) {
         for (id, machine) in world.arcades where nodesByArcade[id] == nil {
             make(machine)
+
+            // Owned means placed. The map's four belong to nobody and have always
+            // been standing there, so they are simply drawn; a machine with a team
+            // on it was carried across the map and put down by somebody, which is
+            // the single best thing that happens to a base all match.
+            if hasSynced, let owner = machine.owner {
+                standUp(machine, owner: owner)
+            }
         }
+
+        hasSynced = true
 
         for (id, machine) in world.arcades {
             defer { lastTimers[id] = machine.emitTimer }
@@ -193,6 +213,71 @@ final class ArcadeRenderer {
             .group([.scaleX(to: 1, y: 1, duration: 0.22),
                     .colorize(withColorBlendFactor: 0, duration: 0.22)])
         ]), withKey: "paid")
+    }
+
+    /// Set down, rather than switched on.
+    ///
+    /// The counterpart to the blow-apart in sync, and deliberately its opposite
+    /// shape: that one swells and then collapses, this one lands and then settles.
+    ///
+    /// The sprite is anchored at its feet, so scaling it grows the cabinet UPWARDS
+    /// out of the ground rather than out from its middle - which is what makes the
+    /// first frames read as a machine being stood up rather than as one being
+    /// zoomed in on. It starts flat and wide, snaps up past full height, takes the
+    /// weight with a squash, and settles. The white is the same flash a machine
+    /// gives when it is hit or when it pays: this file only has one way of saying
+    /// "that just happened to the cabinet", and a third one would be a third thing
+    /// to learn.
+    ///
+    /// The ring is in the owner's colour, because "whose is this" is the question
+    /// a machine appearing in a base raises, and it is the question the damage bar
+    /// answers the same way. It is thrown from the footprint rather than from the
+    /// sprite, so it spreads across the ground the machine is standing on instead
+    /// of round its middle three tiles up.
+    ///
+    /// Nothing here can be interrupted in practice. A placed machine cannot jackpot
+    /// - those are rolled only on the map's own - and its first payout is a full
+    /// emitInterval away, so the scale is this animation's alone for the half
+    /// second it wants it.
+    private func standUp(_ machine: Arcade, owner: TeamID) {
+        guard let sprite = nodesByArcade[machine.id] else { return }
+
+        sprite.xScale = 1.3
+        sprite.yScale = 0.06
+        sprite.alpha = 0.55
+        sprite.color = .white
+        sprite.colorBlendFactor = 0.6
+
+        sprite.removeAction(forKey: "placed")
+        sprite.run(.sequence([
+            .group([.scaleX(to: 0.92, y: 1.12, duration: 0.13),
+                    .fadeIn(withDuration: 0.1)]),
+            .scaleX(to: 1.06, y: 0.94, duration: 0.07),
+            .group([.scaleX(to: 1, y: 1, duration: 0.13),
+                    .colorize(withColorBlendFactor: 0, duration: 0.18)])
+        ]), withKey: "placed")
+
+        let footing = GridGeometry.point(
+            for: Vec2(x: machine.centre.x, y: Double(machine.origin.row)))
+
+        let ring = SKShapeNode(circleOfRadius: GridGeometry.length(ofTiles: 0.55))
+        ring.position = footing
+        ring.fillColor = .clear
+        ring.strokeColor = RenderPalette.colour(for: owner)
+        ring.lineWidth = 3
+        ring.alpha = 0
+        ring.zPosition = sprite.zPosition - 0.5
+        node.addChild(ring)
+
+        ring.run(.sequence([
+            .wait(forDuration: 0.12),
+            .group([
+                .sequence([.fadeAlpha(to: 0.9, duration: 0.06),
+                           .fadeOut(withDuration: 0.34)]),
+                .scale(to: 2.9, duration: 0.4)
+            ]),
+            .removeFromParent()
+        ]))
     }
 
     /// Puts a machine into its jackpot colours, or takes it out of them.
