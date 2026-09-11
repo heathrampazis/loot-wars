@@ -1182,6 +1182,57 @@ enum GameConfig {
         /// always get the bomb where it meant to.
         static let breachWorth: Double = 40
 
+        // MARK: - Hunting
+
+        /// How far clear of the field somebody has to be before bots come looking
+        /// for them personally.
+        ///
+        /// On World.lead's scale, where 1 is a runaway. Lower than leaderChaseAt
+        /// (0.35) would have every bot abandoning its match to chase a narrow lead;
+        /// much higher and the pressure arrives too late to matter, because by then
+        /// the leader has already won and is simply being told about it.
+        ///
+        /// This is the answer to "the player can roam all game without much
+        /// threat". Nothing in the brain ever went and FOUND anybody: fights were
+        /// acquired by line of sight inside twelve tiles and dropped again at
+        /// sixteen, so a player who kept moving was never followed by anything. A
+        /// good player therefore chose every fight they were in, which is most of
+        /// what dominating a match consists of.
+        static let huntsLeaderAt: Double = 0.45
+
+        /// How long between one bot's hunts.
+        ///
+        /// Deliberately long and deliberately staggered. Seven bots hunting at once
+        /// is a mob; on twenty-five to fifty seconds apiece, one or two of the seven
+        /// are out looking at any moment and the rest are playing the match. That is
+        /// the difference between the leader being under pressure and the leader
+        /// being griefed.
+        static let huntUrgeInterval: ClosedRange<Double> = 25...50
+
+        /// How long a bot will keep looking before giving up and going back to its
+        /// own match.
+        ///
+        /// A hunt that has found nobody is a bot walking away from its base for
+        /// nothing, and thirty seconds of that is a tenth of a match spent on an
+        /// errand with no payoff. It gives up, takes a fresh urge, and gets on.
+        static let huntPatience: Double = 30
+
+        /// How far off a bot can pick a hunt's trail up from.
+        ///
+        /// The mark only refreshes on a clear view inside this, so a hunt tracks
+        /// where somebody WAS rather than where they are. Wider than the twelve a
+        /// fight is acquired at, because noticing somebody across a clearing and
+        /// being close enough to shoot at them are different things.
+        static let huntSight: Double = 16
+
+        /// How close counts as having reached the mark.
+        ///
+        /// Standing here with nobody in sight is what makes a trail go cold: the
+        /// mark is dropped and the hunt falls back on the quarry's base. Small,
+        /// because "where they were" is a spot and not an area.
+        static let huntArrival: Double = 1.5
+
+
 
         /// This is the counterweight to a runaway leader. Get far enough ahead and
         /// seven opponents start preferring you, which is also what makes their kill

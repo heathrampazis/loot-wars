@@ -98,6 +98,30 @@ struct AIState {
     ///
     var raidUrgeTimer: Double = 0
 
+    /// Counts down to going after whoever is winning, in person.
+    ///
+    /// Separate from the raid urge because they answer different questions - that
+    /// one is about a BASE and this one is about a PERSON - and because they must
+    /// not fire together. Seven bots all deciding at once that the leader is the
+    /// problem is not pressure, it is a mob, and a mob is both unfair and dull.
+    /// Staggered per bot on its own clock, one or two of the seven are usually out
+    /// looking for the leader at any moment and the rest are getting on with the
+    /// match.
+    var huntUrgeTimer: Double = 0
+
+    /// Where the quarry was last actually SEEN.
+    ///
+    /// A hunt walks at this and not at the quarry's live position, which is the
+    /// difference between a bot that is hunting you and a bot that knows where you
+    /// are. Refreshed only on a clear view inside huntSight; when there has never
+    /// been one, the hunt falls back on the quarry's own base, which is the one
+    /// place somebody is guaranteed to turn up eventually.
+    ///
+    /// So breaking line of sight works, and works the way it looks like it should:
+    /// the bot keeps coming to where you were, arrives, finds nothing, and has to
+    /// pick the trail up again.
+    var huntMark: Vec2?
+
     /// Walls left to lay on this trip home.
     var blocksLeftToLay: Int = 0
 

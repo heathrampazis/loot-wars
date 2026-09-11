@@ -35,6 +35,20 @@ enum AIGoal: Equatable {
     /// Get home, because somebody is in your base.
     case defend(ActorID)
 
+    /// Cross the map to find a particular person, because they are winning.
+    ///
+    /// The one goal with no place attached to it. Every other errand here names a
+    /// tile, a crate or a machine that sits still and can be walked at; this one
+    /// names a PERSON, who does not, and that is the whole difficulty of it - see
+    /// AIState.huntMark for where a hunt actually walks, which is the last place
+    /// the quarry was seen rather than wherever they happen to be now.
+    ///
+    /// It deliberately does not shoot. A hunt is the part before the fight: it gets
+    /// a bot into the same postcode, and then the ordinary threat scan promotes it
+    /// to .fight the moment there is something to shoot at. Keeping the two apart
+    /// is what stops a hunt being an aimbot with a long lead.
+    case hunt(ActorID)
+
     var isBuild: Bool {
         if case .build = self { return true }
         return false
@@ -94,6 +108,7 @@ enum AIGoal: Equatable {
         case .farm:  return "coin"
         case .robChest: return "rob"
         case .stash: return "stash"
+        case .hunt: return "hunt"
         }
     }
 }

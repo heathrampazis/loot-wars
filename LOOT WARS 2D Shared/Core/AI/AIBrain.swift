@@ -29,6 +29,7 @@ enum AIBrain {
         state.lootCooldown = max(0, state.lootCooldown - dt)
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
         state.raidUrgeTimer = max(0, state.raidUrgeTimer - dt)
+        state.huntUrgeTimer = max(0, state.huntUrgeTimer - dt)
         state.stashCooldown = max(0, state.stashCooldown - dt)
         state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
@@ -287,6 +288,19 @@ enum AIBrain {
                 state.buildUrgeTimer = Double.random(in: GameConfig.Build.urgeInterval,
                                                      using: &world.rng)
             }
+        case .hunt:
+            // A hunt gives up. It is the only errand here that can be walked all
+            // the way to the end of and still have found nothing, because the thing
+            // it is looking for moves - and a bot thirty seconds into an empty
+            // search is a bot that has left its own match to go for a walk.
+            //
+            // Giving up costs it a fresh urge, so it does not simply re-pick the
+            // same quarry on the next tick and walk the same empty line again.
+            if state.goalAge > GameConfig.AI.huntPatience {
+                state.huntUrgeTimer = Double.random(in: GameConfig.AI.huntUrgeInterval,
+                                                    using: &world.rng)
+                state.huntMark = nil
+            }
         case .wander, .fight, .retreat, .raid:
             // Raiding needs no patience of its own: it ends the moment the wall
             // falls or the last bomb is spent, and raidTarget stops offering it.
@@ -331,6 +345,17 @@ enum AIBrain {
         if wanted.isRaiding, !state.goal.isRaiding {
             state.raidUrgeTimer = Double.random(in: GameConfig.AI.raidUrgeInterval,
                                                 using: &world.rng)
+        }
+
+        // Same bargain for a hunt, and for the same reason: spent on setting off
+        // rather than on catching anybody, so a bot that never finds its quarry
+        // does not re-ask for the rest of the match. A fresh hunt also starts with
+        // no mark, so it walks at the quarry's base until it sees them - see
+        // AIState.huntMark.
+        if case .hunt = wanted, !isHunt(state.goal) {
+            state.huntUrgeTimer = Double.random(in: GameConfig.AI.huntUrgeInterval,
+                                                using: &world.rng)
+            state.huntMark = nil
         }
 
         if wanted != state.goal {
@@ -402,7 +427,11 @@ enum AIBrain {
             // defender has to actually shoot rather than merely walk up to.
             guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
 
-        case .wander, .loot, .collect, .build, .farm, .stash, .rearm, .defend:
+        case .wander, .loot, .collect, .build, .farm, .stash, .rearm, .defend, .hunt:
+            // All interruptible, and the hunt MOST of all: getting close enough to
+            // be interrupted is the entire job it was given. This is the line
+            // where a hunt turns into a fight.
+            //
             // All interruptible. A bot laying bricks - or lining up a throw, or
             // waiting on a payout - while somebody shoots at it is not a bot
             // anyone believes in.
@@ -507,6 +536,25 @@ enum AIBrain {
         if !state.baseWasComplete, state.buildUrgeTimer <= 0,
            let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
+        }
+
+        // Somebody is running away with the match, and this bot has decided to go
+        // and do something about it in person.
+        //
+        // Placed here on purpose: under defending your own base and under getting
+        // the first wall up, because those are yours and this is somebody else's
+        // problem - but over every errand below, because an errand is exactly what
+        // a hunt has always lost to. Everything down there fires readily, and a
+        // thing that is always eighth in line never happens.
+        //
+        // It is the only goal in this list that goes looking for a PERSON. Fights
+        // were acquired at twelve tiles by line of sight and dropped again at
+        // sixteen, so nothing ever followed anybody: a player who kept moving chose
+        // every fight they were in, and choosing your fights is most of what
+        // dominating a match consists of.
+        if state.huntUrgeTimer <= 0,
+           let quarry = worthHunting(for: actor, in: world) {
+            return .hunt(quarry.id)
         }
 
         // Gear on the grass that beats what it is holding.
@@ -882,6 +930,43 @@ enum AIBrain {
         return bestTile
     }
 
+    /// Who is worth crossing the map for.
+    ///
+    /// The leader, if there is one worth the name - World.lead measures that the
+    /// same way for all eight teams, so this points at a runaway bot exactly as
+    /// readily as at a runaway player, and the bots do not need to know which they
+    /// are looking at.
+    ///
+    /// Gated on carrying some healing, like the raiding pickers are and for the
+    /// same reason: arriving at the best player in the match with an empty pocket
+    /// is a donation. That gate is also why a hunt cannot dogpile even when every
+    /// bot's urge happens to come round together - the ones that have been losing
+    /// fights are out of bandages and stay home.
+    ///
+    /// Sorted by id, because two teams on the same lead would otherwise resolve out
+    /// of dictionary order and two runs of one seed would diverge.
+    private static func worthHunting(for actor: Actor, in world: World) -> Actor? {
+        guard actor.inventory.totalHealing(of: actor.maxHealth)
+                >= GameConfig.AI.emergencyHealingStock else { return nil }
+
+        var best: Actor?
+        var bestLead = GameConfig.AI.huntsLeaderAt
+
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let candidate = world.actors[id],
+                  candidate.isAlive,
+                  candidate.team != actor.team else { continue }
+
+            let ahead = world.lead(of: candidate.team)
+            guard ahead > bestLead else { continue }
+
+            bestLead = ahead
+            best = candidate
+        }
+
+        return best
+    }
+
     /// An enemy chest worth going for.
     ///
     /// Two ways in, and adding the second is most of why raids were so rare. A
@@ -1109,7 +1194,7 @@ enum AIBrain {
         if actor.secondsSinceHit < GameConfig.AI.combatRecency { return true }
 
         let distance = (enemy.position - actor.position).length
-        if distance <= fightRanges(for: actor, against: enemy, in: world).pressing { return true }
+        if distance <= fightRanges(for: actor, in: world).pressing { return true }
 
         // In its base. Whatever they came for, they are not getting it.
         if world.claim(for: actor.team)?
@@ -1126,7 +1211,7 @@ enum AIBrain {
         // further away they are the more they have to be worth. Somebody a step
         // outside arm's length is worth going for; the same person at the edge of
         // vision is somebody else's problem.
-        let ranges = fightRanges(for: actor, against: enemy, in: world)
+        let ranges = fightRanges(for: actor, in: world)
         let band = max(0.001, ranges.engage - ranges.pressing)
         let reach = min(1, (distance - ranges.pressing) / band)
 
@@ -1309,7 +1394,52 @@ enum AIBrain {
 
         case .fight(let id):
             steerForFight(&state, actor: actor, enemy: id, in: world)
+
+        case .hunt(let id):
+            guard let quarry = world.actors[id], quarry.isAlive else {
+                // Dead, or gone. Somebody else got there first and the reason for
+                // the walk went with them.
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+                state.huntMark = nil
+                return
+            }
+
+            // The mark refreshes only on a clear VIEW, and only from inside
+            // huntSight. This is the whole honesty of the mechanic: without the
+            // sight test a hunt would track a live position through walls and
+            // across the map, which is not a bot hunting you, it is a bot that
+            // knows where you are. With it, breaking line of sight works - the bot
+            // keeps coming to where you were, arrives, and has to find you again.
+            let away = quarry.position - actor.position
+            if away.length <= GameConfig.AI.huntSight,
+               hasLineOfSight(from: actor.position, to: quarry.position, in: world) {
+                state.huntMark = quarry.position
+            }
+
+            // No mark yet means it has never laid eyes on them, so it walks at
+            // their base instead. That is the one place somebody turns up sooner or
+            // later, and it puts the bot somewhere useful even if they never do.
+            let mark = state.huntMark ?? world.claims[quarry.team]?.centreTile.center
+
+            // Stood on the spot with nobody here: the trail is cold. Dropping the
+            // mark sends it to their base on the next tick rather than leaving it
+            // milling about on an empty patch of grass.
+            if let mark, (mark - actor.position).length < GameConfig.AI.huntArrival {
+                state.huntMark = nil
+            }
+
+            steer(&state, actor: actor, to: mark)
         }
+    }
+
+    /// Whether this goal is a hunt. AIGoal has no isHunt of its own because
+    /// nothing else needs to ask, and one more near-identical one-line predicate on
+    /// that enum earns less than it costs - isRob is already sitting there unread.
+    private static func isHunt(_ goal: AIGoal) -> Bool {
+        if case .hunt = goal { return true }
+        return false
     }
 
     private static func steer(_ state: inout AIState, actor: Actor, to target: Vec2?) {
@@ -1339,7 +1469,7 @@ enum AIBrain {
         // fight and they would both wander off.
         guard let enemy = world.actors[id], enemy.isAlive,
               (enemy.position - actor.position).length
-                <= fightRanges(for: actor, against: enemy, in: world).disengage else {
+                <= fightRanges(for: actor, in: world).disengage else {
             state.goal = .wander
             state.goalAge = 0
             return
@@ -1353,7 +1483,7 @@ enum AIBrain {
 
         // Too close, or nothing loaded: give ground. Backing off no longer costs a
         // bot its shot, so this is a reposition rather than a surrender.
-        let ranges = fightRanges(for: actor, against: enemy, in: world)
+        let ranges = fightRanges(for: actor, in: world)
 
         if gap < ranges.minimum || actor.ammo <= 0 {
             let escape = breakOffPoint(for: actor, awayFrom: enemy, in: world) - actor.position
@@ -1422,10 +1552,17 @@ enum AIBrain {
         let pressing: Double
     }
 
-    static func fightRanges(for actor: Actor,
-                            against target: Actor?,
-                            in world: World) -> FightRanges {
-        let engage = engageLimit(for: actor, against: target, in: world)
+    /// Takes no target any more. It used to, so that the local player could be
+    /// given a shorter engage range than a bot - see canOpenFire, which is where
+    /// that protection went and why it is better off there.
+    ///
+    /// It still takes the actor and the world, and at the moment uses neither: the
+    /// engage range is one number for everybody. They are kept because the NEXT
+    /// question anybody asks of this is "should somebody holding a Blaster 6 pick
+    /// fights from further away", and that wants an actor. Deleting two parameters
+    /// to add them back is a worse trade than a pair that are briefly unread.
+    static func fightRanges(for actor: Actor, in world: World) -> FightRanges {
+        let engage = GameConfig.AI.engageRange
 
         return FightRanges(engage: engage,
                            preferred: engage * GameConfig.AI.preferredFraction,
@@ -1434,44 +1571,41 @@ enum AIBrain {
                            pressing: engage * GameConfig.AI.pressingFraction)
     }
 
-    /// How far a bot may engage THIS target from.
+    /// Whether a shot at this target is one the target could see coming.
     ///
-    /// Only the local player is protected, because this rule is about the camera
-    /// and nobody is watching one bot shoot another. Bots fighting each other keep
-    /// the full range, which also keeps the map busy away from the player.
+    /// THE CAP MOVED. It used to sit on the engage RANGE, capping how far off a bot
+    /// could take an interest in the local player at all - and that conflated two
+    /// different things. Not shooting somebody from off screen is fair. Not being
+    /// allowed to WALK TOWARDS them from off screen is not a fairness rule, it is a
+    /// blind spot, and on a landscape phone it was an enormous one.
     ///
-    /// The screen is a RECTANGLE, and asking it as one is most of the value here.
-    /// A circle has to fit the short axis of a landscape phone, so capping by
-    /// radius threw away two thirds of the width - bots ignored somebody stood ten
-    /// tiles to the side, in plain view, because somebody ten tiles ABOVE would
-    /// have been off screen. Now the limit is the distance to the screen edge along
-    /// the line to the target: nearly eleven tiles sideways, five straight up.
-    private static func engageLimit(for actor: Actor,
-                                    against target: Actor?,
-                                    in world: World) -> Double {
-        let ceiling = GameConfig.AI.engageRange
+    /// The arithmetic: tiles are 36 points, so a landscape screen is about eleven
+    /// tiles wide either side of the player and under six tall. Bots engaged each
+    /// other at a flat twelve and engaged the player at whatever the screen edge
+    /// allowed along the line between them - eleven sideways, five and a bit
+    /// vertically. By area that is a shade over forty per cent of the region a bot
+    /// gets. Move vertically and almost nothing noticed you. That is a large part
+    /// of "the player can roam all game without much threat", and it was invisible
+    /// because it reads as a courtesy.
+    ///
+    /// So noticing is symmetric now - twelve tiles, everybody - and this is what
+    /// is left of the courtesy: a bot may come for you from anywhere, and may not
+    /// shoot until you could see it. Asked as a rectangle, because the screen is
+    /// one and the camera is centred on the player, so it is simply whether the
+    /// bot is inside the box.
+    ///
+    /// Only the local player is protected. Nobody is watching one bot shoot
+    /// another.
+    private static func canOpenFire(on target: Actor,
+                                    from actor: Actor,
+                                    in world: World) -> Bool {
+        guard target.id == world.localPlayerID else { return true }
 
-        guard let target, target.id == world.localPlayerID,
-              let player = world.actors[world.localPlayerID] else { return ceiling }
-
-        // From the camera to the BOT, which is the question this was always meant
-        // to be asking and never was. It measured player-to-target - and the target
-        // IS the player in the only branch that gets here, so the vector was
-        // identically zero and the fallback direction took over every single time.
-        //
-        // That fallback is (1, 0), so the answer was always the horizontal
-        // half-extent. On a phone in landscape that is the LONG axis: a bot
-        // directly above or below the player was cleared to open fire from about
-        // eleven tiles when the screen shows four and a half that way. Being shot
-        // by something you cannot see was never fixed, it was only fixed sideways.
-        let towards = actor.position - player.position
-        let direction = towards.length > 0.001 ? towards.normalized() : Vec2(x: 1, y: 0)
-
+        let away = actor.position - target.position
         let half = world.visibleHalfExtent
-        let toSide = abs(direction.x) > 0.001 ? half.x / abs(direction.x) : .greatestFiniteMagnitude
-        let toTopOrBottom = abs(direction.y) > 0.001 ? half.y / abs(direction.y) : .greatestFiniteMagnitude
 
-        return min(ceiling, min(toSide, toTopOrBottom) * GameConfig.AI.visibleMargin)
+        return abs(away.x) <= half.x * GameConfig.AI.visibleMargin
+            && abs(away.y) <= half.y * GameConfig.AI.visibleMargin
     }
 
     // MARK: - Spending
@@ -1816,7 +1950,8 @@ enum AIBrain {
             target = tile
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
-        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash, .rearm, .wreck, .defend:
+        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
+             .rearm, .wreck, .defend, .hunt:
             target = nil
         }
 
@@ -1994,7 +2129,7 @@ enum AIBrain {
         guard away.length > 0.01 else { return home }
 
         let escape = actor.position + away.normalized() * GameConfig.AI.breakOffDistance
-        let urgency = max(0, min(1, 1 - away.length / fightRanges(for: actor, against: threat, in: world).engage))
+        let urgency = max(0, min(1, 1 - away.length / fightRanges(for: actor, in: world).engage))
 
         return escape * urgency + home * (1 - urgency)
     }
@@ -2012,7 +2147,7 @@ enum AIBrain {
                     && $0.isAlive
                     && $0.invulnerability <= 0
                     && ($0.position - actor.position).length
-                        < fightRanges(for: actor, against: $0, in: world).engage
+                        < fightRanges(for: actor, in: world).engage
             }
             // Nearest first - but weighted by standing, so a bot will walk past
             // somebody nearer to go after whoever is winning. Ties broken by id, so
@@ -2056,7 +2191,11 @@ enum AIBrain {
         case .fight(let id):   targetID = id
         case .retreat(let id): targetID = id
         case .defend(let id):  targetID = id
-        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash, .rearm, .wreck, .defend:
+        // A hunt is deliberately not here. It walks; it does not shoot. The
+        // moment there is anything worth shooting at, reactToThreats has already
+        // turned it into a .fight - see AIGoal.hunt.
+        case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash,
+             .rearm, .wreck, .defend, .hunt:
             targetID = nil
         }
 
@@ -2067,6 +2206,12 @@ enum AIBrain {
 
         let towards = enemy.position - actor.position
         guard towards.length <= GameConfig.Blaster.range else { return nil }
+
+        // And they have to be able to SEE it coming. The blaster reaches twelve
+        // tiles and a landscape screen shows under six of them vertically, so
+        // without this a bot would open fire from above or below the camera - which
+        // is the one thing the old engage cap was genuinely there to prevent.
+        guard canOpenFire(on: enemy, from: actor, in: world) else { return nil }
 
         // Do not fire into the back of a tree. Same rules a bullet obeys, so a bot
         // never takes a shot the simulation would swallow.
