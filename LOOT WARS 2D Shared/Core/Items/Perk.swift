@@ -109,16 +109,26 @@ enum Perk: Hashable, CaseIterable {
         }
     }
 
-    /// How often it turns up, relative to the others.
+    /// How heavily it sits in a crate's table, by how far the match has run.
     ///
-    /// The four shares add to four, which is what the crate tables were already
-    /// handing to the single perk - so the same number of power-ups fall out of the
-    /// map as before, and this only decides which. The disco ball is the scarce one
-    /// at 0.7 against 1.1, so it is about a sixth of the power-ups you find.
-    var lootShare: Double {
+    /// This was a SHARE - 0.7 or 1.1, multiplied against one weight the crate tables
+    /// handed both kinds - and it is a weight now because the two kinds stopped
+    /// wanting the same curve. The singles were made commoner and made to climb
+    /// harder as a match runs; the disco ball was meant to stay exactly where it
+    /// was. Expressed as shares of a shared base that is rising, "stay where it was"
+    /// becomes a share that falls by a different amount in every band, and nobody
+    /// reading 0.44 / 0.33 / 0.33 would ever guess it meant "unchanged".
+    ///
+    /// So each kind names its own curve in GameConfig and this picks one. The
+    /// relationship between them is still perfectly readable - the three singles
+    /// together are about nine times the disco ball late - it is just no longer
+    /// encoded in a number you have to divide to understand.
+    func lootWeight(at progress: Double) -> Int {
         switch self {
-        case .overdrive: return 0.7
-        case .strength, .speed, .regeneration: return 1.1
+        case .overdrive:
+            return GameConfig.Loot.overdriveWeight(at: progress)
+        case .strength, .speed, .regeneration:
+            return GameConfig.Loot.singlePerkWeight(at: progress)
         }
     }
 }

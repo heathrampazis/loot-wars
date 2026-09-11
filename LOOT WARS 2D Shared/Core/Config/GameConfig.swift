@@ -1777,39 +1777,58 @@ enum GameConfig {
         /// number.
         static let rareShare: Double = 0.125
 
-        /// How heavily ONE power-up sits in a crate's table, by how far the match
-        /// has run.
+        /// How heavily ONE of the three plain power-ups sits in a crate's table,
+        /// by how far the match has run.
         ///
-        /// The BASE weight, doubled for the blue pair in LootTable - see
-        /// Perk.rarity - so the arithmetic is worth writing down. Against band
-        /// totals around three hundred, the six shares together come to roughly one
-        /// crate in nineteen early and one in ten late. A particular blue perk is
-        /// about one crate in forty, a particular purple one about one in eighty.
+        /// Written as the weight itself rather than a base to be multiplied. It used
+        /// to be one number that both this and the disco ball were scaled off, which
+        /// worked while they wanted the same curve and stopped working the moment
+        /// they did not: the singles needed to climb and the disco ball needed to
+        /// hold still, and a shared base cannot do both without a fudge factor that
+        /// falls as the base rises. Two curves, two functions, each number the thing
+        /// it actually is.
         ///
-        /// That is the shape variety wants: a power-up is a normal part of a match
-        /// rather than an event, you hold each of them often enough to learn what
-        /// they do, and the two that decide a fight outright stay scarce.
+        /// Against band totals around three hundred, one particular single is about
+        /// one crate in thirty-eight early and one in twenty late; the three
+        /// together are 7.9% of an early crate and 15.1% of a late one, which over
+        /// the fourteen-odd crates a player opens comes to 1.56 a match.
         ///
-        /// This is the dial for all four. Halve it and perks become a story you
-        /// tell about a match; double it and they are part of the loadout.
-        /// Two higher in every band, which is about half again as many power-ups.
+        /// That is up from 0.96, and under one a match was the problem: most matches
+        /// had none. A power-up you meet less than once is a mechanic nobody plans
+        /// around - you drink it when you find it and forget it exists between
+        /// times. At about one and a half you hold one most matches and two often
+        /// enough to have an opinion on which you would rather have, and having an
+        /// opinion is the entire reason there are three of them.
         ///
-        /// Measured before it was moved, because "rare" and "absent" are different
-        /// things and this was the second one. Against a full band table - a crate
-        /// is mostly bandages and bombs - the old weights made a power-up 3.4% of
-        /// an early crate and 8.1% of a late one, which over the fourteen-odd
-        /// crates a player opens in a match came to 0.77 of them. Most matches you
-        /// found none, and a mechanic you meet in half your matches is one nobody
-        /// ever learns to plan around.
-        ///
-        /// At these weights it is about 1.2 a match: reliably one, sometimes two,
-        /// still never something you count on. That is the intended shape - a perk
-        /// is a thing that happens to you rather than a resource you manage.
-        static func perkWeight(at progress: Double) -> Int {
+        /// The climb across the match is steeper than it was on purpose - nearly
+        /// twice as likely late as early, where it used to be a little over half
+        /// again. Seven seconds of faster feet is worth more in a late fight than an
+        /// early one, and late is also when the match is being decided and a crate
+        /// needs to be able to change something.
+        static func singlePerkWeight(at progress: Double) -> Int {
             switch progress {
-            case ..<0.35: return 5
-            case ..<0.70: return 6
-            default:      return 7
+            case ..<0.35: return 9
+            case ..<0.70: return 12
+            default:      return 15
+            }
+        }
+
+        /// The same, for the disco ball.
+        ///
+        /// Deliberately flat where the singles climb, and these numbers are chosen
+        /// to hold its ABSOLUTE rate still - about 0.19 a match, exactly what it was
+        /// before the singles moved - rather than to hold some ratio against them.
+        /// The table grows underneath it as the singles get heavier, so standing
+        /// still here is a weight rise of its own.
+        ///
+        /// It is the one power-up that ends a fight by itself, and "rarer than it
+        /// was" was never the ask. Everything the change handed out went to the
+        /// three that each do one thing.
+        static func overdriveWeight(at progress: Double) -> Int {
+            switch progress {
+            case ..<0.35: return 4
+            case ..<0.70: return 4
+            default:      return 5
             }
         }
 
