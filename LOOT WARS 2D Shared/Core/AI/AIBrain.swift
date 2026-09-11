@@ -2194,8 +2194,10 @@ enum AIBrain {
         // A hunt is deliberately not here. It walks; it does not shoot. The
         // moment there is anything worth shooting at, reactToThreats has already
         // turned it into a .fight - see AIGoal.hunt.
+        // .defend used to appear here as well as three lines up, where it binds.
+        // The second one was unreachable and the compiler said so on every build.
         case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash,
-             .rearm, .wreck, .defend, .hunt:
+             .rearm, .wreck, .hunt:
             targetID = nil
         }
 
