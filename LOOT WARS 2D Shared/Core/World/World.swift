@@ -576,6 +576,25 @@ final class World {
         worth += min(GameConfig.AI.raidPressureCap,
                      secondsSinceRaid(of: team) * GameConfig.AI.raidPressurePerSecond)
 
+        // And the WALL, which is the part this never counted.
+        //
+        // lootValue prices what a raider carries home, and that is genuinely all
+        // it should price - but it is not all a raid pays. A bomb through a
+        // standing wall is Score.wallDestroyed a tile and clears three to five of
+        // them, so the hole alone is worth 45 to 75 points, more than the 55 a
+        // cracked chest pays. None of that was in the price.
+        //
+        // The omission had a shape, and the shape was the player. Bot bases are
+        // stocked and handed a machine the moment they seal, so they price at 55
+        // on contents before anything happens; a player's chests are theirs to
+        // fill and mostly are not, so they priced at nothing and the bots
+        // correctly went elsewhere, all match, every match. Counting the wall
+        // prices every base on the one thing every base has.
+        //
+        // Sealed only. A base already standing open does not need a bomb, and its
+        // hole has been paid for.
+        if !baseIsBreached(team) { worth += GameConfig.AI.breachWorth }
+
         // And winning. Whoever is out in front is worth breaking into whoever they
         // are - see World.lead, which says the same of all eight teams.
         worth += lead(of: team) * GameConfig.AI.leaderWorth

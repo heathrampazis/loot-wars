@@ -842,7 +842,23 @@ enum AIBrain {
             var tile: GridPoint?
             var closest = Double.greatestFiniteMagnitude
 
-            for candidate in world.baseLayouts[team]?.tiles ?? [] {
+            // The wall AS BUILT, not as planned.
+            //
+            // This read baseLayouts - the schematic the tutorial draws - and that
+            // is a plan, not a fact. Bots follow it, so for seven bases the two
+            // agreed and the bug was invisible. A player can build any shape they
+            // like inside their claim, and when they do, every tile in this loop
+            // comes back with no block on it, no candidate survives, and the base
+            // is skipped entirely. Build off-plan and you were unbombable.
+            //
+            // wallInTheWay two functions down already asks the enclosure for
+            // exactly this reason and says so in its own comment. This is the same
+            // question and now gets the same authority.
+            //
+            // Sorted, because a Set has no order and the minimum below would
+            // otherwise resolve differently between two runs of the same seed.
+            for candidate in world.enclosure(of: team).wall
+                .sorted(by: { ($0.col, $0.row) < ($1.col, $1.row) }) {
                 guard world.map[candidate].blockOwner != nil else { continue }
 
                 let toLoot = spots

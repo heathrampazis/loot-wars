@@ -87,6 +87,15 @@ struct AIState {
     /// queue - above building and stashing, still below fighting for your life and
     /// below patching a hole in your own wall, because those are emergencies and
     /// this is an errand.
+    /// It is a PRIORITY clock, not a rate limit, and the difference has caught
+    /// two people out. chooseGoal asks chestWorthRobbing twice: once up here
+    /// behind this timer, and again much further down with no gate on it at all.
+    /// So when the timer is cold a bot still robs - it simply does it after
+    /// building, re-arming and stashing rather than instead of them. Nothing
+    /// anywhere caps how OFTEN a bot raids. What caps that is the bomb supply,
+    /// because chestWorthRobbing wants a bomb in the bag or a hole already in the
+    /// wall, and robRange, because it will not cross the whole map for one.
+    ///
     var raidUrgeTimer: Double = 0
 
     /// Walls left to lay on this trip home.

@@ -1165,6 +1165,24 @@ enum GameConfig {
         /// bandage behind a wall is not a reason to go anywhere.
         static let raidWorthOpening = 15
 
+        /// What one bomb through a standing wall is worth going for.
+        ///
+        /// On the same scale as everything else in raidWorth, where a unit is a
+        /// tile of walking: forty means a sealed base is worth about ten seconds of
+        /// travel on its own, before anything that happens to be inside it.
+        ///
+        /// Under a stocked bot base's 55, deliberately. A rich base should still
+        /// beat a bare one - that is the whole reason a base is priced rather than
+        /// just measured - but the bare one should not price at ZERO, which is what
+        /// it did, and which is why the one base on the map whose chests nobody
+        /// fills for it went a whole match without being visited.
+        ///
+        /// The real payoff is 45 to 75 score, three to five tiles at
+        /// Score.wallDestroyed. Forty rather than sixty because a raider does not
+        /// always get the bomb where it meant to.
+        static let breachWorth: Double = 40
+
+
         /// This is the counterweight to a runaway leader. Get far enough ahead and
         /// seven opponents start preferring you, which is also what makes their kill
         /// bounty worth having.
