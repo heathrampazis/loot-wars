@@ -156,8 +156,8 @@ final class EffectsRenderer {
         // rings of one colour said "something is happening", four rings of four
         // said "and it is all of them". They arrive close enough together to read
         // as one gesture, so the extra pair costs the moment nothing in length -
-        // which matters, because a perk that runs for nine seconds cannot afford a
-        // second and a half of ceremony in front of it.
+        // which matters more than it did, because a perk that runs for seven seconds
+        // cannot afford a second and a half of ceremony in front of it.
         for index in 0..<4 {
             let ring = SKShapeNode(circleOfRadius: tile * (1.15 + CGFloat(index) * 0.14))
 

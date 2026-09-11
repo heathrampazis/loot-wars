@@ -1629,10 +1629,16 @@ enum GameConfig {
         /// as a decision, where a long weak one reads as a status effect you
         /// happened to be wearing.
         ///
-        /// Nine is about one fight at this game's ranges, which is the length the
-        /// perk should be: long enough to decide the fight you drank it for, too
-        /// short to still be running for the next one.
-        static let duration: Double = 9
+        /// Seven, down from nine, and still the same for all four. Nine was written
+        /// as "about one fight at this game's ranges", and that was true of a fight
+        /// you walk into knowing it is coming - most of them are shorter, and the
+        /// back half of a nine-second perk was routinely spent walking around
+        /// powered up with nobody to use it on. Seven is the fight and not the walk
+        /// away from it.
+        ///
+        /// It matters more now there are four of them and they turn up half again
+        /// as often: the moment should stay a moment.
+        static let duration: Double = 7
 
         /// Seconds between portions of health.
         ///
@@ -1648,8 +1654,8 @@ enum GameConfig {
 
         /// Share of a full health bar handed back per beat.
         ///
-        /// 5% nine times is about 45% of a bar across the perk, against the 78% the
-        /// old regeneration paid over fifteen seconds. Barely more than one medkit,
+        /// 5% seven times is about 35% of a bar across the perk, against the 78%
+        /// the old regeneration paid over fifteen seconds. Barely more than one medkit,
         /// on purpose: this is no longer the whole item, it is one quarter of it,
         /// and it now arrives alongside thicker skin, which is the same defence
         /// bought twice. Stacked at the old rate the two together simply refused to
@@ -1682,12 +1688,12 @@ enum GameConfig {
         /// item rather than a reason to pick a bottle up.
         static let soloSpeedBoost: Double = 1.32
 
-        /// A quarter again becomes a third again, which over nine seconds is about
+        /// A quarter again becomes a third again, which over seven seconds is about
         /// one extra hit landed in a close fight. That is the whole item.
         static let soloDamageBoost: Double = 1.35
 
-        /// 7% a beat rather than 5%, so about 63% of a bar across the perk against
-        /// the disco ball's 45%. Short of the 78% the old regeneration paid, and
+        /// 7% a beat rather than 5%, so about 49% of a bar across the perk against
+        /// the disco ball's 35%. Short of the 78% the old regeneration paid, and
         /// deliberately: this no longer arrives alongside thicker skin, but it is
         /// still a bar and a half of healing on a map where a medkit is the
         /// expensive thing in the shop.
@@ -1786,11 +1792,24 @@ enum GameConfig {
         ///
         /// This is the dial for all four. Halve it and perks become a story you
         /// tell about a match; double it and they are part of the loadout.
+        /// Two higher in every band, which is about half again as many power-ups.
+        ///
+        /// Measured before it was moved, because "rare" and "absent" are different
+        /// things and this was the second one. Against a full band table - a crate
+        /// is mostly bandages and bombs - the old weights made a power-up 3.4% of
+        /// an early crate and 8.1% of a late one, which over the fourteen-odd
+        /// crates a player opens in a match came to 0.77 of them. Most matches you
+        /// found none, and a mechanic you meet in half your matches is one nobody
+        /// ever learns to plan around.
+        ///
+        /// At these weights it is about 1.2 a match: reliably one, sometimes two,
+        /// still never something you count on. That is the intended shape - a perk
+        /// is a thing that happens to you rather than a resource you manage.
         static func perkWeight(at progress: Double) -> Int {
             switch progress {
-            case ..<0.35: return 3
-            case ..<0.70: return 4
-            default:      return 5
+            case ..<0.35: return 5
+            case ..<0.70: return 6
+            default:      return 7
             }
         }
 

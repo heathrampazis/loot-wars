@@ -196,7 +196,7 @@ enum LootTable {
         // at 0.7 against the singles' 1.1, so it is about a sixth of them.
         //
         // The weight climbs with the match for the same reason the gear rungs do:
-        // nine seconds of anything is worth more in a late fight than an early one.
+        // seven seconds of anything is worth more in a late fight than an early one.
         let perkWeight = GameConfig.Loot.perkWeight(at: progress)
 
         rows += Perk.allCases.map { perk in
