@@ -337,7 +337,15 @@ enum GameConfig {
             // day selling a perk is worth more than drinking one, the strongest
             // item in the game turns into a coin, which is the opposite of finding
             // something.
-            .perk(.overdrive): 22
+            .perk(.overdrive): 22,
+
+            // Fourteen for the singles. Not far under the disco ball, because the
+            // floor here is set by the same worry: the day selling a perk beats
+            // drinking one, the best items in the game turn into coins. At a fifth
+            // back that is under three tokens, which is not a strategy.
+            .perk(.strength): 14,
+            .perk(.speed): 14,
+            .perk(.regeneration): 14
         ]
 
         /// What the shop pays for something you sell back, as a share of its price.
@@ -1655,6 +1663,35 @@ enum GameConfig {
         /// enough to make everyone else look like they are standing still - which
         /// is what a third again looked like once it came free with the damage.
         static let speedBoost: Double = 1.22
+
+        // MARK: - The three that each do one thing
+        //
+        // Every one of these is ABOVE the disco ball's version of the same power,
+        // which reads backwards for the weaker item and is the point. A single that
+        // is worse at its one job than the item which also does three others is
+        // strictly dominated - no situation makes finding it good news - and an
+        // item nobody is pleased to find is exactly what the old four-perk version
+        // was. Less overall, better in its lane.
+        //
+        // Modestly above, though. Far enough that the right tool is worth reaching
+        // for, near enough that the disco ball is still the one you hope for.
+
+        /// A fifth again becomes a third again. Speed on its own has to be worth
+        /// drinking for the chase or the escape alone, with no shots or health
+        /// behind it - and at 1.22 it was not, it was a bonus attached to a better
+        /// item rather than a reason to pick a bottle up.
+        static let soloSpeedBoost: Double = 1.32
+
+        /// A quarter again becomes a third again, which over nine seconds is about
+        /// one extra hit landed in a close fight. That is the whole item.
+        static let soloDamageBoost: Double = 1.35
+
+        /// 7% a beat rather than 5%, so about 63% of a bar across the perk against
+        /// the disco ball's 45%. Short of the 78% the old regeneration paid, and
+        /// deliberately: this no longer arrives alongside thicker skin, but it is
+        /// still a bar and a half of healing on a map where a medkit is the
+        /// expensive thing in the shop.
+        static let soloHealPortion: Double = 0.07
 
         /// How much harder your shots hit.
         ///

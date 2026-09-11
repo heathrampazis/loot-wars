@@ -226,14 +226,19 @@ final class EnchantNode: SKNode {
         }
     }
 
-    /// A perk never gets a colour, only the ring.
+    /// The disco ball never gets a colour, only the ring. The singles get theirs.
     ///
-    /// Still takes the perk rather than ignoring it, because the day there are two
-    /// again this is where the second one's colour goes - and a caller that had
-    /// stopped passing it would have to be found and fixed first.
+    /// This is the line the old comment was left open for - "the day there are two
+    /// again this is where the second one's colour goes" - and it is the clearest
+    /// single difference between the two kinds of power-up. One will not settle on
+    /// a colour because it is all of them; one holds a colour because it is one of
+    /// them. A player can tell which they are holding without reading anything.
     func tint(for perk: Perk) {
         switch perk {
-        case .overdrive: shimmer()
+        case .overdrive:
+            shimmer()
+        case .strength, .speed, .regeneration:
+            tint(RenderPalette.colours(for: perk, at: 0).bright)
         }
     }
 

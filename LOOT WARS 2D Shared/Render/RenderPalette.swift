@@ -236,6 +236,28 @@ enum RenderPalette {
         (hue(at: step), hue(at: step + 3))
     }
 
+    /// What each power-up is, in colour.
+    ///
+    /// The disco ball refuses to settle on one and walks the whole ring - see
+    /// perkColours - which is the claim that it is all of them at once. A single
+    /// holds still on its own, which is the same claim in reverse, and each is
+    /// taken from the ring rather than invented so the two read as one family.
+    ///
+    /// Red for hitting harder, cyan for moving faster, green for healing: the three
+    /// associations this game has already taught everywhere else - damage is red,
+    /// the heal motes are green - so nothing new has to be learned.
+    static func colours(for perk: Perk, at step: Int) -> (bright: SKColor, deep: SKColor) {
+        switch perk {
+        case .overdrive:    return perkColours(at: step)
+        case .strength:     return (hue(at: 0), hue(at: 1))
+        case .speed:        return (hue(at: 4), hue(at: 5))
+        // Green twice rather than green and the gold beside it on the ring. Gold
+        // means money everywhere else in this game, and a healing trail that
+        // glitters with it says the wrong thing twice a second.
+        case .regeneration: return (hue(at: 3), hue(at: 3))
+        }
+    }
+
     /// The near-white middle of a SPARKLE, which is a glint rather than a colour.
     ///
     /// The one thing about a perk that does NOT change with which perk it is: every

@@ -797,17 +797,16 @@ final class GameScene: SKScene {
             case .jackpot(let position):
                 effectsRenderer.jackpot(at: position)
 
-            case .perkStarted(_, let user):
-                // The steady rainbow trail comes off the world state a frame later;
-                // this is only the switch being thrown, which nothing about the
-                // state a second afterwards can show.
+            case .perkStarted(let perk, let user):
+                // The steady trail comes off the world state a frame later; this is
+                // only the switch being thrown, which nothing about the state a
+                // second afterwards can show.
                 //
-                // WHICH perk is thrown away here rather than never sent. The event
-                // still carries it because the world knows it and events are how
-                // the world says things, and the day there are two perks again this
-                // is a one-word change rather than a plumbing job.
+                // WHICH perk used to be thrown away here, and the comment said it
+                // was still sent because the day there were two again this would be
+                // a one-word change rather than a plumbing job. It was.
                 guard let actor = world.actors[user] else { break }
-                effectsRenderer.charge(at: actor.position)
+                effectsRenderer.charge(at: actor.position, perk: perk)
                 actorRenderer.charge(user)
 
             case .gas(let position):

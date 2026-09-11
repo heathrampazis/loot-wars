@@ -187,22 +187,21 @@ enum LootTable {
         let table = table(at: progress)
         var rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
 
-        // The power-up, added here rather than written into every band by hand.
+        // The power-ups, added here rather than written into every band by hand.
         //
-        // One row now, where there were four. The four used to carry different
-        // weights - the blue pair twice as often as the purple pair - and that
-        // arithmetic is now this multiplier: the old table offered a perk at six
-        // times the base weight in total, this offers it at four, so a power-up
-        // turns up about two thirds as often as SOME power-up used to. Rarer,
-        // because it is now worth four times as much, and not much rarer, because
-        // a perk you never see is a mechanic the game does not have.
+        // Four rows again, and the total is the same as when there was one. The
+        // multiplier below was already handing the single perk four times the base
+        // weight; the four shares add to four, so the same number of power-ups fall
+        // out of the map as before and this only decides WHICH. The disco ball sits
+        // at 0.7 against the singles' 1.1, so it is about a sixth of them.
         //
         // The weight climbs with the match for the same reason the gear rungs do:
         // nine seconds of anything is worth more in a late fight than an early one.
-        let perkWeight = GameConfig.Loot.perkWeight(at: progress) * 4
+        let perkWeight = GameConfig.Loot.perkWeight(at: progress)
 
         rows += Perk.allCases.map { perk in
-            (pickup: Pickup.item(.perk(perk)), weight: perkWeight)
+            (pickup: Pickup.item(.perk(perk)),
+             weight: max(1, Int((Double(perkWeight) * perk.lootShare).rounded())))
         }
 
         // A rare crate cannot hand you a bandage.

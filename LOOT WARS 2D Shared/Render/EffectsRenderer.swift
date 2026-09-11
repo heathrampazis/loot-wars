@@ -69,7 +69,7 @@ final class EffectsRenderer {
             // Running a power-up, which the world states plainly - so nothing has
             // to be announced. It also means a bot picking one up gets the same
             // violet trail the player does, without a line of code saying so.
-            if actor.perk != nil {
+            if let perk = actor.perk {
                 let previous = lastPerk[id] ?? (actor.perkRemaining + EffectsRenderer.auraInterval)
                 let beat = Int(actor.perkRemaining / EffectsRenderer.auraInterval)
                 if Int(previous / EffectsRenderer.auraInterval) != beat {
@@ -77,7 +77,7 @@ final class EffectsRenderer {
                     // the rainbow runs one way for everybody on the map regardless
                     // of when they drank it, and two people running a perk side by
                     // side are never mirror images of each other.
-                    aura(at: actor.position, step: -beat)
+                    aura(at: actor.position, step: -beat, perk: perk)
                 }
                 lastPerk[id] = actor.perkRemaining
             } else {
@@ -128,7 +128,7 @@ final class EffectsRenderer {
     /// Grand on purpose. This is a thing you find perhaps twice in a match and
     /// choose the moment for, and the first version - one thin ring - spent that
     /// moment as quietly as a bandage.
-    func charge(at position: Vec2) {
+    func charge(at position: Vec2, perk: Perk) {
         let origin = GridGeometry.point(for: position)
         let tile = GridGeometry.length(ofTiles: 1)
 
@@ -211,7 +211,7 @@ final class EffectsRenderer {
             let step = Double(index) * 0.05
             node.run(.sequence([
                 .wait(forDuration: step),
-                .run { [weak self] in self?.aura(at: position, step: index) }
+                .run { [weak self] in self?.aura(at: position, step: index, perk: perk) }
             ]))
         }
     }
@@ -240,7 +240,7 @@ final class EffectsRenderer {
     /// moving player leave a trail and a standing one wear a cloud - one behaviour
     /// out of one emitter, and the reason this is not an SKEmitterNode bolted to
     /// the sprite.
-    private func aura(at position: Vec2, step: Int) {
+    private func aura(at position: Vec2, step: Int, perk: Perk) {
         let origin = GridGeometry.point(for: position)
 
         // One step round the ring per puff, so the trail somebody leaves behind
@@ -250,7 +250,10 @@ final class EffectsRenderer {
         // in here, which is what keeps the colour on the ground true when frames
         // are dropped: a stutter loses a puff, it does not shift the whole trail
         // out of phase with everybody else's.
-        let colours = RenderPalette.perkColours(at: step)
+        // The disco ball walks the ring; a single holds its own colour. One call,
+        // so the trail says which power-up somebody is running from across the map
+        // - see RenderPalette.colours(for:at:).
+        let colours = RenderPalette.colours(for: perk, at: step)
 
         // Two at a time, on opposite sides of the figure more often than not. One
         // per beat came off the middle in a single file, which read as steam from a

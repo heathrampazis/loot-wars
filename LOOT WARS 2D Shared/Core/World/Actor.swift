@@ -87,22 +87,28 @@ struct Actor {
     /// with it in the same instant. Only the healing needs a beat, and PerkSystem
     /// runs that.
     ///
-    /// All three now ask the same question - is a perk running - where they used to
-    /// each name their own. That collapse is the entire cost of merging the four
-    /// power-ups into one, which is a fair sign the original split was carrying its
-    /// weight in the right place.
+    /// All three ask the PERK rather than asking whether one is running, which is
+    /// the difference between three power-ups and three copies of the same one:
+    /// "is a perk running" was correct for exactly as long as there was one perk,
+    /// and would have quietly granted every power to every bottle. See Perk, which
+    /// answers for itself and does it in one switch per power.
+    ///
+    /// They asked it directly for a while, and only a while: with one power-up in
+    /// the game "is a perk running" and "does this perk do that" are the same
+    /// question, and they stopped being the same question the moment there were
+    /// four again.
     var speedMultiplier: Double {
-        perk != nil ? GameConfig.Perks.speedBoost : 1
+        perk?.speedBoost ?? 1
     }
 
     /// How hard this actor's shots hit, as a share of the blaster's own damage.
     var damageMultiplier: Double {
-        perk != nil ? GameConfig.Perks.damageBoost : 1
+        perk?.damageBoost ?? 1
     }
 
     /// The share of incoming damage this actor actually takes.
     var damageTakenShare: Double {
-        perk != nil ? GameConfig.Perks.damageTaken : 1
+        perk?.damageTakenShare ?? 1
     }
 
     var inventory = Inventory()

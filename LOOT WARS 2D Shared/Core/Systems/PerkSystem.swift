@@ -62,16 +62,19 @@ enum PerkSystem {
     /// Only the healing, because only the healing is a thing that HAPPENS. The
     /// speed, the damage and the resistance are numbers read where they matter - by
     /// MovementSystem, by WeaponSystem, by CombatSystem - so they need no beat and
-    /// nothing put back at the end. The switch stays a switch rather than an `if`,
-    /// so a second perk added later arrives as a compiler error here rather than as
-    /// a power-up that silently does nothing.
+    /// nothing put back at the end.
+    ///
+    /// It asks the perk how much it heals rather than switching on which one it is,
+    /// and a perk that does not heal answers zero. That keeps the exhaustive switch
+    /// - the thing that turns a new power-up into a compiler error rather than one
+    /// that silently does nothing - in Perk, where every other power already has
+    /// one, instead of spread across the systems that read them.
     private static func apply(_ perk: Perk?, to id: ActorID, in world: World) {
         guard let perk, let actor = world.actors[id] else { return }
 
-        switch perk {
-        case .overdrive:
-            let portion = Double(actor.maxHealth) * GameConfig.Perks.healPortion
-            CombatSystem.heal(id, amount: max(1, Int(portion.rounded())), in: world)
-        }
+        let portion = Double(actor.maxHealth) * perk.healPortion
+        guard portion > 0 else { return }
+
+        CombatSystem.heal(id, amount: max(1, Int(portion.rounded())), in: world)
     }
 }
