@@ -1475,34 +1475,46 @@ enum AIBrain {
     /// whistle, with the buying happening in the second half - late enough to be a
     /// difficulty curve rather than a head start.
     private static func purchaseToMake(actor: Actor, in world: World) -> ItemType? {
-        // Past a point, everything goes on gear.
+        // Healing before gear, and only when the cupboard is bare.
         //
-        // Furniture is an INVESTMENT - a machine pays itself back over minutes, a
-        // chest is a place other people come to raid - and an investment made with
-        // ninety seconds on the clock is just tokens that never became anything. A
-        // bot buying its second chest in the closing minute is a bot choosing to be
-        // easy to kill, which is most of what "too easy" was.
-        guard world.matchProgress < GameConfig.AI.investsUntil else {
-            return upgradeToBuy(actor: actor, in: world)
-        }
+        // It goes first because it is the cheaper decision by an order of magnitude
+        // - a bandage is six tokens against forty for the next helmet - and because
+        // being out of bandages is what stops a bot raiding at all.
+        // emergencyHealingStock gates chestWorthRobbing and machineWorthWrecking
+        // both, so a bot with nothing to patch up with does not go and take
+        // anybody's chest; it wanders off to find a crate. Six tokens buys that
+        // walk back.
+        if let healing = healingToBuy(actor: actor, in: world) { return healing }
 
-        // No machine here any more: they are not sold. A bot that finds one in a
-        // rare crate still carries it home and stands it up - see chestSpotWanted,
-        // which prefers a machine over a chest when it happens to be holding both.
-
-        // No chest here either, and that is a change worth recording rather than a
-        // gap. Bots used to buy one the moment their wall shut, which is where
-        // most bases got theirs. Then the shop became two cards - gear and healing
-        // - and nothing has sold a chest since, so this branch sat here asking
-        // ShopSystem for a price that no longer exists and quietly answering "no"
-        // every time. Dead code that looks like a feature is worse than no
-        // feature: it is why nobody noticed bases were going empty.
-        //
-        // Chests come out of crates now, at about one crate in twelve, and a bot
-        // carrying one takes it home - see chestSpotWanted. The other half of
-        // keeping a base worth visiting is that a stripped chest is no longer
-        // destroyed; see ChestSystem.
+        // What used to stand here was a guard on GameConfig.AI.investsUntil whose
+        // two branches were the same line, left behind when the shop stopped
+        // selling furniture. Bots once bought a chest the moment their wall shut
+        // and a machine when they could afford one; neither is on the shelf any
+        // more - see GameConfig.Shop.tabs, which is gear and healing - so the only
+        // thing tokens have gone on for some time is the ladder. The constant and
+        // its several paragraphs of reasoning have gone with the branch.
         return upgradeToBuy(actor: actor, in: world)
+    }
+
+    /// The cheapest thing on the healing shelf a bot can afford, when it has run
+    /// out of healing.
+    ///
+    /// Reads everythingOffered rather than a tab index, because which tab the
+    /// bandages sit on is a lookup detail and nothing out here should have to know
+    /// it. worthBuying does the "has it actually run out" half, so both kinds of
+    /// purchase are decided in the same place.
+    private static func healingToBuy(actor: Actor, in world: World) -> ItemType? {
+        ShopSystem.everythingOffered(to: actor)
+            .filter { offer in
+                switch offer.type {
+                case .bandage, .medkit: return true
+                default:                return false
+                }
+            }
+            .filter { worthBuying($0.type, for: actor, in: world)
+                      && ShopSystem.canBuy($0.type, actor: actor, in: world) }
+            .min { $0.price < $1.price }?
+            .type
     }
 
     private static func upgradeToBuy(actor: Actor, in world: World) -> ItemType? {
@@ -1513,21 +1525,37 @@ enum AIBrain {
             .type
     }
 
-    /// Whether this is a rung the shop is the only way to reach.
+    /// Whether this is worth tokens rather than worth waiting for.
     ///
-    /// A bot that is losing drops the bar by one rung, which is the difference
-    /// between saving for an upgrade and having a gun now. The thresholds exist so
-    /// bots do not spend a match's tokens on things crates hand out for free; that
-    /// reasoning is about the ordinary case, and a bot being left behind is not it.
+    /// THREE ways to clear the bar for gear, and only the first of them used to
+    /// exist. Either the rung is one crates never hand out, so the shop is the only
+    /// way up; or the match has run past buysAnythingAfter and waiting has stopped
+    /// being a plan; or the bot is being left behind badly enough that a gun now
+    /// beats a better gun later.
+    ///
+    /// The first alone could never be cleared from below, because the shop offers
+    /// the rung ABOVE what you are wearing and that rung is always one short of the
+    /// line until a crate has already carried you past it. See
+    /// GameConfig.AI.buysHelmetsAbove for the whole of that - it is the reason
+    /// seven bots finished every match with a full purse and a starting blaster.
+    ///
+    /// Healing is a different question and gets a different test: not whether this
+    /// is good value, but whether the bot has any.
     private static func worthBuying(_ type: ItemType, for actor: Actor, in world: World) -> Bool {
-        let impatient = world.behind(actor.team) >= GameConfig.AI.pressureBuysAt ? 1 : 0
+        let impatient = world.behind(actor.team) >= GameConfig.AI.pressureBuysAt
+        let waited = world.matchProgress >= GameConfig.AI.buysAnythingAfter
 
         switch type {
         case .helmet(let tier):
-            return tier.rawValue > GameConfig.AI.buysHelmetsAbove.rawValue - impatient
+            return tier.rawValue > GameConfig.AI.buysHelmetsAbove.rawValue
+                || waited || impatient
         case .blaster(let tier):
-            return tier.rawValue > GameConfig.AI.buysBlastersAbove.rawValue - impatient
-        case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .perk:
+            return tier.rawValue > GameConfig.AI.buysBlastersAbove.rawValue
+                || waited || impatient
+        case .bandage, .medkit:
+            return actor.inventory.totalHealing(of: actor.maxHealth)
+                 < GameConfig.AI.buysHealingBelow
+        case .bomb, .stink, .chest, .arcade, .perk:
             return false
         }
     }

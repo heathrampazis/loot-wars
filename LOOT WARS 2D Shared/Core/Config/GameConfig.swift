@@ -817,19 +817,62 @@ enum GameConfig {
 
         // MARK: - Shopping
 
-        /// Bots leave these tiers to the crates and save their tokens for what only
-        /// the shop sells.
+        /// Bots leave these tiers to the crates while waiting is still a plan.
         ///
-        /// Set at exactly where the loot table stops. Buying a Common for three
-        /// tokens is three tokens not spent on a Legendary, and a bot would have
+        /// Set at exactly where the loot table stops. Buying a Common for six
+        /// tokens is six tokens not spent on a Legendary, and a bot would have
         /// found that Common in a crate within the minute anyway - so below this
         /// line spending is worse than saving. Above it there is no other way up.
         ///
         /// Epic now rather than Rare, and it is the same line in the new ladder's
         /// terms: the late crate band tops out at Legendary, so Legendary is the
         /// first rung worth a token.
+        ///
+        /// WHAT THIS COULD NOT SAY, and what made it a bug rather than a policy:
+        /// the shop offers exactly the rung ABOVE what you are wearing, so the tier
+        /// tested against this line is never the one the bot HAS - it is the one it
+        /// wants next. A bot wearing nothing is offered Common and asked whether
+        /// Common clears Epic. It does not. Wearing Common it is offered Epic and
+        /// asked whether Epic clears Epic. It does not either. The same holds one
+        /// rung at a time all the way up, so the bar did not read "save for a
+        /// Legendary", it read "buy nothing, ever, until a crate has already
+        /// carried you past Epic on its own".
+        ///
+        /// Seven bots therefore spent every match banking tokens they could not
+        /// spend, and finished in whatever gear the crates happened to hand them.
+        /// That is most of what "the other players are not competitive" was.
+        ///
+        /// The line itself is kept, because the reasoning behind it is sound. What
+        /// it was missing is an expiry - see buysAnythingAfter.
         static let buysHelmetsAbove: HelmetTier = .epic
         static let buysBlastersAbove: BlasterTier = .three
+
+        /// When waiting for a crate stops being a plan.
+        ///
+        /// Past this, a bot buys the rung in front of it whatever it is. The whole
+        /// argument for saving was "a crate will hand you one of those within the
+        /// minute", and there are only so many minutes: a bot a third of the way
+        /// into a match still wearing nothing is not being patient, it is being
+        /// farmed.
+        ///
+        /// A third rather than halfway, because gear compounds - the tokens buy
+        /// fights and the fights buy tokens - and a ladder started at a hundred
+        /// seconds has the rest of the match to pay itself back. Started at a
+        /// hundred and fifty it mostly does not.
+        static let buysAnythingAfter: Double = 0.33
+
+        /// How little healing a bot has to be carrying before it buys some.
+        ///
+        /// Bots could not buy a bandage at all: upgradeToBuy reads the gear tab and
+        /// nothing anywhere read the other one. So a bot that ran dry had exactly
+        /// one answer - walk to a crate and hope - while carrying forty tokens past
+        /// a shop selling bandages at six.
+        ///
+        /// Deliberately the same number the raiding gates use rather than a new
+        /// one, so the two cannot drift apart: emergencyHealingStock is the line
+        /// below which a bot stops raiding and goes looking for supplies, and this
+        /// is that same bot buying them instead of walking.
+        static let buysHealingBelow = emergencyHealingStock
 
         /// Seconds before a bot with no bombs left is handed one.
         ///
@@ -1055,12 +1098,6 @@ enum GameConfig {
         /// Longer than raidRange, because this one is worth the walk: a chest with
         /// something in it is the only thing on the map that repays crossing it.
         static let robRange: Double = 40
-
-        /// How far into a match a bot will still spend on furniture rather than on
-        /// gear. Past this everything goes on the ladder - see
-        /// AIBrain.purchaseToMake for why an investment made this late is just
-        /// tokens that never became anything.
-        static let investsUntil: Double = 0.60
 
         /// What a raider thinks a base is worth, and what the walk costs.
         ///
