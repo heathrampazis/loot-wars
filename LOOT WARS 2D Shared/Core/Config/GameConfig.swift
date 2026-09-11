@@ -1241,28 +1241,48 @@ enum GameConfig {
 
         /// How big a lead over the field counts as running away with it.
         ///
-        /// The scale behind World.lead and World.behind, and the single number that
-        /// decides who the adaptive difficulty touches. Everything below reads one
-        /// of those two, so this is where "how good do you have to be" is set.
+        /// The scale behind World.lead, which is what points the bots at whoever is
+        /// running away with the match.
         ///
-        /// Seven hundred, modelled against what a match actually pays. A bot that
-        /// seals its base, lays a couple of dozen walls, opens a dozen crates and
-        /// gets a kill or two finishes around 420; seven of them land in a 350 to
-        /// 500 spread. A player doing the same finishes level with them. A player
-        /// who has learned the raid loop - bomb the wall, crack the chest, wreck the
-        /// machine, bank it, repeat - finishes near 1,200, because a single raid
-        /// pays 55 plus 40 plus the items and takes under a minute.
+        /// Modelled against what a match actually pays. A bot that seals its base,
+        /// lays a couple of dozen walls, opens a dozen crates and gets a kill or two
+        /// finishes around 420; seven of them land in a 350 to 500 spread. A player
+        /// doing the same finishes level with them. A player who has learned the
+        /// raid loop - bomb the wall, crack the chest, wreck the machine, bank it,
+        /// repeat - finishes near 1,200, because one raid pays 55 plus 40 plus the
+        /// items and takes under a minute.
         ///
-        /// Against that, seven hundred gives: an ordinary player 0.01, a decent one
-        /// 0.40, an expert 1.00 - and about 0.11 among the bots when no player is
-        /// running away with anything, which is to say none of this fires in an
-        /// ordinary match. Half way through, the same expert is at 0.54, so it
-        /// arrives as a ramp rather than a switch.
+        /// Down from 700 to 560, which moves WHEN rather than whether. At seven
+        /// hundred an expert read 0.54 half way through and nothing pointed at them
+        /// before that; the first half of a match had no answer to anybody, and the
+        /// first half is where a runaway is built. At 560 the same player crosses
+        /// huntsLeaderAt around the end of the first third, which is early enough
+        /// to be a contest and late enough not to be a punishment for a good
+        /// opening.
         ///
-        /// That shape is the requirement. Somebody learning the game must never
-        /// meet any of it; the whole point is that the difficulty is not a setting
-        /// but an answer to what you are actually doing to the other seven teams.
-        static let leadScale: Double = 700
+        /// What must not change is the bottom of the ramp. An ordinary player
+        /// reads 0.01 and a decent one about 0.50; seven bots with nobody running
+        /// away read about 0.14 among themselves, which is below every threshold
+        /// that hangs off this. Somebody learning the game still never meets any of
+        /// it. That is the requirement, and the reason this is a measure of what
+        /// you are doing to the other seven teams rather than a difficulty setting.
+        static let leadScale: Double = 560
+
+        /// The scale behind World.behind, which is what a losing bot sharpens up
+        /// against - aim, reaction and how soon it starts spending.
+        ///
+        /// Its own number, because behind and lead are not the same measurement.
+        /// lead compares a team against the AVERAGE of the other seven; this
+        /// compares it against the BEST of them, and a maximum saturates far more
+        /// easily than a mean. One constant serving both meant the thresholds on
+        /// the two sides were not comparable quantities, which is the sort of thing
+        /// that looks tidy and quietly makes every number above it a guess.
+        ///
+        /// Held at 700 - the value both sides shared - so this change moves the
+        /// leader-pointing half only. The losing half already fires when it should:
+        /// against one runaway on three times the field, all seven bots correctly
+        /// read as fully behind and all seven sharpen up.
+        static let deficitScale: Double = 700
 
         /// What a full leader's base is worth on top of what is in it.
         ///

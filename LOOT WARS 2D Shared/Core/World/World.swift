@@ -176,14 +176,37 @@ final class World {
         return min(1, max(0, (Double(mine) - average) / GameConfig.AI.leadScale))
     }
 
-    /// How far behind the leader a team is, on the same scale.
+    /// How far behind the best team a team is.
     ///
     /// What a bot is measured by when it decides how hard to try. A bot at the top
     /// is under no pressure and plays as it always has; one being left behind
-    /// sharpens up. Same number seen from the other end, so a match cannot be in a
-    /// state where nobody is ahead and everybody is behind.
+    /// sharpens up - see AIBrain.shotToTake, reactionDelay and worthBuying.
+    ///
+    /// NOT THE MIRROR OF lead, and the comment that used to sit here said it was.
+    /// "Same number seen from the other end" is a pleasing sentence and it is
+    /// false: lead measures against the AVERAGE of the other seven and this
+    /// measures against the BEST of them, so a match can perfectly well have six
+    /// teams reading as behind and nobody reading as ahead. That happens in every
+    /// close match.
+    ///
+    /// They are different on purpose, and making them agree would break one of
+    /// them. lead asks "is this team everybody's problem", and the field is what
+    /// you are a problem relative to - one other team having a good match should
+    /// not make a runaway read as ordinary. This asks "is this bot getting
+    /// beaten", and the answer to that is about the person actually beating them.
+    ///
+    /// The difference matters most in exactly the match this was tuned for: one
+    /// runaway leader on three times the field. Measured against the average,
+    /// every bot above mid-table would read as comfortable - because the average
+    /// has been dragged up by the very team that is crushing them - and the six
+    /// bots who most need to sharpen up would get nothing. Measured against the
+    /// best, they all correctly read as losing, which they all correctly are.
+    ///
+    /// Its own scale for the same reason. One constant serving both meant the
+    /// thresholds on either side were not comparable numbers, and a max-based
+    /// measure is far more easily saturated than a mean-based one.
     func behind(_ team: TeamID) -> Double {
-        min(1, max(0, Double(bestScore - score(for: team)) / GameConfig.AI.leadScale))
+        min(1, max(0, Double(bestScore - score(for: team)) / GameConfig.AI.deficitScale))
     }
 
     /// Adds to a team's score.
