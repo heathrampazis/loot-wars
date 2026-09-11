@@ -286,12 +286,21 @@ final class EffectsRenderer {
         let angle = Double(step) * 2.39996
         let size = CGFloat.random(in: 11...16)
 
+        // Split into named steps rather than written as one expression, and not for
+        // readability: Swift infers CGFloat, Double and the literals separately at
+        // every operator, and a single line mixing a cast, a multiply, a random
+        // range and an add is the shape that makes the type checker give up.
+        let outward = CGFloat(cos(angle))
+        let upward = CGFloat(sin(angle))
+
         // An ellipse rather than a circle, because a person is not one: the figure
         // is nine tenths of a tile across and one and three quarters deep, so a
         // circle would put half the glints inside the silhouette and half a long
         // way off the sides of it.
-        let ring = CGPoint(x: origin.x + CGFloat(cos(angle)) * CGFloat.random(in: 18...27),
-                           y: origin.y + CGFloat(sin(angle)) * CGFloat.random(in: 22...32))
+        let acrossBy: CGFloat = CGFloat.random(in: 18...27)
+        let upBy: CGFloat = CGFloat.random(in: 22...32)
+        let ring = CGPoint(x: origin.x + outward * acrossBy,
+                           y: origin.y + upward * upBy)
 
         let sparkle = SKNode()
 
@@ -299,7 +308,8 @@ final class EffectsRenderer {
         // reads at a distance is a coloured light with something bright in it.
         let glow = SKSpriteNode(texture: GlowArt.pool)
         glow.size = CGSize(width: size * 2.1, height: size * 2.1)
-        glow.color = step % 2 == 0 ? colours.bright : colours.deep
+        let tone: SKColor = step % 2 == 0 ? colours.bright : colours.deep
+        glow.color = tone
         glow.colorBlendFactor = 1
         glow.alpha = 0.9
 
@@ -324,10 +334,12 @@ final class EffectsRenderer {
         // A drift of a few points outward, which is enough to stop them looking
         // pinned and not enough to become a direction. The twinkle is the whole
         // animation: snap up, ease down, and out.
+        let driftX: CGFloat = outward * 5
+        let driftY: CGFloat = upward * 5 + 4
+
         sparkle.run(.sequence([
             .group([
-                .moveBy(x: CGFloat(cos(angle)) * 5, y: CGFloat(sin(angle)) * 5 + 4,
-                        duration: 0.62),
+                .moveBy(x: driftX, y: driftY, duration: 0.62),
                 .sequence([.scale(to: 1.15, duration: 0.14),
                            .scale(to: 0.45, duration: 0.48)]),
                 .sequence([.wait(forDuration: 0.22),
