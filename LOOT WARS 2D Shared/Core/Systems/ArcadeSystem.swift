@@ -16,7 +16,53 @@ enum ArcadeSystem {
 
     static func update(_ world: World, commands: [ActorID: [Command]], dt: Double) {
         place(world, commands: commands)
+        mend(world, dt: dt)
         emit(world, dt: dt)
+    }
+
+    // MARK: - Mending
+
+    /// Health coming back into a machine nobody is shooting.
+    ///
+    /// Deliberately the same shape as a person recovering at home - a delay, then
+    /// whole portions on a tick rather than a smooth trickle - because it is the
+    /// same idea and should read the same way. See CombatSystem.recover.
+    ///
+    /// It exists to make a machine's health mean "can you commit to this" rather
+    /// than "how many times have you walked past it". Without it, damage is
+    /// permanent, so the correct way to break a machine is to put two shots into
+    /// every one you pass and come back in three minutes; a raid becomes an errand
+    /// you run in instalments and nobody ever has to stand and fight for one. With
+    /// it, a machine you started on and abandoned is a machine you have not dented,
+    /// and the health bar over it is a question about right now.
+    ///
+    /// It is also why the machines could afford to be so much easier to break. The
+    /// two changes are one change: less health so a raider can realistically take
+    /// one down inside a raid, and mending so that being easy to break does not
+    /// mean being impossible to keep.
+    ///
+    /// Owned machines only. The map's four cannot be damaged at all.
+    private static func mend(_ world: World, dt: Double) {
+        for id in world.arcades.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var machine = world.arcades[id], machine.owner != nil else { continue }
+
+            machine.secondsSinceHit += dt
+            defer { world.arcades[id] = machine }
+
+            guard machine.health < machine.kind.health,
+                  machine.secondsSinceHit >= GameConfig.Arcade.mendDelay else {
+                machine.mendTimer = GameConfig.Arcade.mendTick
+                continue
+            }
+
+            machine.mendTimer -= dt
+            guard machine.mendTimer <= 0 else { continue }
+            machine.mendTimer = GameConfig.Arcade.mendTick
+
+            let portion = max(1, Int((Double(machine.kind.health)
+                                      * GameConfig.Arcade.mendPortion).rounded()))
+            machine.health = min(machine.kind.health, machine.health + portion)
+        }
     }
 
     // MARK: - Standing one up

@@ -54,6 +54,19 @@ struct Arcade {
     /// one map do not pay out in lockstep.
     var emitTimer: Double
 
+    /// How long since anybody last put a shot into it.
+    ///
+    /// The same clock a person has, for the same reason - see CombatSystem.recover.
+    /// A machine left alone mends; a machine somebody is still shooting does not,
+    /// and starting again puts this back to nothing.
+    ///
+    /// Starts absurdly high rather than at zero so a machine that has never been
+    /// touched is not, for its first few seconds, a machine that was just shot.
+    var secondsSinceHit: Double = 999
+
+    /// Counts down to the next portion of health coming back.
+    var mendTimer: Double = 0
+
     /// Seconds left of a jackpot, or zero.
     ///
     /// Only the map's own machines ever have one. A jackpot is a reason to LEAVE

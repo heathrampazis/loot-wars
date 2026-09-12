@@ -74,6 +74,12 @@ enum ProjectileSystem {
 
             machine.health -= projectile.damage
 
+            // Starts the mending clock over. Plink at a machine and wander off and
+            // you have achieved nothing; the only way to take one down is to stay
+            // and finish it - see ArcadeSystem.mend.
+            machine.secondsSinceHit = 0
+            machine.mendTimer = GameConfig.Arcade.mendTick
+
             guard machine.health <= 0 else {
                 world.arcades[id] = machine
                 world.record(.machineHit(id, at: machine.centre))

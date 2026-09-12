@@ -2313,14 +2313,23 @@ enum GameConfig {
         /// It also restores the choice the old comment claimed and did not deliver:
         /// the seconds spent wrecking are seconds not spent on the chest, and both
         /// are on the clock the owner is walking home along.
-        static let health = 520
+        /// Down from 520, and the reason is the mending below rather than the
+        /// number itself. At 520 a Blaster 3 needed five and a half seconds of
+        /// standing still in somebody's base to break one machine, which nobody
+        /// ever has; the machines were not tough, they were simply never the thing
+        /// a raid had time for. At 340 it is three and a half - long enough to be a
+        /// commitment, short enough to fit inside a raid you are already making.
+        ///
+        /// Easy to break and easy to keep, rather than hard to break and gone
+        /// forever once it is: see mendPortion.
+        static let health = 340
 
         /// A mini has noticeably less in it, and that is its main weakness rather
         /// than a rounding of its payout. Three hundred and twenty against five
         /// hundred and twenty is eleven seconds of Blaster 3 against seventeen: a
         /// raider passing through can take a mini apart on their way to something
         /// else, where a full cabinet is a decision to stand still and commit.
-        static let miniHealth = 320
+        static let miniHealth = 200
 
         /// Machines on the map. Deliberately few: an arcade you have to travel to
         /// is a place worth fighting over, one on every corner is furniture.
@@ -2390,6 +2399,29 @@ enum GameConfig {
         /// which cost eight tiles of base against six, comfortably ahead of one.
         /// That is the trade the two sizes are for.
         static let miniRate: Double = 1.6
+
+        /// Health coming back into a machine nobody is shooting: how long after the
+        /// last shot it starts, how big each portion is, and how long between them.
+        ///
+        /// Five seconds, then a tenth of its own maximum every second - so a machine
+        /// left alone is whole again about fifteen seconds after the shooting stops,
+        /// and a mini a touch sooner in absolute terms because a tenth of it is less.
+        ///
+        /// The delay is the part that matters. Without it, mending fights the
+        /// raider in real time and taking a machine down becomes a damage race; with
+        /// it, mending only ever undoes damage nobody followed up on. That is the
+        /// behaviour this is for - a machine you put two shots into and walked away
+        /// from is a machine you have not dented, so breaking one has to be a thing
+        /// you commit to rather than an errand you run in instalments over a match.
+        ///
+        /// Portions on a tick rather than a smooth trickle, exactly as a person
+        /// recovers at home - see GameConfig.Player.recoveryPortion for that
+        /// argument, which is about the screen as much as the arithmetic. A bar
+        /// that climbs in ten visible steps reads as repairing; one that creeps up
+        /// a pixel a frame reads as a rendering fault.
+        static let mendDelay: Double = 5
+        static let mendPortion: Double = 0.10
+        static let mendTick: Double = 1.0
 
         /// How often a bot's free machine on seal is the small one.
         ///

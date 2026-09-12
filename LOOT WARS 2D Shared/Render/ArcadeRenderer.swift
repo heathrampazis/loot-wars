@@ -107,7 +107,7 @@ final class ArcadeRenderer {
             // going - the event only says when to CELEBRATE, and arriving late to
             // a jackpot should still look like arriving at a jackpot.
             setJackpot(machine.isJackpot, on: sprite)
-            setHealth(of: machine, on: sprite)
+            setHealth(of: machine, on: sprite, in: world)
 
             if let previous = lastTimers[id], machine.emitTimer > previous {
                 payOut(sprite)
@@ -141,7 +141,7 @@ final class ArcadeRenderer {
     ///
     /// In the owner's colour, like the bar over a person, because that is already
     /// the question you are asking when you see one - whose is this.
-    private func setHealth(of machine: Arcade, on sprite: SKSpriteNode) {
+    private func setHealth(of machine: Arcade, on sprite: SKSpriteNode, in world: World) {
         guard machine.owner != nil else { return }
         guard drawnHealth[machine.id] != machine.health else { return }
         drawnHealth[machine.id] = machine.health
@@ -157,6 +157,12 @@ final class ArcadeRenderer {
         let fill = bars[machine.id] ?? makeBar(for: machine, on: sprite, full: full)
         fill.parent?.isHidden = false
 
+        // Re-sited every time it changes rather than once when it is built, because
+        // what is standing around a machine is not fixed: a base fills up over a
+        // match, and the bar you most need to read is the one on the machine
+        // somebody has just squeezed a second machine in beside.
+        if let bar = fill.parent { place(bar, for: machine, in: world) }
+
         // Never shorter than it is tall, or the last sliver of health draws as a
         // rounded rectangle smaller than its own corner radius - which is to say,
         // as nothing, on the one machine you most want to see is nearly gone.
@@ -168,21 +174,47 @@ final class ArcadeRenderer {
         let colour = machine.owner.map { RenderPalette.colour(for: $0) } ?? .white
         let (bar, fill) = BarArt.make(full: full, colour: colour)
 
-        // Above the cabinet, in the scene rather than on the sprite: the sprite is
-        // shoved about by the payout squash and the jackpot flash, and a bar riding
-        // on it would bounce every time the machine paid out.
-        let footing = GridGeometry.point(
-            for: Vec2(x: machine.centre.x, y: Double(machine.origin.row)))
-
-        bar.position = CGPoint(
-            x: footing.x,
-            y: footing.y + GridGeometry.length(ofTiles: Double(machine.height) + 0.3))
+        // In the scene rather than on the sprite: the sprite is shoved about by the
+        // payout squash and the jackpot flash, and a bar riding on it would bounce
+        // every time the machine paid out.
         bar.zPosition = sprite.zPosition + 0.5
 
         node.addChild(bar)
         bars[machine.id] = fill
         return fill
     }
+
+    /// Above the machine, or below it when there is something in the way.
+    ///
+    /// The bar always sat a third of a tile over the cabinet, which was fine while
+    /// a base could hold one machine. Now that they come in twos and threes, the
+    /// spot over a machine is quite often the spot ANOTHER machine is standing in -
+    /// so the bar for the one being shot was drawn across the face of the one
+    /// behind it, on the single occasion you most need to read it.
+    ///
+    /// So it asks. World.structureOccupies knows about every crate, chest and
+    /// machine at once, which is the same question with one answer rather than this
+    /// file learning to recognise furniture. If the tile overhead is taken the bar
+    /// drops to the machine's feet instead, where there is nothing to collide with
+    /// because the machine itself is standing on it.
+    private func place(_ bar: SKNode, for machine: Arcade, in world: World) {
+        let footing = GridGeometry.point(
+            for: Vec2(x: machine.centre.x, y: Double(machine.origin.row)))
+
+        let above = Double(machine.height) + 0.3
+        let overhead = GridPoint(containing: Vec2(x: machine.centre.x,
+                                                  y: Double(machine.origin.row) + above))
+
+        let offset = world.structureOccupies(overhead)
+            ? -ArcadeRenderer.barFootingDrop
+            : above
+
+        bar.position = CGPoint(x: footing.x,
+                               y: footing.y + GridGeometry.length(ofTiles: offset))
+    }
+
+    /// How far below its feet a bar sits when it cannot go above.
+    private static let barFootingDrop: Double = 0.45
 
     /// Shot, rather than blown up.
     ///
