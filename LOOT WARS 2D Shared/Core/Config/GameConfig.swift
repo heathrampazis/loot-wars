@@ -1947,28 +1947,34 @@ enum GameConfig {
         /// falls as the base rises. Two curves, two functions, each number the thing
         /// it actually is.
         ///
-        /// Against band totals around three hundred, one particular single is about
-        /// one crate in thirty-eight early and one in twenty late; the three
-        /// together are 7.9% of an early crate and 15.1% of a late one, which over
-        /// the fourteen-odd crates a player opens comes to 1.56 a match.
+        /// 7 / 9 / 12, down a fifth from the 9 / 12 / 15 these were first set to.
+        /// That first pass was solved against fourteen crates a match, which is what
+        /// an ordinary player opens; somebody who knows the map opens twenty to
+        /// twenty-five, and at the old weights that put two and a half to nearly
+        /// three singles in their hands - often enough that having one stopped being
+        /// a thing that happened and started being a state you were usually in.
         ///
-        /// That is up from 0.96, and under one a match was the problem: most matches
-        /// had none. A power-up you meet less than once is a mechanic nobody plans
-        /// around - you drink it when you find it and forget it exists between
-        /// times. At about one and a half you hold one most matches and two often
-        /// enough to have an opinion on which you would rather have, and having an
-        /// opinion is the entire reason there are three of them.
+        /// The figures now. The three together are 6.2% of an early crate and 12.5%
+        /// of a late one, which is 1.2 a match for an ordinary player and 1.8 to 2.2
+        /// for somebody opening everything they walk past. So you reliably meet one,
+        /// often two, occasionally three - rare enough to be a find, common enough
+        /// to have an opinion about which of the three you would rather have, which
+        /// is the entire reason there are three.
         ///
-        /// The climb across the match is steeper than it was on purpose - nearly
-        /// twice as likely late as early, where it used to be a little over half
-        /// again. Seven seconds of faster feet is worth more in a late fight than an
-        /// early one, and late is also when the match is being decided and a crate
-        /// needs to be able to change something.
+        /// Still well above where this started. The original 5 / 6 / 7 came out at
+        /// 0.96 a match, the wrong side of one, and most matches had none at all - a
+        /// power-up you meet less than once is a mechanic nobody plans around.
+        ///
+        /// The climb across the match is the part that has not moved: twice as
+        /// likely late as early, against a little over half again before any of
+        /// this. Seven seconds of faster feet is worth more in a late fight than an
+        /// early one, and late is when the match is being decided and a crate needs
+        /// to be able to change something.
         static func singlePerkWeight(at progress: Double) -> Int {
             switch progress {
-            case ..<0.35: return 9
-            case ..<0.70: return 12
-            default:      return 15
+            case ..<0.35: return 7
+            case ..<0.70: return 9
+            default:      return 12
             }
         }
 
