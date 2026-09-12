@@ -662,7 +662,30 @@ enum GameConfig {
         static let recoveryDelay: Double = 4
 
         /// Seconds spent dead before respawning at your own claim.
-        static let respawnDelay: Double = 3.0
+        ///
+        /// Ten, up from three, and it is the largest single change to what a death
+        /// costs that this file contains. Three seconds was barely a pause - you
+        /// lost your gear and your purse and were back in the match before the
+        /// fight you lost had finished - so the only real price of dying was the
+        /// stuff, and stuff is replaceable. Ten is a twelfth of a five-minute
+        /// match spent watching it happen without you, and it applies to all eight
+        /// teams alike.
+        ///
+        /// TWO THINGS QUIETLY DIED WITH IT, and they are worth writing down rather
+        /// than discovering later. A purse lies there for Arcade.tokenLifetime
+        /// (10s) and dropped gear for Loot.itemLifetime (13s); at a three-second
+        /// respawn you had seven seconds and ten seconds respectively to get back
+        /// to your own body, which across a map this size was a race you usually
+        /// lost but could sometimes win. At ten you cannot win it: the purse
+        /// expires on the same beat you stand up, and you respawn at your claim
+        /// centre with three seconds to reach gear that may be forty tiles away.
+        ///
+        /// So both are now a straight transfer to whoever killed you, or to nobody
+        /// if they do not bother. That may well be the right shape for a death to
+        /// have - it makes a kill unambiguously worth taking - but it is a
+        /// consequence of this number and not a decision anybody made. The dial
+        /// that turns it back into a race is Arcade.tokenLifetime, not this one.
+        static let respawnDelay: Double = 10.0
 
         /// The kit you come back in, by how far the match has run.
         ///
@@ -1718,14 +1741,20 @@ enum GameConfig {
         /// the cheapest rung is six tokens. If saving towards a Cosmic stops
         /// happening at all, this is the number that did it.
         ///
-        /// What softens it is that the money is not gone, it is on the floor where
-        /// you died. Whether that matters depends on two numbers in other enums: a
-        /// purse lives Arcade.tokenLifetime (10s) and respawning costs
-        /// Player.respawnDelay (3s), so you have about seven seconds to get back to
-        /// your own body from wherever your base is. Across a sixty-four tile map
-        /// that usually means the killer gets it. Lengthening the purse's life is
-        /// the dial that turns a death into a race for your own money rather than a
-        /// transfer, and it is deliberately NOT touched here - one change at a time.
+        /// What used to soften it was that the money is not gone, it is on the
+        /// floor where you died - so a death was a race for your own purse that you
+        /// could occasionally win. That is no longer true, and the number that
+        /// changed was not in this enum. A purse lives Arcade.tokenLifetime (10s)
+        /// and respawning now costs Player.respawnDelay (10s), so the purse expires
+        /// on the same beat you stand up. It is a transfer to whoever killed you,
+        /// or to nobody.
+        ///
+        /// Whether that is right is a live question. It makes a kill unambiguously
+        /// worth taking, which is good; it also means the one thing that made
+        /// dying survivable is gone, and losing a fight now costs the gear, the
+        /// purse and a twelfth of the match. If deaths start to feel like being
+        /// removed from the game rather than set back in it, Arcade.tokenLifetime
+        /// is the dial - not this one, and not the respawn.
         ///
         /// Points are deliberately NOT touched. Score is the win condition, and
         /// taking it away on death compounds in the wrong direction: whoever is
