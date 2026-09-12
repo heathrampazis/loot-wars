@@ -18,6 +18,15 @@ final class BombRenderer {
 
     private var nodesByBomb: [BombID: SKSpriteNode] = [:]
 
+    /// Where each bomb last threw a spark.
+    ///
+    /// The trail is spaced by DISTANCE rather than by time, which is why this is
+    /// here at all. A renderer gets no dt, and a spark every frame would be a solid
+    /// ribbon on a fast device and a dotted line on a slow one - measuring the gap
+    /// in tiles makes the fuse look the same whatever the frame rate is doing, and
+    /// makes it stretch when the bomb is moving fast, which is what a trail does.
+    private var lastSpark: [BombID: Vec2] = [:]
+
     /// One texture per kind. Both are drawn by this renderer because both FLY the
     /// same way - it is only what happens when they stop that differs - but they
     /// are different objects and have to look it: a stink bomb that tumbles through
@@ -36,14 +45,120 @@ final class BombRenderer {
         for bomb in world.bombs {
             let sprite = nodesByBomb[bomb.id] ?? makeNode(for: bomb)
             sprite.position = GridGeometry.point(for: bomb.position)
+            trail(bomb)
         }
 
         let inFlight = Set(world.bombs.map(\.id))
         for (id, sprite) in Array(nodesByBomb) where !inFlight.contains(id) {
             nodesByBomb[id] = nil
+            lastSpark[id] = nil
             sprite.removeFromParent()
         }
+    }
 
+    // MARK: - The fuse
+
+    /// How close to landing the fuse starts visibly burning down, in tiles.
+    private static let fuseTail: Double = 1.6
+    /// Tiles between sparks, far out and about to land.
+    private static let sparkGap: ClosedRange<Double> = 0.18...0.36
+    /// How big one is, on the same two ends.
+    private static let sparkSize: ClosedRange<Double> = 0.14...0.24
+    private static let sparkLife: TimeInterval = 0.26
+
+    /// Sparks coming off a bomb in flight, faster and fatter the closer it is to
+    /// going off.
+    ///
+    /// A bomb used to simply tumble across the screen and then detonate, so the
+    /// only warning a defender got was the object itself - and a small dark thing
+    /// spinning over grass is not much of a warning. The fuse is the tell: it says
+    /// this is lit, it is going to go off, and by how hard it is spitting, roughly
+    /// when.
+    ///
+    /// Sparks are thrown into the WORLD rather than parented to the bomb, which is
+    /// the whole reason it reads as a trail. A child node travels with its parent
+    /// and would look like a halo bolted to the side of it; one left behind at the
+    /// position the bomb has just vacated stays where it was dropped and the bomb
+    /// flies away from it.
+    ///
+    /// Deliberately nothing to do with the bomb's artwork. It keys off the
+    /// position and the distance left to run, so a new sprite drops straight in
+    /// underneath it without any of this needing to know what changed.
+    private func trail(_ bomb: Bomb) {
+        // Nought far out, one as it lands. distanceRemaining is what the simulation
+        // already counts down to decide when it goes off, so this is the same fuse
+        // the world is burning rather than a second one kept in step by hand.
+        let heat = max(0, min(1, 1 - bomb.distanceRemaining / BombRenderer.fuseTail))
+
+        let gap = BombRenderer.sparkGap.upperBound
+            - (BombRenderer.sparkGap.upperBound - BombRenderer.sparkGap.lowerBound) * heat
+
+        // First frame of its flight: mark the spot and let the next one throw.
+        guard let last = lastSpark[bomb.id] else {
+            lastSpark[bomb.id] = bomb.position
+            return
+        }
+        guard (bomb.position - last).length >= gap else { return }
+        lastSpark[bomb.id] = bomb.position
+
+        spark(at: bomb.position, along: bomb.velocity, kind: bomb.kind, heat: heat)
+    }
+
+    private func spark(at position: Vec2, along velocity: Vec2, kind: Bomb.Kind, heat: Double) {
+        // Broken into named steps rather than written as one expression. This file
+        // has cost an afternoon to a Swift type-checker timeout on exactly this
+        // shape before - a compound of literals, range bounds and a Double, inside
+        // a call that wants a CGFloat.
+        let small = BombRenderer.sparkSize.lowerBound
+        let large = BombRenderer.sparkSize.upperBound
+        let side = GridGeometry.length(ofTiles: small + (large - small) * heat)
+
+        let flare = SKSpriteNode(texture: ImpactArt.star,
+                                 size: CGSize(width: side, height: side))
+        flare.position = GridGeometry.point(for: position)
+
+        // Under the bomb, so the bomb stays the thing you are looking at.
+        flare.zPosition = 8
+
+        // A stink bomb sparks in its own colour. Both kinds fly identically and the
+        // file already argues that they must not LOOK identical doing it - somebody
+        // deciding whether to run needs to know which one is coming, and by the time
+        // it lands that decision has been made.
+        if kind == .stink {
+            flare.color = RenderPalette.gas
+            flare.colorBlendFactor = 0.85
+        }
+
+        node.addChild(flare)
+
+        // Thrown backwards off the flight, so it falls away behind rather than
+        // spraying in every direction like an impact.
+        let back = velocity.length > 0.001
+            ? Vec2(x: -velocity.x, y: -velocity.y).normalized()
+            : Vec2(x: 0, y: -1)
+
+        let sideways = Vec2(x: -back.y, y: back.x)
+        let drift = Double.random(in: 0.2...0.55)
+        let wander = Double.random(in: -0.28...0.28)
+
+        let away = CGVector(
+            dx: GridGeometry.length(ofTiles: back.x * drift + sideways.x * wander),
+            dy: GridGeometry.length(ofTiles: back.y * drift + sideways.y * wander))
+
+        let life = BombRenderer.sparkLife * Double.random(in: 0.7...1.1)
+
+        let fly = SKAction.move(by: away, duration: life)
+        fly.timingMode = .easeOut
+
+        flare.zRotation = CGFloat.random(in: 0..<(2 * .pi))
+        flare.run(.sequence([
+            .group([fly,
+                    .rotate(byAngle: CGFloat.random(in: -3...3), duration: life),
+                    .scale(to: 0.25, duration: life),
+                    .sequence([.wait(forDuration: life * 0.35),
+                               .fadeOut(withDuration: life * 0.65)])]),
+            .removeFromParent()
+        ]))
     }
 
     private func makeNode(for bomb: Bomb) -> SKSpriteNode {
