@@ -23,12 +23,17 @@ enum ArcadeSystem {
 
     /// Where a machine may go: entirely inside your own walls, clear of everything.
     ///
-    /// Two wide and three high, so unlike a chest this needs SIX tiles rather than
-    /// one - checked as a block, because a footprint half inside a wall is not a
-    /// placement. Measured across 200,000 random layouts, 98.8% of bases have room
-    /// for one and 97.8% still do with a chest already down; the rest are the tight
-    /// ones where the spawn tile sits in the only gap.
-    static func canPlace(at origin: GridPoint, by actor: Actor, in world: World) -> Bool {
+    /// Two wide and either two or three high, so unlike a chest this needs four or
+    /// six tiles rather than one - checked as a block, because a footprint half
+    /// inside a wall is not a placement. Measured across 200,000 random layouts,
+    /// 98.8% of bases have room for a cabinet and 97.8% still do with a chest
+    /// already down; the rest are the tight ones where the spawn tile sits in the
+    /// only gap. A mini needs a third less and fits in most of those too, which is
+    /// half of why it exists.
+    static func canPlace(at origin: GridPoint,
+                         kind: ArcadeKind,
+                         by actor: Actor,
+                         in world: World) -> Bool {
 
         // No requirement that the wall be shut, and that is a deliberate reversal.
         //
@@ -41,12 +46,20 @@ enum ArcadeSystem {
         // a rule protecting them from a decision that is theirs to make. Leave it
         // out in the open and somebody will take it; that is the deal, and it is a
         // legible one.
-        guard actor.inventory.firstSlot(holding: .arcade) != nil else { return false }
+        guard actor.inventory.firstSlot(holding: .arcade(kind)) != nil else { return false }
 
-        // One to a base. Two machines in the same walls would double an income that
-        // is already the safest on the map, and the shop refuses to sell a second
-        // for the same reason - this is the backstop for one found any other way.
-        guard !world.hasArcade(actor.team) else { return false }
+        // NO CAP. There used to be one machine to a base, and that single line was
+        // holding up the whole economy on its own - which is exactly why it had to
+        // be replaced rather than simply deleted. Uncapped and undamped, a room you
+        // can fit six machines into pays about 860 tokens a match, against a full
+        // gear ladder at 150 and a raiding player's entire income at around 136.
+        // That is not a strong base, it is the end of the shop.
+        //
+        // So the limit is a cost instead of a wall: machines crowd, and each one in
+        // a base slows the others - see GameConfig.Arcade.crowding. Six machines
+        // earn about twice what one does rather than nine times, the floor space
+        // they eat is real, and every one of them is another thing a raider is
+        // coming for. Nothing here has to say no.
 
         // The room you actually walled in, not the rectangle the generator drew for
         // this claim. See World.baseGround: asking the plan here let the game
@@ -58,7 +71,8 @@ enum ArcadeSystem {
             return false
         }
 
-        let machine = Arcade(id: ArcadeID(-1), origin: origin, owner: actor.team, emitTimer: 0)
+        let machine = Arcade(id: ArcadeID(-1), kind: kind, origin: origin,
+                             owner: actor.team, emitTimer: 0)
 
         for tile in machine.tiles {
             guard ground.contains(tile) else { return false }
@@ -68,31 +82,35 @@ enum ArcadeSystem {
             guard !world.treeTiles.contains(tile) else { return false }
         }
 
-        // Nothing standing where it would appear - it is solid, and six tiles of it.
+        // Nothing standing where it would appear - it is solid, and four or six
+        // tiles of it.
         return !world.actors.values.contains {
             $0.isAlive && $0.hitbox.intersects(machine.hitbox)
         }
     }
 
     @discardableResult
-    static func place(at origin: GridPoint, by actor: Actor, in world: World) -> Bool {
-        guard canPlace(at: origin, by: actor, in: world) else { return false }
+    static func place(at origin: GridPoint,
+                      kind: ArcadeKind,
+                      by actor: Actor,
+                      in world: World) -> Bool {
+        guard canPlace(at: origin, kind: kind, by: actor, in: world) else { return false }
 
         var owner = actor
-        guard let slot = owner.inventory.firstSlot(holding: .arcade),
+        guard let slot = owner.inventory.firstSlot(holding: .arcade(kind)),
               owner.inventory.consume(at: slot) != nil else { return false }
 
         world.actors[actor.id] = owner
-        world.spawnArcade(at: origin, owner: actor.team)
+        world.spawnArcade(at: origin, kind: kind, owner: actor.team)
         return true
     }
 
     private static func place(_ world: World, commands: [ActorID: [Command]]) {
         for (id, list) in commands {
             for command in list {
-                guard case .placeArcade(let origin) = command else { continue }
+                guard case .placeArcade(let origin, let kind) = command else { continue }
                 guard let actor = world.actors[id], actor.isAlive else { break }
-                place(at: origin, by: actor, in: world)
+                place(at: origin, kind: kind, by: actor, in: world)
             }
         }
     }
@@ -113,9 +131,9 @@ enum ArcadeSystem {
         if arcade.isJackpot { return GameConfig.Arcade.jackpotBank }
 
         guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
-            return GameConfig.Arcade.maxUncollected
+            return arcade.kind.openBank
         }
-        return GameConfig.Arcade.sealedUncollected
+        return arcade.kind.sealedBank
     }
 
     /// How long the tokens it pays out survive on the ground.
@@ -152,10 +170,26 @@ enum ArcadeSystem {
             return GameConfig.Arcade.emitInterval * GameConfig.Arcade.jackpotRate
         }
 
+        // A mini is slower wherever it stands - see ArcadeKind.rate.
+        let base = GameConfig.Arcade.emitInterval * arcade.kind.rate
+
         guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
-            return GameConfig.Arcade.emitInterval
+            return base
         }
-        return GameConfig.Arcade.emitInterval * GameConfig.Arcade.sealedInterval
+
+        // CROWDING. Every other machine in the same base slows this one down, as
+        // though the room only has so many people in it to play them. It is what
+        // replaced the one-machine cap: a limit you weigh rather than one you hit,
+        // so a second machine is clearly worth standing up and a sixth is mostly
+        // floor space. See GameConfig.Arcade.crowding for the arithmetic.
+        //
+        // Owned and sealed only. The map's four stand a long way apart and belong
+        // to nobody, so there is nothing for them to crowd against; and a base
+        // standing open has already lost the multiplier this modifies.
+        let others = max(0, world.arcadeCount(ownedBy: owner) - 1)
+        let crowded = 1 + GameConfig.Arcade.crowding * Double(others)
+
+        return base * GameConfig.Arcade.sealedInterval * crowded
     }
 
     /// Starts and ends jackpots on the map's own machines.

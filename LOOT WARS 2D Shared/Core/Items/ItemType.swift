@@ -38,7 +38,14 @@ enum ItemType: Hashable {
 
     /// A machine you carry home and stand up in your own base, where it pays out
     /// somewhere nobody can reach without breaking in.
-    case arcade
+    ///
+    /// Carries its SIZE rather than there being a second case for the small one.
+    /// Everything that differs between them is a number on ArcadeKind, so the
+    /// switches through the rest of this file - stacking, healing, how it is used,
+    /// whether it is gear - go on matching `case .arcade` and go on being right
+    /// about both. A separate case would have made every one of them a place
+    /// somebody could forget the mini.
+    case arcade(ArcadeKind)
 
     /// Something you switch on for a while - see Perk.
     case perk(Perk)

@@ -109,8 +109,8 @@ enum AIBrain {
             actor.ai = state
         }
 
-        if let origin = arcadeToPlace(actor: actor, in: world) {
-            commands.append(.placeArcade(origin))
+        if let stand = arcadeToPlace(actor: actor, in: world) {
+            commands.append(.placeArcade(stand.origin, stand.kind))
         }
 
         if let tile = chestToPlace(actor: actor, in: world) {
@@ -1724,9 +1724,13 @@ enum AIBrain {
         guard !world.baseIsBreached(actor.team) else { return nil }
 
         // A machine before a chest when carrying both, because it starts earning the
-        // moment it is down and a chest only holds what you put in it.
-        if actor.inventory.firstSlot(holding: .arcade) != nil,
-           let origin = world.nextArcadeOrigin(for: actor.team, near: actor.position) {
+        // moment it is down and a chest only holds what you put in it. Either size
+        // will do - a mini earns less but earns immediately, and a bot holding one
+        // of each stands the first one it finds up and comes back for the other.
+        if let kind = carriedArcade(of: actor),
+           let origin = world.nextArcadeOrigin(for: actor.team,
+                                               kind: kind,
+                                               near: actor.position) {
             return origin
         }
 
@@ -1754,18 +1758,38 @@ enum AIBrain {
         return tile
     }
 
-    /// A spot to stand a carried machine up, from where the bot is now.
-    private static func arcadeToPlace(actor: Actor, in world: World) -> GridPoint? {
+    /// Which size of machine this bot is carrying, if any.
+    ///
+    /// Sorted, so a bot holding one of each always reaches for the same one and two
+    /// runs of a seed cannot diverge over which. The cabinet goes down first: it is
+    /// worth more standing and worth more to whoever kills this bot on the way home.
+    private static func carriedArcade(of actor: Actor) -> ArcadeKind? {
+        for kind in [ArcadeKind.full, .mini]
+        where actor.inventory.firstSlot(holding: .arcade(kind)) != nil {
+            return kind
+        }
+        return nil
+    }
+
+    /// A spot to stand a carried machine up, from where the bot is now, and which
+    /// machine goes there.
+    private static func arcadeToPlace(actor: Actor,
+                                      in world: World) -> (origin: GridPoint, kind: ArcadeKind)? {
         guard !world.baseIsBreached(actor.team) else { return nil }
+        guard let kind = carriedArcade(of: actor) else { return nil }
         guard let origin = world.nextArcadeOrigin(for: actor.team,
+                                                  kind: kind,
                                                   near: actor.position) else { return nil }
 
-        let machine = Arcade(id: ArcadeID(-1), origin: origin, owner: actor.team, emitTimer: 0)
+        let machine = Arcade(id: ArcadeID(-1), kind: kind, origin: origin,
+                             owner: actor.team, emitTimer: 0)
         guard (machine.centre - actor.position).length <= GameConfig.Build.reach + 1.5 else {
             return nil
         }
-        guard ArcadeSystem.canPlace(at: origin, by: actor, in: world) else { return nil }
-        return origin
+        guard ArcadeSystem.canPlace(at: origin, kind: kind, by: actor, in: world) else {
+            return nil
+        }
+        return (origin, kind)
     }
 
     /// The best thing in somebody else's chest that this bot could carry off.

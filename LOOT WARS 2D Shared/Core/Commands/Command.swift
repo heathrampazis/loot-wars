@@ -56,9 +56,15 @@ enum Command {
     /// bandages would be ambiguous about which one shrank.
     case sellItem(slot: Int)
 
-    /// Stand a carried arcade machine up on this tile. Two wide and three high, so
-    /// the tile is its bottom-left corner.
-    case placeArcade(GridPoint)
+    /// Stand a carried arcade machine up on this tile, which is its bottom-left
+    /// corner.
+    ///
+    /// Names the SIZE as well as the spot, and has to. Both sizes live in the same
+    /// bag and the same hotbar, so "stand up the machine I am carrying" stopped
+    /// being an unambiguous instruction the moment there were two - a player
+    /// holding one of each would have got whichever the bag happened to list first.
+    /// The tap already knows which slot it came from; this carries that through.
+    case placeArcade(GridPoint, ArcadeKind)
 
     /// Move one item from a hotbar slot into an open chest, and back again.
     ///

@@ -539,8 +539,11 @@ final class World {
     }
 
     @discardableResult
-    func spawnArcade(at origin: GridPoint, owner: TeamID?) -> ArcadeID {
-        let machine = Arcade(id: ArcadeID(nextArcadeID), origin: origin,
+    @discardableResult
+    func spawnArcade(at origin: GridPoint,
+                     kind: ArcadeKind = .full,
+                     owner: TeamID?) -> ArcadeID {
+        let machine = Arcade(id: ArcadeID(nextArcadeID), kind: kind, origin: origin,
                              owner: owner, emitTimer: GameConfig.Arcade.emitInterval)
         nextArcadeID += 1
         arcades[machine.id] = machine
@@ -568,7 +571,14 @@ final class World {
             value += items * GameConfig.AI.chestItemWorth
         }
 
-        if hasArcade(team) { value += GameConfig.AI.machineWorth }
+        // Every machine, not "does it have one". A base can hold several now, and
+        // a room with three in it is worth more to break into than a room with one
+        // - which this could not say while the answer was a boolean. It is also the
+        // reason lifting the cap did not need a separate rule to keep raiding
+        // pointed at the rich bases: the price follows the furniture.
+        for machine in arcades.values where machine.owner == team {
+            value += machine.kind.raidWorth
+        }
         return value
     }
 
@@ -665,6 +675,16 @@ final class World {
         arcades.values.contains { $0.owner == team }
     }
 
+    /// How many machines this team has standing.
+    ///
+    /// What crowding is measured against - see ArcadeSystem.interval, where each
+    /// machine in a base slows the others down. Counted rather than asked about,
+    /// because "does this base have a machine" stopped being the interesting
+    /// question the moment a base could have four.
+    func arcadeCount(ownedBy team: TeamID) -> Int {
+        arcades.values.reduce(0) { $0 + ($1.owner == team ? 1 : 0) }
+    }
+
     /// The ground this team may stand furniture on.
     ///
     /// Inside the walls once there are walls, anywhere on their own claim before
@@ -699,6 +719,7 @@ final class World {
     ///   different question of whether the base has room for one at all, which is a
     ///   fact about the walls and not about where its owner happens to be standing.
     func nextArcadeOrigin(for team: TeamID,
+                          kind: ArcadeKind = .full,
                           near position: Vec2,
                           avoidingActors: Bool = true) -> GridPoint? {
         let ground = baseGround(of: team)
@@ -707,10 +728,11 @@ final class World {
         var shortest = Double.greatestFiniteMagnitude
 
         for origin in ground.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
-            let machine = Arcade(id: ArcadeID(-1), origin: origin, owner: team, emitTimer: 0)
+            let machine = Arcade(id: ArcadeID(-1), kind: kind, origin: origin,
+                                 owner: team, emitTimer: 0)
 
-            // Six tiles of solid machine, so the same rule as a chest: not on top
-            // of anybody, the placer included.
+            // Four or six tiles of solid machine, so the same rule as a chest: not
+            // on top of anybody, the placer included.
             if avoidingActors, actors.values.contains(where: {
                 $0.isAlive && $0.hitbox.intersects(machine.hitbox)
             }) { continue }
@@ -938,9 +960,28 @@ final class World {
         //
         // It still cannot be hoarded: one to a base, destroyed when somebody shoots
         // it apart, and back only when the wall goes up again.
-        if ownedByABot, !hasArcade(team),
-           let origin = nextArcadeOrigin(for: team, near: centre) {
-            _ = spawnArcade(at: origin, owner: team)
+        // ONE, on seal, and usually the small one.
+        //
+        // Still only when the base has none, so this is the leg-up it always was
+        // and not a supply: a bot that has already found a machine in a crate does
+        // not get handed another. What has changed is that a bot can now stand up
+        // everything else it finds, exactly as you can, so bases diverge over a
+        // match instead of all ending on one identical cabinet. Some finish with a
+        // single mini; a lucky few finish with three or four machines and are worth
+        // raiding badly, which is the spread the raid pricing was rebuilt to read.
+        //
+        // Mini about two thirds of the time. The free machine is a floor under a
+        // base being worth visiting at all, and the cabinet is the thing that
+        // should be worth going out of your way for - handing every bot the good
+        // one for nothing would make finding one yourself mean nothing.
+        if ownedByABot, !hasArcade(team) {
+            let kind: ArcadeKind =
+                Double.random(in: 0..<1, using: &rng) < GameConfig.Arcade.botMiniShare
+                ? .mini : .full
+
+            if let origin = nextArcadeOrigin(for: team, kind: kind, near: centre) {
+                spawnArcade(at: origin, kind: kind, owner: team)
+            }
         }
 
         return placed

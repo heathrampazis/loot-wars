@@ -203,6 +203,22 @@ enum LootTable {
              weight: perk.lootWeight(at: progress))
         }
 
+        // The mini machine, out of ANY crate.
+        //
+        // This is the whole difference between the two sizes as far as this file is
+        // concerned. The cabinet is added further down, inside the rare branch, and
+        // is therefore something you go looking for; this is something you find. A
+        // base used to either have THE machine or have nothing, decided by whichever
+        // crate you happened to open in the first two minutes, and a base with no
+        // machine in it has no economy and nothing worth breaking in for.
+        //
+        // One crate in thirteen or so, which is about one and a half a match.
+        // Together with the one bots are handed on seal, that is most bases holding
+        // one or two machines and a few holding four - which is the spread the raid
+        // pricing was rebuilt to read, and it cannot come from a rare drop.
+        rows.append((pickup: .item(.arcade(.mini)),
+                     weight: GameConfig.Loot.miniArcadeWeight))
+
         // A rare crate cannot hand you a bandage.
         //
         // This is what makes opening one worth the walk. The bandage row comes out
@@ -244,7 +260,8 @@ enum LootTable {
             // worth defending and everybody else has something worth raiding, which
             // is a better shape than eight bases each with the same appliance in
             // the corner because the shop sold it to them.
-            rows.append((pickup: .item(.arcade), weight: GameConfig.Loot.rareArcadeWeight))
+            rows.append((pickup: .item(.arcade(.full)),
+                         weight: GameConfig.Loot.rareArcadeWeight))
         }
 
         let total = rows.reduce(0) { $0 + $1.weight }

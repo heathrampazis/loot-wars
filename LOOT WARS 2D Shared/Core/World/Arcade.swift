@@ -21,6 +21,10 @@ struct ArcadeID: Hashable {
 struct Arcade {
     let id: ArcadeID
 
+    /// Which size of machine this is, and with it everything that differs between
+    /// them - see ArcadeKind, which owns all of it.
+    let kind: ArcadeKind
+
     /// Bottom-left tile of the footprint. The machine extends right and up.
     let origin: GridPoint
 
@@ -44,7 +48,7 @@ struct Arcade {
     /// never got broken. A machine you can shoot is a machine an opportunist can
     /// wreck on their way past, which makes owning one a thing you have to defend
     /// rather than a thing you have to hide.
-    var health: Int = GameConfig.Arcade.health
+    var health: Int
 
     /// Counts down to the next token. Starts staggered, so several machines on
     /// one map do not pay out in lockstep.
@@ -63,28 +67,48 @@ struct Arcade {
 
     var isJackpot: Bool { jackpotRemaining > 0 }
 
-    static var width: Int { GameConfig.Arcade.footprintWidth }
-    static var height: Int { GameConfig.Arcade.footprintHeight }
+    /// Written out rather than left to the memberwise one, because health depends
+    /// on the kind and a stored property's default cannot read another property.
+    /// Every machine therefore starts at its own full health and nobody has to
+    /// remember to pass it.
+    init(id: ArcadeID,
+         kind: ArcadeKind = .full,
+         origin: GridPoint,
+         owner: TeamID?,
+         emitTimer: Double) {
+        self.id = id
+        self.kind = kind
+        self.origin = origin
+        self.owner = owner
+        self.health = kind.health
+        self.emitTimer = emitTimer
+    }
+
+    /// Instance properties now, not static ones. They were static because there was
+    /// one size of machine; asking the world how big A machine is, rather than how
+    /// big THIS machine is, is exactly the assumption a second size breaks.
+    var width: Int { kind.width }
+    var height: Int { kind.height }
 
     /// Every tile the machine stands on.
     var tiles: [GridPoint] {
-        (0..<Arcade.width).flatMap { dx in
-            (0..<Arcade.height).map { dy in
+        (0..<width).flatMap { dx in
+            (0..<height).map { dy in
                 GridPoint(col: origin.col + dx, row: origin.row + dy)
             }
         }
     }
 
     var centre: Vec2 {
-        Vec2(x: Double(origin.col) + Double(Arcade.width) / 2,
-             y: Double(origin.row) + Double(Arcade.height) / 2)
+        Vec2(x: Double(origin.col) + Double(width) / 2,
+             y: Double(origin.row) + Double(height) / 2)
     }
 
     /// Solid, and exactly the size the renderer draws - the machine you see is the
     /// machine you bump into.
     var hitbox: Box {
         Box(centre: centre,
-            size: Vec2(x: Double(Arcade.width), y: Double(Arcade.height)))
+            size: Vec2(x: Double(width), y: Double(height)))
     }
 
     /// The footprint plus a margin of ground around it.
@@ -97,8 +121,8 @@ struct Arcade {
     func tiles(within margin: Int) -> [GridPoint] {
         var area: [GridPoint] = []
 
-        for dx in -margin..<(Arcade.width + margin) {
-            for dy in -margin..<(Arcade.height + margin) {
+        for dx in -margin..<(width + margin) {
+            for dy in -margin..<(height + margin) {
                 area.append(GridPoint(col: origin.col + dx, row: origin.row + dy))
             }
         }
@@ -114,9 +138,9 @@ struct Arcade {
     var surroundingTiles: [GridPoint] {
         var ring: [GridPoint] = []
 
-        for dx in -1...Arcade.width {
-            for dy in -1...Arcade.height {
-                let inside = (0..<Arcade.width).contains(dx) && (0..<Arcade.height).contains(dy)
+        for dx in -1...width {
+            for dy in -1...height {
+                let inside = (0..<width).contains(dx) && (0..<height).contains(dy)
                 guard !inside else { continue }
                 ring.append(GridPoint(col: origin.col + dx, row: origin.row + dy))
             }

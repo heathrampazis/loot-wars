@@ -121,39 +121,21 @@ enum ShopSystem {
         return !isSoldOut(type, actor: actor, in: world)
     }
 
-    /// The one refusal the SHOP itself makes, as opposed to the ones you make.
+    /// Whether the SHOP itself refuses this, as opposed to you not affording it.
     ///
-    /// This is the only thing that greys a card out, and the list is deliberately
-    /// one item long. Everything else that can stop a purchase - the price, a bag
-    /// with no room in it - is a fact about YOU, changes minute to minute, and
-    /// greying the shelf out for it had the shop looking permanently shut. A
-    /// machine you already own is different in kind: the shop will not sell you a
-    /// second one however rich you get, and saying so on the card is the only way
-    /// you would ever know.
+    /// Nothing, currently, and this is the second reason it went. It was written
+    /// for machines - one to a base, so the card greyed out once you had one - and
+    /// that argument had already stopped applying when the shop stopped selling
+    /// them; ShopSystem.price returns nil for a machine, so canBuy was refusing
+    /// before this was ever consulted. Lifting the one-machine cap took the
+    /// reasoning away as well as the caller.
     ///
-    /// The tap covers the rest. It asks canBuy, and a refusal shakes the card
-    /// rather than the command quietly going nowhere.
+    /// Kept as a function rather than deleted because canBuy asks it and something
+    /// on a future shelf will want it - a per-match limit, a thing sold out for
+    /// everyone. A shape with nothing in it is easier to find than a concept that
+    /// has to be reintroduced.
     static func isSoldOut(_ type: ItemType, actor: Actor, in world: World) -> Bool {
-        guard type == .arcade else { return false }
-
-        // One machine to a base, counting the one in your bag as well as the one
-        // already standing, or you could buy a spare and be twenty-four tokens out
-        // of pocket for a thing with nowhere to go.
-        if world.hasArcade(actor.team) { return true }
-        if actor.inventory.firstSlot(holding: .arcade) != nil { return true }
-
-        // And not one your walls have no room for. A machine needs a clear 2 x 3
-        // inside the base, and about one base in seven is a small enough rectangle
-        // that a chest already leaves it without one.
-        //
-        // Asked WITHOUT the standing-actor rule, because this is a question about
-        // the walls rather than about the moment. The search skips spots somebody
-        // is standing in - it has to, or a bot would try to drop a machine on its
-        // own head - and reusing that answer here would tell a player their base
-        // was full while they were the only thing filling it.
-        return world.nextArcadeOrigin(for: actor.team,
-                                      near: actor.position,
-                                      avoidingActors: false) == nil
+        false
     }
 
     /// What the shop pays for something out of your bag.

@@ -318,7 +318,7 @@ final class GameScene: SKScene {
 
         // Before the first frame rather than on whichever frame first needs it -
         // see ArtFit.warm.
-        ArtFit.warm(["Chest", "Arcade"])
+        ArtFit.warm(["Chest", "Arcade", "Mini Arcade"])
 
         tileRenderer.build(from: generated.map)
         claimRenderer.build(claims: generated.claims)

@@ -67,7 +67,8 @@ enum ItemArt {
         case .bomb:    return "Bomb"
         case .stink:   return "Stink Bomb"
         case .chest:   return "Chest"
-        case .arcade:  return "Arcade"
+        case .arcade(let kind):
+            return kind == .mini ? "Mini Arcade" : "Arcade"
         case .perk(let which):
             switch which {
             // "Power-Up" rather than "Overdrive", which is what the code calls
@@ -95,7 +96,8 @@ enum ItemArt {
         case .item(.bomb):       return "Bomb"
         case .item(.stink):      return "StinkBomb"
         case .item(.chest):      return "Chest"
-        case .item(.arcade):     return "Arcade"
+        case .item(.arcade(.full)): return "Arcade"
+        case .item(.arcade(.mini)): return "Mini Arcade"
         case .item(.perk(.overdrive)):     return "Perk"
         case .item(.perk(.strength)):      return "StrengthPerk"
         case .item(.perk(.speed)):         return "SpeedPerk"

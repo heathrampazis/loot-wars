@@ -89,6 +89,14 @@ enum GameConfig {
         /// Blowing up a machine. Between a wall at 15 and a chest emptied.
         static let arcadeDestroyed = 40
 
+        /// The same for a mini, on the same ratio as everything else about it.
+        ///
+        /// Not the same number for both. A machine's destruction score is the one
+        /// thing a raider gets for certain - the chest may be empty, the owner may
+        /// come home - so paying the same for breaking the small one would quietly
+        /// make the small one the better target, being cheaper to shoot apart.
+        static let miniArcadeDestroyed = 24
+
         // MARK: - Holding what you built
 
         /// How often a standing base pays.
@@ -326,7 +334,8 @@ enum GameConfig {
         static let offShelf: [ItemType: Int] = [
             .bomb: 11,
             .chest: 14,
-            .arcade: 24,
+            .arcade(.full): 24,
+            .arcade(.mini): 14,
 
             // The power-up. Never on the shelf - the whole point of a perk is that
             // it is found - but the shop still makes an offer for one, because
@@ -1168,6 +1177,12 @@ enum GameConfig {
         /// read World.raidWorth now, so this is the survivor.
         static let machineWorth = 25
 
+        /// And what a mini adds. Counted per machine rather than once for the base
+        /// now that a base can hold several - see World.lootValue, where a room
+        /// with three machines in it correctly prices above one with a single
+        /// cabinet.
+        static let miniMachineWorth = 14
+
         /// What a base gains as a target for every second nobody has touched it,
         /// and the most it can gain.
         ///
@@ -1922,6 +1937,20 @@ enum GameConfig {
         /// and catching up with it.
         static let rareArcadeWeight = 150
 
+        /// And how heavily a MINI sits in an ordinary one.
+        ///
+        /// Against band totals of 338 down to 315 once the perks are in, twenty-six
+        /// is about one crate in thirteen - and a shade likelier late than early,
+        /// because the bands shrink while this does not.
+        ///
+        /// Over the twenty-odd crates somebody opens that is roughly one and a half
+        /// a match. Deliberately a number you can count on rather than a number you
+        /// hope for: the cabinet is the prize and stays behind a rare crate, and
+        /// this is the thing that makes a base an economy instead of a lottery
+        /// ticket. A base with no machine in it has nothing to defend and nothing
+        /// worth breaking into, and that used to be seven bases out of eight.
+        static let miniArcadeWeight = 26
+
         /// Share of crates on the map that are the good ones.
         ///
         /// One in eight. At one in six they were everywhere, and a thing you see
@@ -2230,6 +2259,8 @@ enum GameConfig {
         /// enough to be the reason you came.
         static let destroyedReward = 5
 
+        static let miniDestroyedReward = 3
+
         /// How much shooting a machine takes to break.
         ///
         /// 520, doubled, because at 260 a Blaster 6 finished one in 1.6 seconds and
@@ -2255,6 +2286,13 @@ enum GameConfig {
         /// are on the clock the owner is walking home along.
         static let health = 520
 
+        /// A mini has noticeably less in it, and that is its main weakness rather
+        /// than a rounding of its payout. Three hundred and twenty against five
+        /// hundred and twenty is eleven seconds of Blaster 3 against seventeen: a
+        /// raider passing through can take a mini apart on their way to something
+        /// else, where a full cabinet is a decision to stand still and commit.
+        static let miniHealth = 320
+
         /// Machines on the map. Deliberately few: an arcade you have to travel to
         /// is a place worth fighting over, one on every corner is furniture.
         ///
@@ -2272,6 +2310,12 @@ enum GameConfig {
         /// grid without stretching.
         static let footprintWidth = 2
         static let footprintHeight = 3
+
+        /// A mini is two by two. The WIDTH is shared - both machines are two tiles
+        /// across, which is what lets one stand anywhere the other would and makes
+        /// "swap a full one for a mini" a real choice about depth rather than a
+        /// different placement puzzle.
+        static let miniFootprintHeight = 2
 
         /// How much clear ground a machine on the MAP needs around it, in tiles.
         ///
@@ -2308,6 +2352,46 @@ enum GameConfig {
         /// 2.4 seconds a token against 3.2 - so the reward for owning one goes to
         /// whoever is actually around to work it.
         static let sealedInterval: Double = 0.75
+
+        /// How much slower a mini pays, as a multiplier on the interval.
+        ///
+        /// Sixty per cent more, so behind a standing wall a mini pays every 3.84
+        /// seconds against a cabinet's 2.4. Together with the smaller bank that
+        /// puts a mini at about two thirds of a full machine - and two of them,
+        /// which cost eight tiles of base against six, comfortably ahead of one.
+        /// That is the trade the two sizes are for.
+        static let miniRate: Double = 1.6
+
+        /// How often a bot's free machine on seal is the small one.
+        ///
+        /// Two thirds. The free machine exists so that every base is worth visiting
+        /// at all, and the cabinet is the thing that should be worth going out of
+        /// your way for - handing all seven bots the good one for nothing would
+        /// make finding one yourself mean nothing.
+        static let botMiniShare: Double = 0.65
+
+        /// How much every extra machine in the same base slows all of them down.
+        ///
+        /// THE REASON THE CAP COULD GO. A base used to hold exactly one machine,
+        /// and that single rule was carrying the whole economy: the safest income
+        /// on the map, uncapped, in a room you can fit six machines into, works out
+        /// at about 860 tokens a match - nearly three full gear ladders, against a
+        /// raiding player's entire income of around 136. Simply removing the cap
+        /// would have ended the shop.
+        ///
+        /// So machines crowd instead. Each one in a base is slowed by 30% of itself
+        /// per other machine standing there, as though the room only has so many
+        /// people in it to play them. One machine is 165 tokens a match, two full
+        /// and two mini is 278, and six is 343 - so building your base out is
+        /// clearly worth doing and tops out at about twice one machine rather than
+        /// nine times.
+        ///
+        /// A cost you weigh rather than a wall you hit, which is the difference
+        /// between this and putting the cap back at three. It also prices itself
+        /// into the raiding side for free: a base with four machines in it is worth
+        /// far more to break into than a base with one, and now actually reads that
+        /// way to the bots.
+        static let crowding: Double = 0.30
 
         static let tokenValue = 1
 
@@ -2378,6 +2462,8 @@ enum GameConfig {
         /// alone is full in eighteen seconds and then pays nothing.
         static let maxUncollected = 3
 
+        static let miniUncollected = 2
+
         /// And how many it will let pile up behind a wall that is standing.
         ///
         /// Part of why you build a base, and it used to be most of it. A machine in
@@ -2396,6 +2482,11 @@ enum GameConfig {
         /// machine that pays out its whole cap between visits however often you
         /// call, so income scaled with nothing but how often you walked home.
         static let sealedUncollected = 5
+
+        /// A mini holds three. The other half of "about two thirds": the interval
+        /// decides what it pays while you stand there, and the bank decides what it
+        /// is worth coming home to.
+        static let miniSealedUncollected = 3
 
         /// How far out from the footprint a token still counts as this machine's,
         /// for the cap above. Just past the ring it drops them on.

@@ -159,8 +159,8 @@ enum BombSystem {
                   machine.hitbox.expanded(by: radius).contains(bomb.position) else { continue }
 
             world.removeArcade(machineID)
-            world.award(GameConfig.Score.arcadeDestroyed, to: bomb.team)
-            world.awardTokens(GameConfig.Arcade.destroyedReward, to: bomb.owner)
+            world.award(machine.kind.destroyedScore, to: bomb.team)
+            world.awardTokens(machine.kind.destroyedReward, to: bomb.owner)
         }
 
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {

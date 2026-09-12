@@ -70,9 +70,13 @@ extension ItemType {
         // any of the map with it.
         case .stink:   return .legendary
 
-        // The most expensive thing anybody buys, and the safest income on the map
-        // once it is standing behind a wall.
-        case .arcade:  return .mythical
+        // The safest income on the map once it is standing behind a wall, and the
+        // rung comes off the SIZE - Mythical for a cabinet, Legendary for a mini.
+        // Asked of the kind rather than answered here for the same reason the perk
+        // below is: the rung is a fact about the thing, and the loot table, the
+        // pool on the grass and the glow on the crate are all already reading it
+        // from one place.
+        case .arcade(let kind): return kind.rarity
 
         // The power-up carries its own rung - see Perk.rarity - rather than being
         // given one here. There is one perk and it is Mythical, so this line could

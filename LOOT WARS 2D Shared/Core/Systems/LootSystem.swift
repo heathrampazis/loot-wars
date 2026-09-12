@@ -148,10 +148,13 @@ enum LootSystem {
             // to FIND theirs. Left where it fell, it is still there when they get
             // to it.
             //
-            // Asked of the world rather than the actor because it is a fact about
-            // the base, not about the bag - which is why it lives here rather than
-            // in wantsFromGround with the rest.
-            if case .arcade = type, world.hasArcade(actor.team) { return false }
+            // The refusal that used to stand here is gone with the one-machine cap.
+            // It read: leave a machine on the ground if this team already has one,
+            // so that seven bots who could not use a second would stop sweeping
+            // them off the map before the player found one. Nobody is full up any
+            // more - a base takes as many as it has floor for - so there is nothing
+            // left to protect the player from. See ArcadeSystem.canPlace for what
+            // replaced the cap.
 
             // Worn if it beats what is on, bagged if it does not - and that rule
             // lives on the Actor, so walking over a helmet and pulling one out of a

@@ -260,8 +260,14 @@ extension MapFactory {
         for _ in 0..<attempts {
             guard placed.count < GameConfig.Arcade.count else { break }
 
-            let col = Int.random(in: 2...(map.width - Arcade.width - 2), using: &rng)
-            let row = Int.random(in: 2...(map.height - Arcade.height - 2), using: &rng)
+            // The map's own are always cabinets. A mini is something you find in
+            // a crate and stand up behind your own wall - the point of the four out
+            // here is that they are the best machines on the board and the risky
+            // way to earn, and a small one in the open would be neither.
+            let size = ArcadeKind.full
+
+            let col = Int.random(in: 2...(map.width - size.width - 2), using: &rng)
+            let row = Int.random(in: 2...(map.height - size.height - 2), using: &rng)
             let stagger = Double.random(in: 0...GameConfig.Arcade.emitInterval, using: &rng)
 
             let candidate = Arcade(id: ArcadeID(placed.count),

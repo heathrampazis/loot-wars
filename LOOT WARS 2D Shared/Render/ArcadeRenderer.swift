@@ -54,11 +54,16 @@ final class ArcadeRenderer {
     /// the edges. That survived exactly one re-export: the fractions were of a
     /// 926 x 928 canvas, the new image is 818 x 1236, and the same fractions cut
     /// the sides off the cabinet. ArtFit measures the margin instead, every launch.
-    static let machine: SKTexture = {
-        let texture = SKTexture(imageNamed: "Arcade")
-        texture.usesMipmaps = true
-        return texture
-    }()
+    static func texture(for kind: ArcadeKind) -> SKTexture {
+        if let cached = textures[kind] { return cached }
+
+        let made = SKTexture(imageNamed: kind == .mini ? "Mini Arcade" : "Arcade")
+        made.usesMipmaps = true
+        textures[kind] = made
+        return made
+    }
+
+    private static var textures: [ArcadeKind: SKTexture] = [:]
 
     /// How the machine is drawn, here and in the preview: as big as it goes inside
     /// its 2 x 3 footprint without crossing the edge.
@@ -68,9 +73,9 @@ final class ArcadeRenderer {
     /// machine that overhangs the space it reserved is a machine that looks like it
     /// does not fit - which it does not. The art is drawn narrower than 2:3 for
     /// exactly this reason, so it fills the height and leaves a sliver at the sides.
-    static func fit() -> ArtFit.Fit {
-        ArtFit.contained("Arcade",
-                         within: Vec2(x: Double(Arcade.width), y: Double(Arcade.height)))
+    static func fit(_ kind: ArcadeKind) -> ArtFit.Fit {
+        ArtFit.contained(kind == .mini ? "Mini Arcade" : "Arcade",
+                         within: Vec2(x: Double(kind.width), y: Double(kind.height)))
     }
 
     func build(mapHeight: Int) {
@@ -141,7 +146,7 @@ final class ArcadeRenderer {
         guard drawnHealth[machine.id] != machine.health else { return }
         drawnHealth[machine.id] = machine.health
 
-        let share = min(1, max(0, Double(machine.health) / Double(GameConfig.Arcade.health)))
+        let share = min(1, max(0, Double(machine.health) / Double(machine.kind.health)))
         let full = GridGeometry.length(ofTiles: ArcadeRenderer.barWidthInTiles)
 
         guard share < 1 else {
@@ -171,7 +176,7 @@ final class ArcadeRenderer {
 
         bar.position = CGPoint(
             x: footing.x,
-            y: footing.y + GridGeometry.length(ofTiles: Double(Arcade.height) + 0.3))
+            y: footing.y + GridGeometry.length(ofTiles: Double(machine.height) + 0.3))
         bar.zPosition = sprite.zPosition + 0.5
 
         node.addChild(bar)
@@ -269,7 +274,8 @@ final class ArcadeRenderer {
 
         // Copied off the real sprite rather than measured again, so the silhouette
         // cannot land anywhere but exactly over the machine however the fit changes.
-        let aura = SKSpriteNode(texture: ArcadeRenderer.machine, size: sprite.size)
+        let aura = SKSpriteNode(texture: ArcadeRenderer.texture(for: machine.kind),
+                                size: sprite.size)
         aura.anchorPoint = sprite.anchorPoint
         aura.position = sprite.position
         aura.color = .white
@@ -309,9 +315,10 @@ final class ArcadeRenderer {
     }
 
     private func make(_ machine: Arcade) {
-        let fit = ArcadeRenderer.fit()
+        let fit = ArcadeRenderer.fit(machine.kind)
 
-        let sprite = SKSpriteNode(texture: ArcadeRenderer.machine, size: fit.size)
+        let sprite = SKSpriteNode(texture: ArcadeRenderer.texture(for: machine.kind),
+                                  size: fit.size)
 
         // Anchored at its feet, so the sprite stands ON the footprint rather than
         // being centred over it - and then dropped by the transparent strip below

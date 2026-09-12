@@ -85,9 +85,9 @@ final class PlacementGhost {
                             cornerWidth: 4, cornerHeight: 4, transform: nil)
 
         switch type {
-        case .arcade:
-            let fit = ArcadeRenderer.fit()
-            sprite.texture = ArcadeRenderer.machine
+        case .arcade(let kind):
+            let fit = ArcadeRenderer.fit(kind)
+            sprite.texture = ArcadeRenderer.texture(for: kind)
             sprite.size = fit.size
             sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
             sprite.position = CGPoint(x: width / 2 - fit.content.midX,

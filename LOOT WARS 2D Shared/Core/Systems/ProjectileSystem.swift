@@ -81,8 +81,8 @@ enum ProjectileSystem {
             }
 
             world.removeArcade(id)
-            world.award(GameConfig.Score.arcadeDestroyed, to: projectile.team)
-            world.awardTokens(GameConfig.Arcade.destroyedReward, to: projectile.owner)
+            world.award(machine.kind.destroyedScore, to: projectile.team)
+            world.awardTokens(machine.kind.destroyedReward, to: projectile.owner)
             world.record(.blast(at: machine.centre))
             return true
         }
