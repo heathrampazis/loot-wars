@@ -85,8 +85,8 @@ final class ArcadeRenderer {
             // been standing there, so they are simply drawn; a machine with a team
             // on it was carried across the map and put down by somebody, which is
             // the single best thing that happens to a base all match.
-            if hasSynced, let owner = machine.owner {
-                standUp(machine, owner: owner)
+            if hasSynced, machine.owner != nil {
+                standUp(machine)
             }
         }
 
@@ -229,17 +229,27 @@ final class ArcadeRenderer {
     /// "that just happened to the cabinet", and a third one would be a third thing
     /// to learn.
     ///
-    /// The ring is in the owner's colour, because "whose is this" is the question
-    /// a machine appearing in a base raises, and it is the question the damage bar
-    /// answers the same way. It is thrown from the footprint rather than from the
-    /// sprite, so it spreads across the ground the machine is standing on instead
-    /// of round its middle three tiles up.
+    /// The aura is the same flourish a wall gets when you lay one - see
+    /// BlueprintRenderer.fill, where a copy of the block blooms outward and fades
+    /// so the wall looks like it came FROM somewhere rather than switching on. Same
+    /// idea here and the same numbers, a third bigger over about a fifth of a
+    /// second, with the machine's own silhouette as the shape.
+    ///
+    /// Struck white rather than tinted, because it is not saying whose this is - a
+    /// team colour bloom would be a third thing in the base wearing that colour,
+    /// after the walls and the damage bar. It is saying something just landed here,
+    /// and white is how the rest of this file says that.
+    ///
+    /// Anchored at the feet like the cabinet, so it rises off the machine instead
+    /// of swelling evenly around its middle three tiles up. That is the one place
+    /// this deliberately differs from the wall's version: a wall is a square on the
+    /// floor and blooms evenly; a cabinet is a tall thing standing on a footprint.
     ///
     /// Nothing here can be interrupted in practice. A placed machine cannot jackpot
     /// - those are rolled only on the map's own - and its first payout is a full
     /// emitInterval away, so the scale is this animation's alone for the half
     /// second it wants it.
-    private func standUp(_ machine: Arcade, owner: TeamID) {
+    private func standUp(_ machine: Arcade) {
         guard let sprite = nodesByArcade[machine.id] else { return }
 
         sprite.xScale = 1.3
@@ -257,25 +267,24 @@ final class ArcadeRenderer {
                     .colorize(withColorBlendFactor: 0, duration: 0.18)])
         ]), withKey: "placed")
 
-        let footing = GridGeometry.point(
-            for: Vec2(x: machine.centre.x, y: Double(machine.origin.row)))
+        // Copied off the real sprite rather than measured again, so the silhouette
+        // cannot land anywhere but exactly over the machine however the fit changes.
+        let aura = SKSpriteNode(texture: ArcadeRenderer.machine, size: sprite.size)
+        aura.anchorPoint = sprite.anchorPoint
+        aura.position = sprite.position
+        aura.color = .white
+        aura.colorBlendFactor = 1
+        aura.alpha = 0
+        aura.zPosition = sprite.zPosition + 0.4
+        node.addChild(aura)
 
-        let ring = SKShapeNode(circleOfRadius: GridGeometry.length(ofTiles: 0.55))
-        ring.position = footing
-        ring.fillColor = .clear
-        ring.strokeColor = RenderPalette.colour(for: owner)
-        ring.lineWidth = 3
-        ring.alpha = 0
-        ring.zPosition = sprite.zPosition - 0.5
-        node.addChild(ring)
-
-        ring.run(.sequence([
-            .wait(forDuration: 0.12),
-            .group([
-                .sequence([.fadeAlpha(to: 0.9, duration: 0.06),
-                           .fadeOut(withDuration: 0.34)]),
-                .scale(to: 2.9, duration: 0.4)
-            ]),
+        // Held back until the cabinet has reached its full height, so the bloom
+        // punctuates the landing rather than racing it.
+        aura.run(.sequence([
+            .wait(forDuration: 0.1),
+            .fadeAlpha(to: 0.8, duration: 0.04),
+            .group([.scale(to: 1.3, duration: 0.2),
+                    .fadeOut(withDuration: 0.2)]),
             .removeFromParent()
         ]))
     }
