@@ -117,8 +117,25 @@ final class ArcadeRenderer {
         for (id, sprite) in Array(nodesByArcade) where world.arcades[id] == nil {
             nodesByArcade[id] = nil
             lastTimers[id] = nil
-            bars[id] = nil
             drawnHealth[id] = nil
+
+            // The bar goes WITH it, and forgetting the node is the bug this fixes.
+            //
+            // Dropping the dictionary entry only let go of this file's reference to
+            // the fill; the bar node itself was added to the renderer's own node in
+            // makeBar and stayed there, parented, drawn, and now belonging to
+            // nothing. So a broken machine left an empty bar hanging in the air over
+            // the rubble - and left it there for the rest of the match, one more
+            // every time anybody broke anything.
+            //
+            // Faded rather than cut, over half the time the cabinet takes to come
+            // apart, so the bar is gone before the machine finishes going and the
+            // two read as one event. ChestRenderer has done exactly this for its
+            // crack bars all along; this is the same line it has.
+            if let bar = bars[id]?.parent {
+                bar.run(.sequence([.fadeOut(withDuration: 0.14), .removeFromParent()]))
+            }
+            bars[id] = nil
 
             // Blown apart rather than switched off.
             sprite.run(.sequence([
