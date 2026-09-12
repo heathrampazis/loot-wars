@@ -539,7 +539,6 @@ final class World {
     }
 
     @discardableResult
-    @discardableResult
     func spawnArcade(at origin: GridPoint,
                      kind: ArcadeKind = .full,
                      owner: TeamID?) -> ArcadeID {
@@ -1222,16 +1221,68 @@ final class World {
         return count
     }
 
+    /// Every loose token lying inside this team's base.
+    ///
+    /// The per-machine count above stopped being the right question when a base
+    /// could hold more than one machine. Each machine had its own allowance,
+    /// measured in its own small radius, so four of them meant four separate piles
+    /// and the better part of twenty tokens on the floor - which is not a bank, it
+    /// is litter, and it made the cap that is supposed to say "come home and clear
+    /// this" say nothing at all.
+    ///
+    /// Counted over the whole base ground rather than round each machine, so the
+    /// machines share one allowance however many of them there are and however
+    /// close together they stand.
+    func looseTokens(inside team: TeamID) -> Int {
+        let ground = baseGround(of: team)
+
+        var count = 0
+        for item in groundItems.values {
+            guard case .token = item.pickup else { continue }
+            if ground.contains(GridPoint(containing: item.position)) { count += 1 }
+        }
+        return count
+    }
+
+    /// Whether a token is already lying on this tile.
+    func hasToken(on tile: GridPoint) -> Bool {
+        groundItems.values.contains { item in
+            guard case .token = item.pickup else { return false }
+            return GridPoint(containing: item.position) == tile
+        }
+    }
+
     /// Somewhere around the machine a token could actually be picked up from, or
     /// nil if it is boxed in.
     func freeSpot(around arcade: Arcade) -> Vec2? {
         // Built in the ring's fixed order and then chosen from with the world's own
         // generator, so the same seed drops tokens in the same places.
-        var options: [Vec2] = []
+        //
+        // Empty tiles FIRST, and that is the whole of "do not stack". isClearForDrop
+        // asks about the map - walls, trees, furniture - and has never had an
+        // opinion about what is already lying there, so two payouts landing on the
+        // same tile landed on the same POINT and the second was drawn exactly on top
+        // of the first. Three tokens looked like one, which is the worst way for a
+        // machine to pay you: it looks like it has stopped.
+        var empty: [Vec2] = []
+        var shared: [GridPoint] = []
+
         for tile in arcade.surroundingTiles where isClearForDrop(tile.center) {
-            options.append(tile.center)
+            if hasToken(on: tile) { shared.append(tile) } else { empty.append(tile.center) }
         }
-        return options.randomElement(using: &rng)
+
+        if let spot = empty.randomElement(using: &rng) { return spot }
+
+        // Every clear tile round the machine already has something on it. Doubling
+        // up is allowed rather than refused - a machine that stops because the ring
+        // is busy is a machine that stops for a reason nobody can see - but the
+        // second one is nudged off centre so it reads as two things rather than as
+        // one that failed to appear.
+        guard let tile = shared.randomElement(using: &rng) else { return nil }
+
+        let nudge = GameConfig.Arcade.tokenNudge
+        return Vec2(x: tile.center.x + Double.random(in: -nudge...nudge, using: &rng),
+                    y: tile.center.y + Double.random(in: -nudge...nudge, using: &rng))
     }
 
     /// - Parameter lifetime: how long it lies there, defaulting to the item's own

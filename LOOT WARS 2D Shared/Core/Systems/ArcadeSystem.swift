@@ -133,7 +133,48 @@ enum ArcadeSystem {
         guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
             return arcade.kind.openBank
         }
-        return arcade.kind.sealedBank
+        return basePile(of: owner, in: world)
+    }
+
+    /// How many loose tokens a whole BASE will let pile up before every machine in
+    /// it stops.
+    ///
+    /// ONE allowance for the room, not one each. Per machine was right while a base
+    /// could only hold one; with four of them it meant four separate piles measured
+    /// in four small overlapping radii, and the better part of twenty tokens on the
+    /// floor. That is not a bank, it is litter - and worse, it silently deleted the
+    /// rule: a cap that is never reached cannot say "come home and clear this",
+    /// which is the one thing it is for.
+    ///
+    /// The machines' own banks still add up, so a base with a cabinet in it holds
+    /// more than one with a single mini and coming home is worth proportionally
+    /// more - but the total stops at a ceiling. Beyond that a bigger base earns by
+    /// PAYING FASTER while you stand in it, which is what crowding already governs,
+    /// rather than by leaving more on the ground while you are somewhere else.
+    private static func basePile(of team: TeamID, in world: World) -> Int {
+        var total = 0
+        for machine in world.arcades.values where machine.owner == team {
+            total += machine.kind.sealedBank
+        }
+        return min(GameConfig.Arcade.basePileCeiling, total)
+    }
+
+    /// How much is already lying about, as far as THIS machine is concerned.
+    ///
+    /// The mirror of bank above, and they have to agree about what they are
+    /// counting or the comparison is nonsense. A machine standing in the open or in
+    /// a breached base answers for itself, in its own radius, because the map's four
+    /// stand a long way apart and a breached base is not a room any more. A machine
+    /// behind a standing wall answers for the whole base.
+    ///
+    /// It counts every loose token on that ground, including anything somebody
+    /// spilled dying in there. That is deliberate: the cap is about how much is on
+    /// the floor, and the floor does not care where it came from.
+    private static func pile(for arcade: Arcade, in world: World) -> Int {
+        guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
+            return world.uncollectedTokens(around: arcade)
+        }
+        return world.looseTokens(inside: owner)
     }
 
     /// How long the tokens it pays out survive on the ground.
@@ -241,7 +282,7 @@ enum ArcadeSystem {
                 continue
             }
 
-            guard world.uncollectedTokens(around: arcade) < bank(for: arcade, in: world),
+            guard pile(for: arcade, in: world) < bank(for: arcade, in: world),
                   let spot = world.freeSpot(around: arcade) else {
                 world.arcades[id] = arcade
                 continue

@@ -2490,7 +2490,44 @@ enum GameConfig {
 
         /// How far out from the footprint a token still counts as this machine's,
         /// for the cap above. Just past the ring it drops them on.
+        ///
+        /// Only used by machines standing in the OPEN now, and by a base somebody
+        /// has broken into. A sealed base counts its whole floor instead - see
+        /// ArcadeSystem.basePile.
         static let collectionRadius: Double = 1.5
+
+        /// The most loose tokens a base will let lie on its floor before every
+        /// machine in it stops.
+        ///
+        /// Six. "A few to collect, and then it waits for you" is the whole feel this
+        /// is for, and six is about two handfuls - enough that a cabinet's bank of
+        /// five still means something on its own, small enough that walking in
+        /// reads as clearing a pile rather than wading through one.
+        ///
+        /// It is a CEILING on the machines' own banks added together, not a
+        /// replacement for them: a base with a single mini still stops at three, so
+        /// what coming home is worth still scales with what you have built. It only
+        /// bites once a base holds more than about one cabinet's worth, which is
+        /// exactly the case that was producing twenty tokens of litter.
+        ///
+        /// This does not cap income, and that distinction matters. Stand in your own
+        /// base and the tokens are picked up as they land, so the pile never gets
+        /// near this and the rate is whatever crowding allows. It caps what
+        /// accumulates while you are somewhere ELSE - which is the thing that should
+        /// have a limit on it.
+        static let basePileCeiling = 6
+
+        /// How far off a tile's centre a token is nudged when it has to share.
+        ///
+        /// Tokens prefer an empty tile and only double up when every clear spot
+        /// round the machine is taken - see World.freeSpot. When they do, this stops
+        /// the second one being drawn exactly on top of the first, which made three
+        /// tokens look like one and a working machine look like a stopped one.
+        ///
+        /// In tiles, so a quarter of one either way: visibly two things, still
+        /// obviously on the same square, and nowhere near far enough to land
+        /// somewhere you cannot reach.
+        static let tokenNudge: Double = 0.22
 
         /// How long a token lies there.
         ///
