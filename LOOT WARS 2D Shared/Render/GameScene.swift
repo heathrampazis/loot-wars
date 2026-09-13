@@ -1494,10 +1494,35 @@ extension GameScene {
         if case .hotbar(let slot) = target {
             hotbar.beginHold(slot, duration: GameScene.holdDuration)
         }
+
+        if case .map = target { beginPrising(at: touch.location(in: worldLayer)) }
+    }
+
+    /// Starts a wall working loose under a finger, when that is what the finger is
+    /// actually on.
+    ///
+    /// Asked of BuildSystem.canRemove rather than answered here, which is the same
+    /// rule the placement preview follows: the moment this file starts deciding for
+    /// itself which walls can come up, it can promise one that the simulation then
+    /// refuses. A hold on grass, on somebody else's wall, or from outside your own
+    /// claim shows nothing and does nothing, and those are the same sentence.
+    private func beginPrising(at pointInWorld: CGPoint) {
+        guard let player = world.localPlayer, player.isAlive else { return }
+
+        let tile = GridGeometry.gridPoint(for: pointInWorld)
+        guard BuildSystem.canRemove(at: tile, by: player, in: world) else { return }
+
+        blockRenderer.prise(at: tile, duration: GameScene.holdDuration)
     }
 
     private func cancelPress() {
         if let press = pending, case .hotbar = press.target { hotbar.endHold() }
+
+        // Covers every way a hold can end without firing - lifted early, dragged
+        // off into a run of wall, or interrupted by a call arriving. All three
+        // reach here, which is why the wall is put back here rather than in three
+        // places that each have to remember.
+        blockRenderer.release()
         pending = nil
     }
 
@@ -1527,7 +1552,26 @@ extension GameScene {
 
         switch press.target {
         case .map:
-            queuedCommands.append(.removeBlock(GridGeometry.gridPoint(for: press.worldOrigin)))
+            let tile = GridGeometry.gridPoint(for: press.worldOrigin)
+            queuedCommands.append(.removeBlock(tile))
+
+            // Let go WITHOUT putting it back, but only when it is actually about to
+            // go. The wall is gone next frame and BlockRenderer will crumble it, so
+            // springing it back to full size first would put a bounce in the middle
+            // of it coming apart.
+            //
+            // The check matters, and leaving it out was a bug for about a minute: a
+            // hold that BuildSystem then refuses - you wandered out of your own
+            // claim while the finger was down - would have left the wall squeezed
+            // to four fifths and tilted, for the rest of the match, with nothing
+            // left tracking it to put it right. Asked with the same predicate the
+            // simulation is about to use on the same state, so the two cannot
+            // disagree.
+            let coming = world.localPlayer.map {
+                BuildSystem.canRemove(at: tile, by: $0, in: world)
+            } ?? false
+
+            blockRenderer.release(settling: !coming)
         case .hotbar(let slot):
             queuedCommands.append(GameScene.holdSells ? .sellItem(slot: slot)
                                                       : .dropItem(slot: slot))

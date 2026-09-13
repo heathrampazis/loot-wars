@@ -114,9 +114,92 @@ final class BlockRenderer {
 
         // And whatever is no longer there - blown up, or taken back down.
         for (point, wall) in walls where !seen.contains(point) {
-            wall.sprite.removeFromParent()
+            if prising == point { prising = nil }
             walls[point] = nil
+            crumble(wall.sprite)
         }
+    }
+
+    // MARK: - Coming apart
+
+    /// A wall that has stopped existing, on its way out.
+    ///
+    /// It used to be removeFromParent on the same frame the tile changed, which is
+    /// correct and reads as nothing at all: a bomb takes four tiles out and they
+    /// simply are not there any more, so the hole appears without anything having
+    /// visibly happened to make it. A wall you prised up yourself was worse - you
+    /// held a finger down for four tenths of a second and the thing under it
+    /// vanished, which is indistinguishable from a misfire.
+    ///
+    /// Lifted off its neighbours before it goes, so it is not drawn half behind the
+    /// walls either side while it comes apart.
+    private func crumble(_ sprite: SKSpriteNode) {
+        sprite.removeAction(forKey: "prise")
+        sprite.removeAction(forKey: "shudder")
+        sprite.zPosition = 6
+
+        sprite.run(.sequence([
+            .group([.scale(to: 1.16, duration: 0.05),
+                    .rotate(toAngle: CGFloat.random(in: -0.12...0.12), duration: 0.05)]),
+            .group([.scale(to: 0.25, duration: 0.17),
+                    .rotate(byAngle: CGFloat.random(in: -0.7...0.7), duration: 0.17),
+                    .fadeOut(withDuration: 0.17)]),
+            .removeFromParent()
+        ]))
+    }
+
+    // MARK: - Being prised up
+
+    /// The tile currently being held down on, if any.
+    private var prising: GridPoint?
+
+    /// How far the wall is squeezed by the end of the hold.
+    private static let prisedScale: CGFloat = 0.82
+
+    /// A wall with a finger held on it, working loose.
+    ///
+    /// Four tenths of a second with no response at all reads as a tap that failed
+    /// to register, and the player lifts off just before the thing they were
+    /// waiting for would have happened. ItemSlotNode.beginHold makes exactly this
+    /// argument about the hotbar and answers it by squeezing the slot over the
+    /// length of the hold; this is the same answer for the other half of the
+    /// gesture, which had no answer at all.
+    ///
+    /// Squeeze AND shudder, where the hotbar only squeezes. A slot is a button and
+    /// a squeeze is what a button does; a wall is a solid thing being worked out of
+    /// the ground, and the game already has a vocabulary for that - a chest being
+    /// cracked shakes and swells, and then bursts. This shakes and shrinks, and then
+    /// crumbles. Coming apart looks like coming apart either way round.
+    ///
+    /// The scale runs for the whole duration so it is also the timer: how far down
+    /// the wall has been squeezed is how close it is to going.
+    func prise(at point: GridPoint, duration: TimeInterval) {
+        guard prising != point else { return }
+        release()
+
+        guard let wall = walls[point] else { return }
+        prising = point
+
+        wall.sprite.run(.scale(to: BlockRenderer.prisedScale, duration: duration),
+                        withKey: "prise")
+        wall.sprite.run(.repeatForever(.sequence([
+            .rotate(toAngle: 0.055, duration: 0.045),
+            .rotate(toAngle: -0.055, duration: 0.045)
+        ])), withKey: "shudder")
+    }
+
+    /// - Parameter settling: whether to put the wall back. False when it is about
+    ///   to be removed anyway, so the crumble picks up from where the squeeze got
+    ///   to rather than from a wall that has just sprung back to full size.
+    func release(settling: Bool = true) {
+        guard let point = prising else { return }
+        prising = nil
+
+        guard settling, let wall = walls[point] else { return }
+        wall.sprite.removeAction(forKey: "prise")
+        wall.sprite.removeAction(forKey: "shudder")
+        wall.sprite.run(.group([.scale(to: 1, duration: 0.1),
+                                .rotate(toAngle: 0, duration: 0.1)]))
     }
 
     /// Fades a wall out while the team that owns it is standing in it, so you can
