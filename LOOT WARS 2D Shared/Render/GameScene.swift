@@ -374,8 +374,29 @@ final class GameScene: SKScene {
         layOutUI()
     }
 
-    /// How much the right edge is eaten by the Dynamic Island, in points.
-    private var islandInset: CGFloat {
+    /// How much of each short edge is eaten by the notch, the island or the
+    /// rounded corner, in points.
+    ///
+    /// BOTH EDGES, and asking only about one was the bug. This read
+    /// safeAreaInsets.right and nothing else, on the reasoning that in landscape
+    /// the island lands in the top-right corner - which is true of exactly one of
+    /// the two landscape rotations. Turn the phone the other way and the whole
+    /// inset moves to the LEFT edge, where nothing was asking about it, so the
+    /// panels in that corner sat under the island while the leaderboard opposite
+    /// them politely inset itself away from nothing at all.
+    ///
+    /// Nothing here decides which way up the phone is. It reads both numbers and
+    /// applies each to its own side, so whichever edge is eaten is the edge that
+    /// moves and the other one stays where it was.
+    private var safeLeft: CGFloat {
+        #if os(iOS) || os(tvOS)
+        return view?.safeAreaInsets.left ?? 0
+        #else
+        return 0
+        #endif
+    }
+
+    private var safeRight: CGFloat {
         #if os(iOS) || os(tvOS)
         return view?.safeAreaInsets.right ?? 0
         #else
@@ -383,19 +404,22 @@ final class GameScene: SKScene {
         #endif
     }
 
-    private var laidOutForIsland: CGFloat = -1
+    /// The pair this interface was last laid out against - left in x, right in y.
+    private var laidOutForInsets = CGPoint(x: -1, y: -1)
 
     /// The insets are not known when the scene first lays itself out, and they
     /// change on rotation. Rather than hunt for the callback that covers both, this
-    /// notices the value moving - one float compare a frame, against a reposition
-    /// that is a single assignment.
+    /// notices the values moving - two float compares a frame, against a reposition
+    /// that is a handful of assignments.
     ///
-    /// Scoped to the leaderboard alone on purpose. Laying the WHOLE interface out
-    /// from the safe area moved the sticks sixty points inboard and you did not like
-    /// it, so the controls still measure from the glass. Only the thing that has to
-    /// be readable gets out of the island's way.
-    private func repositionLeaderboardIfNeeded() {
-        guard laidOutForIsland != islandInset else { return }
+    /// Scoped to the READOUTS on purpose, and that line has not moved. Laying the
+    /// whole interface out from the safe area put the sticks sixty points inboard
+    /// and you did not like it, so the controls still measure from the glass -
+    /// where your thumbs are is a fact about your hands rather than about the
+    /// hardware. What changed is which readouts: it is the panels in both top
+    /// corners now, not just the one on the right.
+    private func repositionForSafeAreaIfNeeded() {
+        guard laidOutForInsets != CGPoint(x: safeLeft, y: safeRight) else { return }
         layOutUI()
     }
 
@@ -434,20 +458,29 @@ final class GameScene: SKScene {
 
 
         // The HUD's origin is its own top-left corner, so this is just an inset.
+        //
+        // Plus whatever the hardware is eating off the left edge. Everything else
+        // anchored to this corner is measured FROM this point - the quick-buy panel
+        // below it and the shop button beside it both start at hud.position.x - so
+        // moving the HUD moves the corner, and the three of them stay a block.
         let inset: CGFloat = 16
-        hud.position = CGPoint(x: -size.width / 2 + inset,
+        hud.position = CGPoint(x: -size.width / 2 + inset + safeLeft,
                                y: size.height / 2 - inset)
 
-        // Mirrored in the opposite corner, and the ONE thing here that respects the
-        // safe area. In landscape the Dynamic Island eats about sixty points off one
-        // side and the top-right corner is exactly where it lands, so a leaderboard
-        // measured from the glass would be half hidden behind it. The sticks stay
-        // measured from the glass because that is where they felt right - this is a
-        // thing you read rather than a thing you press, so it is the one that has to
-        // move out of the way.
-        leaderboard.position = CGPoint(x: size.width / 2 - inset - islandInset,
+        // Mirrored in the opposite corner, off its own edge's inset.
+        //
+        // In landscape the island eats about sixty points off one short edge, and
+        // WHICH edge depends on which way round the phone is being held. This used
+        // to be the only thing in here that inset itself at all, and it only ever
+        // asked about the right - so held the other way it moved away from an edge
+        // that was clear while the panels opposite it sat under the island. Both
+        // corners ask about their own side now.
+        //
+        // The sticks still measure from the glass: this is a thing you read rather
+        // than a thing you press, and readouts are what have to get out of the way.
+        leaderboard.position = CGPoint(x: size.width / 2 - inset - safeRight,
                                        y: size.height / 2 - inset)
-        laidOutForIsland = islandInset
+        laidOutForInsets = CGPoint(x: safeLeft, y: safeRight)
 
         // The one strip of the top edge nothing else wants: the HUD holds the left
         // corner, the leaderboard the right, and the middle is clear on every size
@@ -580,7 +613,7 @@ final class GameScene: SKScene {
         projectileRenderer.sync(with: world)
         actorRenderer.sync(with: world, dt: frameDelta)
         hud.update(with: world)
-        repositionLeaderboardIfNeeded()
+        repositionForSafeAreaIfNeeded()
         leaderboard.update(with: world)
         matchTimer.update(with: world)
         shopPanel.update(with: world)
