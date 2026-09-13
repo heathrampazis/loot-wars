@@ -105,7 +105,7 @@ final class BlockRenderer {
                                                                           team: owner)),
                                           size: size)
                 sprite.position = GridGeometry.pointAtCentre(of: point)
-                sprite.zPosition = 5     // above terrain and trees, below actors
+                sprite.zPosition = BlockRenderer.wallZ
 
                 node.addChild(sprite)
                 walls[point] = Wall(sprite: sprite, owner: owner, mask: shape)
@@ -136,7 +136,12 @@ final class BlockRenderer {
     private func crumble(_ sprite: SKSpriteNode) {
         sprite.removeAction(forKey: "prise")
         sprite.removeAction(forKey: "shudder")
-        sprite.zPosition = 6
+
+        // Deliberately NOT reset to full size first. A wall that was being prised
+        // up is already swollen to about 1.12 and the first beat below takes it to
+        // 1.16, so it carries straight on; snapping it back to 1 would put a flinch
+        // in the middle of the one moment it is meant to be coming apart.
+        sprite.zPosition = BlockRenderer.crumbleZ
 
         sprite.run(.sequence([
             .group([.scale(to: 1.16, duration: 0.05),
@@ -153,8 +158,39 @@ final class BlockRenderer {
     /// The tile currently being held down on, if any.
     private var prising: GridPoint?
 
-    /// How far the wall is squeezed by the end of the hold.
-    private static let prisedScale: CGFloat = 0.82
+    /// How far the wall has swollen by the end of the hold.
+    ///
+    /// OVER one, and it started at 0.82 - under. Shrinking was the obvious reading
+    /// of prising something out of the ground and it was wrong for a reason
+    /// specific to how these walls are drawn: makeTexture bakes a black band onto
+    /// every side that has no friendly neighbour, which is what makes a run of wall
+    /// seamless down its middle and hard-edged against the world. Shrink one tile
+    /// and it pulls away from the run, and the seam it was hiding - its own black
+    /// outside edge, and the grass in the gap - is suddenly visible all the way
+    /// round it. It reads as a black border being drawn on the tile you touched,
+    /// because that is exactly what it looks like.
+    ///
+    /// Growing cannot do that. A block over full size covers its neighbours rather
+    /// than retreating from them, so no seam is ever exposed, and on the two sides
+    /// that DO carry black the band simply moves a little further out over grass it
+    /// was already against.
+    ///
+    /// It has to clear the tilt as well. Rotating a square by θ needs about
+    /// (cos θ + sin θ) to still cover the square it started in, which at the 0.055
+    /// radians below is 1.055 - so anything over that is safe, and 1.12 has room
+    /// to spare.
+    private static let prisedScale: CGFloat = 1.12
+
+    /// Above terrain and trees, below actors.
+    private static let wallZ: CGFloat = 5
+
+    /// Higher again, so a wall coming apart is not drawn half behind the ones
+    /// either side of it while it goes.
+    private static let crumbleZ: CGFloat = 6
+
+    /// A swelling wall has to be above the walls it is swelling over, or the growth
+    /// happens underneath them and reads as nothing at all.
+    private static let prisedZ: CGFloat = 5.5
 
     /// A wall with a finger held on it, working loose.
     ///
@@ -180,6 +216,7 @@ final class BlockRenderer {
         guard let wall = walls[point] else { return }
         prising = point
 
+        wall.sprite.zPosition = BlockRenderer.prisedZ
         wall.sprite.run(.scale(to: BlockRenderer.prisedScale, duration: duration),
                         withKey: "prise")
         wall.sprite.run(.repeatForever(.sequence([
@@ -198,8 +235,14 @@ final class BlockRenderer {
         guard settling, let wall = walls[point] else { return }
         wall.sprite.removeAction(forKey: "prise")
         wall.sprite.removeAction(forKey: "shudder")
-        wall.sprite.run(.group([.scale(to: 1, duration: 0.1),
-                                .rotate(toAngle: 0, duration: 0.1)]))
+
+        // Back into the run before it is back to full size, so it never sits at
+        // normal scale while still drawn over its neighbours.
+        wall.sprite.run(.sequence([
+            .group([.scale(to: 1, duration: 0.1),
+                    .rotate(toAngle: 0, duration: 0.1)]),
+            .run { wall.sprite.zPosition = BlockRenderer.wallZ }
+        ]))
     }
 
     /// Fades a wall out while the team that owns it is standing in it, so you can
