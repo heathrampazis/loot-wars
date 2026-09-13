@@ -182,6 +182,14 @@ final class BlockRenderer {
     private static let prisedScale: CGFloat = 1.12
 
     /// Above terrain and trees, below actors.
+    /// How much of a tile the black band takes, as a share of its width.
+    ///
+    /// Written as the proportion it always was rather than as a number of pixels.
+    /// It was 14 of 128; raising the texture to 160 without this would have
+    /// quietly fattened every wall's edge by a sixth, which is a change to how the
+    /// game LOOKS smuggled in under a change to how sharp it is.
+    private static let edgeShare: CGFloat = 14.0 / 128.0
+
     private static let wallZ: CGFloat = 5
 
     /// Higher again, so a wall coming apart is not drawn half behind the ones
@@ -335,8 +343,16 @@ final class BlockRenderer {
     }
 
     private static func makeTexture(mask: UInt8, colour: SKColor) -> SKTexture {
-        let side: CGFloat = 128
-        let edge: CGFloat = 14
+        // 160 rather than 128, and the edge kept proportional at an eighth.
+        //
+        // A tile was 36 points everywhere, which is 108 device pixels on a 3x phone
+        // and comfortably under 128. Pulling the camera in on a big screen makes a
+        // tile about 80 points, and an iPad is 2x, so the same wall is now asked to
+        // fill 160 - which a 128 texture can only do by being stretched. This is the
+        // one piece of art in the game that is DRAWN rather than exported, so it is
+        // also the only one that cannot be fixed by re-exporting it larger.
+        let side: CGFloat = 160
+        let edge: CGFloat = side * BlockRenderer.edgeShare
 
         func has(_ bit: UInt8) -> Bool { mask & bit != 0 }
 

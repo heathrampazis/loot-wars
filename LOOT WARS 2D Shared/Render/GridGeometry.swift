@@ -23,6 +23,51 @@ enum GridGeometry {
     /// this zoom against five up and down, which is both fair and a real fight.
     static let tileSize: CGFloat = 36
 
+    /// The window this zoom was tuned against, in tiles.
+    ///
+    /// Straight off the reasoning above: nearly eleven tiles sideways and five up
+    /// and down are HALF extents, so the whole window is twenty-two by ten. Every
+    /// balance number that reads the screen was solved against this rectangle -
+    /// AIBrain.canOpenFire, which decides whether a bot may shoot you, is the one
+    /// that matters most.
+    static let referenceWindow = CGSize(width: 22, height: 10)
+
+    /// How far the camera has to be pulled in on a screen this size to show the
+    /// same amount of world.
+    ///
+    /// scaleMode is .resizeFill, so the scene is the view's size in points and a
+    /// tile is 36 points on everything. That is the right answer for a phone and
+    /// the wrong one for anything bigger: an iPad does not draw the game smaller,
+    /// it simply shows far more of it - about 38 by 28 tiles against a phone's 23
+    /// by 11 - which reads as being zoomed out because you are looking at three
+    /// times as much map.
+    ///
+    /// It is not only how it looks. GameScene pushes the visible rectangle into the
+    /// simulation and the bots read it: a player on a big screen was seeing most of
+    /// a base's surroundings at once AND being shot at from correspondingly further
+    /// away, neither of which the balance was solved for.
+    ///
+    /// Matched by AREA rather than by width or height, because the shape of the
+    /// window is not something this can hold constant - a phone is more than twice
+    /// as wide as it is tall and an iPad is a third wider. Holding the width would
+    /// hand an iPad half the map vertically; holding the height would leave it
+    /// looking down a narrow slot. Holding the area means the same AMOUNT of world
+    /// through a differently shaped window, which is the honest reading of "the
+    /// same zoom" when the window is a different shape.
+    ///
+    /// Never above 1, so this can only ever pull the camera IN. A screen smaller
+    /// than the reference - an SE is about a fifth short - keeps what it has rather
+    /// than being zoomed out to match, because the fix for a small screen is not
+    /// showing the same amount of world at a size nobody can read.
+    static func zoom(for screen: CGSize) -> CGFloat {
+        guard screen.width > 1, screen.height > 1 else { return 1 }
+
+        let wanted = referenceWindow.width * referenceWindow.height * tileSize * tileSize
+        let have = screen.width * screen.height
+
+        return min(1, (wanted / have).squareRoot())
+    }
+
     static func point(for position: Vec2) -> CGPoint {
         CGPoint(x: CGFloat(position.x) * tileSize,
                 y: CGFloat(position.y) * tileSize)

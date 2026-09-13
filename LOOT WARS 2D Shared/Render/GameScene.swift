@@ -267,6 +267,16 @@ final class GameScene: SKScene {
         }
 
         let touch: UITouch
+        /// Where the press landed ON SCREEN, in the camera's own space.
+        ///
+        /// The camera's space rather than the scene's, which is what this used to
+        /// be. Two reasons, and the second one was always a bug. The camera is
+        /// scaled now, so a scene-space delta is a world measurement and tapSlop -
+        /// which is a number of points a thumb moves - would have meant twice as
+        /// far on an iPad. And the camera FOLLOWS the player, so a scene-space
+        /// origin drifts under a finger that has not moved at all: walk while
+        /// holding still and the press would cancel itself. The camera's own space
+        /// is neither scaled nor moved by any of that.
         let screenOrigin: CGPoint
         /// Where the press landed on the MAP, captured at press time.
         ///
@@ -424,14 +434,28 @@ final class GameScene: SKScene {
     }
 
     private func layOutUI() {
+        // How far in the camera has to sit to show the same amount of world as a
+        // phone - see GridGeometry.zoom. One on a phone, about a half on an iPad.
+        //
+        // On the CAMERA rather than on the world layer, because the interface is
+        // parented to the camera and a camera's own children are drawn at their
+        // natural point size whatever it is scaled to. So the map zooms and the
+        // buttons do not, which is the whole reason the HUD hangs off the camera.
+        let zoom = GridGeometry.zoom(for: size)
+        cameraController.node.setScale(zoom)
+
         // Tell the simulation how much of the map this screen is actually showing,
         // so bots will not open fire from somewhere the player cannot look. Done
         // here because this is where the size is known, and it is the only thing
         // Render ever pushes INTO the world - a plain number, no SpriteKit.
+        //
+        // Through the zoom, and it has to be: this is the rectangle the player can
+        // SEE, and on a pulled-in camera that is a good deal less of the map than
+        // the screen is points wide.
         if world != nil {
             world.visibleHalfExtent = Vec2(
-                x: Double(size.width / 2 / GridGeometry.tileSize),
-                y: Double(size.height / 2 / GridGeometry.tileSize))
+                x: Double(size.width / 2 * zoom / GridGeometry.tileSize),
+                y: Double(size.height / 2 * zoom / GridGeometry.tileSize))
         }
 
         let margin: CGFloat = 110
@@ -1420,7 +1444,7 @@ extension GameScene {
         // A finger that wanders was neither a tap nor a hold. On the map it is now
         // a third thing - a run of wall - and everywhere else it is still nothing.
         if let press = pending, touches.contains(press.touch) {
-            let moved = press.touch.location(in: self) - press.screenOrigin
+            let moved = press.touch.location(in: cameraController.node) - press.screenOrigin
             if hypot(moved.x, moved.y) > tapSlop {
                 if case .map = press.target, !press.fired { beginPainting(from: press) }
                 cancelPress()
@@ -1484,7 +1508,7 @@ extension GameScene {
         guard pending == nil else { return }
 
         pending = PendingPress(touch: touch,
-                               screenOrigin: touch.location(in: self),
+                               screenOrigin: touch.location(in: cameraController.node),
                                worldOrigin: touch.location(in: worldLayer),
                                // UITouch timestamps share the frame clock's base,
                                // so this is directly comparable in resolveHold.
