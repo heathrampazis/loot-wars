@@ -102,7 +102,7 @@ final class GameScene: SKScene {
     /// The tokens stayed because they are not readable anywhere else, and they
     /// moved next to the shop button because that is the only thing they are for.
     /// A purse and the counter it is spent at are one piece of information.
-    private let tokens = StatCounterNode(iconNamed: "Token", plated: true)
+    private let tokens = StatCounterNode(iconNamed: "Token")
     private let leaderboard = LeaderboardNode()
     private let matchTimer = MatchTimerNode()
 
@@ -374,7 +374,18 @@ final class GameScene: SKScene {
         openButton.isHidden = true
         cameraController.node.addChild(itemButton)
         itemButton.isHidden = true
-        cameraController.node.addChild(tokens)
+        // ON the button rather than beside it, and a child of it rather than a
+        // neighbour. Three things follow for free: it moves wherever the button
+        // moves, it squashes with the button's press, and it hides when the shop
+        // opens - which is right, because the shop shows you your tokens itself.
+        //
+        // Clipped to the lower edge, overlapping by a third of its height, so it
+        // reads as part of the button rather than as something resting under it.
+        tokens.position = CGPoint(x: 0,
+                                  y: -GameScene.shopButtonRadius
+                                     - StatCounterNode.size.height / 3)
+        tokens.zPosition = 1
+        shopButton.addChild(tokens)
         cameraController.node.addChild(leaderboard)
         cameraController.node.addChild(matchTimer)
         cameraController.node.addChild(shopButton)
@@ -530,11 +541,8 @@ final class GameScene: SKScene {
         let radius = GameScene.shopButtonRadius
         shopButton.position = CGPoint(x: corner.x + radius, y: corner.y - radius)
 
-        // Immediately beside it, on the same line through the middle of the button.
-        // A purse and the counter it is spent at read as one thing when they touch
-        // and as two unrelated readouts when they do not.
-        tokens.position = CGPoint(x: shopButton.position.x + radius + 10,
-                                  y: shopButton.position.y)
+        // The purse needs no placing: it is a child of the button now, hung off it
+        // once where the button is built.
 
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
         hotbar.position = CGPoint(x: 0,
@@ -548,11 +556,19 @@ final class GameScene: SKScene {
         // corner inside the move stick's grab radius, which is deliberately far
         // wider than the stick you can see. The stick gets first refusal on every
         // touch, so the leftmost slot would have quietly stopped responding.
-        // What everything below the corner hangs off. It was the bottom of the HUD
-        // panel; it is the bottom of the shop button now, which is a few points
-        // higher and a good deal more honest - the panel's height included a bar
-        // that is not there any more.
+        // TWO bottoms, because the corner is no longer one rectangle.
+        //
+        // cornerBottom is the button's, and it is what the CENTRED things hang off
+        // - the hint, the chest panel, the shop panel. None of those come anywhere
+        // near the left edge on any screen, so the badge dangling off the button is
+        // none of their business, and making them clear it would cost the shop
+        // panel fifteen points of height on an SE for nothing.
+        //
+        // purseBottom is the badge's, and only the quick offer needs it, because
+        // the quick offer is the one thing that sits directly underneath.
         let cornerBottom = shopButton.position.y - radius
+        let purseBottom = shopButton.position.y + tokens.position.y
+                        - StatCounterNode.size.height / 2
         let hotbarTop = hotbar.position.y + HotbarNode.size.height / 2
         chestPanel.position = CGPoint(x: 0, y: (cornerBottom + hotbarTop) / 2)
 
@@ -580,7 +596,7 @@ final class GameScene: SKScene {
         // side, and the stick gets first refusal on everything it covers.
         quickBuy.position = CGPoint(
             x: corner.x + QuickBuyNode.size.width / 2,
-            y: cornerBottom - 10 - QuickBuyNode.size.height / 2)
+            y: purseBottom - 10 - QuickBuyNode.size.height / 2)
 
         // The strip directly under the health panel, centred: the one band of
         // screen nothing else occupies mid-match. Measured off the HUD rather than
