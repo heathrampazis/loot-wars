@@ -88,6 +88,20 @@ enum WorldEvent {
     /// Somebody bought something.
     case purchase(ItemType, by: ActorID)
 
+    /// Somebody picked something up off the ground, and whether it went straight on.
+    ///
+    /// This one is close to the line the note at the top of this file draws, so it
+    /// is worth saying why it clears it. WHAT was picked up does not survive: a
+    /// bandage joins a stack that was already there and a helmet is simply worn,
+    /// and a frame later the bag looks the same as a bag somebody bought from.
+    /// Neither does WORN - acquire is what makes "this beats what you have" stop
+    /// being true, by putting it on your head.
+    ///
+    /// Worn is carried rather than worked out by the listener for exactly that
+    /// reason. By the time anybody reads this, comparing the item against what the
+    /// actor is wearing would compare it against ITSELF.
+    case pickedUp(ItemType, by: ActorID, worn: Bool)
+
     /// Somebody was killed, and what it was worth to whoever did it.
     ///
     /// Carries the position because by the time this is read the victim has been

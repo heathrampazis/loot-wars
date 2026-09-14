@@ -156,10 +156,24 @@ enum LootSystem {
             // left to protect the player from. See ArcadeSystem.canPlace for what
             // replaced the cap.
 
+            // Worked out BEFORE acquire, because acquire is precisely what stops
+            // it being true: a helmet that beats yours is on your head by the time
+            // that call returns, and asking afterwards compares it with itself.
+            let worn: Bool
+            switch type {
+            case .helmet(let tier):  worn = tier > actor.helmet
+            case .blaster(let tier): worn = tier > actor.blaster
+            case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .perk:
+                worn = false
+            }
+
             // Worn if it beats what is on, bagged if it does not - and that rule
             // lives on the Actor, so walking over a helmet and pulling one out of a
             // chest cannot come to different conclusions.
-            return actor.acquire(type)
+            guard actor.acquire(type) else { return false }
+
+            world.record(.pickedUp(type, by: actor.id, worn: worn))
+            return true
 
         case .token(let value):
             actor.tokens += value

@@ -65,6 +65,9 @@ final class MenuScene: SKScene {
     }
 
     override func didMove(to view: SKView) {
+        // Before anything asks for a sound. See SoundPlayer.warm.
+        SoundPlayer.shared.warm()
+
         backgroundColor = MenuScene.ground
         removeAllChildren()
         build()
@@ -333,6 +336,12 @@ final class MenuScene: SKScene {
         // reads as having been let go of rather than as having sprung back.
         play.removeAction(forKey: "breathe")
         play.removeAllActions()
+
+        // On the press rather than when the match appears. The button's animation
+        // and the fade to the map take the better part of half a second between
+        // them, and a sound that arrives at the end of that belongs to the scene
+        // change; one that arrives on the press belongs to the finger.
+        SoundPlayer.shared.play(.play)
 
         let press = SKAction.sequence([
             .scale(to: 0.90, duration: 0.05),

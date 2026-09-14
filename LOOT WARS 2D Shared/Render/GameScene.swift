@@ -845,11 +845,23 @@ final class GameScene: SKScene {
         }
     }
 
+    /// Where the player's ears are.
+    ///
+    /// The CAMERA rather than the player, and they are not always the same thing:
+    /// die and the camera goes to watch whoever killed you, so for those ten
+    /// seconds the screen is somewhere else entirely. Hearing your own corpse's
+    /// surroundings while looking at a fight across the map would be two senses
+    /// disagreeing about where you are.
+    private var listener: Vec2 {
+        GridGeometry.position(for: cameraController.node.position)
+    }
+
     private func dispatch(_ events: [WorldEvent], in world: World) {
         for event in events {
             switch event {
             case .blast(let position):
                 bombRenderer.flash(at: position)
+                SoundPlayer.shared.play(.bomb, at: position, heardFrom: listener)
 
             case .jackpot(let position):
                 effectsRenderer.jackpot(at: position)
@@ -899,6 +911,15 @@ final class GameScene: SKScene {
                 guard !ring.isEmpty else { break }
                 effectsRenderer.seal(GameScene.sweptRound(ring), chests: chests)
 
+                // Heard from wherever it happened, which for seven of the eight is
+                // somewhere off-screen. That is the useful half of it: a wall
+                // closing away to your left is a base that has just become worth
+                // taking a bomb to, and the sound is the only thing that says so.
+                SoundPlayer.shared.play(.complete,
+                                        at: world.claim(for: team)?.centreTile.center
+                                            ?? world.localPlayer?.position ?? .zero,
+                                        heardFrom: listener)
+
             case .vault(let points, let team, let position):
                 // Only your own base, and only when you can see it. Somebody else's
                 // wall paying out is a number over a base you are not standing in,
@@ -920,6 +941,14 @@ final class GameScene: SKScene {
 
             case .purchase(let bought, let buyer):
                 guard buyer == world.localPlayerID else { break }
+
+                // Gear gets the upgrade noise wherever it was bought, and
+                // everything else gets the till. Sorted on WHAT rather than on
+                // which panel sold it: the quick offer and the shop are two ways
+                // into the same purchase, and a helmet that sounded different
+                // depending on which one you used would be telling you about the
+                // interface instead of about the helmet.
+                SoundPlayer.shared.play(bought.isGear ? .upgrade : .purchase)
 
                 // A heal you just bought is a heal you are about to want.
                 //
@@ -948,6 +977,16 @@ final class GameScene: SKScene {
                 shopPanel.confirm(
                     flyingTo: shopPanel.convert(.zero, from: hotbar)
                 )
+
+            case .pickedUp(_, let who, let worn):
+                // Yours only. Seven bots sweeping the map is a constant patter of
+                // somebody else's good fortune, and none of it is about you.
+                guard who == world.localPlayerID else { break }
+
+                // Worn means it beat what you had on, which is the one pickup worth
+                // a different noise - see WorldEvent.pickedUp for why the world has
+                // to say so rather than this working it out, which it cannot.
+                SoundPlayer.shared.play(worn ? .upgrade : .collect)
 
             case .kill(let victim, let killer, let position, let points, _):
                 // Remembered so the camera can go and watch them - see aimCamera.
@@ -1346,6 +1385,7 @@ extension GameScene {
                shopButton.begin(atLocalPoint: touch.location(in: shopButton)) {
                 shopButton.end()
                 shopPanel.open()
+                SoundPlayer.shared.play(.select)
                 continue
             }
 
@@ -1695,6 +1735,10 @@ extension GameScene {
             return
         }
 
+        // On the CHANGE rather than on the tap, so putting a slot down sounds the
+        // same as picking one up - both are the selection moving, which is the
+        // thing this noise is about.
+        SoundPlayer.shared.play(.tap)
         selectedSlot = (selectedSlot == slot) ? nil : slot
     }
 
@@ -1808,6 +1852,7 @@ extension GameScene {
         selectedSlot = nil
         chestPanel.open(id)
         chestRenderer.nudge(id)
+        SoundPlayer.shared.play(.select)
 
         moveStick.end()
         moveTouch = nil
