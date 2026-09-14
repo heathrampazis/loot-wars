@@ -4,23 +4,27 @@
 //
 //  Playing the things in Sound, and placing them.
 //
-//  AVAudioPlayer rather than SKAction.playSoundFileNamed, and that is not a matter
-//  of taste. The SKAction version has no volume and no pan - it plays a file at
-//  full blast, centred - so every distance rule below would have been impossible to
-//  express. It also ties the sound's lifetime to a node's, which means an explosion
-//  stops halfway through if whatever it was attached to is removed, and an
-//  explosion is a thing that removes nodes.
+//  AVAudioEngine with the files decoded into memory up front, NOT AVAudioPlayer -
+//  and that is a rewrite rather than a preference. AVAudioPlayer is built for
+//  playing a track: every call to play() re-primes the thing, seeking currentTime
+//  back to zero is a real seek, and Apple's own guidance is to call prepareToPlay
+//  again after each stop. None of that matters for a menu click. All of it matters
+//  for the blaster, which fires four and a half times a second per person with
+//  eight people on the map, every one of those calls landing on the thread that is
+//  trying to draw the frame. That is where the stutter came from.
 //
-//  A POOL per sound, because one player cannot play twice at once: asking it to
-//  start again cuts off what it was doing. Four bombs in a second is an ordinary
-//  thing for eight teams to manage, and one player would render it as one bomb.
-//  Round-robin across the voices, so the oldest is the one that gets cut.
+//  An engine does the expensive half once. A file is decoded to a PCM buffer at
+//  launch and never touched again; playing it is scheduleBuffer, which hands a
+//  pointer to the audio thread and returns. The mixing happens on the audio
+//  thread, where it belongs, and nothing about firing a gun reaches the renderer.
 //
-//  Shared, and this is the one place in the drawing code where that is the right
-//  shape. There is one speaker in the phone. Two scenes hand off to each other -
-//  the menu plays its button and the match starts a second later - and a per-scene
-//  player would decode the same files again on every transition, for no reason
-//  other than tidiness.
+//  A POOL of player nodes per sound, because one node plays one thing at a time.
+//  Round-robin, so the oldest is the one that gets interrupted - four bombs in a
+//  second is ordinary for eight teams, and one voice would render it as one bomb.
+//
+//  Shared, and this is the one place in the drawing code where that is right.
+//  There is one speaker in the phone. Two scenes hand off to each other and a
+//  per-scene player would decode thirteen files again on every transition.
 //
 
 import AVFoundation
@@ -31,7 +35,12 @@ final class SoundPlayer {
 
     static let shared = SoundPlayer()
 
-    private var voices: [Sound: [AVAudioPlayer]] = [:]
+    private let engine = AVAudioEngine()
+
+    /// Decoded once, at launch, and then never again.
+    private var buffers: [Sound: AVAudioPCMBuffer] = [:]
+    private var nodes: [Sound: [AVAudioPlayerNode]] = [:]
+
     private var next: [Sound: Int] = [:]
     private var lastPlayed: [Sound: TimeInterval] = [:]
 
@@ -60,15 +69,22 @@ final class SoundPlayer {
         try? session.setActive(true)
         #endif
 
-        for sound in Sound.allCases { load(sound) }
+        // Touched before anything is attached, because asking for it is what builds
+        // it - and building the mixer half way through wiring nodes into it is how
+        // an engine ends up with a connection to something that did not exist yet.
+        let mixer = engine.mainMixerNode
+
+        for sound in Sound.allCases { load(sound, into: mixer) }
+
+        resume()
     }
 
-    /// Decoded and primed at launch rather than on first use.
+    /// Decoded, wired up, and left running.
     ///
-    /// The first play of an untouched file costs a decode, and it arrives exactly
-    /// when something interesting has happened - which is the worst possible moment
-    /// for a frame to go long. prepareToPlay does that work now instead.
-    private func load(_ sound: Sound) {
+    /// All of it at launch rather than on first use. The decode is the expensive
+    /// part and it would otherwise land on whichever frame first fired a gun -
+    /// which is to say, on the first interesting thing that happens in a match.
+    private func load(_ sound: Sound, into mixer: AVAudioMixerNode) {
         let file = sound.file
 
         // Both spellings, because where these land in the bundle depends on how the
@@ -85,23 +101,69 @@ final class SoundPlayer {
             return
         }
 
-        var made: [AVAudioPlayer] = []
-        for _ in 0..<sound.voices {
-            guard let player = try? AVAudioPlayer(contentsOf: url) else { continue }
-            player.prepareToPlay()
-            made.append(player)
+        guard let audio = try? AVAudioFile(forReading: url) else {
+            print("Loot Wars: unreadable sound \(file.name).\(file.kind)")
+            return
         }
 
-        voices[sound] = made
+        let frames = AVAudioFrameCount(audio.length)
+        guard frames > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: audio.processingFormat,
+                                            frameCapacity: frames) else {
+            print("Loot Wars: undecodable sound \(file.name).\(file.kind)")
+            return
+        }
+
+        do { try audio.read(into: buffer) } catch {
+            print("Loot Wars: unreadable sound \(file.name).\(file.kind) - \(error)")
+            return
+        }
+
+        buffers[sound] = buffer
+
+        // Connected at the FILE's own format rather than at one house format. The
+        // mixer converts, which is its job, and the alternative is resampling
+        // thirteen files by hand to agree with each other.
+        var pool: [AVAudioPlayerNode] = []
+        for _ in 0..<sound.voices {
+            let node = AVAudioPlayerNode()
+            engine.attach(node)
+            engine.connect(node, to: mixer, format: buffer.format)
+            pool.append(node)
+        }
+
+        nodes[sound] = pool
+    }
+
+    /// Starts the engine, and every node in it, if they are not already going.
+    ///
+    /// A player node has to be told to play once before anything scheduled into it
+    /// is heard, and it stays playing forever afterwards - scheduling is what makes
+    /// a noise, not starting. The engine itself can be stopped out from under all
+    /// of this by the system: a phone call, headphones going in or out. So this is
+    /// idempotent and is asked again cheaply on the way into every sound.
+    @discardableResult
+    private func resume() -> Bool {
+        if engine.isRunning { return true }
+
+        do { try engine.start() } catch {
+            print("Loot Wars: audio engine would not start - \(error)")
+            return false
+        }
+
+        for pool in nodes.values {
+            for node in pool { node.play() }
+        }
+        return true
     }
 
     /// Builds the shared player, if nothing has yet.
     ///
-    /// Everything expensive happens in init - the audio session comes up, nine
-    /// files are decoded - and without this the first thing to ask for a sound
-    /// pays for all of it. That would be the menu's play button, which is the one
-    /// press in the game where a late noise is most obvious, because there is
-    /// nothing else happening.
+    /// Everything expensive happens in init - the session comes up, thirteen files
+    /// are decoded, thirty-odd nodes are wired into the mixer - and without this
+    /// the first thing to ask for a sound pays for all of it. That would be the
+    /// menu's play button, which is the press in the game where a late noise is
+    /// most obvious, because nothing else is happening.
     func warm() {}
 
     // MARK: - Playing
@@ -115,9 +177,9 @@ final class SoundPlayer {
     /// A sound that happened at a place on the map, heard from another.
     ///
     /// Silently does nothing past the sound's earshot, which is most of the point:
-    /// eight teams bombing each other across a fifty-six tile map would otherwise
-    /// be a continuous rumble that tells you nothing, where a bomb you can only
-    /// just hear, off to the left, is somebody opening a base over there.
+    /// eight teams shooting at each other across a fifty-six tile map would
+    /// otherwise be a continuous rumble that tells you nothing, where a shot you
+    /// can only just hear, off to the left, is a fight you could walk to.
     func play(_ sound: Sound, at position: Vec2, heardFrom listener: Vec2) {
         guard let earshot = sound.earshot else {
             play(sound)
@@ -142,34 +204,40 @@ final class SoundPlayer {
         //
         // The limit exists to stop eight people shooting at once flattening the
         // mix, and it does that by dropping whatever asks too soon after something
-        // else. That is fine for a gun across the base and wrong for YOURS: a
-        // blaster is four and a half shots a second, so in a busy firefight a
-        // distant bot firing thirty milliseconds before you would silence your own
-        // trigger about one press in five. A gun that intermittently does not go
-        // off does not read as a busy mix, it reads as a broken game.
+        // else. Fine for a gun across the base, wrong for YOURS: a blaster is four
+        // and a half shots a second, so in a busy firefight a distant bot firing
+        // thirty milliseconds before you would silence your own trigger about one
+        // press in five. A gun that intermittently does not go off does not read as
+        // a busy mix, it reads as a broken game.
         start(sound, volume: volume, pan: pan, urgent: distance < SoundPlayer.atYourFeet)
     }
 
     private func start(_ sound: Sound, volume: Float, pan: Float, urgent: Bool = false) {
-        guard let pool = voices[sound], !pool.isEmpty else { return }
+        guard let buffer = buffers[sound],
+              let pool = nodes[sound], !pool.isEmpty else { return }
 
         // One moment can announce the same thing several times over - a kill
         // scatters a bagful and it is swept up across two frames - and a dozen
         // copies of one chime is not a dozen pickups, it is a fault.
         //
         // Urgent skips the wait but still resets it, so your own shot cannot be
-        // dropped and still counts against whoever asks next.
+        // dropped and cannot be used to jump the queue twice either.
         let now = CACurrentMediaTime()
         if !urgent, let last = lastPlayed[sound], now - last < sound.minimumGap { return }
         lastPlayed[sound] = now
 
+        guard resume() else { return }
+
         let index = (next[sound] ?? 0) % pool.count
         next[sound] = index + 1
 
-        let player = pool[index]
-        player.volume = max(0, min(1, volume))
-        player.pan = pan
-        player.currentTime = 0
-        player.play()
+        let node = pool[index]
+        node.volume = max(0, min(1, volume))
+        node.pan = pan
+
+        // interrupts, so a voice that is still busy is taken over rather than
+        // queued behind itself. Queued is the wrong answer for every sound here:
+        // a second gunshot belongs now or not at all, never in two seconds' time.
+        node.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
     }
 }
