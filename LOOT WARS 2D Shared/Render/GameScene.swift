@@ -852,7 +852,14 @@ final class GameScene: SKScene {
     /// seconds the screen is somewhere else entirely. Hearing your own corpse's
     /// surroundings while looking at a fight across the map would be two senses
     /// disagreeing about where you are.
-    private var listener: Vec2 {
+    ///
+    /// NOT called `listener`, which is what it was and which does not compile.
+    /// SKScene already has one - `var listener: SKNode?`, the node SpriteKit uses
+    /// as the ear for its own positional audio - so declaring a Vec2 of that name
+    /// on a subclass of it is a redeclaration of an inherited property with a
+    /// different type. A good name for the concept, already taken by the framework
+    /// for the same concept.
+    private var ears: Vec2 {
         GridGeometry.position(for: cameraController.node.position)
     }
 
@@ -861,7 +868,7 @@ final class GameScene: SKScene {
             switch event {
             case .blast(let position):
                 bombRenderer.flash(at: position)
-                SoundPlayer.shared.play(.bomb, at: position, heardFrom: listener)
+                SoundPlayer.shared.play(.bomb, at: position, heardFrom: ears)
 
             case .jackpot(let position):
                 effectsRenderer.jackpot(at: position)
@@ -926,7 +933,7 @@ final class GameScene: SKScene {
                     heart = world.localPlayer?.position ?? Vec2.zero
                 }
 
-                SoundPlayer.shared.play(.complete, at: heart, heardFrom: listener)
+                SoundPlayer.shared.play(.complete, at: heart, heardFrom: ears)
 
             case .vault(let points, let team, let position):
                 // Only your own base, and only when you can see it. Somebody else's
