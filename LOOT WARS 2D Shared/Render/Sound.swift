@@ -47,6 +47,8 @@ enum Sound: CaseIterable {
 
     // MARK: - Things that happened
 
+    /// A blaster firing, anybody's.
+    case pop
     /// A bomb going off, anywhere on the map.
     case bomb
     /// A wall closing for the first time, anybody's.
@@ -65,6 +67,7 @@ enum Sound: CaseIterable {
         case .exit:     return ("Exit", "mp3")
         case .error:    return ("Error", "mp3")
         case .notification: return ("Notification", "mp3")
+        case .pop:      return ("Pop", "mp3")
         case .bomb:     return ("Bomb", "wav")
         case .complete: return ("Complete", "mp3")
         }
@@ -86,6 +89,14 @@ enum Sound: CaseIterable {
         switch self {
         case .bomb:     return 34
         case .complete: return 24
+
+        // Much tighter than either, and on purpose. A bomb is one event a minute
+        // and worth hearing from across the map; a blaster is four and a half a
+        // second per person and there are eight of them. Eighteen tiles is a
+        // little inside what you can see, so gunfire means a fight you could walk
+        // to rather than a fight somewhere on this map - which is the difference
+        // between atmosphere and a wall of noise.
+        case .pop:      return 18
         case .play, .purchase, .upgrade, .collect, .select, .tap,
              .heal, .exit, .error, .notification: return nil
         }
@@ -99,6 +110,10 @@ enum Sound: CaseIterable {
     /// thing for eight teams to do.
     var voices: Int {
         switch self {
+        // The most of anything by a distance. Eight actors at four and a half
+        // shots a second will genuinely have six in the air at once during a
+        // firefight, and a pool that runs out renders that as one gun.
+        case .pop:      return 6
         case .bomb:     return 4
         case .complete: return 3
         case .collect:  return 3
@@ -117,6 +132,12 @@ enum Sound: CaseIterable {
         switch self {
         case .collect: return 0.07
         case .tap:     return 0.04
+
+        // Short enough not to touch your own fire - four and a half a second is
+        // 222ms apart - and long enough to cap what eight people shooting at once
+        // can do to the mix. Your own shots skip it anyway; see SoundPlayer, where
+        // anything at your feet is exempt.
+        case .pop:     return 0.035
         case .bomb, .complete, .play, .purchase, .upgrade, .select,
              .heal, .exit, .error, .notification: return 0.02
         }
@@ -125,6 +146,11 @@ enum Sound: CaseIterable {
     /// Per-sound trim, so the mix can be balanced without re-exporting anything.
     var gain: Float {
         switch self {
+        // The quietest thing in the game, because it is the commonest by an order
+        // of magnitude. A pop at the same level as a purchase, four and a half
+        // times a second, is the only sound here capable of making somebody turn
+        // the volume off.
+        case .pop:      return 0.42
         case .tap:      return 0.55
         case .collect:  return 0.7
         case .bomb:     return 0.9

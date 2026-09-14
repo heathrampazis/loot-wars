@@ -18,12 +18,29 @@ final class ProjectileRenderer {
     private var nodesByProjectile: [ProjectileID: SKSpriteNode] = [:]
     private lazy var texture: SKTexture = ProjectileRenderer.makeTexture()
 
-    func sync(with world: World) {
+    /// - Parameter ears: where the player is listening from, so a shot can be
+    ///   placed. Passed in rather than looked up, because the scene is the only
+    ///   thing that knows - the camera is not always on the player.
+    func sync(with world: World, heardFrom ears: Vec2) {
         var stillFlying = Set<ProjectileID>()
 
         for projectile in world.projectiles {
             stillFlying.insert(projectile.id)
-            let sprite = nodesByProjectile[projectile.id] ?? makeNode(for: projectile.id)
+
+            // A projectile this renderer has not seen before is a shot that has
+            // just been fired, and that is the whole hook - no event, nothing
+            // announced. The bullet appearing IS the trigger being pulled, and this
+            // file already had to notice it in order to draw the thing.
+            //
+            // Everybody's, including from behind a wall where you cannot see who
+            // fired. Especially from behind a wall: a shot you can hear and cannot
+            // see is the game telling you somebody is in your base.
+            let known = nodesByProjectile[projectile.id]
+            if known == nil {
+                SoundPlayer.shared.play(.pop, at: projectile.position, heardFrom: ears)
+            }
+
+            let sprite = known ?? makeNode(for: projectile.id)
             sprite.position = GridGeometry.point(for: projectile.position)
         }
 

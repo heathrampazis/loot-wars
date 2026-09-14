@@ -47,6 +47,9 @@ final class SoundPlayer {
     /// headphones rather than as a direction.
     private static let widest: Float = 0.85
 
+    /// Close enough that it is you rather than something near you.
+    private static let atYourFeet: Double = 2
+
     private init() {
         #if os(iOS) || os(tvOS)
         // Ambient, so the silent switch means silent and whatever the player had
@@ -135,17 +138,29 @@ final class SoundPlayer {
         let sideways = away.x / SoundPlayer.fullyOneSide
         let pan = max(-1, min(1, Float(sideways))) * SoundPlayer.widest
 
-        start(sound, volume: volume, pan: pan)
+        // Anything happening at your feet skips the rate limit.
+        //
+        // The limit exists to stop eight people shooting at once flattening the
+        // mix, and it does that by dropping whatever asks too soon after something
+        // else. That is fine for a gun across the base and wrong for YOURS: a
+        // blaster is four and a half shots a second, so in a busy firefight a
+        // distant bot firing thirty milliseconds before you would silence your own
+        // trigger about one press in five. A gun that intermittently does not go
+        // off does not read as a busy mix, it reads as a broken game.
+        start(sound, volume: volume, pan: pan, urgent: distance < SoundPlayer.atYourFeet)
     }
 
-    private func start(_ sound: Sound, volume: Float, pan: Float) {
+    private func start(_ sound: Sound, volume: Float, pan: Float, urgent: Bool = false) {
         guard let pool = voices[sound], !pool.isEmpty else { return }
 
         // One moment can announce the same thing several times over - a kill
         // scatters a bagful and it is swept up across two frames - and a dozen
         // copies of one chime is not a dozen pickups, it is a fault.
+        //
+        // Urgent skips the wait but still resets it, so your own shot cannot be
+        // dropped and still counts against whoever asks next.
         let now = CACurrentMediaTime()
-        if let last = lastPlayed[sound], now - last < sound.minimumGap { return }
+        if !urgent, let last = lastPlayed[sound], now - last < sound.minimumGap { return }
         lastPlayed[sound] = now
 
         let index = (next[sound] ?? 0) % pool.count

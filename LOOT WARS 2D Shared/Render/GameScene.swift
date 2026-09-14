@@ -634,7 +634,7 @@ final class GameScene: SKScene {
         arcadeRenderer.sync(with: world)
         groundItemRenderer.sync(with: world)
         bombRenderer.sync(with: world)
-        projectileRenderer.sync(with: world)
+        projectileRenderer.sync(with: world, heardFrom: ears)
         actorRenderer.sync(with: world, dt: frameDelta)
         hud.update(with: world)
         repositionForSafeAreaIfNeeded()
