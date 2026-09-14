@@ -92,30 +92,42 @@ final class GameScene: SKScene {
     private var cornerAction: CornerAction = .aim
 
     private let leaderboard = LeaderboardNode()
+    private let matchTimer = MatchTimerNode()
 
-    /// The clock, and your purse under it, in one plate along the top middle.
+    /// Your purse, standing inside the shop's panel beside the glyph.
     ///
-    /// The purse ended up here after two worse homes. It was a row on the health
-    /// panel; when that went it stood beside the shop button as its own plate,
-    /// which laid a bar of furniture across the corner of the map for a
-    /// three-character number; then it clipped to the button as a badge, which
-    /// read as a sticker. A row belongs inside somebody's panel, and the top edge
-    /// had a panel with room in it.
-    private let matchPanel = MatchPanelNode()
+    /// FOURTH HOME, and the three before it were all the same mistake seen from
+    /// different angles: the purse kept being given a place NEAR the shop instead
+    /// of a place IN it. A row on the health panel, then its own plate beside the
+    /// button - furniture laid across the corner of the map for a three-character
+    /// number - then a badge clipped to the button, which read as a sticker, then
+    /// a row in the clock's panel, which put it the length of the screen away from
+    /// the only thing it is for.
+    ///
+    /// One plate, glyph on the left and the number on the right, and the whole
+    /// thing is the button. Tapping your own balance opens the shop, which is what
+    /// you were going to do about it anyway.
+    private let purse = StatCounterNode(iconNamed: "Token")
 
     /// Opens the shop. Sits on the top edge between the clock and the leaderboard -
     /// the only gap that is clear on every size. Under the HUD, which was the
     /// obvious spot, it lands inside the move stick's grab radius on anything
     /// smaller than a Pro Max.
-    private static let shopButtonRadius: CGFloat = 34
+    /// Wide enough for the glyph, a gap, and three digits with room to breathe.
+    /// As tall as the button used to be square, so the corner is the same height it
+    /// was and everything hanging below it keeps its place.
+    private static let shopButtonSize = CGSize(width: 132, height: 68)
+
+    /// Where the number sits inside that plate: centred in what the glyph leaves.
+    private static let purseCentre: CGFloat = 26
 
     private let shopButton = ActionButtonNode(glyph: Glyphs.shoppingBag,
-                                              radius: shopButtonRadius, grabRadius: 42,
-                                              shape: .roundedSquare,
+                                              shape: .panel(shopButtonSize),
                                               fill: RenderPalette.hudPanel,
-                                              // 0.73 of the plate, kept as the
-                                              // button grew. The reference draws it
-                                              // at 0.6, which left more air round it
+                                              // Against the plate's HEIGHT, which
+                                              // is what a wide panel leaves as the
+                                              // limit. The reference draws it at
+                                              // 0.6, which left more air round it
                                               // than the button wanted.
                                               glyphSize: 50)
     private let shopPanel = ShopPanelNode()
@@ -373,7 +385,13 @@ final class GameScene: SKScene {
         itemButton.isHidden = true
 
         cameraController.node.addChild(leaderboard)
-        cameraController.node.addChild(matchPanel)
+        cameraController.node.addChild(matchTimer)
+
+        // Inside the shop's own plate, to the right of the glyph. A child, so it
+        // moves with the panel, squashes with its press and goes when it goes.
+        purse.position = CGPoint(x: GameScene.purseCentre, y: 0)
+        purse.zPosition = 1
+        shopButton.addChild(purse)
         cameraController.node.addChild(shopButton)
         cameraController.node.addChild(shopPanel)
         cameraController.node.addChild(quickBuy)
@@ -514,7 +532,7 @@ final class GameScene: SKScene {
         // The one strip of the top edge nothing else wants: the HUD holds the left
         // corner, the leaderboard the right, and the middle is clear on every size
         // those two fit on.
-        matchPanel.position = CGPoint(x: 0, y: size.height / 2 - inset)
+        matchTimer.position = CGPoint(x: 0, y: size.height / 2 - inset)
         results.layOut(for: size)
 
         // IN the corner now, where the health panel used to be.
@@ -524,11 +542,12 @@ final class GameScene: SKScene {
         // lapping the match clock on a narrow phone. Starting at the corner instead
         // of 114 points into it, there is no longer anything to clamp against: even
         // on an SE the purse beside it ends about 130 points clear of the clock.
-        let radius = GameScene.shopButtonRadius
-        shopButton.position = CGPoint(x: corner.x + radius, y: corner.y - radius)
+        let plate = GameScene.shopButtonSize
+        shopButton.position = CGPoint(x: corner.x + plate.width / 2,
+                                      y: corner.y - plate.height / 2)
 
-        // TWO bottoms are back down to one: the badge is gone, so the corner is
-        // the button and nothing else.
+        // The purse needs no placing here: it is a child of the panel, hung inside
+        // it once where the panel is built.
 
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
         hotbar.position = CGPoint(x: 0,
@@ -552,7 +571,7 @@ final class GameScene: SKScene {
         //
         // purseBottom is the badge's, and only the quick offer needs it, because
         // the quick offer is the one thing that sits directly underneath.
-        let cornerBottom = shopButton.position.y - radius
+        let cornerBottom = shopButton.position.y - plate.height / 2
         let hotbarTop = hotbar.position.y + HotbarNode.size.height / 2
         chestPanel.position = CGPoint(x: 0, y: (cornerBottom + hotbarTop) / 2)
 
@@ -649,7 +668,8 @@ final class GameScene: SKScene {
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world, heardFrom: ears)
         actorRenderer.sync(with: world, dt: frameDelta)
-        matchPanel.update(with: world)
+        matchTimer.update(with: world)
+        if let player = world.localPlayer { purse.setValue(player.tokens) }
         repositionForSafeAreaIfNeeded()
         leaderboard.update(with: world)
         
