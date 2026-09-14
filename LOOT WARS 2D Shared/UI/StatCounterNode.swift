@@ -3,8 +3,17 @@
 //  Loot Wars
 //
 //  An icon and a number, for the things you count rather than the things that run
-//  down. Same icon size and spacing as StatBarNode, so a counter row lines up with
-//  the bars above it.
+//  down.
+//
+//  It used to be a row on the HUD panel, which is where its icon size and spacing
+//  came from - they were StatBarNode's, so a counter lined up with the bars above
+//  it. The panel is gone and so are the bars, so those two numbers live here now
+//  and StatBarNode went with the thing it was drawing.
+//
+//  Which leaves it standing on grass, and that is what `plated` is for. A white
+//  label with nothing behind it is legible over a wall and invisible over a pale
+//  crate, and the token count is the one number you check before deciding whether
+//  the walk to the shop is worth it.
 //
 
 import SpriteKit
@@ -16,12 +25,39 @@ final class StatCounterNode: SKNode {
     /// shorter than a bar row - and at 84 points the panel needed it to be.
     static let height: CGFloat = 20
 
+    /// How big the icon is drawn, and how far the number sits from it. Inherited
+    /// from the bars this used to line up with, and kept at those values because
+    /// they were the right ones - not because anything lines up with them now.
+    static let iconSize: CGFloat = 24
+    static let gap: CGFloat = 8
+
+    /// The plate, when there is one. Wide enough for four digits, which is more
+    /// tokens than anybody finishes a match holding - a plate that resized itself
+    /// around the number would twitch every time you picked one up.
+    static let size = CGSize(width: 84, height: 28)
+    private static let lip: CGFloat = 8
+
     private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private var lastValue = Int.min
 
     /// Local origin is the left edge of the icon, vertically centred on the row.
-    init(iconNamed iconName: String) {
+    init(iconNamed iconName: String, plated: Bool = false) {
         super.init()
+
+        if plated {
+            let plate = SKShapeNode(path: CGPath(
+                roundedRect: CGRect(x: -StatCounterNode.lip,
+                                    y: -StatCounterNode.size.height / 2,
+                                    width: StatCounterNode.size.width,
+                                    height: StatCounterNode.size.height),
+                cornerWidth: StatCounterNode.size.height / 2,
+                cornerHeight: StatCounterNode.size.height / 2,
+                transform: nil))
+
+            plate.fillColor = RenderPalette.hudPanel
+            plate.strokeColor = .clear
+            addChild(plate)
+        }
 
         let texture = SKTexture(imageNamed: iconName)
         let art = texture.size()
@@ -32,14 +68,14 @@ final class StatCounterNode: SKNode {
         let width = art.height > 0 ? height * (art.width / art.height) : height
 
         let icon = SKSpriteNode(texture: texture, size: CGSize(width: width, height: height))
-        icon.position = CGPoint(x: StatBarNode.iconSize / 2, y: 0)
+        icon.position = CGPoint(x: StatCounterNode.iconSize / 2, y: 0)
         addChild(icon)
 
         label.fontSize = 16
         label.fontColor = .white
         label.horizontalAlignmentMode = .left
         label.verticalAlignmentMode = .center
-        label.position = CGPoint(x: StatBarNode.iconSize + StatBarNode.gap, y: 0)
+        label.position = CGPoint(x: StatCounterNode.iconSize + StatCounterNode.gap, y: 0)
         addChild(label)
 
         setValue(0)

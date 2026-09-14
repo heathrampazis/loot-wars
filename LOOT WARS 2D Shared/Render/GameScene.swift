@@ -91,7 +91,18 @@ final class GameScene: SKScene {
 
     private var cornerAction: CornerAction = .aim
 
-    private let hud = HUDNode()
+    /// Your purse, top-left beside the shop it is spent in.
+    ///
+    /// What is left of the HUD panel. The panel carried a health bar and this, and
+    /// the bar was the part nobody read - the one over the player's own head is in
+    /// the middle of the screen, where you are already looking, and it moves. A
+    /// second copy of it in the corner is a number you have to look away from the
+    /// fight to check.
+    ///
+    /// The tokens stayed because they are not readable anywhere else, and they
+    /// moved next to the shop button because that is the only thing they are for.
+    /// A purse and the counter it is spent at are one piece of information.
+    private let tokens = StatCounterNode(iconNamed: "Token", plated: true)
     private let leaderboard = LeaderboardNode()
     private let matchTimer = MatchTimerNode()
 
@@ -363,7 +374,7 @@ final class GameScene: SKScene {
         openButton.isHidden = true
         cameraController.node.addChild(itemButton)
         itemButton.isHidden = true
-        cameraController.node.addChild(hud)
+        cameraController.node.addChild(tokens)
         cameraController.node.addChild(leaderboard)
         cameraController.node.addChild(matchTimer)
         cameraController.node.addChild(shopButton)
@@ -481,15 +492,12 @@ final class GameScene: SKScene {
             y: aimStick.position.y + 115)
 
 
-        // The HUD's origin is its own top-left corner, so this is just an inset.
-        //
-        // Plus whatever the hardware is eating off the left edge. Everything else
-        // anchored to this corner is measured FROM this point - the quick-buy panel
-        // below it and the shop button beside it both start at hud.position.x - so
-        // moving the HUD moves the corner, and the three of them stay a block.
+        // The top-left corner itself, plus whatever the hardware is eating off the
+        // left edge. Everything in that corner is measured from this one point, so
+        // the block moves together.
         let inset: CGFloat = 16
-        hud.position = CGPoint(x: -size.width / 2 + inset + safeLeft,
-                               y: size.height / 2 - inset)
+        let corner = CGPoint(x: -size.width / 2 + inset + safeLeft,
+                             y: size.height / 2 - inset)
 
         // Mirrored in the opposite corner, off its own edge's inset.
         //
@@ -512,20 +520,21 @@ final class GameScene: SKScene {
         matchTimer.position = CGPoint(x: 0, y: size.height / 2 - inset)
         results.layOut(for: size)
 
-        // Tucked against the right-hand edge of the HUD, top-aligned with it.
+        // IN the corner now, where the health panel used to be.
         //
-        // Clamped so it can never reach the clock. On a phone as narrow as an SE
-        // there is only 51 points between the two and the button wants 70, so the
-        // clamp bites and it overlaps the HUD's edge by about 8 instead. That is the
-        // better of the two failures by a distance: the HUD is a readout nobody
-        // presses, so a few points of overlap costs nothing, whereas lapping the
-        // clock would cover a number you need.
+        // The clamp that used to live here is gone with the panel. It existed to
+        // stop the button - which sat to the RIGHT of a 104-point panel - from
+        // lapping the match clock on a narrow phone. Starting at the corner instead
+        // of 114 points into it, there is no longer anything to clamp against: even
+        // on an SE the purse beside it ends about 130 points clear of the clock.
         let radius = GameScene.shopButtonRadius
-        let besideTheHUD = hud.position.x + HUDNode.size.width + 10 + radius
-        let clearOfTheClock = -MatchTimerNode.size.width / 2 - 8 - radius
+        shopButton.position = CGPoint(x: corner.x + radius, y: corner.y - radius)
 
-        shopButton.position = CGPoint(x: min(besideTheHUD, clearOfTheClock),
-                                      y: size.height / 2 - inset - radius)
+        // Immediately beside it, on the same line through the middle of the button.
+        // A purse and the counter it is spent at read as one thing when they touch
+        // and as two unrelated readouts when they do not.
+        tokens.position = CGPoint(x: shopButton.position.x + radius + 10,
+                                  y: shopButton.position.y)
 
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
         hotbar.position = CGPoint(x: 0,
@@ -539,9 +548,13 @@ final class GameScene: SKScene {
         // corner inside the move stick's grab radius, which is deliberately far
         // wider than the stick you can see. The stick gets first refusal on every
         // touch, so the leftmost slot would have quietly stopped responding.
-        let hudBottom = hud.position.y - HUDNode.size.height
+        // What everything below the corner hangs off. It was the bottom of the HUD
+        // panel; it is the bottom of the shop button now, which is a few points
+        // higher and a good deal more honest - the panel's height included a bar
+        // that is not there any more.
+        let cornerBottom = shopButton.position.y - radius
         let hotbarTop = hotbar.position.y + HotbarNode.size.height / 2
-        chestPanel.position = CGPoint(x: 0, y: (hudBottom + hotbarTop) / 2)
+        chestPanel.position = CGPoint(x: 0, y: (cornerBottom + hotbarTop) / 2)
 
         // Hung in the gap the hotbar leaves behind: centred between the bottom of
         // the HUD and the bottom of the screen.
@@ -555,7 +568,7 @@ final class GameScene: SKScene {
         // is: it is sized to the gap it lives in.
         shopPanel.position = CGPoint(
             x: 0,
-            y: (hudBottom + (-size.height / 2 + 12)) / 2)
+            y: (cornerBottom + (-size.height / 2 + 12)) / 2)
 
         // Hung under the health panel, left edges flush with it. It is a reading
         // of your purse as much as an offer, so it belongs with the other numbers
@@ -566,14 +579,14 @@ final class GameScene: SKScene {
         // phone this small the stick's grab circle reaches most of the left-hand
         // side, and the stick gets first refusal on everything it covers.
         quickBuy.position = CGPoint(
-            x: hud.position.x + QuickBuyNode.size.width / 2,
-            y: hudBottom - 10 - QuickBuyNode.size.height / 2)
+            x: corner.x + QuickBuyNode.size.width / 2,
+            y: cornerBottom - 10 - QuickBuyNode.size.height / 2)
 
         // The strip directly under the health panel, centred: the one band of
         // screen nothing else occupies mid-match. Measured off the HUD rather than
         // off the top edge, so it follows the panel if that ever changes height -
         // which it just did, when the ammo bar came out.
-        hint.position = CGPoint(x: 0, y: hudBottom - 18)
+        hint.position = CGPoint(x: 0, y: cornerBottom - 18)
 
     }
 
@@ -636,7 +649,8 @@ final class GameScene: SKScene {
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world, heardFrom: ears)
         actorRenderer.sync(with: world, dt: frameDelta)
-        hud.update(with: world)
+        // The one thing the panel was carrying that still had to be carried.
+        if let player = world.localPlayer { tokens.setValue(player.tokens) }
         repositionForSafeAreaIfNeeded()
         leaderboard.update(with: world)
         matchTimer.update(with: world)
