@@ -2,57 +2,38 @@
 //  StatCounterNode.swift
 //  Loot Wars
 //
-//  Your purse, worn on the shop button.
+//  An icon and a number, for the things you count rather than the things that run
+//  down.
 //
-//  It has been three things. A row on the HUD panel, which is where its icon size
-//  and spacing came from - they were StatBarNode's, so a counter lined up with the
-//  bars above it. Then a plate of its own beside the button when the panel went.
-//  Now a badge ON the button, which is where it should have gone first.
+//  NO PLATE. It has had one twice and been wrong both times, which is worth
+//  recording because the mistake was the same mistake in two shapes: a plate makes
+//  a thing an OBJECT, and a purse is not an object. Beside the shop button it read
+//  as a bar of furniture laid across the corner of the map; clipped to the button
+//  it read as a sticker. It is a row, and a row belongs inside somebody else's
+//  panel - which is where it started, on the HUD, and where it has gone back to,
+//  in the clock's.
 //
-//  The plate beside the button was the mistake, and it is worth naming: a purse is
-//  not a readout, it is a property of the shop. Standing it next to the button as
-//  its own object said they were two things that happened to be near each other,
-//  and it put a bar of furniture out across the corner of the map for a number
-//  that is three characters long. Clipped to the button's lower edge it is
-//  unmistakably the button's, costs no ground at all, and disappears with the
-//  button when the shop is open - which is correct, because the shop shows you
-//  your tokens itself.
-//
-//  Its origin is its own CENTRE, unlike the row it used to be, so hanging it off
-//  the middle of a round button is one coordinate rather than arithmetic.
+//  Its origin is its own centre, and the pair centres ITSELF on every change. The
+//  clock next to it can hardcode its offset because a time is always four
+//  characters wide; a token count is one, two or three, and a pair hung off a
+//  fixed offset would sit visibly left of centre all match and then jump.
 //
 
 import SpriteKit
 
 final class StatCounterNode: SKNode {
 
-    /// Sized for three digits, which is more tokens than anybody holds at once -
-    /// a match pays somewhere between seventy and three hundred and they are spent
-    /// as they arrive. Fixed rather than hugging the number: this is centred on a
-    /// button, so a plate that grew would push out from both sides every time you
-    /// picked one up.
-    static let size = CGSize(width: 56, height: 22)
+    static let height: CGFloat = 24
 
-    private static let iconHeight: CGFloat = 14
+    private static let iconHeight: CGFloat = 15
+    private static let gap: CGFloat = 6
 
+    private let icon = SKSpriteNode()
     private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private var lastValue = Int.min
 
     init(iconNamed iconName: String) {
         super.init()
-
-        let plate = SKShapeNode(path: CGPath(
-            roundedRect: CGRect(x: -StatCounterNode.size.width / 2,
-                                y: -StatCounterNode.size.height / 2,
-                                width: StatCounterNode.size.width,
-                                height: StatCounterNode.size.height),
-            cornerWidth: StatCounterNode.size.height / 2,
-            cornerHeight: StatCounterNode.size.height / 2,
-            transform: nil))
-
-        plate.fillColor = RenderPalette.hudPanel
-        plate.strokeColor = .clear
-        addChild(plate)
 
         let texture = SKTexture(imageNamed: iconName)
         let art = texture.size()
@@ -62,15 +43,14 @@ final class StatCounterNode: SKNode {
         let height = StatCounterNode.iconHeight
         let width = art.height > 0 ? height * (art.width / art.height) : height
 
-        let icon = SKSpriteNode(texture: texture, size: CGSize(width: width, height: height))
-        icon.position = CGPoint(x: -StatCounterNode.size.width / 2 + 4 + width / 2, y: 0)
+        icon.texture = texture
+        icon.size = CGSize(width: width, height: height)
         addChild(icon)
 
-        label.fontSize = 13
+        label.fontSize = 16
         label.fontColor = .white
         label.horizontalAlignmentMode = .left
         label.verticalAlignmentMode = .center
-        label.position = CGPoint(x: icon.position.x + width / 2 + 4, y: 0)
         addChild(label)
 
         setValue(0)
@@ -87,6 +67,7 @@ final class StatCounterNode: SKNode {
         let previous = lastValue
         lastValue = value
         label.text = "\(value)"
+        centre()
 
         // The first paint is not a change - the counter opening on zero should not
         // announce itself.
@@ -94,19 +75,18 @@ final class StatCounterNode: SKNode {
         announce(value - previous)
     }
 
-    /// Says what just happened to the number.
+    /// Re-centres the icon and the number as one pair.
     ///
-    /// Tokens arrive from four places and leave from one, and until now all five
-    /// were silent: the number simply differed from the number you last happened to
-    /// look at. A kill paid eleven and nothing on screen said so, and a purchase
-    /// took fifteen out with no more ceremony than the shop card going faint.
-    ///
-    /// It lives on the counter rather than on any of the five, so every source is
-    /// covered by construction - including the ones added later - and the one place
-    /// it can be seen is the place you already look to find out how rich you are.
+    /// Measured rather than assumed, and only on a change, so the cost lands on the
+    /// frame a token was picked up rather than on all of them.
+    private func centre() {
+        let width = icon.size.width + StatCounterNode.gap + label.frame.width
+        icon.position = CGPoint(x: -width / 2 + icon.size.width / 2, y: 0)
+        label.position = CGPoint(x: -width / 2 + icon.size.width + StatCounterNode.gap, y: 0)
+    }
+
     private func announce(_ delta: Int) {
         guard delta != 0 else { return }
-
         let gained = delta > 0
 
         label.removeAction(forKey: "pulse")
@@ -123,18 +103,17 @@ final class StatCounterNode: SKNode {
         float.text = gained ? "+\(delta)" : "\(delta)"
         float.fontSize = 15
         float.fontColor = gained ? RenderPalette.placementValid : RenderPalette.placementBlocked
-        float.verticalAlignmentMode = .center
-        // Above the badge and centred on it, rather than off its right-hand end.
-        // The old offset was measured from a label that started at the node's
-        // origin; this one hangs off the middle of a pill, and +12 off the side of
-        // a 56-point plate would have floated the number into the map.
         float.horizontalAlignmentMode = .center
-        float.position = CGPoint(x: 0, y: StatCounterNode.size.height / 2 + 2)
+        float.verticalAlignmentMode = .center
+
+        // Below rather than above, because this row is the BOTTOM of the clock's
+        // panel and anything rising off the top of it would climb through the time.
+        float.position = CGPoint(x: 0, y: -StatCounterNode.height / 2 - 4)
         float.zPosition = 2
         addChild(float)
 
         float.run(.sequence([
-            .group([.moveBy(x: 0, y: 22, duration: 0.7),
+            .group([.moveBy(x: 0, y: -20, duration: 0.7),
                     .sequence([.wait(forDuration: 0.28),
                                .fadeOut(withDuration: 0.42)])]),
             .removeFromParent()
