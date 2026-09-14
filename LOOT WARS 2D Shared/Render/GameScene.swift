@@ -915,10 +915,18 @@ final class GameScene: SKScene {
                 // somewhere off-screen. That is the useful half of it: a wall
                 // closing away to your left is a base that has just become worth
                 // taking a bomb to, and the sound is the only thing that says so.
-                SoundPlayer.shared.play(.complete,
-                                        at: world.claim(for: team)?.centreTile.center
-                                            ?? world.localPlayer?.position ?? .zero,
-                                        heardFrom: listener)
+                // Worked out first rather than written into the call. A nested ??
+                // chain ending in an inferred .zero, inside an argument list, is
+                // the shape that has twice cost this project an afternoon of
+                // "unable to type-check in reasonable time".
+                let heart: Vec2
+                if let claim = world.claim(for: team) {
+                    heart = claim.centreTile.center
+                } else {
+                    heart = world.localPlayer?.position ?? Vec2.zero
+                }
+
+                SoundPlayer.shared.play(.complete, at: heart, heardFrom: listener)
 
             case .vault(let points, let team, let position):
                 // Only your own base, and only when you can see it. Somebody else's

@@ -18,7 +18,7 @@
 //  one at your feet.
 //
 
-import CoreGraphics
+import Foundation
 
 enum Sound: CaseIterable {
 
