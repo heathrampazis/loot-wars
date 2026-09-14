@@ -83,5 +83,6 @@ enum ConsumableSystem {
 
         world.actors[id] = actor
         CombatSystem.heal(id, amount: supply.healAmount(of: actor.maxHealth), in: world)
+        world.record(.healed(by: id))
     }
 }

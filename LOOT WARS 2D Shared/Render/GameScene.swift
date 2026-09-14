@@ -993,6 +993,10 @@ final class GameScene: SKScene {
                     flyingTo: shopPanel.convert(.zero, from: hotbar)
                 )
 
+            case .healed(let who):
+                guard who == world.localPlayerID else { break }
+                SoundPlayer.shared.play(.heal)
+
             case .pickedUp(_, let who, let worn):
                 // Yours only. Seven bots sweeping the map is a constant patter of
                 // somebody else's good fortune, and none of it is about you.
@@ -1363,6 +1367,7 @@ extension GameScene {
                     // Cannot afford it, or nowhere to put it. Say so and leave the
                     // offer up: both of those can change in a few seconds.
                     quickBuy.refuse()
+                    SoundPlayer.shared.play(.error)
                     continue
                 }
 
@@ -1774,13 +1779,18 @@ extension GameScene {
         // Anywhere off the panel shuts it, the same way tapping off a menu does
         // everywhere else. The BACK button stays - it is the obvious way out, and
         // the one somebody looks for before they think to try the background.
+        // Both ways out of the shop, and only these two. The bulk close at the
+        // whistle is deliberately silent - that is the match ending, not you
+        // leaving, and a panel shutting itself is not a thing you did.
         guard shopPanel.contains(localPoint: point) else {
             shopPanel.close()
+            SoundPlayer.shared.play(.exit)
             return
         }
 
         if shopPanel.isBackButton(atLocalPoint: point) {
             shopPanel.close()
+            SoundPlayer.shared.play(.exit)
             return
         }
 
@@ -1793,6 +1803,7 @@ extension GameScene {
             guard let player = world.localPlayer,
                   ShopSystem.canBuy(item, actor: player, in: world) else {
                 shopPanel.refuse()
+                SoundPlayer.shared.play(.error)
                 return
             }
 
@@ -1807,6 +1818,7 @@ extension GameScene {
 
         if chestPanel.isBackButton(atLocalPoint: touch.location(in: chestPanel)) {
             chestPanel.close()
+            SoundPlayer.shared.play(.exit)
             return
         }
 
@@ -1831,6 +1843,7 @@ extension GameScene {
         // wrong here is one tap to reopen, since the chest is standing right there.
         if !chestPanel.contains(localPoint: touch.location(in: chestPanel)) {
             chestPanel.close()
+            SoundPlayer.shared.play(.exit)
         }
     }
 
@@ -2023,6 +2036,7 @@ extension GameScene {
         guard world.claim(for: player.team)?.contains(tile) == true else { return false }
 
         blueprint.refuse(at: tile)
+        SoundPlayer.shared.play(.error)
 
         // One refusal has a reason worth spelling out, because it is temporary and
         // nothing else on screen mentions it: the quiet after a raid, which exists

@@ -88,6 +88,19 @@ enum WorldEvent {
     /// Somebody bought something.
     case purchase(ItemType, by: ActorID)
 
+    /// Somebody patched themselves up with a supply.
+    ///
+    /// The twin of perkStarted, and it clears the same bar for the same reason.
+    /// Health going up IS state and the bar shows it - but health also goes up from
+    /// standing at home, and from a helmet that came with capacity attached, and
+    /// nothing a renderer can see a frame later tells those three apart. The one
+    /// that involved spending a bandage is the one worth a noise.
+    ///
+    /// Recorded by ConsumableSystem rather than by CombatSystem.heal, which is
+    /// shared with the slow recovery at home - putting it there would announce a
+    /// bandage every two seconds to anybody stood in their own base.
+    case healed(by: ActorID)
+
     /// Somebody picked something up off the ground, and whether it went straight on.
     ///
     /// This one is close to the line the note at the top of this file draws, so it

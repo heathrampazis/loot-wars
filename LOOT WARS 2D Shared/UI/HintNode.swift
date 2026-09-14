@@ -91,6 +91,14 @@ final class HintNode: SKNode {
         guard showing != text || isHidden else { return }
         showing = text
 
+        // Here rather than at the four places that call this, because a hint
+        // arriving makes the noise - that is a fact about the hint, not something
+        // each caller has to remember. The guard above is what makes it safe: the
+        // same line re-asked while it is already up does not re-announce itself,
+        // which matters for the build reminder that fires every time you walk into
+        // your own base.
+        SoundPlayer.shared.play(.notification)
+
         label.text = text
 
         // The plate is cut to the words rather than to a guessed width, so a longer

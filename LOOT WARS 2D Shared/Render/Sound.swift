@@ -36,6 +36,14 @@ enum Sound: CaseIterable {
     case select
     /// Moving along the hotbar.
     case tap
+    /// A supply spent patching yourself up.
+    case heal
+    /// Backing out of a panel.
+    case exit
+    /// Something the game refused to do.
+    case error
+    /// A line of text arriving to tell you something.
+    case notification
 
     // MARK: - Things that happened
 
@@ -53,6 +61,10 @@ enum Sound: CaseIterable {
         case .collect:  return ("Collect", "wav")
         case .select:   return ("Select", "mp3")
         case .tap:      return ("Tap", "wav")
+        case .heal:     return ("Heal", "wav")
+        case .exit:     return ("Exit", "mp3")
+        case .error:    return ("Error", "mp3")
+        case .notification: return ("Notification", "mp3")
         case .bomb:     return ("Bomb", "wav")
         case .complete: return ("Complete", "mp3")
         }
@@ -74,7 +86,8 @@ enum Sound: CaseIterable {
         switch self {
         case .bomb:     return 34
         case .complete: return 24
-        case .play, .purchase, .upgrade, .collect, .select, .tap: return nil
+        case .play, .purchase, .upgrade, .collect, .select, .tap,
+             .heal, .exit, .error, .notification: return nil
         }
     }
 
@@ -89,7 +102,8 @@ enum Sound: CaseIterable {
         case .bomb:     return 4
         case .complete: return 3
         case .collect:  return 3
-        case .play, .purchase, .upgrade, .select, .tap: return 2
+        case .play, .purchase, .upgrade, .select, .tap,
+             .heal, .exit, .error, .notification: return 2
         }
     }
 
@@ -103,7 +117,8 @@ enum Sound: CaseIterable {
         switch self {
         case .collect: return 0.07
         case .tap:     return 0.04
-        case .bomb, .complete, .play, .purchase, .upgrade, .select: return 0.02
+        case .bomb, .complete, .play, .purchase, .upgrade, .select,
+             .heal, .exit, .error, .notification: return 0.02
         }
     }
 
@@ -113,7 +128,14 @@ enum Sound: CaseIterable {
         case .tap:      return 0.55
         case .collect:  return 0.7
         case .bomb:     return 0.9
-        case .play, .purchase, .upgrade, .select, .complete: return 1
+        // Quieter than the things you chose to do. A refusal and a line of text
+        // are the game interrupting you, and an interruption that is as loud as
+        // your own actions stops reading as a footnote and starts reading as a
+        // telling-off.
+        case .error:        return 0.6
+        case .notification: return 0.6
+        case .exit:         return 0.8
+        case .play, .purchase, .upgrade, .select, .complete, .heal: return 1
         }
     }
 }
