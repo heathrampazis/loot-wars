@@ -81,11 +81,10 @@ enum AIBrain {
             steerAroundObstacles(&state, actor: actor, in: world)
         }
 
-        // Gas is walked AROUND, whatever else the bot had in mind. Above the goal
-        // list entirely rather than inside it, because no goal is worth standing in
-        // a cloud for - a bot that walks through one to reach a chest arrives with
-        // half a bar gone and dies to the first person it meets.
-        avoidGas(&state, actor: actor, in: world)
+        // Gas is walked around, and LATE - see avoidGas. Still above the goal list,
+        // because no errand is worth standing in a cloud for, but no longer above
+        // running for your life, and no longer instant.
+        avoidGas(&state, actor: actor, dt: dt, in: world)
 
         // The edge nudge is for roaming. Applying it in a fight fights the bot's
         // own attempt to hold its range near a border.
@@ -1930,14 +1929,21 @@ enum AIBrain {
 
     /// Which hotbar slot to lob, or nil for "not yet".
     ///
-    /// Steers clear of any cloud the bot is standing in or about to walk into.
+    /// Steers clear of any cloud the bot is standing in or about to walk into -
+    /// eventually, imperfectly, and not while it is being shot at.
     ///
     /// A push directly away from the middle of it, blended into the heading rather
-    /// than replacing it - so a bot skirts a cloud on its way somewhere instead of
-    /// turning round and abandoning the trip. Checked a short way AHEAD as well as
-    /// underfoot, because a bot that only reacts once it is already choking has
-    /// already paid for the mistake.
-    private static func avoidGas(_ state: inout AIState, actor: Actor, in world: World) {
+    /// than replacing it, so a bot skirts a cloud on its way somewhere instead of
+    /// turning round and abandoning the trip.
+    ///
+    /// Three things here are deliberately WORSE than they were, and they are the
+    /// reason a stink bomb is now worth throwing. See GameConfig.AI.gasReaction for
+    /// the full account; briefly: this used to run with a look-ahead longer than a
+    /// cloud's own radius, no reaction time at all, and a weight of 1.0 that threw
+    /// the heading away for the exactly optimal vector out. Nobody was ever in the
+    /// gas, so no amount of damage on the cloud could make the item matter.
+    private static func avoidGas(_ state: inout AIState, actor: Actor, dt: Double,
+                                 in world: World) {
         let ahead = actor.feet + state.desiredHeading * GameConfig.AI.gasLookAhead
 
         for id in world.gasClouds.keys.sorted(by: { $0.raw < $1.raw }) {
@@ -1947,16 +1953,38 @@ enum AIBrain {
             let inIt = cloud.contains(actor.feet)
             guard inIt || cloud.contains(ahead) else { continue }
 
+            // Noticing it comes first, and takes a moment. Divided by caution
+            // rather than multiplied, so a nervy bot (caution above one) reacts
+            // SOONER - and seven bots do not all flinch on the same tick.
+            state.gasNoticed += dt
+            let needed = GameConfig.AI.gasReaction / max(0.01, state.caution)
+            guard state.gasNoticed >= needed else { return }
+
             let away = actor.feet - cloud.centre
             let escape = away.length > 0.01 ? away.normalized() : Vec2(x: 1, y: 0)
 
-            // Standing in one is an emergency and outruns whatever it was doing;
-            // seeing one ahead is a nudge.
-            let weight = inIt ? 1.0 : GameConfig.AI.gasSwerve
-            state.desiredHeading = (state.desiredHeading * (1 - weight)
-                                    + escape * weight).normalized()
+            // Standing in one outranks whatever errand it was on; seeing one ahead
+            // is a nudge.
+            var weight = inIt ? GameConfig.AI.gasFlee : GameConfig.AI.gasSwerve
+
+            // Except when it is running for its life, where a cloud is the lesser
+            // problem. This is what makes gas across somebody's escape route work:
+            // it used to be rerouted around for free.
+            if state.goal.isRetreat { weight *= GameConfig.AI.gasPanic }
+
+            let steer = state.desiredHeading * (1 - weight) + escape * weight
+
+            // A blend can cancel itself out - walking straight at the middle of a
+            // cloud puts escape opposite the heading - and normalized() answers
+            // .zero for that, which would leave the bot with no heading at all.
+            // Falling back on the escape is right either way: it is the direction
+            // this function exists to produce.
+            state.desiredHeading = steer.length > 0.01 ? steer.normalized() : escape
             return
         }
+
+        // Clear of all of them, so the next cloud gets to surprise it again.
+        state.gasNoticed = 0
     }
 
     /// A bomb flies along the aim, which for a raiding bot is wherever it is

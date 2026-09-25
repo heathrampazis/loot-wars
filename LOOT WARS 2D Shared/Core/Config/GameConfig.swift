@@ -1120,12 +1120,54 @@ enum GameConfig {
         /// need the precision a shot does.
         static let throwTolerance: Double = 0.45
 
-        /// How far ahead a bot looks for gas, and how hard it swerves when it sees
-        /// some. Standing in a cloud overrides the heading entirely; seeing one
-        /// coming only bends it, so a bot skirts a cloud rather than abandoning
-        /// wherever it was going.
-        static let gasLookAhead: Double = 3.5
-        static let gasSwerve: Double = 0.6
+        /// How a bot deals with gas, and the reason a stink bomb used to be worth
+        /// nothing at all.
+        ///
+        /// The item was buffed twice on its damage and stayed useless both times,
+        /// because damage was never the problem: NOBODY WAS EVER IN THE CLOUD.
+        /// avoidGas ran above the goal list, every frame, for every bot, against
+        /// every cloud on the map, with a 3.5 tile look-ahead in front of a 2.9
+        /// tile cloud - so a bot began turning before it could possibly have
+        /// touched one - and when it was somehow caught inside anyway it took a
+        /// weight of 1.0, which threw the heading away and replaced it with the
+        /// exactly optimal vector out. Perfect information, zero reaction time,
+        /// perfect escape. A cloud landing squarely on a bot's feet was answered on
+        /// the very next tick.
+        ///
+        /// So the numbers below are all about being late and imperfect, which is
+        /// the same fix `reactionDelay` above makes for spotting a person - and for
+        /// the same reason, written there: nobody reacts instantly, and a bot that
+        /// does feels like a machine.
+
+        /// How far ahead a bot looks, in tiles. Barely past its own feet now, so
+        /// bots clip the edges of clouds instead of giving them a wide berth.
+        static let gasLookAhead: Double = 1.6
+
+        /// Seconds of standing in it before a bot starts getting out.
+        ///
+        /// This is the buff. Scaled by the bot's own caution, so the nervy ones
+        /// notice sooner - and at 0.5 a cloud thrown onto somebody gets two doses
+        /// into them before they have begun to move, which is the difference
+        /// between an item that does something and an item that is a warning sign.
+        static let gasReaction: Double = 0.5
+
+        /// How hard it swerves: a nudge for one seen ahead, most of the heading for
+        /// one it is standing in.
+        ///
+        /// Not 1.0 any more. A bot leaving a cloud now takes a slightly wrong line
+        /// out and spends an extra fraction of a second in it, because the escape
+        /// is blended with whatever it was doing rather than replacing it.
+        static let gasSwerve: Double = 0.5
+        static let gasFlee: Double = 0.85
+
+        /// What is left of all that when the bot is running for its life.
+        ///
+        /// Gas used to outrank fleeing, which quietly removed the best thing a
+        /// stink bomb can do: cut off the way out. A bot being shot at would
+        /// calmly reroute around a cloud laid across its escape. At 0.3 it would
+        /// rather choke than be shot, which is the correct answer and makes
+        /// throwing one at a fleeing enemy worth doing.
+        static let gasPanic: Double = 0.3
 
         /// How close a bot has to be to somebody's claim before raiding it even
         /// occurs to it, in tiles.
@@ -1612,18 +1654,18 @@ enum GameConfig {
     enum Stink {
         /// How far the cloud reaches, in tiles.
         ///
-        /// 2.9, up from 2.2, which is six tiles across.
+        /// 3.5, up from 2.9 and 2.2 before that - seven tiles across.
         ///
-        /// The size was only half of why the first one felt small - it was drawn as
-        /// a soft gradient, and a shape with no edge reads smaller than it is - but
-        /// only half. At six tiles it covers a doorway and the ground either side,
-        /// which is the least that "taking ground" can mean.
+        /// The ceiling on this is the BASE: a claim is nine tiles across, so seven
+        /// closes about three quarters of the width of somebody's home and still
+        /// leaves a corner of it to stand in. A cloud that swallowed a whole base
+        /// would not be a way of taking ground, it would be a way of ending a match
+        /// from outside the walls, and that is still the line this does not cross.
         ///
-        /// Not larger, and the number that decides it is the BASE: a claim is nine
-        /// tiles across, so this closes two thirds of the width of somebody's home.
-        /// A cloud that swallowed a whole base would not be a way of taking ground,
-        /// it would be a way of ending a match from outside the walls.
-        static let radius: Double = 2.9
+        /// Seven tiles is also what makes CROSSING one cost something. At a walk of
+        /// 3.8 tiles a second the far side is 1.8 seconds away, which is two doses
+        /// and change - where six tiles was 1.5 seconds and could be shrugged off.
+        static let radius: Double = 3.5
 
         /// Seconds it stands for, and how long it takes to billow out and to thin
         /// away at the end. A cloud that arrived and vanished instantly would be a
@@ -1649,19 +1691,31 @@ enum GameConfig {
         /// dangerous, which meant that by the time you had a stink bomb and a
         /// target worth using it on, it did nothing to them.
         ///
-        /// Seven per cent a dose, every 0.7 seconds. Over a full stay in a cloud
-        /// that is about 80% of a bar - against ANY helmet - and around 15% for
-        /// walking through one. So the shape it always wanted is finally the shape
-        /// it has: crossing costs something you can shrug off, standing in it is a
-        /// decision you regret in instalments, and being held in it is fatal.
+        /// Eleven per cent a dose, every 0.7 seconds, up from seven.
         ///
-        /// Deliberately still short of a kill on its own. The first pass at this
-        /// was eight every half second, and the arithmetic caught it before anybody
-        /// played it: a cloud that kills a full-health player outright is not a
-        /// piece of ground to avoid, it is a death sentence with a radius. 80% is
-        /// the number that makes a stink bomb decisive WITH one shot behind it and
-        /// never on its own.
-        static let doseShare: Double = 0.07
+        /// Seven was set against a full eight-second stay, which came to 80% of a
+        /// bar and read as about right on paper. What it actually meant in a match
+        /// was 15% for the only exposure that ever happened - a crossing - because
+        /// the bots never stood in one. That is an item nobody has a use for.
+        ///
+        /// So it is priced against the SHORT stay instead, which is the real one.
+        /// Crossing seven tiles is two or three doses, 22% to 33%. Being caught by
+        /// one thrown at your feet, with the half second of reaction the bots now
+        /// have, is about the same. Being pinned in one during a fight is four or
+        /// five doses and better than half a bar.
+        ///
+        /// A full stay is now past a kill, and the note that used to be here argued
+        /// against exactly that - "a death sentence with a radius". The difference
+        /// is what it takes to get there: eight unbroken seconds inside a cloud you
+        /// can see the edge of, which is not a thing that happens to somebody who
+        /// is paying attention. What the old note was really defending was that
+        /// walking in and turning straight back out should be survivable, and at
+        /// one dose for the round trip it comfortably is.
+        ///
+        /// Still a share of the bar rather than a flat number, for the reason
+        /// above: the helmet ladder runs to 3.57 times a bare head, and a flat dose
+        /// is what made this stop working on the people worth throwing one at.
+        static let doseShare: Double = 0.11
         static let doseInterval: Double = 0.7
     }
 
