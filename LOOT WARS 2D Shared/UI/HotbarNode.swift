@@ -46,7 +46,11 @@ final class HotbarNode: SKNode {
     private var payouts: [Int: SKNode] = [:]
     private var heldSlot: Int?
     private var lastInventory: Inventory?
-    private var lastUsable: [Bool] = []
+
+    /// The refusal currently sitting over the bar. Only ever one: tapping two
+    /// things you cannot use should replace the message, not stack a second one on
+    /// top of it.
+    private var note: SKNode?
 
     override init() {
         super.init()
@@ -216,6 +220,68 @@ final class HotbarNode: SKNode {
         slots[index].flinch()
     }
 
+    /// Says no to a tap: the slot shakes red and the bar says why.
+    ///
+    /// Both halves matter and they are doing different jobs. The shake is the
+    /// answer - it is instant, it is where the finger is, and it says "that tap
+    /// landed and the answer is no". The words are the reason, and they are over
+    /// the BAR rather than over the slot, because a sentence in a 66-point square
+    /// either does not fit or covers the item it is about.
+    ///
+    /// Centred, so it reads the same whichever of the four was pressed and cannot
+    /// run off the edge of the screen from an outside slot. Its own note rather
+    /// than the hint panel at the top of the screen: that one is hidden whenever
+    /// anybody is shooting at you, which is exactly when somebody fumbles for the
+    /// wrong slot.
+    func refuse(slot index: Int, saying reason: String) {
+        guard slots.indices.contains(index) else { return }
+        slots[index].refuse()
+
+        note?.removeFromParent()
+
+        let note = SKNode()
+        note.position = CGPoint(x: 0, y: HotbarNode.slotSize * 0.88)
+        note.zPosition = 20
+        addChild(note)
+        self.note = note
+
+        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        label.text = reason
+        label.fontSize = HotbarNode.slotSize * 0.26
+        label.fontColor = .white
+        label.horizontalAlignmentMode = .center
+        label.verticalAlignmentMode = .center
+        label.zPosition = 1
+
+        // Cut to the words rather than to a guessed width, the same way the hint
+        // panel is, so a short reason does not sit in a long plate.
+        let padding = HotbarNode.slotSize * 0.2
+        let height = label.frame.height + padding
+        let pill = SKShapeNode(
+            rect: CGRect(x: -label.frame.width / 2 - padding, y: -height / 2,
+                         width: label.frame.width + padding * 2, height: height),
+            cornerRadius: height / 2)
+
+        pill.fillColor = RenderPalette.placementBlocked
+        pill.strokeColor = .clear
+
+        note.addChild(pill)
+        note.addChild(label)
+
+        // Pops in with the shake, holds long enough to be read, and goes. Removed
+        // rather than left hidden, so nothing accumulates over a match.
+        note.setScale(0.7)
+        note.run(.sequence([
+            .scale(to: 1.0, duration: 0.11),
+            .wait(forDuration: 1.1),
+            .fadeOut(withDuration: 0.3),
+            .removeFromParent(),
+            .run { [weak self] in
+                if self?.note === note { self?.note = nil }
+            }
+        ]))
+    }
+
     func update(with world: World) {
         guard let player = world.localPlayer else { return }
 
@@ -233,22 +299,17 @@ final class HotbarNode: SKNode {
             slots[index].setUrgent(spends)
         }
 
-        // Whether each slot can be used is the actor's own answer, so a greyed slot
-        // always means the simulation would refuse it. A bandage greys out at full
-        // health; a bomb and a chest never do.
-        // Not canUse: see Actor.showsAsUnusable for why the hotbar and the use
-        // button are asking two different questions on purpose.
-        let usable = (0..<Inventory.slotCount).map { !player.showsAsUnusable(slot: $0) }
-
-        guard player.inventory != lastInventory || usable != lastUsable else { return }
+        // NOTHING IS DIMMED any more, and that is why this redraw is back to
+        // watching the inventory alone. It used to also track which slots the
+        // simulation would refuse, because those were drawn faint - see
+        // Actor.refusesTap for why the refusal moved from the slot's appearance to
+        // the tap on it. A bar that is only ever redrawn when its contents change
+        // is what this was before the dimming, and what it is again.
+        guard player.inventory != lastInventory else { return }
         lastInventory = player.inventory
-        lastUsable = usable
 
         for (index, stack) in player.inventory.slots.enumerated() {
-            // Nothing is greyed while selling. A bandage at full health cannot be
-            // USED, which is exactly why you might want to sell it, and a faint
-            // slot would be the screen discouraging the one action it is offering.
-            slots[index].show(stack, dimmed: selling ? false : !usable[index])
+            slots[index].show(stack)
 
             if selling, let stack {
                 slots[index].setPrice(ShopSystem.sellPrice(of: stack.type))

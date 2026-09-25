@@ -184,20 +184,31 @@ struct Actor {
         }
     }
 
-    /// Whether the HOTBAR should draw this slot as unavailable.
+    /// Whether a tap on this slot should be ANSWERED WITH A NO rather than obeyed.
     ///
-    /// Deliberately not the same question as canUse, and the difference is what a
-    /// grey slot is for. Greying says "you have this and you cannot use it", which
-    /// is worth saying about a spare helmet that is worse than the one you have on
-    /// - that stays true until you die, and it explains itself. It is not worth
-    /// saying about a bandage at full health: full health is the state you spend
-    /// most of the match in, so the useful half of your bag sat grey almost all the
-    /// time and the grey stopped meaning anything at all.
+    /// The same question this used to answer as showsAsUnusable, put to a different
+    /// use, and the rename is the whole change: a helmet worse than the one you are
+    /// wearing used to sit grey in the bar and is now drawn like anything else, and
+    /// the refusal happens when you touch it. Nothing about WHICH items refuse has
+    /// moved - only when the player finds out.
     ///
-    /// The button still asks canUse, so a bandage on a full health bar is faint on
-    /// the one control that would spend it - which is where the warning belongs,
-    /// because that is the moment you would waste it.
-    func showsAsUnusable(slot index: Int) -> Bool {
+    /// Greying was the honest version and it did not work. A row of four with two
+    /// of them faint reads as a bar that is half broken, the grey has to be learned
+    /// before it means anything, and it is smallest and least legible at exactly
+    /// the moment it matters - a glance down mid-fight. A tap that shakes red and
+    /// says why cannot be missed and needs no learning. The shop kept its greying,
+    /// and that is not an inconsistency: shopping is deciding at leisure between
+    /// things you do not own yet, where knowing before you reach is the point.
+    /// These are your own four items, and you reach for them without looking.
+    ///
+    /// Deliberately not the same question as canUse, and the healing carve-out is
+    /// why. A bandage at full health fails canUse, and refusing a tap on one would
+    /// be wrong: picking it out ahead of a fight is a reasonable thing to do, and
+    /// full health is the state you spend most of the match in. The use BUTTON
+    /// still asks canUse, so a bandage on a full bar is faint on the one control
+    /// that would spend it - which is where that warning belongs, because that is
+    /// the moment you would waste it.
+    func refusesTap(slot index: Int) -> Bool {
         guard inventory.slots.indices.contains(index),
               let stack = inventory.slots[index] else { return false }
 

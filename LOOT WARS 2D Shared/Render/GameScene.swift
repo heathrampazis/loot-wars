@@ -1753,6 +1753,19 @@ extension GameScene {
             return
         }
 
+        // Something you own and cannot use: the tap is answered rather than obeyed.
+        //
+        // BEFORE the heal shortcut and before the selection, because both of those
+        // would act on a slot the simulation is about to refuse - and picking out a
+        // helmet worse than the one you are wearing is not a thing anybody means to
+        // do. Actor.refusesTap decides WHICH; the wording below is this screen's,
+        // because Core does not hold sentences.
+        if player.refusesTap(slot: slot) {
+            SoundPlayer.shared.play(.error)
+            hotbar.refuse(slot: slot, saying: GameScene.refusal(for: stack.type))
+            return
+        }
+
         // Hurt, and holding a bandage: the tap IS the heal.
         //
         // Two presses and an invisible rule stood between deciding to patch up and
@@ -1774,6 +1787,27 @@ extension GameScene {
         // thing this noise is about.
         SoundPlayer.shared.play(.tap)
         selectedSlot = (selectedSlot == slot) ? nil : slot
+    }
+
+    /// Why a tap on this was refused, in as few words as will fit over the bar.
+    ///
+    /// Exhaustive and listed one by one rather than defaulted, which is the rule
+    /// everywhere a switch reads an ItemType here: a new kind of item should make
+    /// this fail to compile and be given its own sentence, not inherit somebody
+    /// else's. The cases that CANNOT get here still answer, because a wrong-looking
+    /// sentence on screen is easier to find than a silent tap.
+    ///
+    /// The gear pair names the thing rather than the rule. "Your helmet is better"
+    /// is the reason; "you cannot downgrade" is the rulebook, and nobody reads a
+    /// rulebook with a finger on the bar.
+    private static func refusal(for type: ItemType) -> String {
+        switch type {
+        case .helmet:  return "Your helmet is better"
+        case .blaster: return "Your blaster is better"
+        case .perk:    return "One power-up at a time"
+        case .bandage, .medkit: return "You are at full health"
+        case .bomb, .stink, .chest, .arcade: return "Not right now"
+        }
     }
 
     /// Taps while the shop is open: a tab, a card, or done.

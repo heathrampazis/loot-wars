@@ -32,6 +32,13 @@ final class ItemSlotNode: SKNode {
 
     private let panel: SKShapeNode
 
+    /// A red wash over the whole slot, for a tap that was refused.
+    ///
+    /// Its own node rather than a colour on the panel, which is the lesson the
+    /// shop's card learned: the panel is redrawn whenever the slot's contents
+    /// change, and a fill being animated on it would be overwritten mid-fade.
+    private let flash: SKShapeNode
+
     /// A pool of the item's rarity colour, BEHIND the item.
     ///
     /// Behind, and not a coloured plate, which was the first attempt: filling the
@@ -88,11 +95,24 @@ final class ItemSlotNode: SKNode {
         urgentRing = SKShapeNode(rect: CGRect(x: -side / 2 - 2, y: -side / 2 - 2,
                                               width: side + 4, height: side + 4),
                                  cornerRadius: side * 0.2)
+
+        flash = SKShapeNode(rect: CGRect(x: -side / 2, y: -side / 2,
+                                         width: side, height: side),
+                            cornerRadius: side * 0.182)
         super.init()
 
         panel.fillColor = RenderPalette.hotbarSlot
         panel.strokeColor = .clear
         addChild(panel)
+
+        // Over everything, including the count badge and the urgent ring: a refusal
+        // is about the slot as a whole and should not be drawn underneath half of
+        // what is in it.
+        flash.fillColor = RenderPalette.placementBlocked
+        flash.strokeColor = RenderPalette.placementBlocked
+        flash.alpha = 0
+        flash.zPosition = 5
+        addChild(flash)
 
         glow.size = CGSize(width: side * 0.92, height: side * 0.92)
         glow.colorBlendFactor = 1
@@ -242,9 +262,9 @@ final class ItemSlotNode: SKNode {
     /// colours, so the top pair is now called Mythical and Cosmic. Left at
     /// Legendary this would have been three rungs plus the stink bomb - which is
     /// the "every slot pulses" failure it exists to prevent.
-    private func breathe(for rarity: Rarity, dimmed: Bool) {
+    private func breathe(for rarity: Rarity) {
         glow.removeAction(forKey: "rare")
-        guard rarity >= .mythical, !dimmed else { return }
+        guard rarity >= .mythical else { return }
 
         glow.run(.repeatForever(.sequence([
             .group([.fadeAlpha(to: 1.0, duration: 1.4), .scale(to: 1.12, duration: 1.4)]),
@@ -281,14 +301,48 @@ final class ItemSlotNode: SKNode {
     /// key, so a squeeze and a settle cannot both be running.
     func flinch() {
         removeAction(forKey: "scale")
+        zRotation = 0
         run(.sequence([
             .scale(to: restingScale * 0.86, duration: 0.07),
             .scale(to: restingScale, duration: 0.14)
         ]), withKey: "scale")
     }
 
+    /// The tap was refused: wobble, and wash the slot red.
+    ///
+    /// The same pair the shop answers a card with, and deliberately the same pair
+    /// rather than a second language - somebody who has learned that a red shake
+    /// means "no" in one place has learned it everywhere.
+    ///
+    /// A wobble rather than a slide, for the reason the shop's version records: the
+    /// bar owns slot POSITION, so a moveBy interrupted by a relayout could leave a
+    /// slot parked where it used to be. Rotation and scale are nobody else's.
+    ///
+    /// It takes the "scale" key, which is what settle, flinch and a hold all use,
+    /// so a refusal and a settle can never run together. The zRotation reset in
+    /// each of those is what straightens a wobble that one of them cut short.
+    func refuse() {
+        removeAction(forKey: "scale")
+        removeAction(forKey: "hold")
+        zRotation = 0
+
+        run(.sequence([
+            .group([.rotate(toAngle: -0.085, duration: 0.05),
+                    .scale(to: restingScale * 0.94, duration: 0.05)]),
+            .rotate(toAngle: 0.085, duration: 0.09),
+            .rotate(toAngle: -0.05, duration: 0.07),
+            .group([.rotate(toAngle: 0, duration: 0.06),
+                    .scale(to: restingScale, duration: 0.06)])
+        ]), withKey: "scale")
+
+        flash.removeAllActions()
+        flash.alpha = 0.55
+        flash.run(.fadeAlpha(to: 0, duration: 0.42))
+    }
+
     private func settle() {
         removeAction(forKey: "scale")
+        zRotation = 0
         run(.scale(to: restingScale, duration: 0.12), withKey: "scale")
     }
 
@@ -303,9 +357,12 @@ final class ItemSlotNode: SKNode {
         price.text = "+\(tokens)"
     }
 
-    /// - Parameter dimmed: the item is there but cannot be used right now. Drawn
-    ///   faint rather than hidden, so you can still see what you are carrying.
-    func show(_ stack: ItemStack?, dimmed: Bool = false) {
+    /// Draws what is in the slot, or empties it.
+    ///
+    /// No dimming, here or anywhere else. A slot you cannot use right now looks
+    /// exactly like one you can, and says so when it is tapped - see
+    /// Actor.refusesTap for why, and refuse() above for what the tap gets.
+    func show(_ stack: ItemStack?) {
         guard let stack else {
             icon.isHidden = true
             enchant.isHidden = true
@@ -320,21 +377,21 @@ final class ItemSlotNode: SKNode {
 
         glow.isHidden = false
         glow.color = RenderPalette.colour(of: stack.type.rarity)
-        glow.alpha = dimmed ? 0.35 : 0.75
-        breathe(for: stack.type.rarity, dimmed: dimmed)
+        glow.alpha = 0.75
+        breathe(for: stack.type.rarity)
 
         let texture = ItemArt.texture(for: stack.type)
         icon.texture = texture
         icon.size = ItemArt.size(of: texture, fittingInto: side - side * 0.152)
         icon.isHidden = false
-        icon.alpha = dimmed ? 0.35 : 1.0
+        icon.alpha = 1.0
 
-        // A perk you cannot use right now - because one is already running - still
-        // shows its sparkles, faintly. Hiding them would say the item had changed
-        // into something ordinary, when what has actually happened is that you are
-        // busy being powerful.
+        // A perk shows its sparkles whether or not one is already running. It used
+        // to fade them, back when the slot faded with them; a power-up in the bar
+        // is a power-up in the bar, and what has changed when you cannot use it is
+        // not the item, it is that you are busy being powerful.
         enchant.isHidden = !stack.type.isEnchanted
-        enchant.alpha = dimmed ? 0.4 : 1.0
+        enchant.alpha = 1.0
 
         if stack.type.isEnchanted { enchant.tint(for: stack.type) }
 
