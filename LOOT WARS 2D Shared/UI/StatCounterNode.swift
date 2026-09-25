@@ -10,8 +10,8 @@
 //  a thing an OBJECT, and a purse is not an object. Beside the shop button it read
 //  as a bar of furniture laid across the corner of the map; clipped to the button
 //  it read as a sticker. It is a row, and a row belongs inside somebody else's
-//  panel - which is where it started, on the HUD, and where it has gone back to,
-//  in the clock's.
+//  panel - which is where it started, on the HUD, and where it lives now, beside
+//  the clock in the match panel.
 //
 //  Its origin is its own centre, and the pair centres ITSELF on every change. The
 //  clock next to it can hardcode its offset because a time is always four
@@ -106,8 +106,9 @@ final class StatCounterNode: SKNode {
         float.horizontalAlignmentMode = .center
         float.verticalAlignmentMode = .center
 
-        // Below rather than above, because this row is the BOTTOM of the clock's
-        // panel and anything rising off the top of it would climb through the time.
+        // Below rather than above, because this row sits inside the match panel and
+        // anything rising off the top of it would climb through the panel's own top
+        // edge and then off the screen. Downward, the strip underneath is clear.
         float.position = CGPoint(x: 0, y: -StatCounterNode.height / 2 - 4)
         float.zPosition = 2
         addChild(float)

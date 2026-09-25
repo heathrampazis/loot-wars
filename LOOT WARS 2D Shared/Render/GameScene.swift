@@ -92,44 +92,43 @@ final class GameScene: SKScene {
     private var cornerAction: CornerAction = .aim
 
     private let leaderboard = LeaderboardNode()
-    private let matchTimer = MatchTimerNode()
 
-    /// Your purse, standing inside the shop's panel beside the glyph.
+    /// The clock and your purse, one row, top middle. The purse lives in there
+    /// rather than out here because the panel owns its layout; see MatchPanelNode
+    /// for why those two numbers share a plate.
+    private let matchPanel = MatchPanelNode()
+
+    /// Opens the shop. A button, on its own, in the top-left corner - where the
+    /// health panel used to be.
     ///
-    /// FOURTH HOME, and the three before it were all the same mistake seen from
-    /// different angles: the purse kept being given a place NEAR the shop instead
-    /// of a place IN it. A row on the health panel, then its own plate beside the
-    /// button - furniture laid across the corner of the map for a three-character
-    /// number - then a badge clipped to the button, which read as a sticker, then
-    /// a row in the clock's panel, which put it the length of the screen away from
-    /// the only thing it is for.
+    /// It was briefly a wide plate with the purse standing inside it, on the theory
+    /// that tapping your own balance should open the shop. What that actually did
+    /// was put a 132-point slab in the corner of the map and leave the two numbers
+    /// you read mid-fight - the clock and the purse - at opposite ends of the
+    /// screen. A button is a button and a readout is a readout.
     ///
-    /// One plate, glyph on the left and the number on the right, and the whole
-    /// thing is the button. Tapping your own balance opens the shop, which is what
-    /// you were going to do about it anyway.
-    private let purse = StatCounterNode(iconNamed: "Token")
-
-    /// Opens the shop. Sits on the top edge between the clock and the leaderboard -
-    /// the only gap that is clear on every size. Under the HUD, which was the
-    /// obvious spot, it lands inside the move stick's grab radius on anything
-    /// smaller than a Pro Max.
-    /// Wide enough for the glyph, a gap, and three digits with room to breathe.
-    /// As tall as the button used to be square, so the corner is the same height it
-    /// was and everything hanging below it keeps its place.
-    private static let shopButtonSize = CGSize(width: 132, height: 68)
-
-    /// Where the number sits inside that plate: centred in what the glyph leaves.
-    private static let purseCentre: CGFloat = 26
+    /// 40 rather than 34, because standing on its own it was the hardest thing on
+    /// the top edge to find. It also wore a gold ring for one revision, on the
+    /// theory that an outline is what separates a control from a readout when they
+    /// share a fill - and it does, but it read as loot in the corner of the map and
+    /// was the loudest thing on the screen for the thing you press least often.
+    /// Plain and bigger, which was what was asked for first.
+    ///
+    /// 80 points square costs the corner 12 points of height, which everything
+    /// below it inherits through cornerBottom. On an SE - where that gap is
+    /// tightest - the shop panel still clears the corner by 18 and the floor by 30.
+    private static let shopButtonRadius: CGFloat = 40
 
     private let shopButton = ActionButtonNode(glyph: Glyphs.shoppingBag,
-                                              shape: .panel(shopButtonSize),
+                                              radius: shopButtonRadius, grabRadius: 50,
+                                              shape: .roundedSquare,
                                               fill: RenderPalette.hudPanel,
-                                              // Against the plate's HEIGHT, which
-                                              // is what a wide panel leaves as the
-                                              // limit. The reference draws it at
-                                              // 0.6, which left more air round it
-                                              // than the button wanted.
-                                              glyphSize: 50)
+                                              // Grown with the plate, at the same
+                                              // 0.73 the button has always worn.
+                                              // The reference draws it at 0.6,
+                                              // which left more air round it than
+                                              // the button wanted.
+                                              glyphSize: 58)
     private let shopPanel = ShopPanelNode()
 
     /// One offer, unprompted, for a few seconds - see QuickBuyNode.
@@ -385,13 +384,7 @@ final class GameScene: SKScene {
         itemButton.isHidden = true
 
         cameraController.node.addChild(leaderboard)
-        cameraController.node.addChild(matchTimer)
-
-        // Inside the shop's own plate, to the right of the glyph. A child, so it
-        // moves with the panel, squashes with its press and goes when it goes.
-        purse.position = CGPoint(x: GameScene.purseCentre, y: 0)
-        purse.zPosition = 1
-        shopButton.addChild(purse)
+        cameraController.node.addChild(matchPanel)
         cameraController.node.addChild(shopButton)
         cameraController.node.addChild(shopPanel)
         cameraController.node.addChild(quickBuy)
@@ -529,25 +522,22 @@ final class GameScene: SKScene {
                                        y: size.height / 2 - inset)
         laidOutForInsets = CGPoint(x: safeLeft, y: safeRight)
 
-        // The one strip of the top edge nothing else wants: the HUD holds the left
-        // corner, the leaderboard the right, and the middle is clear on every size
-        // those two fit on.
-        matchTimer.position = CGPoint(x: 0, y: size.height / 2 - inset)
+        // The one strip of the top edge nothing else wants: the shop button holds
+        // the left corner, the leaderboard the right, and the middle is clear on
+        // every size those two fit on. Its origin is its own top edge, so it wants
+        // a top edge and nothing else.
+        //
+        // 176 across and centred. On an SE - the tightest screen - that finishes
+        // 161 points clear of the button and 37 clear of the leaderboard, and both
+        // of those grow on every larger phone.
+        matchPanel.position = CGPoint(x: 0, y: size.height / 2 - inset)
         results.layOut(for: size)
 
-        // IN the corner now, where the health panel used to be.
-        //
-        // The clamp that used to live here is gone with the panel. It existed to
-        // stop the button - which sat to the RIGHT of a 104-point panel - from
-        // lapping the match clock on a narrow phone. Starting at the corner instead
-        // of 114 points into it, there is no longer anything to clamp against: even
-        // on an SE the purse beside it ends about 130 points clear of the clock.
-        let plate = GameScene.shopButtonSize
-        shopButton.position = CGPoint(x: corner.x + plate.width / 2,
-                                      y: corner.y - plate.height / 2)
-
-        // The purse needs no placing here: it is a child of the panel, hung inside
-        // it once where the panel is built.
+        // IN the corner, where the health panel used to be. Nothing to clamp
+        // against: it is square, it starts at the corner, and the nearest thing to
+        // it is the centred panel a long way off to the right.
+        let radius = GameScene.shopButtonRadius
+        shopButton.position = CGPoint(x: corner.x + radius, y: corner.y - radius)
 
         // The hotbar's origin is its own centre, so it only needs a bottom edge.
         hotbar.position = CGPoint(x: 0,
@@ -561,17 +551,9 @@ final class GameScene: SKScene {
         // corner inside the move stick's grab radius, which is deliberately far
         // wider than the stick you can see. The stick gets first refusal on every
         // touch, so the leftmost slot would have quietly stopped responding.
-        // TWO bottoms, because the corner is no longer one rectangle.
-        //
-        // cornerBottom is the button's, and it is what the CENTRED things hang off
-        // - the hint, the chest panel, the shop panel. None of those come anywhere
-        // near the left edge on any screen, so the badge dangling off the button is
-        // none of their business, and making them clear it would cost the shop
-        // panel fifteen points of height on an SE for nothing.
-        //
-        // purseBottom is the badge's, and only the quick offer needs it, because
-        // the quick offer is the one thing that sits directly underneath.
-        let cornerBottom = shopButton.position.y - plate.height / 2
+        // The bottom of the corner, which is what everything below it hangs off -
+        // the quick offer, the hint, the chest panel and the shop panel.
+        let cornerBottom = shopButton.position.y - radius
         let hotbarTop = hotbar.position.y + HotbarNode.size.height / 2
         chestPanel.position = CGPoint(x: 0, y: (cornerBottom + hotbarTop) / 2)
 
@@ -668,8 +650,7 @@ final class GameScene: SKScene {
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world, heardFrom: ears)
         actorRenderer.sync(with: world, dt: frameDelta)
-        matchTimer.update(with: world)
-        if let player = world.localPlayer { purse.setValue(player.tokens) }
+        matchPanel.update(with: world)
         repositionForSafeAreaIfNeeded()
         leaderboard.update(with: world)
         
