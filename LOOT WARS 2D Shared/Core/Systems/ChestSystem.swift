@@ -14,7 +14,7 @@ enum ChestSystem {
 
     static func update(_ world: World, commands: [ActorID: [Command]], dt: Double) {
         restock(world, dt: dt)
-        advanceCracks(world, dt: dt)
+        mend(world, dt: dt)
 
         for (id, list) in commands {
             for command in list {
@@ -30,8 +30,6 @@ enum ChestSystem {
                     store(from: slot, by: id, into: chest, in: world)
                 case .takeItem(let chest, let slot):
                     take(from: slot, of: chest, by: id, in: world)
-                case .raidChest(let chest):
-                    beginCrack(chest, by: id, in: world)
                 case .move, .placeBlock, .removeBlock, .shoot,
                      .openLootbox, .useItem, .dropItem, .buyItem, .sellItem,
                      .placeArcade:
@@ -238,19 +236,86 @@ enum ChestSystem {
         if !chest.contents.add(item) { _ = chest.contents.add(removed) }
     }
 
+    /// Takes a chunk out of a chest, and bursts it if that was the last of it.
+    ///
+    /// The one door damage comes through, whether from a bullet or a blast, so
+    /// there is exactly one place that knows what a broken chest does. Returns
+    /// whether the chest was there to be hit at all.
+    ///
+    /// Your own is not damageable, and that is not politeness - you can walk into
+    /// your own base and open your own chest by tapping it, so a stray shot taking
+    /// one apart would only ever be an accident you could not undo.
+    @discardableResult
+    static func hit(_ chestID: ChestID,
+                    for amount: Int,
+                    by id: ActorID,
+                    of team: TeamID,
+                    in world: World) -> Bool {
+        guard var chest = world.chests[chestID] else { return false }
+        guard chest.owner != team else { return true }
+
+        chest.health -= amount
+
+        // Starts the mending clock over. Plink at a chest and wander off and you
+        // have achieved nothing; the only way to take one is to stay and finish it.
+        chest.secondsSinceHit = 0
+        chest.mendTimer = GameConfig.Chest.mendTick
+
+        guard chest.health <= 0 else {
+            world.chests[chestID] = chest
+            world.record(.chestHit(chestID, at: chest.position))
+            return true
+        }
+
+        world.chests[chestID] = chest
+        crack(chestID, by: id, in: world)
+        return true
+    }
+
+    /// Damage coming back to chests nobody is shooting any more.
+    ///
+    /// The same shape as ArcadeSystem.mend, and deliberately the same shape: a
+    /// delay first, then portions on a tick, so mending never races a raider in
+    /// real time. What it undoes is damage that was not followed up on.
+    private static func mend(_ world: World, dt: Double) {
+        for id in world.chests.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var chest = world.chests[id] else { continue }
+
+            chest.secondsSinceHit += dt
+
+            guard chest.health < GameConfig.Chest.health,
+                  chest.secondsSinceHit >= GameConfig.Chest.mendDelay else {
+                world.chests[id] = chest
+                continue
+            }
+
+            chest.mendTimer -= dt
+
+            guard chest.mendTimer <= 0 else {
+                world.chests[id] = chest
+                continue
+            }
+
+            chest.mendTimer = GameConfig.Chest.mendTick
+
+            let portion = Double(GameConfig.Chest.health) * GameConfig.Chest.mendPortion
+            chest.health = min(GameConfig.Chest.health,
+                               chest.health + max(1, Int(portion.rounded())))
+            world.chests[id] = chest
+        }
+    }
+
     /// Somebody else's chest, broken open.
     ///
-    /// A raider does not OPEN a chest, and this is the change that finally makes a
-    /// raid feel like one. Standing in a base you bombed your way into, tapping
-    /// through a storage panel slot by slot to decide what to carry - with the
-    /// owner running home - was an inventory-management screen in the middle of the
-    /// most exciting thing this game does. Worse, it made the fight optional: you
-    /// could stand in the panel indefinitely.
+    /// A raider does not OPEN a chest. Standing in a base you bombed your way into,
+    /// tapping through a storage panel slot by slot to decide what to carry - with
+    /// the owner running home - was an inventory-management screen in the middle of
+    /// the most exciting thing this game does. Worse, it made the fight optional:
+    /// you could stand in the panel indefinitely.
     ///
-    /// So it behaves like the crate it always should have been. One action, the
-    /// thing bursts, a couple of items land on the grass, and from there it is the
-    /// ordinary business of walking over loot while somebody shoots at you. Nothing
-    /// is decided in a menu.
+    /// So it behaves like the crate it always should have been. The thing bursts, a
+    /// few items land on the grass, and from there it is the ordinary business of
+    /// walking over loot while somebody shoots at you. Nothing is decided in a menu.
     ///
     /// The chest itself is destroyed, which is what makes rebuilding a wall worth
     /// doing: the base is not merely emptied, it is unfurnished, and it refurnishes
@@ -258,93 +323,35 @@ enum ChestSystem {
     ///
     /// The owner still opens their own normally - storing and retrieving is not
     /// raiding, and it happens in your own base with nobody shooting at you.
-    /// Starts breaking a chest open, which used to BE breaking it open.
     ///
-    /// A raid was: throw a bomb, walk in, tap, walk out. Under five seconds, and
-    /// the tap was instant - so the owner racing home to defend their base arrived
-    /// to find the chest already gone, every time, however fast they ran. Defence
-    /// existed and could not matter, because there was no moment during which it
-    /// could happen.
-    ///
-    /// Now there is one. It is short - see GameConfig.Chest.crackTime - and the
-    /// only things that end it early are being shot and walking away. Not a hold:
-    /// you tap once and commit, and the commitment is the cost. Standing still in
-    /// somebody's base for two seconds is a completely different proposition from
-    /// touching a box on your way past, and it is the same two seconds for the
-    /// seven bots who are on their way.
-    ///
-    /// Idempotent, because a bot issues this every tick it can reach the chest and
-    /// restarting the count each time would mean it never finished.
-    private static func beginCrack(_ chestID: ChestID, by id: ActorID, in world: World) {
-        guard var actor = world.actors[id], actor.isAlive,
-              let chest = world.chests[chestID],
-              chest.owner != actor.team,
-              canReach(chest, from: actor) else { return }
-
-        guard actor.crackingChest != chestID else { return }
-
-        actor.crackingChest = chestID
-        actor.crackProgress = 0
-        world.actors[id] = actor
-    }
-
-    /// Carries every attempt forward one tick, and drops the ones that have lost
-    /// their claim to continue.
-    private static func advanceCracks(_ world: World, dt: Double) {
-        // Sorted, because this finishes chests and finishing a chest scores.
-        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
-            guard var actor = world.actors[id], let target = actor.crackingChest else { continue }
-
-            // Dead, gone, out of reach, or somehow now yours: all the same answer.
-            guard actor.isAlive,
-                  let chest = world.chests[target],
-                  chest.owner != actor.team,
-                  canReach(chest, from: actor) else {
-                actor.crackingChest = nil
-                actor.crackProgress = 0
-                world.actors[id] = actor
-                continue
-            }
-
-            // Shot at, so back to the start. THIS is the whole mechanism: it is
-            // what turns an owner running home into something that can actually
-            // stop a raid rather than something that arrives to watch one.
-            //
-            // A reset rather than a pause, and the crack is kept short to pay for
-            // it. Somebody who clears the defenders first still gets the chest in
-            // under two seconds; somebody standing in a firefight does not get it
-            // at all, which is the correct answer to both.
-            if actor.secondsSinceHit < GameConfig.Chest.crackInterrupt {
-                actor.crackProgress = 0
-                world.actors[id] = actor
-                continue
-            }
-
-            actor.crackProgress += dt
-
-            guard actor.crackProgress >= GameConfig.Chest.crackTime else {
-                world.actors[id] = actor
-                continue
-            }
-
-            actor.crackingChest = nil
-            actor.crackProgress = 0
-            world.actors[id] = actor
-
-            crack(target, by: id, in: world)
-        }
-    }
-
+    /// Reached only from hit(), which has already checked the owner and taken the
+    /// last of the health off. It re-checks the owner anyway, because a function
+    /// that destroys somebody's property and pays somebody else for it should not
+    /// depend on its one caller staying its one caller.
     private static func crack(_ chestID: ChestID, by id: ActorID, in world: World) {
-        guard let actor = world.actors[id], actor.isAlive,
+        guard let actor = world.actors[id],
               let chest = world.chests[chestID],
-              chest.owner != actor.team,
-              canReach(chest, from: actor) else { return }
+              chest.owner != actor.team else { return }
 
-        // What survives being smashed, taken from the front of the chest so the
-        // same chest in the same state always spills the same things.
-        let held = chest.contents.slots.compactMap { $0 }
-        let spill = held.prefix(GameConfig.Chest.raidSpill)
+        // The BEST of what was in there rather than whatever was at the front, and
+        // that is the difference between a raid and a rummage: you do not scoop the
+        // nearest thing out of a box you broke open under fire, you take the helmet.
+        //
+        // Sorted by rarity and then by the slot it sat in, so the tie between two
+        // items of the same rung is broken by a fact about the chest rather than by
+        // whatever order the array happened to be in. The same chest in the same
+        // state spills the same things on every run of the same seed.
+        let held = chest.contents.slots.enumerated().compactMap { slot, stack in
+            stack.map { (slot: slot, stack: $0) }
+        }
+
+        let ranked = held.sorted { left, right in
+            let a = left.stack.type.rarity
+            let b = right.stack.type.rarity
+            return a == b ? left.slot < right.slot : a > b
+        }
+
+        let spill = ranked.prefix(GameConfig.Chest.raidSpill).map { $0.stack }
 
         for stack in spill {
             world.spawnGroundItem(.item(stack.type),

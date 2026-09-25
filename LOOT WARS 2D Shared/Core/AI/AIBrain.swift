@@ -72,14 +72,12 @@ enum AIBrain {
         // Waiting up to three seconds to notice a tree is how a bot ends up grinding
         // into one in full view.
         //
-        // Except while breaking a chest open, where the chest IS the obstacle.
-        // Avoidance would steer the bot neatly around the one thing it crossed the
-        // map for, out of reach, and cancel the crack it was two seconds into - so
-        // a bot would have been unable to finish a raid at all now that finishing
-        // one means standing still next to something solid.
-        if actor.crackingChest == nil {
-            steerAroundObstacles(&state, actor: actor, in: world)
-        }
+        // No exemption here any more. It used to skip obstacle avoidance while a
+        // bot was pressed against a chest breaking it open, because the chest WAS
+        // the obstacle and steering round it cancelled the raid. A chest is shot
+        // from a distance now, so a bot raiding one has no reason to be standing in
+        // it and every reason to keep steering round the furniture.
+        steerAroundObstacles(&state, actor: actor, in: world)
 
         // Gas is walked around, and LATE - see avoidGas. Still above the goal list,
         // because no errand is worth standing in a cloud for, but no longer above
@@ -186,17 +184,9 @@ enum AIBrain {
         // Open whatever is within reach, whatever the bot was busy doing. Walking
         // past an open-able crate and ignoring it is the sort of thing that gives
         // a bot away.
-        // Standing at somebody else's chest: break it. Whatever the bot was busy
-        // doing - the same reasoning as the crate below.
-        //
-        // No bag-room check any more, and that is the point of the chest becoming a
-        // crate: what comes out lands on the GROUND, so a bot with four full slots
-        // can still crack one and pick up what it can carry. It used to walk away
-        // from a full chest because it had nowhere to put the first item.
-        if let chest = world.reachableChest(for: actor), chest.owner != actor.team,
-           chest.contents.slots.contains(where: { $0 != nil }) {
-            commands.append(.raidChest(chest: chest.id))
-        }
+        // Nothing here about breaking a chest open any more: a chest is SHOT open,
+        // so a bot raiding one does it through shotToTake, the same way it takes a
+        // machine apart. See GameConfig.Chest.health.
 
         // Standing at its OWN chest under-equipped: take the gear back out.
         //
@@ -421,9 +411,9 @@ enum AIBrain {
             // a person instead of the two it needed for the chest. Seeing somebody
             // is not a reason to stop. Being HIT by them is, and that is the test.
             //
-            // It also makes the interrupt on cracking a chest mean something from
-            // the other side: a raider that refuses to be distracted is one the
-            // defender has to actually shoot rather than merely walk up to.
+            // And it is what makes a defender's shots matter: a raider that refuses
+            // to be distracted is one who has to actually be shot off the chest
+            // rather than merely walked up to.
             guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
 
         case .wander, .loot, .collect, .build, .farm, .stash, .rearm, .defend, .hunt:
@@ -2235,7 +2225,17 @@ enum AIBrain {
         // branch that leaves before the lead calculation below - because furniture
         // does not move, so aiming ahead of it would miss on purpose.
         if case .wreck(let id) = state.goal, let machine = world.arcade(id) {
-            return aimAtMachine(machine, from: actor, in: world)
+            return aimAtTarget(machine.centre, halfSpan: AIBrain.machineFaceInset,
+                               from: actor, in: world)
+        }
+
+        // A chest is shot open, so robbing one is the same act as wrecking a
+        // machine and goes through the same door. Its half-span is small - a chest
+        // is under a tile across - so the aim is at very nearly its centre.
+        if case .robChest(let id) = state.goal, let chest = world.chests[id],
+           chest.owner != actor.team {
+            return aimAtTarget(chest.position, halfSpan: AIBrain.chestFaceInset,
+                               from: actor, in: world)
         }
 
         let targetID: ActorID?
@@ -2319,16 +2319,23 @@ enum AIBrain {
     /// at and every shot would be judged blocked. Backing off by more than its
     /// largest half-extent puts the test point at or outside the face the bullet
     /// will hit, which is exactly what needs to be clear.
-    private static func aimAtMachine(_ machine: Arcade,
-                                     from actor: Actor,
-                                     in world: World) -> Vec2? {
-        let towards = machine.centre - actor.position
+    /// Where to point at a solid thing the bot wants to break: a machine, or a
+    /// chest.
+    ///
+    /// Line of sight is checked to the FACE rather than the centre, because the
+    /// thing's own body sits between the two and would report itself as cover.
+    /// halfSpan is how far back that face can be from the centre at any angle.
+    private static func aimAtTarget(_ centre: Vec2,
+                                    halfSpan: Double,
+                                    from actor: Actor,
+                                    in world: World) -> Vec2? {
+        let towards = centre - actor.position
         let distance = towards.length
 
         guard distance > 0.01, distance <= GameConfig.Blaster.range else { return nil }
 
         let direction = towards * (1 / distance)
-        let face = machine.centre - direction * AIBrain.machineFaceInset
+        let face = centre - direction * halfSpan
 
         guard hasLineOfSight(from: actor.position, to: face, in: world) else { return nil }
         return direction
@@ -2339,6 +2346,10 @@ enum AIBrain {
     /// Its footprint is three by two, so the largest half-extent is 1.5 and this
     /// clears it from any angle.
     private static let machineFaceInset: Double = 1.6
+
+    /// The same for a chest, which is under a tile across - so this is barely off
+    /// its centre, and a bot shooting one is aiming at the box itself.
+    private static let chestFaceInset: Double = 0.55
 
     private static func hasLineOfSight(from start: Vec2, to end: Vec2, in world: World) -> Bool {
         let delta = end - start
@@ -2418,17 +2429,6 @@ enum AIBrain {
         if state.shoveFor > 0 {
             state.shoveFor -= dt
             state.desiredHeading = state.shoveHeading
-            return
-        }
-
-        // Pressed against a chest on purpose. Breaking one open means staying in
-        // reach of a solid object for two seconds, which looks exactly like being
-        // wedged and is the opposite of it - shoving off would cancel the raid this
-        // bot is most of the way through.
-        guard actor.crackingChest == nil else {
-            state.lastPosition = actor.position
-            state.stuckFor = 0
-            state.stuckDistance = 0
             return
         }
 

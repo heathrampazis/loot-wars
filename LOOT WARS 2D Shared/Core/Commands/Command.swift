@@ -25,10 +25,6 @@ enum Command {
     /// for a specific box would mean the input code deciding which one is closest,
     /// and that is the simulation's call.
     case openLootbox
-    /// Break open somebody else's chest. Named apart from takeItem because it is a
-    /// different act: takeItem moves one thing between two containers you are
-    /// allowed to touch, this destroys a container you are not.
-    case raidChest(chest: ChestID)
     /// Use whatever is in this hotbar slot - apply it, or throw it. Which of those
     /// happens depends on the item, so input never has to know the difference.
     case useItem(slot: Int)

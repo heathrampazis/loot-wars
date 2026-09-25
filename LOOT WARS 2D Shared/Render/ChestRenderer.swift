@@ -29,28 +29,27 @@ final class ChestRenderer {
 
     private static let rimName = "reach"
 
-    /// The bar shown while a chest is being broken open, and how full it was drawn.
-    private var cracks: [ChestID: SKShapeNode] = [:]
-    private var drawnCrack: [ChestID: Double] = [:]
-
-    /// Which band of the crack each chest's shudder is currently drawn at.
+    /// The damage bar over each chest, and what it is currently drawn at.
     ///
-    /// Held so the shake is restarted four times over two seconds rather than sixty
-    /// times a second. The progress itself moves every frame, and an SKAction that
-    /// is replaced every frame never gets anywhere - see the note in
-    /// EffectsRenderer about values rewritten each tick. Bands are how this file
-    /// animates something continuous.
-    private var crackStep: [ChestID: Int] = [:]
+    /// The same pair ArcadeRenderer holds, for the same reasons, and this file now
+    /// answers the question the same way the machines do.
+    ///
+    /// It used to draw the damage by SHAKING the chest instead - swelling it and
+    /// buzzing it harder in four bands as a raid went on. That was written when a
+    /// raid was a two second timer, where a chest under the clock was a chest
+    /// somebody was actively holding, and a permanent rattle was true for exactly
+    /// as long as that lasted. A chest has HEALTH now, and health is a state rather
+    /// than an act: a chest somebody put two shots into and walked away from would
+    /// have sat buzzing in an empty base for eleven seconds while it mended. A bar
+    /// says how much is left; a shake says it is happening right now. Only one of
+    /// those is the truth about a damaged chest standing still.
+    private var bars: [ChestID: SKShapeNode] = [:]
+    private var drawnHealth: [ChestID: Int] = [:]
 
-    /// How many bands the two seconds are cut into, and how much bigger the chest
-    /// gets at each one. Four steps of seven per cent, so a chest a moment from
-    /// coming open is standing a fifth larger than it did and buzzing twice as fast.
-    private static let crackSteps = 4
-    private static let crackGrowth: CGFloat = 0.07
-
-    /// Narrower than the chest, so it reads as a thing happening TO the chest
-    /// rather than as a label sitting beside it.
-    private static let crackBarInTiles: Double = 0.8
+    /// How wide the bar is, in tiles. A chest is 0.95 across and the bar sits just
+    /// inside it, so it reads as belonging to the chest rather than as a label laid
+    /// on the ground beside it.
+    private static let barWidthInTiles: Double = 0.8
 
     func sync(with world: World) {
         for (id, chest) in world.chests where nodesByChest[id] == nil {
@@ -60,28 +59,44 @@ final class ChestRenderer {
         for (id, sprite) in Array(nodesByChest) where world.chests[id] == nil {
             nodesByChest[id] = nil
             if lit == id { lit = nil }
-            cracks[id]?.parent?.removeFromParent()
-            cracks[id] = nil
-            drawnCrack[id] = nil
-            crackStep[id] = nil
+            drawnHealth[id] = nil
+
+            // The bar goes WITH it, faded over half the time the chest takes to
+            // come apart, so it is gone before the burst finishes and the two read
+            // as one event. Forgetting the NODE rather than the dictionary entry is
+            // the bug ArcadeRenderer records at length: dropping the entry only
+            // lets go of this file's reference, and leaves an empty bar hanging in
+            // the air over the wreckage for the rest of the match.
+            if let bar = bars[id]?.parent {
+                bar.run(.sequence([.fadeOut(withDuration: 0.14), .removeFromParent()]))
+            }
+            bars[id] = nil
+
             smash(sprite)
         }
 
         for (id, sprite) in nodesByChest {
-            setCracking(world.crackShare(of: id), of: id, on: sprite)
+            if let chest = world.chests[id] {
+                setHealth(of: chest, on: sprite, in: world)
+            }
         }
 
         // The chest within arm's reach wears a rim, exactly as a crate does.
         //
-        // Both kinds, yours and anybody else's, because the rim answers "can you
-        // touch this" and the answer is yes to both - what touching it DOES is the
-        // corner button's business, and it already shows a different glyph for
-        // taking your things out and for breaking somebody else's open.
+        // YOURS ONLY now, and it used to be both. The rim answers "can you touch
+        // this", and touching somebody else's used to open it - the corner button
+        // wore a crowbar glyph and that was the whole interaction. A chest is shot
+        // open now, so the answer on an enemy chest is no, and a rim on one would
+        // be the screen offering something that does not happen. The player is told
+        // what DOES happen instead, once, by the hint in GameScene.updateHint.
         //
         // Asked with the same question the tap and the button use, so the outline
         // can never light up on something the simulation would then refuse.
-        let reachable = world.localPlayer.flatMap { player in
-            player.isAlive ? world.reachableChest(for: player)?.id : nil
+        let reachable = world.localPlayer.flatMap { player -> ChestID? in
+            guard player.isAlive,
+                  let chest = world.reachableChest(for: player),
+                  chest.owner == player.team else { return nil }
+            return chest.id
         }
 
         guard reachable != lit else { return }
@@ -98,88 +113,100 @@ final class ChestRenderer {
         rim.run(.fadeAlpha(to: showing ? 0.85 : 0, duration: showing ? 0.12 : 0.18))
     }
 
-    /// A chest with somebody working on it.
+    /// The bar over a chest somebody is shooting.
     ///
-    /// Two things at once, and they are saying different halves of it. The bar is
-    /// how far through they are; the shudder is that it is happening at all, which
-    /// has to be readable from across a base by the person sprinting home. Both
-    /// come off the world's own state rather than from an event, because a crack
-    /// starting, being interrupted and resuming are all just that number moving -
-    /// an interrupt is the bar dropping to nothing, which says it better than any
-    /// announcement would.
-    private func setCracking(_ share: Double?, of id: ChestID, on sprite: SKSpriteNode) {
-        guard drawnCrack[id] != share else { return }
-        let was = drawnCrack[id]
-        drawnCrack[id] = share
+    /// Only once it has been hit, and gone again once it has mended. A chest at
+    /// full health has nothing to say, and every chest on the map wearing a full
+    /// bar all match would be several more things on a busy screen - the bar is
+    /// news rather than a label.
+    ///
+    /// In the OWNER's colour, like the bar over a machine and the bar over a
+    /// person, because whose this is happens to be the question you are asking the
+    /// moment you see one.
+    private func setHealth(of chest: Chest, on sprite: SKSpriteNode, in world: World) {
+        guard drawnHealth[chest.id] != chest.health else { return }
+        drawnHealth[chest.id] = chest.health
 
-        guard let share else {
-            cracks[id]?.parent?.isHidden = true
-            sprite.removeAction(forKey: "cracking")
-            sprite.run(.group([.rotate(toAngle: 0, duration: 0.12),
-                               .scaleX(to: 1, y: 1, duration: 0.12)]))
-            cracks[id] = nil
-            crackStep[id] = nil
+        let share = min(1, max(0, Double(chest.health) / Double(GameConfig.Chest.health)))
+        let full = GridGeometry.length(ofTiles: ChestRenderer.barWidthInTiles)
+
+        guard share < 1 else {
+            bars[chest.id]?.parent?.isHidden = true
             return
         }
 
-        let full = GridGeometry.length(ofTiles: ChestRenderer.crackBarInTiles)
-        let fill = cracks[id] ?? makeCrackBar(for: id, on: sprite, full: full)
+        let fill = bars[chest.id] ?? makeBar(for: chest, on: sprite, full: full)
         fill.parent?.isHidden = false
+
+        // Re-sited every time it changes rather than once when it is built, for the
+        // reason ArcadeRenderer.place gives: what is standing around a chest is not
+        // fixed, and a base fills up over a match.
+        if let bar = fill.parent { place(bar, for: chest, in: world) }
+
+        // Never shorter than it is tall, or the last sliver draws as a rounded
+        // rectangle smaller than its own corner radius - which is to say as
+        // nothing, on the one chest you most want to see is nearly gone.
         fill.path = BarArt.path(full: full,
                                 filled: max(BarArt.height, full * CGFloat(share)))
-
-        // Starting, starting again after somebody put a shot into them, or simply
-        // further through than it was.
-        let step = min(ChestRenderer.crackSteps - 1,
-                       max(0, Int(share * Double(ChestRenderer.crackSteps))))
-        let restarted = was == nil || share < (was ?? 0)
-
-        guard restarted || crackStep[id] != step else { return }
-        crackStep[id] = step
-        shudder(sprite, step: step)
     }
 
-    /// The chest swelling and buzzing harder the closer it is to coming open.
-    ///
-    /// It used to shake at one fixed amplitude for the whole two seconds, which
-    /// said "this is happening" and nothing else - the bar carried all of the
-    /// progress and the chest carried none of it. Now the thing itself is the
-    /// countdown: it grows, and it rattles faster, and by the last band it is
-    /// visibly straining against itself. Then it comes apart, and smash below picks
-    /// up from exactly where this left it rather than starting over at full size.
-    ///
-    /// Four discrete bands rather than a smooth ramp, because an SKAction replaced
-    /// every frame never plays. Four is enough to read as continuous and few enough
-    /// that each one lands as a distinct lurch.
-    private func shudder(_ sprite: SKSpriteNode, step: Int) {
-        let reach = CGFloat(step)
-        let grow = 1 + ChestRenderer.crackGrowth * reach
-        let tilt = 0.045 + 0.022 * reach
-        let beat = TimeInterval(0.05 - 0.008 * Double(step))
+    private func makeBar(for chest: Chest, on sprite: SKSpriteNode, full: CGFloat) -> SKShapeNode {
+        let (bar, fill) = BarArt.make(full: full,
+                                      colour: RenderPalette.colour(for: chest.owner))
 
-        sprite.removeAction(forKey: "cracking")
-        sprite.run(.repeatForever(.sequence([
-            .group([.rotate(toAngle: tilt, duration: beat),
-                    .scaleX(to: grow * 1.03, y: grow * 0.97, duration: beat)]),
-            .group([.rotate(toAngle: -tilt, duration: beat),
-                    .scaleX(to: grow * 0.98, y: grow * 1.02, duration: beat)])
-        ])), withKey: "cracking")
-    }
-
-    private func makeCrackBar(for id: ChestID, on sprite: SKSpriteNode, full: CGFloat) -> SKShapeNode {
-        // In the raider's red rather than a team colour: this is not information
-        // about whose chest it is - the base around it already said that - it is a
-        // countdown to losing it.
-        let (bar, fill) = BarArt.make(full: full, colour: RenderPalette.placementBlocked)
-
-        // In the scene rather than on the sprite, which is shaking.
-        bar.position = CGPoint(x: sprite.position.x,
-                               y: sprite.position.y + GridGeometry.length(ofTiles: 0.75))
+        // In the scene rather than on the sprite: the sprite is knocked about by
+        // the flinch on every hit, and a bar riding on it would jump with each one.
         bar.zPosition = sprite.zPosition + 0.5
 
         node.addChild(bar)
-        cracks[id] = fill
+        bars[chest.id] = fill
         return fill
+    }
+
+    /// Above the chest, or below it when there is something in the way.
+    ///
+    /// The same question ArcadeRenderer.place asks, and it matters more here: a
+    /// chest stands against the inside of somebody's wall as often as not, and the
+    /// tile over it is frequently that wall. World.structureOccupies knows about
+    /// every crate, chest and machine at once.
+    private func place(_ bar: SKNode, for chest: Chest, in world: World) {
+        let above = 0.75
+        let overhead = GridPoint(containing: Vec2(x: chest.position.x,
+                                                  y: chest.position.y + above))
+
+        let offset = world.structureOccupies(overhead)
+            ? -ChestRenderer.barFootingDrop
+            : above
+
+        let footing = GridGeometry.point(for: chest.position)
+        bar.position = CGPoint(x: footing.x,
+                               y: footing.y + GridGeometry.length(ofTiles: offset))
+    }
+
+    /// How far below its feet a bar sits when it cannot go above.
+    private static let barFootingDrop: Double = 0.5
+
+    /// Shot, and still standing.
+    ///
+    /// The machine's flinch, deliberately the same one: a struck chest and a struck
+    /// cabinet are the same event, and giving them two different reactions would be
+    /// two things to learn where the board already has one.
+    ///
+    /// A flinch is not the shake this replaced, and the difference is the whole
+    /// point. This happens ON a hit and is over in a quarter of a second, so it
+    /// says a shot just landed. The shake was a STATE, and a state is what the bar
+    /// is for.
+    func hit(_ id: ChestID) {
+        guard let sprite = nodesByChest[id] else { return }
+
+        sprite.removeAction(forKey: "hit")
+        sprite.run(.sequence([
+            .group([.colorize(with: .white, colorBlendFactor: 0.85, duration: 0.04),
+                    .scaleX(to: 1.06, y: 0.94, duration: 0.04)]),
+            .group([.scaleX(to: 0.97, y: 1.03, duration: 0.06)]),
+            .group([.colorize(withColorBlendFactor: 0, duration: 0.16),
+                    .scaleX(to: 1, y: 1, duration: 0.16)])
+        ]), withKey: "hit")
     }
 
     /// The lid knocked open, for a chest you are looking into.
@@ -212,26 +239,27 @@ final class ChestRenderer {
     /// happen to it, and a fade would say the chest was switched off rather than
     /// taken apart.
     ///
-    /// It BURSTS now rather than shaking twice and shrinking. shudder above has
-    /// spent two seconds swelling the chest and buzzing it harder, so the old
-    /// opening frame - a squash to 1.14 - was actually smaller than where the
-    /// shudder had already got to, and the smash began by deflating. Now it carries
-    /// straight on: a hard wrench, a bigger one the other way, a swell past
-    /// anything the shudder reached, and then it is gone in a fifth of a second.
+    /// It BURSTS rather than shaking twice and shrinking: a hard wrench, a bigger
+    /// one the other way, a swell, and then it is gone in a fifth of a second.
+    ///
+    /// It used to open bigger than this, because the shake it followed had already
+    /// swollen the chest by a fifth and anything smaller would have begun by
+    /// deflating. The shake is gone, so the chest is at REST when this starts and
+    /// the first frame is back to being a squash - which is what a thing bursting
+    /// does, and what the swell two frames later is measured against.
     ///
     /// The collapse at the end is what sells it as bursting rather than as
     /// exploding outward. Nothing here is thrown clear - the contents are already
     /// scattered on the grass by ChestSystem and they are the debris.
     private func smash(_ sprite: SKSpriteNode) {
-        // Whatever was shaking it has had its answer.
-        sprite.removeAction(forKey: "cracking")
         sprite.childNode(withName: ChestRenderer.rimName)?.removeFromParent()
 
+        sprite.removeAction(forKey: "hit")
         sprite.run(.sequence([
             .group([.rotate(toAngle: 0.14, duration: 0.04),
-                    .scaleX(to: 1.42, y: 1.08, duration: 0.04)]),
+                    .scaleX(to: 1.22, y: 0.86, duration: 0.04)]),
             .group([.rotate(toAngle: -0.17, duration: 0.05),
-                    .scaleX(to: 1.26, y: 1.44, duration: 0.05)]),
+                    .scaleX(to: 1.30, y: 1.40, duration: 0.05)]),
             .group([.rotate(toAngle: 0.08, duration: 0.06),
                     .scale(to: 1.72, duration: 0.06),
                     .fadeAlpha(to: 0.92, duration: 0.06)]),

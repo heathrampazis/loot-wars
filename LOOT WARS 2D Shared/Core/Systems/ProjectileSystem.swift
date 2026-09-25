@@ -41,6 +41,7 @@ enum ProjectileSystem {
             // eat the shot first and leave the machine untouched - the order here
             // IS the feature.
             if hitArcade(by: projectile, in: world) { continue }
+            if hitChest(by: projectile, in: world) { continue }
 
             // Crates and machines are solid, so they stop a shot too - otherwise
             // bullets sail through something you demonstrably cannot walk through.
@@ -90,6 +91,27 @@ enum ProjectileSystem {
             world.award(machine.kind.destroyedScore, to: projectile.team)
             world.awardTokens(machine.kind.destroyedReward, to: projectile.owner)
             world.record(.blast(at: machine.centre))
+            return true
+        }
+
+        return false
+    }
+
+    /// Damages somebody else's chest the shot landed on. Returns whether the shot
+    /// was spent, which it is either way - your own chest still stops the bullet,
+    /// it just does not care.
+    ///
+    /// This is how a chest is opened now: there is no crack command and no timer.
+    /// See GameConfig.Chest.health for what that replaced and why.
+    ///
+    /// Sorted, because this hands out damage and damage decides who scores.
+    private static func hitChest(by projectile: Projectile, in world: World) -> Bool {
+        for id in world.chests.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let chest = world.chests[id],
+                  chest.hitbox.contains(projectile.position) else { continue }
+
+            ChestSystem.hit(id, for: projectile.damage,
+                            by: projectile.owner, of: projectile.team, in: world)
             return true
         }
 

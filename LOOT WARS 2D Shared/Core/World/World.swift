@@ -492,23 +492,6 @@ final class World {
 
     /// The same question asked of an area rather than a point, for the things that
     /// reason about whole tiles - building, and putting a chest down.
-    /// How far through being broken open a chest is, if anybody is working on it.
-    ///
-    /// Asked by the renderer, which shows it. Nothing announces a crack starting or
-    /// being interrupted - both are plain facts about the world, and a bar that is
-    /// filling or has just dropped to nothing says each of them better than an
-    /// event could.
-    func crackShare(of chestID: ChestID) -> Double? {
-        var best: Double?
-
-        for actor in actors.values where actor.crackingChest == chestID {
-            let share = min(1, actor.crackProgress / GameConfig.Chest.crackTime)
-            if share > (best ?? -1) { best = share }
-        }
-
-        return best
-    }
-
     func structureIntersects(_ box: Box) -> Bool {
         if lootboxes.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
         if arcades.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
@@ -1493,7 +1476,7 @@ final class World {
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
                      .placeChest, .placeArcade, .storeItem, .takeItem,
-                     .raidChest, .dropItem, .buyItem, .sellItem:
+                     .dropItem, .buyItem, .sellItem:
                     break   // other systems' business, not movement's
                 }
             }

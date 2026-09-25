@@ -83,10 +83,10 @@ final class GameScene: SKScene {
     private enum CornerAction: Equatable {
         case aim
         case lootbox
-        /// Your own: opens the storage panel.
+        /// Your own: opens the storage panel. Somebody else's is not on this
+        /// button at all - it is shot open, so it belongs to the blaster rather
+        /// than to a corner control. See GameConfig.Chest.health.
         case chest(ChestID)
-        /// Somebody else's: breaks it open where it stands.
-        case raid(ChestID)
     }
 
     private var cornerAction: CornerAction = .aim
@@ -162,6 +162,21 @@ final class GameScene: SKScene {
     /// The same shape as wasBlocked, and for the same reason: a hint is a reaction
     /// to a moment, and "being at home" is a state.
     private var wasHome = false
+
+    /// The same pair, for walking up to somebody else's chest.
+    ///
+    /// This one exists because a control was REMOVED. Standing at an enemy chest
+    /// used to put a crowbar glyph on the corner button, and that button was the
+    /// whole of how anybody learned that a chest could be taken. A chest is shot
+    /// open now, so the corner keeps the aim stick and there is nothing on screen
+    /// to discover - which is fine once you know and impossible before.
+    ///
+    /// Twice, and it does not expire with the early window the way the selling
+    /// lesson does. Raiding happens when a raid happens, which for a player still
+    /// finding their feet is often well past the first minute, and a lesson that
+    /// has timed out before the situation it teaches has arisen is not a lesson.
+    private var wasAtEnemyChest = false
+    private var raidHintsLeft = 2
 
     /// Who killed you, while you are waiting to come back - see aimCamera.
     private var killedBy: ActorID?
@@ -732,6 +747,7 @@ final class GameScene: SKScene {
     private func updateHint(with world: World) {
         guard let player = world.localPlayer, player.isAlive, !world.isOver else {
             wasBlocked = false
+            wasAtEnemyChest = false
             hint.hide()
             return
         }
@@ -777,6 +793,21 @@ final class GameScene: SKScene {
 
         if arrivedHome, !hasBuilt, blueprint.hasSlots, world.canBuild(player.team) {
             hint.show("TAP BASE TILES TO PLACE WALLS", seconds: 2.2)
+            return
+        }
+
+        // Within reach of somebody else's chest, on the rising edge of getting
+        // there. Reach rather than line of sight, because being close enough to
+        // touch one is the moment somebody looks for the button that is not there.
+        let atEnemyChest = world.reachableChest(for: player)
+            .map { $0.owner != player.team } ?? false
+
+        let arrivedAtChest = atEnemyChest && !wasAtEnemyChest
+        wasAtEnemyChest = atEnemyChest
+
+        if arrivedAtChest, raidHintsLeft > 0 {
+            raidHintsLeft -= 1
+            hint.show("SHOOT THE CHEST TO BREAK IT OPEN", seconds: 2.2)
             return
         }
 
@@ -917,6 +948,13 @@ final class GameScene: SKScene {
                 // BOMB's flash, which said the cabinet had just been destroyed and
                 // then left it standing.
                 arcadeRenderer.hit(id)
+                effectsRenderer.machineStruck(at: position)
+
+            case .chestHit(let id, let position):
+                // The machine's answer, for the same reason it has one: a chest
+                // being shot has to read differently from a person being shot, or
+                // the screen says somebody is in there taking it.
+                chestRenderer.hit(id)
                 effectsRenderer.machineStruck(at: position)
 
             case .sealed(let team, let chests):
@@ -1137,12 +1175,10 @@ final class GameScene: SKScene {
         // never offer to open something the simulation would then refuse. Your own
         // chest wins over a crate: it is inside your base, and it is yours.
         let wanted: CornerAction
-        if let chest = world.reachableChest(for: player) {
-            // Yours is storage; anybody else's is a crate with a lid on it. Two
-            // different verbs from one button, decided by whose base you are
-            // standing in - which is the only thing a player needs to know about
-            // the difference.
-            wanted = chest.owner == player.team ? .chest(chest.id) : .raid(chest.id)
+        if let chest = world.reachableChest(for: player), chest.owner == player.team {
+            // Only YOURS. Standing next to somebody else's leaves the corner on the
+            // aim stick, which is the correct offer: shooting it is what opens it.
+            wanted = .chest(chest.id)
         } else if world.reachableLootbox(for: player) != nil {
             wanted = .lootbox
         } else {
@@ -1161,11 +1197,6 @@ final class GameScene: SKScene {
             switch wanted {
             case .lootbox: openButton.setGlyph(Glyphs.lootbox)
             case .chest:   openButton.setGlyph(Glyphs.chest)
-            // The crate glyph, not the chest one, because the ACT is opening a
-            // crate. A button that looks like storage and behaves like a crowbar
-            // would be the interface lying about the only irreversible thing on
-            // this screen.
-            case .raid:    openButton.setGlyph(Glyphs.lootbox)
             case .aim:     break
             }
         }
@@ -1457,12 +1488,6 @@ extension GameScene {
                 switch cornerAction {
                 case .lootbox:
                     queuedCommands.append(.openLootbox)
-                case .raid(let id):
-                    // No panel and no choosing. It bursts, a couple of things land
-                    // on the grass, and picking them up is the ordinary business of
-                    // walking over loot while somebody shoots at you.
-                    queuedCommands.append(.raidChest(chest: id))
-
                 case .chest(let id):
                     openOwnChest(id)
                 case .aim:
@@ -1947,7 +1972,6 @@ extension GameScene {
     private enum Touchable {
         case lootbox
         case chest(ChestID)
-        case raid(ChestID)
     }
 
     private func touchable(at pointInWorld: CGPoint) -> Touchable? {
@@ -1957,8 +1981,9 @@ extension GameScene {
         // Your own chest before a crate, which is the order the corner button uses
         // - it is inside your base and it is yours.
         if let chest = world.reachableChest(for: player),
+           chest.owner == player.team,
            chest.hitbox.expanded(by: GameScene.tapSlop).contains(touched) {
-            return chest.owner == player.team ? .chest(chest.id) : .raid(chest.id)
+            return .chest(chest.id)
         }
 
         if let box = world.reachableLootbox(for: player),
@@ -2026,12 +2051,6 @@ extension GameScene {
         switch touchable(at: pointInWorld) {
         case .chest(let id):
             openOwnChest(id)
-            return
-
-        case .raid(let id):
-            // Anybody else's is not opened at all: it is broken, and what falls out
-            // is picked up off the grass.
-            queuedCommands.append(.raidChest(chest: id))
             return
 
         case .lootbox:
