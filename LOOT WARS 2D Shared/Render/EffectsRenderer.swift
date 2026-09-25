@@ -55,7 +55,21 @@ final class EffectsRenderer {
     /// what an enchanted ITEM carries: EnchantArt gives a power-up four stars on a
     /// staggered two-second loop and one or two of them are showing at any moment.
     /// Same look, borrowed on purpose.
-    private static let auraInterval: Double = 0.40
+    /// Seconds between glints off somebody running a perk.
+    ///
+    /// 0.14, down from 0.40 - about seven a second rather than two and a half, and
+    /// fifty over a perk rather than seventeen.
+    ///
+    /// The old number was a fix for a bug that a LATER fix had already solved, and
+    /// it is worth writing down because it is an easy way to leave a thing weak by
+    /// accident. The aura once read as a plume of smoke, and two things were done
+    /// about it at once: the count came down, and the motes stopped all travelling
+    /// upward. The second one was the fix - see aura below, which says so - because
+    /// a dozen particles all going the same way is a jet however few you make it.
+    /// The count staying down was the part that did nothing except make a power-up
+    /// look like an occasional twinkle. Glints that arrive, flash and leave do not
+    /// become a plume however many there are.
+    private static let auraInterval: Double = 0.14
 
     // MARK: - Noticing
 
@@ -216,13 +230,14 @@ final class EffectsRenderer {
         // round the ring, so the first steady glints carry on from the column
         // rather than snapping back to where it started.
         //
-        // Three rather than six, and spread over twice as long. Six at a twentieth
-        // of a second apart was a handover to an aura that threw twelve a second;
-        // against one that throws two and a half it would be the flood moved from
-        // the whole perk to the front of it.
-        for index in 0..<3 {
+        // Paced to the aura it is handing to, which is the only number that makes
+        // sense here: fewer and the effect visibly thins between the column and the
+        // trail, more and the front of a perk is denser than the rest of it. Five
+        // at 0.07 is a shade ahead of the steady seven a second, so it arrives as a
+        // spray that settles into a shimmer.
+        for index in 0..<5 {
             node.run(.sequence([
-                .wait(forDuration: Double(index) * 0.11),
+                .wait(forDuration: Double(index) * 0.07),
                 .run { [weak self] in self?.aura(at: position, step: index, perk: perk) }
             ]))
         }
