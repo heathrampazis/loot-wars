@@ -73,7 +73,11 @@ enum GameConfig {
         /// the game - find a bomb, cross the map, breach a wall, survive the owner
         /// - and it should read as the biggest single thing you can do that is not
         /// a kill.
-        static let chestRaided = 55
+        ///
+        /// Except that it did not: 55 against a kill's 100, for a chain of work a
+        /// kill does not require. 90 puts a raid where that sentence always said it
+        /// was, just under a kill and well clear of everything else.
+        static let chestRaided = 90
 
         /// Zero, deliberately. A token is already its own reward - it buys the
         /// upgrade ladder - and paying score for it as well is the same act counted
@@ -187,9 +191,18 @@ enum GameConfig {
         /// Tokens for cracking somebody's chest. Still more than a rare crate,
         /// because a rare crate does not shoot back.
         ///
-        /// 3 rather than 7. The haul out of a chest is the ITEMS - two of them, and
-        /// they are the reason to go - so this is a tip on top rather than a wage.
-        static let perChestRaided = 3
+        /// 24, and the old note explaining why it was 3 is worth keeping as the
+        /// mistake it was: "the haul out of a chest is the ITEMS, so this is a tip
+        /// on top rather than a wage." True as far as it goes, and it left a raid
+        /// paying less than a fifth of what a KILL pays - 14 - for a chain of work
+        /// that starts with finding a bomb and ends with standing in somebody's
+        /// base while they shoot at you.
+        ///
+        /// Tokens are the gear ladder, so this is not a tip: it is the other way a
+        /// raid can pay off when the chest turns out to be full of bandages. At 24
+        /// a raid is most of a helmet, which is what makes the trip worth planning
+        /// rather than worth taking if you happen to be passing.
+        static let perChestRaided = 24
     }
 
     /// What tokens buy.
@@ -2160,41 +2173,76 @@ enum GameConfig {
         /// make one raid worth four crates and turn the rest of the map into
         /// scenery.
         ///
-        /// Two, and the number is deliberately smaller than a fresh chest holds.
-        /// The victim always loses more than the raider gains, which is what makes
-        /// a raid an attack rather than a transfer - and is the reason defending
-        /// one is worth doing.
-        static let raidSpill = 2
+        /// Three, up from two, and what comes out is now the BEST three rather
+        /// than the first three - see ChestSystem.crack.
+        ///
+        /// Those two changes together are most of "a raid should be worth making".
+        /// A chest is 3 or 4 items and a quarter of the table is gear, so two items
+        /// off the front meant a raid handed you two bandages more often than not.
+        /// Taking the best of what is in there is also just what a person does: you
+        /// do not scoop the nearest thing out of a box you have broken open under
+        /// fire, you take the helmet.
+        ///
+        /// Still short of what a fresh chest holds, so the victim loses more than
+        /// the raider gains - which is what makes a raid an attack rather than a
+        /// transfer, and is the reason defending one is worth doing.
+        static let raidSpill = 3
 
-        /// How long somebody has to stay on a chest to break it open.
+        /// How much punishment a chest takes before it bursts.
         ///
-        /// Two seconds, and the number is the entire point of the change rather
-        /// than a detail of it. A raid used to be: throw, walk in, tap, walk out -
-        /// under five seconds, with the tap instant. Defence existed and could not
-        /// matter, because there was no window in which it could happen. The owner
-        /// sprinting home arrived to find the chest already gone, every time.
+        /// A chest is SHOT open now. It used to be a two second count that began on
+        /// a tap and reset if anybody hit you, and the count was there for a good
+        /// reason - before it, a raid was "walk in, tap, walk out" and the owner
+        /// sprinting home always arrived too late to matter. It bought a defence
+        /// window and it worked.
         ///
-        /// Two rather than four. The cost is meant to be the COMMITMENT, not the
-        /// wait: standing still in somebody's base is a completely different
-        /// proposition from touching a box on your way past, and the difference is
-        /// made by the interrupt below rather than by the duration. Long enough for
-        /// somebody who heard the bomb to cross their own base and get a shot off,
-        /// short enough that a raider who has already cleared the defenders is not
-        /// standing about being bored.
-        static let crackTime: Double = 2.0
+        /// What it cost was the raid itself. The player tapped once and then stood
+        /// still for two seconds doing nothing, in the middle of the most active
+        /// thing in the game, with a progress bar over their head - and one bullet
+        /// sent it back to nothing, so in any contested raid the bar was pure
+        /// frustration and never finished. Health buys the same window and spends
+        /// it on something to DO. It is also the language the board already speaks:
+        /// arcades are shot apart, and a chest that works the same way needs no
+        /// explaining.
+        ///
+        /// 170, which is 3.1 seconds of a starting blaster, 1.8 of a Blaster 3 and
+        /// 1.1 of a Blaster 5. Wider than the flat two seconds it replaces, and
+        /// deliberately: the gear you raided for should make the next raid quicker.
+        /// The bottom of that range is still long enough for somebody who heard the
+        /// bomb to cross their own base and start shooting.
+        ///
+        /// The interrupt is gone and is not missed. Being shot at already stops you
+        /// breaking a chest, because you cannot hold an aim on a box and dodge at
+        /// the same time - the mechanism is now the fight rather than a rule about
+        /// one.
+        static let health = 170
 
-        /// How recently shot counts as interrupted.
+        /// A chest left alone mends, exactly as a machine does.
         ///
-        /// Being hit sends the count back to the start, so a raid is now: breach,
-        /// deal with whoever comes, THEN take the chest. A quarter of a second, so
-        /// one shot costs a raider that plus the progress they had - enough that a
-        /// single defender firing steadily can hold a chest indefinitely, which is
-        /// exactly what defending a base should mean.
+        /// Without it, every chest on the map would be chipped down over five
+        /// minutes by stray fire and the map would end up made of ruins nobody
+        /// chose to break. The delay is the part that matters: mending only ever
+        /// undoes damage nobody followed up on, so breaking a chest stays something
+        /// you commit to rather than an errand you run in instalments.
         ///
-        /// A reset rather than a pause, deliberately, and crackTime is short to pay
-        /// for it. The pair says: you can have the chest, once nobody is shooting
-        /// at you.
-        static let crackInterrupt: Double = 0.25
+        /// Quicker to come back than a machine, because there is so much less of
+        /// it: four seconds of quiet and then a seventh of the box a second, so an
+        /// abandoned chest is whole again about eleven seconds after the shooting
+        /// stops.
+        static let mendDelay: Double = 4
+        static let mendPortion: Double = 0.14
+        static let mendTick: Double = 1.0
+
+        /// What a bomb takes off one at the centre of the blast, falling away to
+        /// nothing at the rim exactly as it does for a person.
+        ///
+        /// Damage rather than destruction, which is what a bomb does to an actor
+        /// and not what it does to a machine. A bomb that burst a chest outright
+        /// would hand the whole raid back to the raider: lob one through the hole
+        /// you just made from outside the wall, and the defence window this is all
+        /// built around never opens at all. 120 of 170 means a bomb is most of a
+        /// chest and never all of it - you still have to go in.
+        static let bombDamage = 120
 
         /// What a bot's chest is holding the moment it goes down.
         ///
@@ -2268,32 +2316,37 @@ enum GameConfig {
         /// game being the prize for a late raid is exactly the reward the closing
         /// minutes were missing.
         ///
-        /// Healing is up: the medkit row nearly doubled and the bomb row gave way
-        /// for it. A chest item is worth 35% of a health bar now against 32%, and
-        /// with three or four items in a fresh chest rather than two or three, a
-        /// raid is worth appreciably more than the bomb that opened it. Gear holds
-        /// 34 of 138 in every band - a quarter, as before - so chests are worth
-        /// breaking into exactly as often as they were, and worth more when you do.
+        /// GEAR IS UP and bandages are down, which is the other half of a raid
+        /// being worth making. Gear held 34 of 138 - a quarter - and bandages held
+        /// 42% on their own, so the commonest outcome of bombing a wall, walking
+        /// into somebody's base and breaking their chest under fire was a couple of
+        /// bandages. That is a crate, and a crate costs nothing.
+        ///
+        /// 46 of 146 now, just under a third, against 42 for bandages. With three
+        /// or four items in a fresh chest and the best three of them coming out,
+        /// 73% of chests hand over a piece of gear, against 43% before - modelled
+        /// over 200,000 chests rather than guessed at. The rest still pay in
+        /// healing and bombs, which is what lets you keep raiding.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
-                (.helmet(.common), 11), (.helmet(.epic), 6),
-                (.blaster(.two),   11), (.blaster(.three), 6)
+                (.bandage, 42), (.medkit, 20), (.bomb, 26), (.stink, 12),
+                (.helmet(.common), 15), (.helmet(.epic), 8),
+                (.blaster(.two),   15), (.blaster(.three), 8)
             ]),
             (0.35, [
-                (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
-                (.helmet(.common), 6), (.helmet(.epic), 11),
-                (.blaster(.two),   11), (.blaster(.three), 6)
+                (.bandage, 42), (.medkit, 20), (.bomb, 26), (.stink, 12),
+                (.helmet(.common), 8), (.helmet(.epic), 15),
+                (.blaster(.two),   15), (.blaster(.three), 8)
             ]),
             (0.65, [
-                (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
-                (.helmet(.epic), 11), (.helmet(.legendary), 6),
-                (.blaster(.three), 11), (.blaster(.four), 6)
+                (.bandage, 42), (.medkit, 20), (.bomb, 26), (.stink, 12),
+                (.helmet(.epic), 15), (.helmet(.legendary), 8),
+                (.blaster(.three), 15), (.blaster(.four), 8)
             ]),
             (0.85, [
-                (.bandage, 58), (.medkit, 20), (.bomb, 26), (.stink, 10),
-                (.helmet(.legendary), 11), (.helmet(.mythical), 6),
-                (.blaster(.four), 11), (.blaster(.five), 6)
+                (.bandage, 42), (.medkit, 20), (.bomb, 26), (.stink, 12),
+                (.helmet(.legendary), 15), (.helmet(.mythical), 8),
+                (.blaster(.four), 15), (.blaster(.five), 8)
             ])
         ]
 

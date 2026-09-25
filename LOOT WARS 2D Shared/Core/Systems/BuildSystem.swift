@@ -22,7 +22,7 @@ enum BuildSystem {
                 // about it.
                 case .move, .shoot, .openLootbox, .useItem,
                      .placeChest, .placeArcade, .storeItem, .takeItem,
-                     .raidChest, .dropItem, .buyItem, .sellItem:
+                     .dropItem, .buyItem, .sellItem:
                     break
                 }
             }

@@ -163,6 +163,22 @@ enum BombSystem {
             world.awardTokens(machine.kind.destroyedReward, to: bomb.owner)
         }
 
+        // Chests, which take damage rather than bursting outright - see
+        // GameConfig.Chest.bombDamage. Falls off from the centre exactly as it does
+        // for a person, so a bomb lobbed through the hole in the wall from outside
+        // softens a chest and does not take it.
+        for id in world.chests.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let chest = world.chests[id] else { continue }
+
+            let distance = (chest.position - bomb.position).length
+            guard distance <= radius else { continue }
+
+            let share = 1 - (distance / radius)
+            let hurt = Int((Double(GameConfig.Chest.bombDamage) * share).rounded())
+            ChestSystem.hit(id, for: max(1, hurt),
+                            by: bomb.owner, of: bomb.team, in: world)
+        }
+
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let actor = world.actors[id], actor.isAlive else { continue }
 

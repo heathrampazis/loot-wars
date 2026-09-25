@@ -48,15 +48,6 @@ struct Actor {
     /// Seconds of spawn protection left.
     var invulnerability: Double = 0
 
-    /// The chest this actor is in the middle of breaking open, and how far in.
-    ///
-    /// On the ACTOR rather than on the chest, because two people can be working on
-    /// the same chest and each one's progress is their own - and because everything
-    /// that interrupts it is a fact about the person: being shot, walking away,
-    /// dying. See ChestSystem.
-    var crackingChest: ChestID?
-    var crackProgress: Double = 0
-
     var isAlive: Bool { respawnTimer == nil }
 
     var ammo: Int = GameConfig.Blaster.magazineSize
@@ -273,7 +264,7 @@ struct Actor {
     /// It used to skip the bottom rung - a Common helmet, a Blaster 2 - on the
     /// argument that they are what the crates hand out in the first minute, so
     /// banking one banks nothing. True of a crate, and wrong everywhere else: a
-    /// chest cracked in somebody's base spills two items, and if one of them was a
+    /// chest cracked in somebody's base spills three items, and if one of them was a
     /// Common you stood on it and nothing happened. The reward for the longest
     /// errand in the game silently declined to exist.
     ///
