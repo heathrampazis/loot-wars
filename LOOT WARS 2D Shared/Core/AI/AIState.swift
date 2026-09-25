@@ -59,6 +59,18 @@ struct AIState {
     /// does feels like a machine.
     var reactionTimer: Double = 0
 
+    /// How long this bot has been standing in gas, or walking at some.
+    ///
+    /// Counts UP, unlike every other timer here, because what it gates is a
+    /// reaction rather than a repeat: a bot does nothing about a cloud until this
+    /// passes GameConfig.AI.gasReaction. Zeroed the moment it is clear of one, so
+    /// stepping out and back in costs it the reaction again - which is what
+    /// stumbling at the edge of a cloud looks like from outside.
+    ///
+    /// This one field is most of why a stink bomb is worth carrying. Without it the
+    /// bots answered a cloud landing on their feet in a single tick.
+    var gasNoticed: Double = 0
+
     /// Which way round the bot is currently circling an enemy. Flipped now and
     /// then, so it does not orbit forever in one direction.
     var strafeDirection: Double = 1
