@@ -13,35 +13,68 @@ enum RenderPalette {
 
     // The menu, which is the one screen in this game that is not the map.
     //
-    // Its own small block rather than borrowed from the HUD, because it answers a
-    // different question. Every colour below the terrain line has to survive being
-    // seen over pale green grass at a glance mid-fight. These sit on a frosted
-    // white veil over a blurred map, read at rest, by somebody who is not being
-    // shot at - so they can be softer, lighter and more numerous than anything the
-    // game itself is allowed.
+    // Every colour here is the GAME'S, and that is the point rather than a
+    // convenience. A menu painted in colours the match never uses is a menu that
+    // belongs to a different product - it was a set of tasteful mid-tones for one
+    // revision and read as a settings screen bolted onto a cartoon.
     //
-    // All three are pitched to carry BLACK, not white. That is the decision the
-    // rest follows from: on a light screen, dark type is what reads, and a button
-    // that needs white text would have to be dark enough to punch a hole in it.
-    // Black clears 12:1 on the green, 8.3:1 on the blue and 7.7:1 on the purple.
-    static let menuPlay     = rgb(0x4A, 0xDE, 0x80)
-    static let menuInfo     = rgb(0x60, 0xA5, 0xFA)
-    static let menuSettings = rgb(0xA7, 0x8B, 0xFA)
+    // Play is offerPlate, the green this game already uses to mean yes - it is the
+    // fill under every offer the shop makes you. Info and Settings are two of the
+    // eight TEAM colours, blue pulled a little deeper so white type clears it.
+    // White clears 4.3:1, 4.1:1 and 4.9:1 respectively.
+    /// A button's fill and the lip it stands on, as ONE thing.
+    ///
+    /// A pair rather than a colour and a function that darkens it. The function
+    /// version wanted UIColor.getRed to pull the components back out, which is a
+    /// UIKit call in a file that imports SpriteKit and nothing else - it would
+    /// most likely have resolved and it is not worth finding out on somebody
+    /// else's build. Two numbers written down together cannot come apart either.
+    struct MenuTone {
+        let face: SKColor
+        let lip: SKColor
+    }
+
+    /// Play is offerPlate, the green this game already uses to mean yes - it is the
+    /// fill under every offer the shop makes you. Info and Settings are two of the
+    /// eight TEAM colours, blue pulled a little deeper so white type clears it.
+    /// White clears 4.3:1, 4.1:1 and 4.9:1 respectively.
+    ///
+    /// Each lip is its own face at two thirds brightness, which is dark enough to
+    /// read as shadow and still obviously the same colour rather than a grey.
+    static let menuPlay = MenuTone(face: rgb(0x2E, 0x8B, 0x47),
+                                   lip:  rgb(0x1E, 0x5B, 0x2E))
+    static let menuInfo = MenuTone(face: rgb(0x3C, 0x7F, 0xC9),
+                                   lip:  rgb(0x27, 0x53, 0x84))
+    static let menuSettings = MenuTone(face: rgb(0x7B, 0x5B, 0xD6),
+                                       lip:  rgb(0x51, 0x3C, 0x8D))
+
+    /// The outline round everything on the menu.
+    ///
+    /// Black, like every sprite on the map. This is the single change that made the
+    /// buttons look like they came out of this game rather than out of a UI kit:
+    /// the whole board is drawn as flat colour inside a heavy black line - the
+    /// figures, the crates, the chests, the health bars - and a button without one
+    /// is the only object on screen that is not.
+    static let menuOutline = SKColor(white: 0.06, alpha: 1)
 
     /// Near-black rather than black. A true black on a light ground vibrates at
     /// large sizes, which is exactly the size the wordmark is set at.
     static let menuInk = SKColor(white: 0.08, alpha: 1)
 
-    /// The frosted veil over the drifting map.
+    /// The veil over the drifting map.
     ///
-    /// WHITE, and it was black at 0.58 for one revision. Dark glass is the current
-    /// fashion and it was wrong here for a reason particular to this game: the map
-    /// is a pale yellow-green lawn, and darkening it does not make it recede, it
-    /// makes it muddy - the grass goes to olive, the trees go to grey-green, and
-    /// the whole thing reads as a photograph taken at dusk rather than as a place.
-    /// Lightening it washes the same colours towards their own pastels, which is
-    /// what frosted glass actually does to what is behind it.
-    static let menuVeil = SKColor(white: 1, alpha: 0.42)
+    /// THE GRASS'S OWN COLOUR, and it has now been black and white and both were
+    /// wrong in the same way: a neutral veil over a coloured map does not soften
+    /// it, it drains it. Black took the lawn to olive and read as dusk. White took
+    /// it to a pale wash and read as a photograph behind frosted glass - a menu
+    /// that had a game somewhere behind it rather than a menu made of one.
+    ///
+    /// Tinting with floorLight pulls everything towards the colour the whole game
+    /// is played on. The claims stay coloured, the woods stay green, nothing goes
+    /// grey, and what the blur is doing reads as distance rather than as a filter.
+    /// Kept light enough - under a third - that it unifies rather than flattens.
+    static let menuVeil = SKColor(red: 0xC0 / 255.0, green: 0xDD / 255.0,
+                                  blue: 0x7A / 255.0, alpha: 0.28)
 
     // Terrain
     static let floorLight = rgb(0xC0, 0xDD, 0x7A)

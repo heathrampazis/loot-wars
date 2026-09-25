@@ -212,9 +212,10 @@ final class MenuScene: SKScene {
         blur.addChild(scenery)
         addChild(blur)
 
-        // The veil. White rather than black - see RenderPalette.menuVeil, which
-        // carries that argument, because it is about this game's particular colours
-        // rather than about menus.
+        // The veil, tinted with the grass's own colour - see RenderPalette.menuVeil,
+        // which carries that argument, because it is about this game's particular
+        // colours rather than about menus. It has been black and it has been white
+        // and both drained the map; this one only softens it.
         //
         // Sized well past the screen so the corners stay covered on any device, and
         // rebuilt never: it is one rectangle.
@@ -333,24 +334,22 @@ final class MenuScene: SKScene {
         // Not named `size`: that is the scene's own, and a local shadowing it three
         // lines above a layout calculation is a trap left for whoever edits next.
         let type = height * 0.48
-        let leading = type * 0.88
+        let leading = type * 0.86
 
         for (index, word) in ["LOOT", "WARS"].enumerated() {
             let line = SKLabelNode()
             line.attributedText = MenuButtonNode.text(word, size: type,
-                                                      weight: .black,
-                                                      kern: type * 0.04,
+                                                      weight: .heavy,
                                                       colour: RenderPalette.menuInk)
             line.verticalAlignmentMode = .center
             line.horizontalAlignmentMode = .center
 
-            // Tracking adds its space AFTER the last letter too, so a centred
-            // tracked line sits half a space left of true. Nudging it back is the
-            // difference between two stacked words that line up and two that very
-            // nearly do. Small now, because the tracking is: the wide spacing went
-            // with AvenirNext, and the system face at Black weight is already a
-            // solid block of letterforms without being prised apart.
-            line.position = CGPoint(x: type * 0.02,
+            // No nudge any more. That correction existed because tracking adds its
+            // space after the LAST letter too, so a tracked line sits half a space
+            // left of true centre - and the tracking is gone with the rest of the
+            // styling. Two untracked words of four letters each, set in the same
+            // face at the same size, centre themselves.
+            line.position = CGPoint(x: 0,
                                     y: index == 0 ? leading / 2 : -leading / 2)
             wordmark.addChild(line)
         }
@@ -372,16 +371,16 @@ final class MenuScene: SKScene {
 
         let play = MenuButtonNode(primary: "PLAY",
                                   width: playSize.width, height: playSize.height,
-                                  fill: RenderPalette.menuPlay)
+                                  tone: RenderPalette.menuPlay)
         play.position = playCentre
         play.zPosition = 10
         addChild(play)
         playButton = play
 
         let info = MenuButtonNode(secondary: Glyphs.info, diameter: iconSide,
-                                  fill: RenderPalette.menuInfo)
+                                  tone: RenderPalette.menuInfo)
         let settings = MenuButtonNode(secondary: Glyphs.gear, diameter: iconSide,
-                                      fill: RenderPalette.menuSettings)
+                                      tone: RenderPalette.menuSettings)
 
         // Side by side under the pill, with enough air between them that a thumb
         // cannot mean both. They are the same size and sit on the same line because
@@ -420,8 +419,7 @@ final class MenuScene: SKScene {
         label.name = "record"
         label.attributedText = MenuButtonNode.text("BEST \(Prefs.bestScore)   ·   \(played)",
                                                    size: 12, weight: .semibold,
-                                                   kern: 1.4,
-                                                   colour: SKColor(white: 0, alpha: 0.38))
+                                                   colour: SKColor(white: 0, alpha: 0.42))
         label.verticalAlignmentMode = .center
         label.position = centre
         label.zPosition = 10

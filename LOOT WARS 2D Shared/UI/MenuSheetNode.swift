@@ -54,10 +54,13 @@ final class MenuSheetNode: SKNode {
         // Near-white, because the screen it sits on is light now. A dark card over
         // a light menu is a hole rather than a sheet - it reads as the screen
         // behind having been switched off rather than as something laid on top.
+        // Outlined in the same black everything else on this screen wears, so a
+        // sheet is recognisably part of the same set of objects as the buttons
+        // that opened it.
         card.zPosition = 1
         card.fillColor = SKColor(white: 0.99, alpha: 1)
-        card.strokeColor = SKColor(white: 0, alpha: 0.08)
-        card.lineWidth = 1
+        card.strokeColor = RenderPalette.menuOutline
+        card.lineWidth = 3
         addChild(card)
 
         heading.verticalAlignmentMode = .center
@@ -76,9 +79,9 @@ final class MenuSheetNode: SKNode {
         // gives: a multiplication sign, a letter x and a dingbat are three different
         // widths in three different fallback fonts.
         for angle in [CGFloat.pi / 4, -CGFloat.pi / 4] {
-            let bar = SKShapeNode(rect: CGRect(x: -8, y: -1.1, width: 16, height: 2.2),
-                                  cornerRadius: 1.1)
-            bar.fillColor = SKColor(white: 0, alpha: 0.4)
+            let bar = SKShapeNode(rect: CGRect(x: -8, y: -1.4, width: 16, height: 2.8),
+                                  cornerRadius: 1.4)
+            bar.fillColor = RenderPalette.menuOutline
             bar.strokeColor = .clear
             bar.zRotation = angle
             close.addChild(bar)
@@ -118,11 +121,9 @@ final class MenuSheetNode: SKNode {
     func open(title: String, message: String, on screen: CGSize) {
         layOut(for: screen)
 
-        heading.attributedText = MenuSheetNode.text(title, size: 22, weight: .heavy,
-                                                    kern: 0.5,
+        heading.attributedText = MenuSheetNode.text(title, size: 22, weight: .bold,
                                                     colour: RenderPalette.menuInk)
-        body.attributedText = MenuSheetNode.text(message, size: 14, weight: .medium,
-                                                 kern: 0,
+        body.attributedText = MenuSheetNode.text(message, size: 14, weight: .regular,
                                                  colour: SKColor(white: 0, alpha: 0.45))
 
         isOpen = true
@@ -162,10 +163,12 @@ final class MenuSheetNode: SKNode {
     /// The system face, like everything else on this screen - see
     /// MenuButtonNode.text for why. Centred and leaded, which is the one thing this
     /// needs that a button label does not.
+    /// The system face, plain, like everything else on this screen - see
+    /// MenuButtonNode.text. Centred and leaded, which is the one thing this needs
+    /// that a button label does not.
     private static func text(_ string: String,
                              size: CGFloat,
                              weight: UIFont.Weight,
-                             kern: CGFloat,
                              colour: SKColor) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
@@ -174,7 +177,6 @@ final class MenuSheetNode: SKNode {
         return NSAttributedString(string: string, attributes: [
             .font: UIFont.systemFont(ofSize: size, weight: weight),
             .foregroundColor: colour,
-            .kern: kern,
             .paragraphStyle: paragraph
         ])
     }
