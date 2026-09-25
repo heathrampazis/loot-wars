@@ -60,6 +60,15 @@ final class QuickBuyNode: SKNode {
     /// miss rather than buy something that is on its way out.
     private var live = false
 
+    /// Whether it is on screen AT ALL - up, or on its way out.
+    ///
+    /// The latch dismiss needs, and the reason it did not work before. dismiss is
+    /// called every frame while a panel is open and has to run exactly once per
+    /// appearance; it used to decide that from `offer` and `isHidden`, and
+    /// `isHidden` is set by the tail of the fade-out it was itself restarting, so
+    /// the condition it was waiting for could never arrive. See dismiss.
+    private var showing = false
+
     /// A tap has been sent and the answer has not come back yet.
     ///
     /// One frame, usually - the command goes into the queue, the world runs, and
@@ -165,10 +174,24 @@ final class QuickBuyNode: SKNode {
         // arrived to be celebrated. The shop card had the identical bug for weeks.
         guard !awaiting else { return }
 
-        // Called every frame by the scene while a panel is open, so it has to be
-        // cheap and idempotent - running a fade-out sixty times a second would
-        // leave the node permanently mid-animation.
-        guard offer != nil || !isHidden else { return }
+        // Called every frame by the scene while a panel is open, so it has to run
+        // exactly once per appearance. The comment that used to sit here said as
+        // much - "running a fade-out sixty times a second would leave the node
+        // permanently mid-animation" - and then guarded it on `offer != nil ||
+        // !isHidden`, which cannot do that job.
+        //
+        // isHidden is set by the .hide() on the END of the fade below, and the
+        // first thing this does is removeAction on that very fade. So every frame
+        // tore up the animation and started a fresh one: isHidden stayed false,
+        // the guard never engaged, .hide() never ran, and the alpha crept down
+        // asymptotically instead of the node going away. Open the shop and the
+        // quick offer sat there beside it, which is what it was reported as.
+        //
+        // A latch fixes it because a latch is what was missing. `showing` is set
+        // by show and cleared here, so the second call and every one after it
+        // leaves the fade alone to finish.
+        guard showing else { return }
+        showing = false
 
         offer = nil
         live = false
@@ -287,6 +310,7 @@ final class QuickBuyNode: SKNode {
 
         offer = item.type
         live = true
+        showing = true
 
         removeAction(forKey: "life")
         isHidden = false
