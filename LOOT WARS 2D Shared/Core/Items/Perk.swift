@@ -54,6 +54,38 @@ enum Perk: Hashable, CaseIterable {
     /// Health back, and only that.
     case regeneration
 
+    /// The ones that can actually be FOUND, and the only list anything handing a
+    /// power-up out should ever read.
+    ///
+    /// Not allCases, and the difference is the point of it existing. A perk that is
+    /// switched off is switched off in ONE place, and the name of this collection
+    /// is what steers the next thing that wants to offer one - a shop tab, a chest
+    /// row, a reward for something - into asking the right question. Filtering
+    /// allCases at each of those call sites would mean every new one starts out
+    /// handing the ball back.
+    ///
+    /// Deterministic: allCases is declaration order and filter preserves it.
+    static let obtainable: [Perk] = allCases.filter { $0.isObtainable }
+
+    /// Whether this one is in the game at the moment.
+    ///
+    /// The disco ball is NOT, and everything it does is still here - its powers,
+    /// its rung, its art, its ring that walks the whole colour wheel, its loot
+    /// curve, its sell price. Nothing about it has been deleted, because nothing
+    /// about it is wrong; it is simply not being handed out, and putting it back is
+    /// this one line.
+    ///
+    /// A flag rather than a weight of zero. Zero is a number in a table that
+    /// somebody has to notice and interpret, and a weighted pick given a zero row
+    /// is a thing to reason about rather than a thing that plainly cannot happen.
+    /// This says what is meant.
+    var isObtainable: Bool {
+        switch self {
+        case .overdrive: return false
+        case .strength, .speed, .regeneration: return true
+        }
+    }
+
     /// Which rung of the ladder it sits on.
     ///
     /// The disco ball is Mythical and the singles are Legendary, one rung down. It
@@ -123,6 +155,11 @@ enum Perk: Hashable, CaseIterable {
     /// relationship between them is still perfectly readable - the three singles
     /// together are about nine times the disco ball late - it is just no longer
     /// encoded in a number you have to divide to understand.
+    ///
+    /// The overdrive branch is unreached today: nothing asks this about a perk that
+    /// is not in Perk.obtainable. It is kept rather than deleted, because it is the
+    /// answer to "how often WOULD it turn up", and that question comes back the day
+    /// the ball does.
     func lootWeight(at progress: Double) -> Int {
         switch self {
         case .overdrive:

@@ -197,8 +197,13 @@ enum LootTable {
         //
         // The three plain ones climb with the match for the same reason the gear
         // rungs do - seven seconds of anything is worth more in a late fight than an
-        // early one - and the disco ball deliberately does not.
-        rows += Perk.allCases.map { perk in
+        // early one.
+        //
+        // obtainable rather than allCases, and that is the ONE gate on which
+        // power-ups exist as far as the map is concerned - see Perk.obtainable. The
+        // disco ball is behind it at the moment, so this is three rows rather than
+        // four; everything the ball does is still written and still works.
+        rows += Perk.obtainable.map { perk in
             (pickup: Pickup.item(.perk(perk)),
              weight: perk.lootWeight(at: progress))
         }
