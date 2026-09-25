@@ -11,6 +11,38 @@ import SpriteKit
 
 enum RenderPalette {
 
+    // The menu, which is the one screen in this game that is not the map.
+    //
+    // Its own small block rather than borrowed from the HUD, because it answers a
+    // different question. Every colour below the terrain line has to survive being
+    // seen over pale green grass at a glance mid-fight. These sit on a frosted
+    // white veil over a blurred map, read at rest, by somebody who is not being
+    // shot at - so they can be softer, lighter and more numerous than anything the
+    // game itself is allowed.
+    //
+    // All three are pitched to carry BLACK, not white. That is the decision the
+    // rest follows from: on a light screen, dark type is what reads, and a button
+    // that needs white text would have to be dark enough to punch a hole in it.
+    // Black clears 12:1 on the green, 8.3:1 on the blue and 7.7:1 on the purple.
+    static let menuPlay     = rgb(0x4A, 0xDE, 0x80)
+    static let menuInfo     = rgb(0x60, 0xA5, 0xFA)
+    static let menuSettings = rgb(0xA7, 0x8B, 0xFA)
+
+    /// Near-black rather than black. A true black on a light ground vibrates at
+    /// large sizes, which is exactly the size the wordmark is set at.
+    static let menuInk = SKColor(white: 0.08, alpha: 1)
+
+    /// The frosted veil over the drifting map.
+    ///
+    /// WHITE, and it was black at 0.58 for one revision. Dark glass is the current
+    /// fashion and it was wrong here for a reason particular to this game: the map
+    /// is a pale yellow-green lawn, and darkening it does not make it recede, it
+    /// makes it muddy - the grass goes to olive, the trees go to grey-green, and
+    /// the whole thing reads as a photograph taken at dusk rather than as a place.
+    /// Lightening it washes the same colours towards their own pastels, which is
+    /// what frosted glass actually does to what is behind it.
+    static let menuVeil = SKColor(white: 1, alpha: 0.42)
+
     // Terrain
     static let floorLight = rgb(0xC0, 0xDD, 0x7A)
     static let floorDark  = rgb(0xAF, 0xCC, 0x71)

@@ -22,6 +22,12 @@ enum Glyphs {
 
     static let clock: SKTexture = makeClock()
 
+    /// The menu's two secondary buttons. Drawn here with the rest rather than
+    /// exported, for the reason this file exists: a symbol made of arcs and
+    /// rectangles is a dozen lines and never needs a retina export.
+    static let info: SKTexture = makeInfo()
+    static let gear: SKTexture = makeGear()
+
     /// The shop's bag, traced off the reference: a body that flares outwards
     /// towards the bottom, and a handle looping up out of the top edge.
     ///
@@ -110,6 +116,97 @@ enum Glyphs {
                 hand.lineCapStyle = .round
                 hand.stroke()
             }
+        }
+
+        return SKTexture(image: image)
+    }
+
+    /// A lowercase i in a ring.
+    ///
+    /// Built out of a dot and a bar rather than set as TEXT, which is the whole
+    /// reason it is in here. A letter drawn by a font is a different weight, a
+    /// different width and a different optical centre in every font the device
+    /// might fall back to, and this has to sit inside a circle next to a gear and
+    /// look like its sibling.
+    private static func makeInfo() -> SKTexture {
+        let side: CGFloat = 128
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side),
+            format: format
+        ).image { _ in
+            SKColor.white.setFill()
+
+            let width = side * 0.13
+            let x = (side - width) / 2
+
+            // The dot, then the stem. The gap between them is a shade wider than
+            // the dot is tall, which is what keeps an i reading as an i at the size
+            // a button glyph is actually seen at.
+            UIBezierPath(ovalIn: CGRect(x: x, y: side * 0.20,
+                                        width: width, height: width)).fill()
+
+            UIBezierPath(roundedRect: CGRect(x: x, y: side * 0.40,
+                                             width: width, height: side * 0.40),
+                         cornerRadius: width / 2).fill()
+        }
+
+        return SKTexture(image: image)
+    }
+
+    /// A gear: a ring with eight teeth and a hole.
+    ///
+    /// Teeth as rotated rectangles around the rim rather than as one traced
+    /// outline, because the traced version is a page of trigonometry to get wrong
+    /// and this is eight rectangles in a loop. At the size a button draws it the
+    /// two are indistinguishable.
+    private static func makeGear() -> SKTexture {
+        let side: CGFloat = 128
+        let centre = CGPoint(x: side / 2, y: side / 2)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side),
+            format: format
+        ).image { context in
+            SKColor.white.setFill()
+
+            let toothWidth = side * 0.15
+            let toothLength = side * 0.17
+
+            for index in 0..<8 {
+                let angle = CGFloat(index) * .pi / 4
+
+                context.cgContext.saveGState()
+                context.cgContext.translateBy(x: centre.x, y: centre.y)
+                context.cgContext.rotate(by: angle)
+
+                UIBezierPath(roundedRect: CGRect(x: -toothWidth / 2,
+                                                 y: -side * 0.40,
+                                                 width: toothWidth,
+                                                 height: toothLength),
+                             cornerRadius: side * 0.025).fill()
+
+                context.cgContext.restoreGState()
+            }
+
+            // The body, and then the hole punched out of it. Punched rather than
+            // drawn in the background colour, because this sits on a button whose
+            // fill is not known here.
+            UIBezierPath(ovalIn: CGRect(x: centre.x - side * 0.30,
+                                        y: centre.y - side * 0.30,
+                                        width: side * 0.60,
+                                        height: side * 0.60)).fill()
+
+            context.cgContext.setBlendMode(.clear)
+            UIBezierPath(ovalIn: CGRect(x: centre.x - side * 0.125,
+                                        y: centre.y - side * 0.125,
+                                        width: side * 0.25,
+                                        height: side * 0.25)).fill()
         }
 
         return SKTexture(image: image)
