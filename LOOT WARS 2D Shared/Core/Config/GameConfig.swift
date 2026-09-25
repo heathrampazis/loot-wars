@@ -354,6 +354,10 @@ enum GameConfig {
             // it is found - but the shop still makes an offer for one, because
             // nobody decides for the player which of their things are junk.
             //
+            // The ball's row is unreachable today: it is not obtainable, so it
+            // cannot be in a bag to be sold out of one. Left in place with the rest
+            // of what it owns - see Perk.isObtainable.
+            //
             // Kept deliberately low against what it does. At a fifth back that is
             // about four tokens, roughly a bandage, and it should stay there: the
             // day selling a perk is worth more than drinking one, the strongest
@@ -2104,6 +2108,10 @@ enum GameConfig {
         }
 
         /// The same, for the disco ball.
+        ///
+        /// PARKED. The ball is not obtainable at the moment - see Perk.obtainable -
+        /// so nothing reads this. Kept because it is the answer to "how often would
+        /// it turn up", which is the first question asked the day it comes back.
         ///
         /// Deliberately flat where the singles climb, and these numbers are chosen
         /// to hold its ABSOLUTE rate still - about 0.19 a match, exactly what it was
