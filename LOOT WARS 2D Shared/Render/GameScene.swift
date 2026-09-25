@@ -196,6 +196,20 @@ final class GameScene: SKScene {
     private let chestPanel = ChestPanelNode()
     private let respawnBanner = RespawnBanner()
 
+    /// A wash of the perk's own colour over the whole screen, for the instant one
+    /// is drunk.
+    ///
+    /// The one effect in this game that is about the PLAYER rather than about the
+    /// world, and the only reason it earns that is what a perk is: a thing you find
+    /// twice a match and choose your moment for. Everything else the item does is
+    /// drawn on the map and is therefore equally true for a bot - which is correct,
+    /// and is also why none of it can ever say "this is happening to YOU".
+    ///
+    /// Sized from the screen in layOutUI, because the camera zooms and a rectangle
+    /// sized once would stop covering the corners the first time somebody opened
+    /// the game on an iPad.
+    private let perkFlash = SKSpriteNode(color: .white, size: .zero)
+
 
     /// How much healing sat in each slot last frame, so PICKING ONE UP can be
     /// noticed. Per slot rather than a total: a bandage landing in an empty slot
@@ -408,6 +422,14 @@ final class GameScene: SKScene {
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
         cameraController.node.addChild(respawnBanner)
+
+        // Over the map and UNDER every control, so a flash never washes out the
+        // stick you are holding or the bar you are reading. It is drawn on the
+        // camera, so it covers the screen wherever the camera is.
+        perkFlash.zPosition = 500
+        perkFlash.alpha = 0
+        perkFlash.isHidden = true
+        cameraController.node.addChild(perkFlash)
         layOutUI()
 
         syncRenderers()
@@ -467,6 +489,30 @@ final class GameScene: SKScene {
         layOutUI()
     }
 
+    /// The screen takes the colour of what you just drank, and lets it go.
+    ///
+    /// Short and not very strong - a fifth of a second up, a third back down, and
+    /// it never passes a third of an alpha. A power-up is drunk in the middle of a
+    /// fight, usually because the fight is going badly, and an effect that blanked
+    /// the screen for half a second would be at its most spectacular exactly when
+    /// it could get you killed. This is a flourish, not a cutaway.
+    ///
+    /// Under the controls - see where it is parented - so the stick under your
+    /// thumb and the health bar you are reading are never washed out by it.
+    private func flashScreen(for perk: Perk) {
+        perkFlash.removeAllActions()
+        perkFlash.color = RenderPalette.colours(for: perk, at: 0).bright
+        perkFlash.isHidden = false
+        perkFlash.alpha = 0
+
+        perkFlash.run(.sequence([
+            .fadeAlpha(to: 0.30, duration: 0.09),
+            .fadeAlpha(to: 0.12, duration: 0.12),
+            .fadeOut(withDuration: 0.34),
+            .hide()
+        ]))
+    }
+
     private func layOutUI() {
         // How far in the camera has to sit to show the same amount of world as a
         // phone - see GridGeometry.zoom. One on a phone, about a half on an iPad.
@@ -518,6 +564,11 @@ final class GameScene: SKScene {
         // The top-left corner itself, plus whatever the hardware is eating off the
         // left edge. Everything in that corner is measured from this one point, so
         // the block moves together.
+        // Generously oversized rather than exactly the screen: the camera can be
+        // mid-shake when this plays, and a rectangle cut to the glass would show a
+        // hard edge sliding in from one side.
+        perkFlash.size = CGSize(width: size.width * 1.3, height: size.height * 1.3)
+
         let inset: CGFloat = 16
         let corner = CGPoint(x: -size.width / 2 + inset + safeLeft,
                              y: size.height / 2 - inset)
@@ -929,6 +980,30 @@ final class GameScene: SKScene {
                 guard let actor = world.actors[user] else { break }
                 effectsRenderer.charge(at: actor.position, perk: perk)
                 actorRenderer.charge(user)
+
+                // And the screen itself, for the one person it happened to.
+                //
+                // Only the local player, which is the whole point: everything else
+                // a perk does is drawn on the map and is equally true for the seven
+                // bots, because it is a fact about the world. This is not a fact
+                // about the world - it is what it feels like from inside, and a
+                // screen that flashed when somebody across the map drank something
+                // would be lying about whose moment it was.
+                //
+                // And it was SILENT, which is most of why drinking one did not feel
+                // like doing anything. The whole board makes a noise - a gun pops, a
+                // base completes, a bomb goes off, buying a helmet plays a fanfare -
+                // and the best item in the game went off without one.
+                //
+                // Upgrade rather than a sound of its own, because there is no sound
+                // of its own to play yet and the nearest thing is the right kind of
+                // thing: it is what a picked-up upgrade plays, and a power-up is an
+                // upgrade you get to keep for seven seconds. A dedicated one would
+                // be better and this is one line when there is one.
+                if user == world.localPlayer?.id {
+                    flashScreen(for: perk)
+                    SoundPlayer.shared.play(.upgrade)
+                }
 
             case .gas(let position):
                 // The cloud itself is drawn from the world every frame; this is the
