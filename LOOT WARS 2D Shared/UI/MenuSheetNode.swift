@@ -54,12 +54,12 @@ final class MenuSheetNode: SKNode {
         // Near-white, because the screen it sits on is light now. A dark card over
         // a light menu is a hole rather than a sheet - it reads as the screen
         // behind having been switched off rather than as something laid on top.
-        // Outlined in the same black everything else on this screen wears, so a
-        // sheet is recognisably part of the same set of objects as the buttons
-        // that opened it.
+        // Edged in a darker shade of its own fill, the way the buttons are - see
+        // MenuButtonNode. Nothing on this screen wears a colour it is not already
+        // made of.
         card.zPosition = 1
         card.fillColor = SKColor(white: 0.99, alpha: 1)
-        card.strokeColor = RenderPalette.menuOutline
+        card.strokeColor = SKColor(white: 0.78, alpha: 1)
         card.lineWidth = 3
         addChild(card)
 
@@ -81,7 +81,7 @@ final class MenuSheetNode: SKNode {
         for angle in [CGFloat.pi / 4, -CGFloat.pi / 4] {
             let bar = SKShapeNode(rect: CGRect(x: -8, y: -1.4, width: 16, height: 2.8),
                                   cornerRadius: 1.4)
-            bar.fillColor = RenderPalette.menuOutline
+            bar.fillColor = SKColor(white: 0.45, alpha: 1)
             bar.strokeColor = .clear
             bar.zRotation = angle
             close.addChild(bar)

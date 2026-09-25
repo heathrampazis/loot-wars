@@ -6,12 +6,17 @@
 //  a heavy black outline, and a darker lip underneath that the button presses down
 //  onto.
 //
-//  THE OUTLINE IS THE WHOLE THING. Two revisions of this screen had buttons that
-//  were perfectly tidy and looked like they came from somewhere else - a white pill
-//  with dark type, then three tasteful mid-tones. What was wrong with both is that
-//  the entire map is drawn as flat colour inside a thick black line: every figure,
-//  every crate, every chest, every health bar. A button without one is the only
-//  object on the screen that is not part of the game.
+//  THE EDGE IS A DARKER SHADE OF THE FILL, not a black outline. That was the
+//  previous version, on the reasoning that the whole map is drawn as flat colour
+//  inside a heavy black line - every figure, crate, chest and health bar - so a
+//  button without one is the only object on screen that is not part of the game.
+//
+//  The reasoning was right about the map and wrong about the button. A black line
+//  round a sprite on grass is separating it from a background it has to survive;
+//  a black line round a button is a colour the button does not otherwise contain,
+//  and it reads as an object that was outlined rather than one that was moulded.
+//  The same shape edged in its own colour taken down to 0.72 brightness reads as a
+//  raised surface with a side to it - which is what a button is.
 //
 //  The lip is the second half of it, and it is what makes a press feel like
 //  something. A button drawn as one flat shape can only answer a finger by changing
@@ -76,10 +81,14 @@ final class MenuButtonNode: SKNode {
         self.lipDepth = max(4, height * 0.11)
         super.init()
 
-        let radius = height / 2
+        // A rounded rectangle, not a pill. A shape whose ends are half-circles has
+        // no straight run along the top and bottom for the edge to read as a side,
+        // so the whole thing goes back to looking like an outlined outline. This is
+        // round enough to be friendly and square enough to have faces.
+        let radius = height * 0.30
         let shape = CGRect(x: -width / 2, y: -height / 2, width: width, height: height)
 
-        let outline = max(2.5, height * 0.055)
+        let outline = max(3, height * 0.07)
 
         addChild(MenuButtonNode.lip(shape, radius: radius, tone: tone,
                                     drop: lipDepth, outline: outline))
@@ -87,12 +96,12 @@ final class MenuButtonNode: SKNode {
 
         let body = SKShapeNode(rect: shape, cornerRadius: radius)
         body.fillColor = tone.face
-        body.strokeColor = RenderPalette.menuOutline
+        body.strokeColor = tone.edge
         body.lineWidth = outline
         face.addChild(body)
 
         // The triangle and the word are laid out as one row and centred together,
-        // rather than the word centred with a triangle hung off it. A pill with
+        // rather than the word centred with a triangle hung off it. A button with
         // centred text and a mark to the left of it looks off-centre, because it is.
         let glyphSide = height * 0.30
         let gap = height * 0.22
@@ -124,7 +133,7 @@ final class MenuButtonNode: SKNode {
         let radius = diameter / 2
         let shape = CGRect(x: -radius, y: -radius, width: diameter, height: diameter)
 
-        let outline = max(2.5, diameter * 0.06)
+        let outline = max(3, diameter * 0.075)
 
         addChild(MenuButtonNode.lip(shape, radius: radius, tone: tone,
                                     drop: lipDepth, outline: outline))
@@ -132,7 +141,7 @@ final class MenuButtonNode: SKNode {
 
         let body = SKShapeNode(circleOfRadius: radius)
         body.fillColor = tone.face
-        body.strokeColor = RenderPalette.menuOutline
+        body.strokeColor = tone.edge
         body.lineWidth = outline
         face.addChild(body)
 
@@ -158,8 +167,8 @@ final class MenuButtonNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// The shadow the face stands on: the same shape, the same outline, a darker
-    /// fill, sitting lower. Drawn once and never moved - the FACE is what moves,
+    /// The side the face stands on: the same shape in the edge colour, sitting
+    /// lower, so what shows below the face is the button's own thickness. Drawn once and never moved - the FACE is what moves,
     /// and a lip that moved with it would be a button with no depth that happened
     /// to be two shapes.
     private static func lip(_ shape: CGRect,
@@ -168,8 +177,8 @@ final class MenuButtonNode: SKNode {
                             drop: CGFloat,
                             outline: CGFloat) -> SKShapeNode {
         let node = SKShapeNode(rect: shape, cornerRadius: radius)
-        node.fillColor = tone.lip
-        node.strokeColor = RenderPalette.menuOutline
+        node.fillColor = tone.edge
+        node.strokeColor = tone.edge
 
         // The SAME weight as the face, handed in rather than recomputed. A lip
         // drawn with a thinner line than the shape standing on it reads as two

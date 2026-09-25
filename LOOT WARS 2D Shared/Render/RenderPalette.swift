@@ -22,7 +22,8 @@ enum RenderPalette {
     // fill under every offer the shop makes you. Info and Settings are two of the
     // eight TEAM colours, blue pulled a little deeper so white type clears it.
     // White clears 4.3:1, 4.1:1 and 4.9:1 respectively.
-    /// A button's fill and the lip it stands on, as ONE thing.
+    /// A button's fill and the darker shade it is edged and shadowed with, as ONE
+    /// thing.
     ///
     /// A pair rather than a colour and a function that darkens it. The function
     /// version wanted UIColor.getRed to pull the components back out, which is a
@@ -31,31 +32,37 @@ enum RenderPalette {
     /// else's build. Two numbers written down together cannot come apart either.
     struct MenuTone {
         let face: SKColor
-        let lip: SKColor
+        /// The border AND the lip, which are the same colour on purpose: a button
+        /// edged in one shade and standing on another reads as two objects.
+        let edge: SKColor
     }
 
-    /// Play is offerPlate, the green this game already uses to mean yes - it is the
-    /// fill under every offer the shop makes you. Info and Settings are two of the
-    /// eight TEAM colours, blue pulled a little deeper so white type clears it.
-    /// White clears 4.3:1, 4.1:1 and 4.9:1 respectively.
+    /// THE RARITY LADDER, straight off the assets.
     ///
-    /// Each lip is its own face at two thirds brightness, which is dark enough to
-    /// read as shadow and still obviously the same colour rather than a grey.
-    static let menuPlay = MenuTone(face: rgb(0x2E, 0x8B, 0x47),
-                                   lip:  rgb(0x1E, 0x5B, 0x2E))
-    static let menuInfo = MenuTone(face: rgb(0x3C, 0x7F, 0xC9),
-                                   lip:  rgb(0x27, 0x53, 0x84))
-    static let menuSettings = MenuTone(face: rgb(0x7B, 0x5B, 0xD6),
-                                       lip:  rgb(0x51, 0x3C, 0x8D))
-
-    /// The outline round everything on the menu.
+    /// Epic green, Legendary blue, Mythical purple - the three colours a player has
+    /// already seen glowing under loot on the grass and worn by the figures
+    /// themselves. That is what makes them the right ones rather than merely
+    /// available: the menu is painted in the colours the game hands out as prizes.
     ///
-    /// Black, like every sprite on the map. This is the single change that made the
-    /// buttons look like they came out of this game rather than out of a UI kit:
-    /// the whole board is drawn as flat colour inside a heavy black line - the
-    /// figures, the crates, the chests, the health bars - and a button without one
-    /// is the only object on screen that is not.
-    static let menuOutline = SKColor(white: 0.06, alpha: 1)
+    /// They replace a set of muted mid-tones picked for text contrast, which looked
+    /// exactly like what they were. The note worth keeping from that mistake is
+    /// that contrast on a BUTTON is not the same problem as contrast in a
+    /// paragraph. White on this green is 2.8:1, which would be unreadable as body
+    /// text and is perfectly clear as a forty-point bold word beside a solid white
+    /// triangle; the purple clears 4:1 outright. If white ever does look weak on
+    /// the green, the lever is a one-point dark shadow behind the label rather than
+    /// a duller green.
+    ///
+    /// Each edge is its own face at 0.72 brightness. Dark enough to read as an
+    /// edge, close enough that it is obviously the same colour and not a border
+    /// somebody chose separately - which is what a black outline looked like, and
+    /// why it went.
+    static let menuPlay = MenuTone(face: rgb(0x22, 0xB0, 0x4E),
+                                   edge: rgb(0x18, 0x7F, 0x38))
+    static let menuInfo = MenuTone(face: rgb(0x2E, 0x9B, 0xFF),
+                                   edge: rgb(0x21, 0x70, 0xB8))
+    static let menuSettings = MenuTone(face: rgb(0xA8, 0x55, 0xF7),
+                                       edge: rgb(0x79, 0x3D, 0xB2))
 
     /// Near-black rather than black. A true black on a light ground vibrates at
     /// large sizes, which is exactly the size the wordmark is set at.
