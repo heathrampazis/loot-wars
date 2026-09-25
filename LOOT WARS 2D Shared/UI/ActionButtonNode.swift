@@ -25,19 +25,7 @@ final class ActionButtonNode: SKNode {
     enum Shape {
         case circle
         case roundedSquare
-
-        /// A wide plate with the glyph at one end, for a button that has something
-        /// standing beside it INSIDE the same panel.
-        ///
-        /// This is still a button that does not know what it is for. It knows it is
-        /// wider than it is tall and that its glyph therefore belongs at the left
-        /// rather than in the middle; whatever fills the space that leaves is added
-        /// from outside, like any other child.
-        case panel(CGSize)
     }
-
-    /// How far the glyph sits in from a panel's left edge.
-    private static let panelInset: CGFloat = 9
 
     /// Grab radius is generous, like the joystick - thumbs are imprecise. Note the
     /// small button's is proportionally MORE generous than the big one's, because
@@ -72,15 +60,6 @@ final class ActionButtonNode: SKNode {
             self.base = SKShapeNode(
                 rect: CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2),
                 cornerRadius: radius * 2 * 0.16)
-
-        case .panel(let size):
-            // Twelve, which is the corner every other panel on the top edge uses -
-            // the clock's and the leaderboard's. A button this shape is read as one
-            // of them rather than as a control, and it should be.
-            self.base = SKShapeNode(
-                rect: CGRect(x: -size.width / 2, y: -size.height / 2,
-                             width: size.width, height: size.height),
-                cornerRadius: 12)
         }
 
         super.init()
@@ -95,14 +74,6 @@ final class ActionButtonNode: SKNode {
         addChild(glyph)
 
         setGlyph(texture)
-
-        // Left-hung rather than centred, and only for a panel. Everything else here
-        // is as wide as it is tall, where the middle is the only sensible place.
-        if case .panel(let size) = shape {
-            glyph.position = CGPoint(
-                x: -size.width / 2 + ActionButtonNode.panelInset + self.glyphSize / 2,
-                y: 0)
-        }
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -143,14 +114,6 @@ final class ActionButtonNode: SKNode {
             caught = hypot(localPoint.x, localPoint.y) <= grabRadius
         case .roundedSquare:
             caught = abs(localPoint.x) <= grabRadius && abs(localPoint.y) <= grabRadius
-
-        case .panel(let size):
-            // Its own plate rather than grabRadius. A panel is already a large
-            // target - the whole of it, including whatever is standing beside the
-            // glyph - and a slop margin on top would start catching taps meant for
-            // the map behind it.
-            caught = abs(localPoint.x) <= size.width / 2
-                  && abs(localPoint.y) <= size.height / 2
         }
 
         guard caught else { return false }
