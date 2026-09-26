@@ -34,12 +34,25 @@ final class ActorRenderer {
     /// the same event seen twice, and two stride constants would drift apart.
     static let walkStride: Double = 1.05
 
-    /// How wide the pool of light under a powered-up figure is, in tiles.
+    /// How wide the pool of light under a powered-up figure is, in tiles - before
+    /// the breathing, which swells it by nearly a fifth again.
     ///
-    /// A shade wider than the person - they are nine tenths of a tile across - so
-    /// it reads as light they are standing IN rather than as a plate they are
-    /// standing on.
-    static let perkAuraInTiles: Double = 1.35
+    /// Comfortably wider than the person, who is nine tenths of a tile across, and
+    /// wider still than the team's pool inside it. Both of those matter: the first
+    /// makes it read as light somebody is standing IN rather than as a plate they
+    /// are standing on, and the second keeps the perk visible past the one mark at
+    /// their feet that is always there. It grew when the team's did, for that
+    /// second reason - the two are sized against each other, not independently.
+    static let perkAuraInTiles: Double = 1.62
+
+    /// How wide the pool of team colour at a figure's feet is, in tiles.
+    ///
+    /// 1.6, up from 1.25 and 1.05 before that, and the climb is the whole story of
+    /// this mark: it has to be legible across a base at a glance, and every version
+    /// that was merely tasteful was not. Nearly twice the figure's own width, which
+    /// sounds enormous written down and is not once it is a gradient - the falloff
+    /// eats the outer fifth on its own.
+    static let teamPoolInTiles: Double = 1.6
 
     /// When a running perk starts saying it is nearly over, in seconds left.
     ///
@@ -142,7 +155,8 @@ final class ActorRenderer {
         /// The muzzle flash, hung at the end of the barrel.
         let muzzle = SKSpriteNode(texture: GlowArt.pool)
 
-        /// The pool of light a powered-up figure stands in, and the ring around it.
+        /// Two pools of light at a figure's feet: whose side they are on, and
+        /// whether anything is running.
         ///
         /// PARENTED TO THE ACTOR, which is the whole reason these exist. The trail
         /// EffectsRenderer throws is drawn on the MAP and stays where it was thrown
@@ -153,14 +167,42 @@ final class ActorRenderer {
         /// up is something you ARE rather than something you have been leaving
         /// behind you.
         ///
-        /// Two nodes rather than one, because they say different things. The pool
-        /// is under the feet and reads as standing in light; the ring is a hard
-        /// edge around it and reads as a boundary switched on. A soft glow on its
-        /// own dissolves into pale grass at any distance, which is the same lesson
-        /// the rarity colours record - a colour that only exists as a haze is a
-        /// colour this map eats.
+        /// TWO NODES SAYING TWO DIFFERENT THINGS, which they did not always. Both
+        /// were the perk's for a while - a pool and a hard ring around it, both in
+        /// the perk's colour, both pulsing. Then the team colour needed somewhere
+        /// to live, because the health bar it used to be painted in had a better
+        /// use for its own colour, and the feet are the one place on a figure that
+        /// is always visible and never busy.
+        ///
+        /// The team's mark was a hard outlined ellipse for exactly one revision,
+        /// and GlowArt had already written down why that was wrong: under a small
+        /// sprite on grass, a hard-edged shape reads as a PLATE the thing is
+        /// standing on, and a gradient reads as light. A ring drawn round somebody's
+        /// feet sits on top of the world; a pool sinks into it.
+        ///
+        /// So both are the same soft texture now, and what tells them apart is
+        /// size, motion and colour rather than shape. The TEAM'S is small, tight,
+        /// perfectly still, and the same colour for the whole match. The PERK'S is
+        /// half again as wide, breathes, changes colour with whatever is running,
+        /// and is simply absent the rest of the time - so it blooms out around the
+        /// team's rather than covering it. A mark that changed colour when somebody
+        /// drank something would be the one thing on the map that answers "whose is
+        /// this" lying about it.
         let perkPool = SKSpriteNode(texture: GlowArt.pool)
-        let perkRing: SKShapeNode
+
+        /// A soft dark pool under the team's, a little wider.
+        ///
+        /// The shadow this game never had, doing two jobs at once. It plants the
+        /// figure - eight people standing on a flat lawn with nothing underneath
+        /// them float - and it is what makes the team colour READ, because a
+        /// colour with a dark rim around it separates from pale grass in a way the
+        /// same colour laid flat on it does not. Softer and wider than what it sits
+        /// under, so it is a shadow rather than an outline.
+        let footShadow = SKSpriteNode(texture: GlowArt.pool)
+
+        /// Not the same texture as the perk's, and that is the difference between
+        /// noticed and read - see GlowArt.footing.
+        let teamPool = SKSpriteNode(texture: GlowArt.footing)
 
         /// Which perk was running last frame, and whether it was in its last
         /// moments. The pair is how the aura is switched on, recoloured, hurried up
@@ -168,6 +210,10 @@ final class ActorRenderer {
         /// the note on breathPhase for why that distinction matters here.
         var lastPerk: Perk?
         var perkEnding = false
+
+        /// Which of the three health bands the bar is currently painted in, so it
+        /// is repainted when the band changes rather than on every point of damage.
+        var lastHealthBand = -1
 
         /// How much of a shot is still working through the weapon, 1 down to 0.
         ///
@@ -186,12 +232,10 @@ final class ActorRenderer {
         init(sprite: SKSpriteNode,
              healthFill: SKShapeNode,
              blaster: SKSpriteNode,
-             perkRing: SKShapeNode,
              goalLabel: SKLabelNode?) {
             self.sprite = sprite
             self.healthFill = healthFill
             self.blaster = blaster
-            self.perkRing = perkRing
             self.goalLabel = goalLabel
         }
     }
@@ -363,8 +407,10 @@ final class ActorRenderer {
         track.strokeColor = .black
         track.lineWidth = GridGeometry.length(ofTiles: ActorRenderer.barOutlineInTiles)
 
+        // Painted by setHealth from the first update, not here: at full health it
+        // is green, and green is a fact about the health rather than about the
+        // actor, so there is nothing sensible to paint it at build time.
         let fill = SKShapeNode()
-        fill.fillColor = RenderPalette.colour(for: actor.team)
         fill.strokeColor = .black
         fill.lineWidth = track.lineWidth
         fill.zPosition = 1
@@ -411,25 +457,44 @@ final class ActorRenderer {
         let auraWide = GridGeometry.length(ofTiles: ActorRenderer.perkAuraInTiles)
         let auraTall = auraWide * 0.5
 
-        let perkRing = SKShapeNode(ellipseOf: CGSize(width: auraWide, height: auraTall))
-        perkRing.fillColor = .clear
-        perkRing.lineWidth = 3
-        perkRing.isHidden = true
-        perkRing.zPosition = -1
-
         let nodes = ActorNodes(sprite: sprite,
                                healthFill: fill,
                                blaster: blaster,
-                               perkRing: perkRing,
                                goalLabel: goalLabel)
+
+        // The team's pool is TIGHTER than the perk's, so the perk blooms out past
+        // it rather than swallowing it. Everything down here wears the same squash,
+        // so they read as lying on the same ground.
+        let poolWide = GridGeometry.length(ofTiles: ActorRenderer.teamPoolInTiles)
+
+        nodes.footShadow.size = CGSize(width: poolWide * 1.16, height: poolWide * 0.58)
+        nodes.footShadow.color = .black
+        nodes.footShadow.colorBlendFactor = 1
+        nodes.footShadow.alpha = 0.3
+        nodes.footShadow.zPosition = -2
+
+        nodes.teamPool.size = CGSize(width: poolWide, height: poolWide * 0.5)
+        nodes.teamPool.color = RenderPalette.colour(for: actor.team)
+        nodes.teamPool.colorBlendFactor = 1
+
+        // Nearly solid, because unlike the perk's this has to be READ rather than
+        // merely noticed - and because it is the brightest thing down here when
+        // both are lit, which is what keeps the team colour on top of a power-up
+        // rather than under it.
+        nodes.teamPool.alpha = 0.92
+        nodes.teamPool.zPosition = -1
 
         nodes.perkPool.size = CGSize(width: auraWide * 1.45, height: auraTall * 1.45)
         nodes.perkPool.colorBlendFactor = 1
         nodes.perkPool.isHidden = true
 
         // Behind the figure and its weapon, which both sit on the body at 0 and
-        // above. Light on the ground goes under the person standing in it.
-        nodes.perkPool.zPosition = -2
+        // above - light on the ground goes under the person standing in it - and
+        // behind the two marks that are always down there, so a power-up blooms out
+        // AROUND the team colour rather than washing over it. Three depths for
+        // three things, and the order is the whole reason the team colour survives
+        // somebody drinking a perk.
+        nodes.perkPool.zPosition = -3
         // root -> body -> figure -> sprite, and each layer owns exactly one kind
         // of movement: the root is where the actor IS, the body is the walk, the
         // figure is whatever just happened to it, and the sprite is which way it is
@@ -459,7 +524,8 @@ final class ActorRenderer {
         // It still inherits the two things it should: the root is hidden when its
         // owner dies, and faded while they are spawn-protected.
         nodes.root.addChild(nodes.perkPool)
-        nodes.root.addChild(perkRing)
+        nodes.root.addChild(nodes.footShadow)
+        nodes.root.addChild(nodes.teamPool)
 
         nodes.figure.addChild(sprite)
         nodes.body.addChild(nodes.figure)
@@ -664,22 +730,24 @@ final class ActorRenderer {
     /// on the screen says so.
     private func setAura(_ perk: Perk?, ending: Bool, on nodes: ActorNodes) {
         nodes.perkPool.removeAllActions()
-        nodes.perkRing.removeAllActions()
+
+        // THE TEAM'S POOL IS NOT TOUCHED ANYWHERE IN HERE, and that is the point of
+        // it. It used to be half of this effect and it pulsed and recoloured with
+        // the rest; now it is the one mark on a figure that never changes, because
+        // what it answers - whose side is this - never changes either. A power-up
+        // is a thing that happens to somebody; it does not make them somebody else.
 
         guard let perk else {
             // Gone, and it collapses rather than blinking out. A power-up ending is
             // a thing that happens to you, and a light that simply stopped being
             // drawn would be the screen switching off rather than the perk running
             // out.
-            let finish = SKAction.sequence([
+            nodes.perkPool.run(.sequence([
                 .group([.scaleX(to: 1.45, y: 1.45, duration: 0.12),
                         .fadeOut(withDuration: 0.12)]),
                 .hide(),
                 .scale(to: 1, duration: 0)
-            ])
-
-            nodes.perkPool.run(finish)
-            nodes.perkRing.run(finish)
+            ]))
             return
         }
 
@@ -690,23 +758,15 @@ final class ActorRenderer {
         nodes.perkPool.alpha = 0.55
         nodes.perkPool.setScale(1)
 
-        nodes.perkRing.strokeColor = colours.bright
-        nodes.perkRing.isHidden = false
-        nodes.perkRing.alpha = 0.8
-        nodes.perkRing.setScale(1)
-
-        // Out of phase with each other on purpose: the ring swells while the pool
-        // dims, so the pair breathes rather than throbbing as one blob.
+        // Swelling further than it used to, now that it is carrying the effect
+        // alone: the ring it was paired with was half of what made a perk readable
+        // from across the map, and a pool that only breathes between 0.94 and 1.1
+        // was pitched against having a hard edge pulsing with it.
         let beat: TimeInterval = ending ? 0.22 : 0.5
 
         nodes.perkPool.run(.repeatForever(.sequence([
-            .group([.fadeAlpha(to: 0.72, duration: beat), .scale(to: 1.1, duration: beat)]),
-            .group([.fadeAlpha(to: 0.38, duration: beat), .scale(to: 0.94, duration: beat)])
-        ])))
-
-        nodes.perkRing.run(.repeatForever(.sequence([
-            .group([.fadeAlpha(to: 0.35, duration: beat), .scale(to: 1.16, duration: beat)]),
-            .group([.fadeAlpha(to: 0.9, duration: beat), .scale(to: 1.0, duration: beat)])
+            .group([.fadeAlpha(to: 0.78, duration: beat), .scale(to: 1.18, duration: beat)]),
+            .group([.fadeAlpha(to: 0.34, duration: beat), .scale(to: 0.92, duration: beat)])
         ])))
     }
 
@@ -739,6 +799,17 @@ final class ActorRenderer {
 
     private func setHealth(_ fraction: Double, on nodes: ActorNodes) {
         let clamped = min(max(fraction, 0), 1)
+
+        // The colour is banded and the LENGTH is continuous, so the two are checked
+        // apart: the band changes about twice a fight and the length changes on
+        // every point of damage, and repainting a shape is the more expensive of
+        // the two. See RenderPalette.healthColour for why bands at all.
+        let band = RenderPalette.healthBand(at: clamped)
+        if band != nodes.lastHealthBand {
+            nodes.lastHealthBand = band
+            nodes.healthFill.fillColor = RenderPalette.healthColour(at: clamped)
+        }
+
         guard abs(clamped - nodes.lastHealthFraction) > 0.002 else { return }
         nodes.lastHealthFraction = clamped
 

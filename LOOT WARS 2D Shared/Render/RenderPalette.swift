@@ -70,6 +70,36 @@ enum RenderPalette {
                                    blue: 0x27 / 255.0, alpha: 0.70)
     static let hudTrack  = SKColor(white: 0.0, alpha: 0.35)
     static let healthBar = rgb(0xFF, 0x51, 0x7B)
+
+    /// The bar over a figure, by how much is left in it.
+    ///
+    /// Green, amber, red: the one colour language nobody has to be taught. It used
+    /// to be the TEAM'S colour, which was doing a different job in the same place -
+    /// whose bar this is, rather than how they are doing - and it meant the eight
+    /// bars on the map were eight different colours at full health and still eight
+    /// different colours at death's door. Team identity moved to the ring at the
+    /// figure's feet, and the bar got the only thing a bar is for.
+    ///
+    /// BANDS rather than a gradient across the range. A colour that slides
+    /// continuously is a colour nobody can read a threshold off: what you want to
+    /// know at a glance is which of three states somebody is in, and three states
+    /// is what this gives. It also means the paint changes about twice a fight
+    /// rather than on every point of damage.
+    ///
+    /// The red is placementBlocked, which is already this game's word for no.
+    static func healthColour(at fraction: Double) -> SKColor {
+        if fraction > 0.6 { return rgb(0x3F, 0xD1, 0x6A) }
+        if fraction > 0.3 { return rgb(0xF5, 0xC5, 0x42) }
+        return placementBlocked
+    }
+
+    /// Which band a fraction falls in, so the renderer can repaint only when the
+    /// band changes rather than on every frame the health moves.
+    static func healthBand(at fraction: Double) -> Int {
+        if fraction > 0.6 { return 2 }
+        if fraction > 0.3 { return 1 }
+        return 0
+    }
     /// Hotbar slots are plain black at 42% in the reference, not the HUD's olive -
     /// the ground shows through them far more.
     static let hotbarSlot = SKColor(white: 0.0, alpha: 0.42)
