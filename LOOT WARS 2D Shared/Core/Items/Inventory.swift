@@ -50,6 +50,21 @@ struct Inventory: Equatable {
         return false
     }
 
+    /// WHICH slot add() would put this in, without putting it there.
+    ///
+    /// The same walk as add, in the same order, and that is the whole requirement:
+    /// it exists so the screen can fly an item to the square it is about to appear
+    /// in, and an answer that disagreed with add by one slot would land the picture
+    /// next to the thing. Nil means the same as add returning false.
+    func firstFreeSlot(for type: ItemType) -> Int? {
+        for index in slots.indices {
+            guard let stack = slots[index] else { continue }
+            if stack.type == type, stack.count < type.maxStack { return index }
+        }
+
+        return slots.firstIndex { $0 == nil }
+    }
+
     /// Tops up a matching stack first, then takes the first empty slot.
     ///
     /// Returns false when there is nowhere for it to go. The caller is expected to

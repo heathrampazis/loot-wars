@@ -1962,7 +1962,9 @@ extension GameScene {
 
     /// Taps while a chest is open: out of the chest, into the chest, or done.
     private func handleChestTouch(_ touch: UITouch) {
-        guard let id = chestPanel.openChest else { return }
+        guard let id = chestPanel.openChest,
+              let chest = world.chests[id],
+              let player = world.localPlayer else { return }
 
         if chestPanel.isBackButton(atLocalPoint: touch.location(in: chestPanel)) {
             chestPanel.close()
@@ -1970,13 +1972,61 @@ extension GameScene {
             return
         }
 
+        // Out of the chest.
+        //
+        // The answer is worked out HERE and the panel is told, which is the shape
+        // the shop already uses: a panel that decided for itself whether a tap had
+        // worked would be a second opinion about the same rules, and the two would
+        // eventually disagree. Asked against the same inventory the simulation will
+        // ask, one frame earlier.
         if let slot = chestPanel.slotIndex(atLocalPoint: touch.location(in: chestPanel)) {
+            guard let stack = chest.contents.stack(at: slot) else { return }
+
+            guard player.inventory.canAccept(stack.type) else {
+                chestPanel.refuse(slot: slot)
+                chestPanel.note("YOUR BAG IS FULL")
+                SoundPlayer.shared.play(.error)
+                return
+            }
+
             queuedCommands.append(.takeItem(chest: id, slot: slot))
+
+            // Flown to the hotbar, in the panel's own space.
+            //
+            // Converted FROM the hotbar rather than from the scene, which is the
+            // difference between right and nearly right: both nodes are children of
+            // the camera, so hotbar.position is in the camera's space and handing it
+            // to the panel as a scene point would put the parcel somewhere else
+            // entirely on any screen where the camera is not at the origin - which
+            // is every frame of a match.
+            chestPanel.confirm(slot: slot,
+                               flyingTo: chestPanel.convert(.zero, from: hotbar))
+            SoundPlayer.shared.play(.collect)
             return
         }
 
+        // And into it.
         if let slot = hotbar.slotIndex(atLocalPoint: touch.location(in: hotbar)) {
+            guard let stack = player.inventory.stack(at: slot) else { return }
+
+            guard let landing = chest.contents.firstFreeSlot(for: stack.type) else {
+                // The shake here, the words on the panel: the bar's own note would
+                // be drawn underneath the chest panel and never seen.
+                hotbar.deny(slot: slot)
+                chestPanel.note("THE CHEST IS FULL")
+                SoundPlayer.shared.play(.error)
+                return
+            }
+
             queuedCommands.append(.storeItem(chest: id, slot: slot))
+            hotbar.acknowledge(slot)
+
+            if let art = hotbar.artwork(inSlot: slot) {
+                chestPanel.receive(into: landing,
+                                   from: chestPanel.convert(.zero, from: hotbar),
+                                   artwork: art)
+            }
+            SoundPlayer.shared.play(.tap)
             return
         }
 
