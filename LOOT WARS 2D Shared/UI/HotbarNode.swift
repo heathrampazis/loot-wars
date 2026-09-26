@@ -213,6 +213,28 @@ final class HotbarNode: SKNode {
         lastInventory = nil      // force the prices on or off
     }
 
+    /// Shakes a slot red and says nothing.
+    ///
+    /// The wordless half of refuse, for a no that some OTHER panel is explaining.
+    /// Storing into a full chest is the case: the tap lands here, so this is what
+    /// has to answer it, but the bar's own note would be drawn underneath the chest
+    /// panel sitting on top of it. The shake belongs to the finger; the words
+    /// belong to whatever is in front.
+    func deny(slot index: Int) {
+        guard slots.indices.contains(index) else { return }
+        slots[index].refuse()
+    }
+
+    /// What is drawn in a slot, so a panel can fly a copy of it somewhere.
+    ///
+    /// Asked of the SLOT rather than worked out from the inventory, so the picture
+    /// that flies is the picture that was on screen - including when the two are a
+    /// frame apart, which is exactly when somebody is moving things about.
+    func artwork(inSlot index: Int) -> (texture: SKTexture, size: CGSize)? {
+        guard slots.indices.contains(index) else { return nil }
+        return slots[index].artwork
+    }
+
     /// Acknowledges a tap that spent something, so the slot answers the finger
     /// even though what it held is on its way out.
     func acknowledge(_ index: Int) {

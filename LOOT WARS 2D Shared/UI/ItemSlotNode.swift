@@ -108,8 +108,8 @@ final class ItemSlotNode: SKNode {
         // Over everything, including the count badge and the urgent ring: a refusal
         // is about the slot as a whole and should not be drawn underneath half of
         // what is in it.
-        flash.fillColor = RenderPalette.placementBlocked
-        flash.strokeColor = RenderPalette.placementBlocked
+        // Colourless until something happens to it: refuse and confirm each set
+        // their own, so the plate is not secretly red between answers.
         flash.alpha = 0
         flash.zPosition = 5
         addChild(flash)
@@ -322,6 +322,36 @@ final class ItemSlotNode: SKNode {
     /// so a refusal and a settle can never run together. The zRotation reset in
     /// each of those is what straightens a wobble that one of them cut short.
     func refuse() {
+        wobble(washedIn: RenderPalette.placementBlocked, strength: 0.55)
+    }
+
+    /// The tap went through: the same wobble, washed green.
+    ///
+    /// ONE MOVEMENT FOR BOTH ANSWERS and the colour is what tells them apart, which
+    /// is the rule the shop's cards already follow and is worth restating here
+    /// because it looks like laziness and is not. What the wobble says is "your tap
+    /// landed on THIS slot", which is equally true of a yes and a no; the eye reads
+    /// a wash of green or red far faster than it reads any difference between two
+    /// wobbles, and two motions would mean learning two motions.
+    ///
+    /// Stronger than the refusal. Taking something out of a chest is the thing you
+    /// opened it to do, and the good answer should not be the quieter one - the
+    /// same correction the shop's confirm records.
+    func confirm() {
+        wobble(washedIn: RenderPalette.placementValid, strength: 0.7)
+    }
+
+    /// The shake both answers share.
+    ///
+    /// A wobble rather than a slide, for the reason the shop's version records: the
+    /// bar and the chest panel own slot POSITION, so a moveBy interrupted by a
+    /// relayout could leave a slot parked where it used to be. Rotation and scale
+    /// are nobody else's.
+    ///
+    /// It takes the "scale" key, which is what settle, flinch and a hold all use,
+    /// so an answer and a settle can never run together. The zRotation reset in
+    /// each of those is what straightens a wobble that one of them cut short.
+    private func wobble(washedIn colour: SKColor, strength: CGFloat) {
         removeAction(forKey: "scale")
         removeAction(forKey: "hold")
         zRotation = 0
@@ -336,8 +366,17 @@ final class ItemSlotNode: SKNode {
         ]), withKey: "scale")
 
         flash.removeAllActions()
-        flash.alpha = 0.55
+        flash.fillColor = colour
+        flash.strokeColor = colour
+        flash.alpha = strength
         flash.run(.fadeAlpha(to: 0, duration: 0.42))
+    }
+
+    /// What is drawn in this slot right now, so a panel can fly a copy of it
+    /// somewhere. Nil for an empty slot.
+    var artwork: (texture: SKTexture, size: CGSize)? {
+        guard !icon.isHidden, let texture = icon.texture else { return nil }
+        return (texture, icon.size)
     }
 
     private func settle() {
