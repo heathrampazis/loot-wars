@@ -56,6 +56,9 @@ enum TurretSystem {
         }
 
         // Solid, and four tiles of it: not on top of anybody, the placer included.
+        // Never where it would box anybody in - see World.keepsBaseOpen.
+        guard world.keepsBaseOpen(placing: turret.tiles, for: actor.team) else { return false }
+
         return !world.actors.values.contains {
             $0.isAlive && $0.hitbox.intersects(turret.hitbox)
         }
