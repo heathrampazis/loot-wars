@@ -94,6 +94,10 @@ enum ArcadeSystem {
         // legible one.
         guard actor.inventory.firstSlot(holding: .arcade(kind)) != nil else { return false }
 
+        // Two to a base, minis included - see GameConfig.Base.maxArcades. Crowding
+        // still slows the two that are there.
+        guard world.arcadeCount(ownedBy: actor.team) < GameConfig.Base.maxArcades else { return false }
+
         // NO CAP. There used to be one machine to a base, and that single line was
         // holding up the whole economy on its own - which is exactly why it had to
         // be replaced rather than simply deleted. Uncapped and undamped, a room you

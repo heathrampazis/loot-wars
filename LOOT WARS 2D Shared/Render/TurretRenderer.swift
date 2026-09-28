@@ -231,7 +231,7 @@ final class TurretRenderer {
         guard drawnHealth[turret.id] != turret.health else { return }
         drawnHealth[turret.id] = turret.health
 
-        let share = min(1, max(0, Double(turret.health) / Double(GameConfig.Turret.health)))
+        let share = min(1, max(0, Double(turret.health) / Double(turret.maxHealth)))
         let full = GridGeometry.length(ofTiles: TurretRenderer.barWidthInTiles)
 
         guard share < 1 else {

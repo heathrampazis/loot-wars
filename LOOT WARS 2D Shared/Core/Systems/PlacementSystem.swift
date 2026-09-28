@@ -73,6 +73,32 @@ enum PlacementSystem {
     }
 
     /// The intent to raise for it.
+    /// Whether this team's base already holds as many of this as it may - see
+    /// GameConfig.Base.maxChests. False for anything that is not base furniture.
+    ///
+    /// Asked by the hotbar, so a tap can say "base full" rather than opening a
+    /// placement that can only ever show red, and by the bots, so none of them
+    /// carries a third chest home to a base that will not take it.
+    static func baseIsFull(for type: ItemType, team: TeamID, in world: World) -> Bool {
+        guard let cap = limit(of: type) else { return false }
+        switch type {
+        case .arcade: return world.arcadeCount(ownedBy: team) >= cap
+        case .turret: return world.turretCount(ownedBy: team) >= cap
+        case .chest:  return world.chestCount(ownedBy: team) >= cap
+        default:      return false
+        }
+    }
+
+    /// How many of this a base may hold, or nil when it is not base furniture.
+    static func limit(of type: ItemType) -> Int? {
+        switch type {
+        case .arcade: return GameConfig.Base.maxArcades
+        case .turret: return GameConfig.Base.maxTurrets
+        case .chest:  return GameConfig.Base.maxChests
+        default:      return nil
+        }
+    }
+
     static func command(for type: ItemType, at origin: GridPoint) -> Command? {
         switch type {
         case .arcade(let kind): return .placeArcade(origin, kind)

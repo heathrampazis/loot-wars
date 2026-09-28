@@ -480,6 +480,19 @@ enum GameConfig {
     /// a base a thing you do rather than a thing you give up on - and it is capped
     /// by the fact that somebody has to breach you first for it to be available.
     enum Base {
+        /// The most of each piece of furniture one base may hold.
+        ///
+        /// Caps rather than costs. Uncapped, a well-run base filled up with
+        /// chests, machines and guns until it was a fortress printing money, and
+        /// the player who got there first had nothing left to want. Two of each
+        /// keeps a base a set of choices - which two spots, which machines - and
+        /// keeps something worth raiding in every base rather than a vault.
+        ///
+        /// Minis and full cabinets both count towards the machines.
+        static let maxChests = 2
+        static let maxTurrets = 2
+        static let maxArcades = 2
+
         /// How many berths - spots an actor could stand, see World+Footing - a
         /// respawn needs to be able to reach before it counts as somewhere you can
         /// move from. Six is a little room, not a corridor.
@@ -527,7 +540,7 @@ enum GameConfig {
             switch tiles {
             case ..<30: return 1
             case ..<45: return 2
-            default:    return 3
+            default:    return 3   // held to Base.maxChests by World.furnish
             }
         }
     }
@@ -2139,7 +2152,11 @@ enum GameConfig {
         /// Still worth being the rare crate's headline. Whoever opens one gets the
         /// machine early, which is the whole difference between owning the economy
         /// and catching up with it.
-        static let rareArcadeWeight = 150
+        ///
+        /// Trimmed to 120 alongside the mini, with bases now capped at two machines:
+        /// a machine should be something you are pleased to find, not something
+        /// every crate run turns up.
+        static let rareArcadeWeight = 120
 
         /// And how heavily a MINI sits in an ordinary one.
         ///
@@ -2153,7 +2170,9 @@ enum GameConfig {
         /// this is the thing that makes a base an economy instead of a lottery
         /// ticket. A base with no machine in it has nothing to defend and nothing
         /// worth breaking into, and that used to be seven bases out of eight.
-        static let miniArcadeWeight = 26
+        ///
+        /// Down to 20 - about one crate in sixteen, a little over one a match.
+        static let miniArcadeWeight = 20
 
         /// A turret, out of any crate, a little rarer than a mini machine.
         ///
@@ -2163,7 +2182,12 @@ enum GameConfig {
         /// in seventeen, a little over one a match: enough that most players will
         /// find one, few enough that a second is a decision about whether to double
         /// up or carry it for later.
-        static let turretWeight = 20
+        ///
+        /// Now a Mythical (purple) find, and weighted like one: 9, about one crate
+        /// in thirty-five - roughly one every other match for somebody opening
+        /// crates steadily. Bots still get theirs on seal, so this is what makes a
+        /// turret in YOUR base something you earned.
+        static let turretWeight = 9
 
         /// Share of crates on the map that are the good ones.
         ///
@@ -2932,6 +2956,20 @@ enum GameConfig {
         ///
         /// 150 of its 360 now. A bomb softens it; it does not do the job.
         static let bombDamage = 150
+
+        /// Turrets in BOT bases, which are deliberately stronger than the player's.
+        ///
+        /// A difficulty lever, and the one place the game quietly favours the bots
+        /// (Heath's call): raiding a bot base should be the hard part of a match,
+        /// and a player's own turret does not need to be anything like as good for
+        /// the player to be well defended - the bots are not as good at dealing
+        /// with one as a person is.
+        ///
+        /// 25 at 2.7 a second is 67 a second against a normal turret's 48, on 460
+        /// health against 360. A bomb (150) is now about a third of one.
+        static let botDamage = 25
+        static let botFireRate: Double = 2.7
+        static let botHealth = 460
 
         /// A turret left alone mends, as a machine does. See Arcade.mendDelay.
         static let mendDelay: Double = 5

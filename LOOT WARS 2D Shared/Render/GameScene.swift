@@ -1873,6 +1873,15 @@ extension GameScene {
             return
         }
 
+        // Base furniture your base already has its fill of. Said now, on the
+        // tap, rather than by opening a placement that could only ever show red.
+        if PlacementSystem.baseIsFull(for: stack.type, team: player.team, in: world),
+           let cap = PlacementSystem.limit(of: stack.type) {
+            SoundPlayer.shared.play(.error)
+            hotbar.refuse(slot: slot, saying: "Base full - \(cap) max")
+            return
+        }
+
         // Anything that still needs a decision out of you is PICKED OUT rather than
         // spent, and what happens next depends on which decision it is: a bomb
         // wants a direction and gets the aim stick, a chest wants a tile and gets

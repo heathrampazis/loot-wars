@@ -81,7 +81,7 @@ extension ItemType {
         // Legendary, the mini machine's rung. The two are found about as often and
         // are worth about as much to a base - one earns, one guards - and putting
         // them on the same rung says so before anybody has learned what either does.
-        case .turret: return .legendary
+        case .turret: return .mythical   // purple - a find, not furniture
 
         // The power-up carries its own rung - see Perk.rarity - rather than being
         // given one here. There is one perk and it is Mythical, so this line could
