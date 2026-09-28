@@ -11,6 +11,83 @@ import SpriteKit
 
 enum RenderPalette {
 
+    // The menu, which is the one screen in this game that is not the map.
+    //
+    // Every colour here is the GAME'S, and that is the point rather than a
+    // convenience. A menu painted in colours the match never uses is a menu that
+    // belongs to a different product - it was a set of tasteful mid-tones for one
+    // revision and read as a settings screen bolted onto a cartoon.
+    //
+    // Play is offerPlate, the green this game already uses to mean yes - it is the
+    // fill under every offer the shop makes you. Info and Settings are two of the
+    // eight TEAM colours, blue pulled a little deeper so white type clears it.
+    // White clears 4.3:1, 4.1:1 and 4.9:1 respectively.
+    /// A button's fill and the darker shade it is edged and shadowed with, as ONE
+    /// thing.
+    ///
+    /// A pair rather than a colour and a function that darkens it. The function
+    /// version wanted UIColor.getRed to pull the components back out, which is a
+    /// UIKit call in a file that imports SpriteKit and nothing else - it would
+    /// most likely have resolved and it is not worth finding out on somebody
+    /// else's build. Two numbers written down together cannot come apart either.
+    struct MenuTone {
+        let face: SKColor
+        /// The border AND the lip, which are the same colour on purpose: a button
+        /// edged in one shade and standing on another reads as two objects.
+        let edge: SKColor
+    }
+
+    /// THE RARITY LADDER, straight off the assets.
+    ///
+    /// Epic green, Legendary blue, Mythical purple - the three colours a player has
+    /// already seen glowing under loot on the grass and worn by the figures
+    /// themselves. That is what makes them the right ones rather than merely
+    /// available: the menu is painted in the colours the game hands out as prizes.
+    ///
+    /// They replace a set of muted mid-tones picked for text contrast, which looked
+    /// exactly like what they were. The note worth keeping from that mistake is
+    /// that contrast on a BUTTON is not the same problem as contrast in a
+    /// paragraph. White on this green is 2.8:1, which would be unreadable as body
+    /// text and is perfectly clear as a forty-point bold word beside a solid white
+    /// triangle; the purple clears 4:1 outright. If white ever does look weak on
+    /// the green, the lever is a one-point dark shadow behind the label rather than
+    /// a duller green.
+    ///
+    /// Each edge is its own face at 0.72 brightness. Dark enough to read as an
+    /// edge, close enough that it is obviously the same colour and not a border
+    /// somebody chose separately - which is what a black outline looked like, and
+    /// why it went.
+    ///
+    /// SUPERSEDED by Heath's mock-up: green, blue and orange, the brighter of the
+    /// two versions he drew. The softer set, matching the team colours on the
+    /// map exactly, was: green 3DA17D / 2F7C61, blue 6AB1FE / 4D86C3,
+    /// orange FF935D / D0784F - swap these back to try it.
+    static let menuPlay = MenuTone(face: rgb(0x00, 0xA6, 0x7A),
+                                   edge: rgb(0x00, 0x84, 0x61))
+    static let menuInfo = MenuTone(face: rgb(0x4F, 0xB3, 0xFF),
+                                   edge: rgb(0x3A, 0x8B, 0xD2))
+    static let menuSettings = MenuTone(face: rgb(0xFF, 0x8B, 0x4F),
+                                       edge: rgb(0xE0, 0x75, 0x49))
+
+    /// Near-black rather than black. A true black on a light ground vibrates at
+    /// large sizes, which is exactly the size the wordmark is set at.
+    static let menuInk = SKColor(white: 0.08, alpha: 1)
+
+    /// The veil over the drifting map.
+    ///
+    /// THE GRASS'S OWN COLOUR, and it has now been black and white and both were
+    /// wrong in the same way: a neutral veil over a coloured map does not soften
+    /// it, it drains it. Black took the lawn to olive and read as dusk. White took
+    /// it to a pale wash and read as a photograph behind frosted glass - a menu
+    /// that had a game somewhere behind it rather than a menu made of one.
+    ///
+    /// Tinting with floorLight pulls everything towards the colour the whole game
+    /// is played on. The claims stay coloured, the woods stay green, nothing goes
+    /// grey, and what the blur is doing reads as distance rather than as a filter.
+    /// Kept light enough - under a third - that it unifies rather than flattens.
+    static let menuVeil = SKColor(red: 0xC0 / 255.0, green: 0xDD / 255.0,
+                                  blue: 0x7A / 255.0, alpha: 0.28)
+
     // Terrain
     static let floorLight = rgb(0xC0, 0xDD, 0x7A)
     static let floorDark  = rgb(0xAF, 0xCC, 0x71)
