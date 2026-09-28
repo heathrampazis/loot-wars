@@ -99,8 +99,31 @@ enum RenderPalette {
         rgb(0xF2, 0x91, 0x3D),   // 4 orange
         rgb(0xE8, 0x6B, 0xB0),   // 5 pink
         rgb(0xF0, 0xC9, 0x4A),   // 6 yellow
-        rgb(0x4C, 0x6A, 0x8A)    // 7 slate
+        rgb(0x3A, 0xB8, 0xD2)    // 7 cyan - was a slate blue-grey that read as "nobody's"
     ]
+
+    /// The same eight, turned up, for the scoreboards.
+    ///
+    /// Two sets on purpose. On the map a team colour covers whole walls, floors
+    /// and bars, and at that size the softer set sits better on the grass. On a
+    /// leaderboard it is a small swatch on a dark panel, and there it has to POP -
+    /// the softer set looked flat and a little muddy at that size.
+    ///
+    /// Same order, same hues, so a team is recognisably the same colour in both.
+    private static let vibrantTeams: [SKColor] = [
+        rgb(0x27, 0xC4, 0x7F),   // 0 green
+        rgb(0xFF, 0x3B, 0x4E),   // 1 red
+        rgb(0x3E, 0x7C, 0xFF),   // 2 blue
+        rgb(0x9B, 0x5C, 0xFF),   // 3 purple
+        rgb(0xFF, 0x8A, 0x1F),   // 4 orange
+        rgb(0xFF, 0x5F, 0xC4),   // 5 pink
+        rgb(0xFF, 0xD2, 0x1F),   // 6 yellow
+        rgb(0x2F, 0xD4, 0xF0)    // 7 cyan
+    ]
+
+    static func vibrantColour(for team: TeamID) -> SKColor {
+        vibrantTeams[team.raw % vibrantTeams.count]
+    }
 
     static func colour(for team: TeamID) -> SKColor {
         teams[team.raw % teams.count]

@@ -213,6 +213,28 @@ final class HotbarNode: SKNode {
         lastInventory = nil      // force the prices on or off
     }
 
+    /// Shakes a slot red and says nothing.
+    ///
+    /// The wordless half of refuse, for a no that some OTHER panel is explaining.
+    /// Storing into a full chest is the case: the tap lands here, so this is what
+    /// has to answer it, but the bar's own note would be drawn underneath the chest
+    /// panel sitting on top of it. The shake belongs to the finger; the words
+    /// belong to whatever is in front.
+    func deny(slot index: Int) {
+        guard slots.indices.contains(index) else { return }
+        slots[index].refuse()
+    }
+
+    /// What is drawn in a slot, so a panel can fly a copy of it somewhere.
+    ///
+    /// Asked of the SLOT rather than worked out from the inventory, so the picture
+    /// that flies is the picture that was on screen - including when the two are a
+    /// frame apart, which is exactly when somebody is moving things about.
+    func artwork(inSlot index: Int) -> (texture: SKTexture, size: CGSize)? {
+        guard slots.indices.contains(index) else { return nil }
+        return slots[index].artwork
+    }
+
     /// Acknowledges a tap that spent something, so the slot answers the finger
     /// even though what it held is on its way out.
     func acknowledge(_ index: Int) {
@@ -285,10 +307,16 @@ final class HotbarNode: SKNode {
     func update(with world: World) {
         guard let player = world.localPlayer else { return }
 
-        // Which slots would be SPENT by a tap rather than picked out. Asked every
-        // frame rather than folded into the redraw below, because it turns on when
-        // your health crosses a line - and nothing about your inventory changes at
-        // that moment, so the redraw would not fire.
+        // Which slot is worth tapping RIGHT NOW, which is not what this used to
+        // mean. It marked the slots a tap would SPEND rather than pick out, back
+        // when most taps only picked out - a warning that this one was different.
+        // Every tap spends now, so a warning would be on everything always; what is
+        // left is the useful half, which is a heal recommending itself once you are
+        // hurt enough for it to be worth the seconds.
+        //
+        // Asked every frame rather than folded into the redraw below, because it
+        // turns on when your health crosses a line - and nothing about your
+        // inventory changes at that moment, so the redraw would not fire.
         let urgent = Double(player.health)
             < Double(player.maxHealth) * GameConfig.Player.tapHealBelow
 
@@ -302,8 +330,8 @@ final class HotbarNode: SKNode {
         // NOTHING IS DIMMED any more, and that is why this redraw is back to
         // watching the inventory alone. It used to also track which slots the
         // simulation would refuse, because those were drawn faint - see
-        // Actor.refusesTap for why the refusal moved from the slot's appearance to
-        // the tap on it. A bar that is only ever redrawn when its contents change
+        // Actor.canUse for what a tap is allowed to do: the refusal lives on the
+        // tap now rather than in the slot's appearance. A bar that is only ever redrawn when its contents change
         // is what this was before the dimming, and what it is again.
         guard player.inventory != lastInventory else { return }
         lastInventory = player.inventory

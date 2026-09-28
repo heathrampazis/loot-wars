@@ -15,8 +15,21 @@ enum ItemArt {
 
     private static var cache: [Pickup: SKTexture] = [:]
 
+    /// The team whose eyes the items are being drawn for - the local player's.
+    ///
+    /// Only matters for the one item drawn in a team colour, the turret, which
+    /// shows up in YOUR colour on the floor, in the hotbar and in the shop, so it
+    /// already looks like part of your base. Set by GameScene when a match starts.
+    static var viewer: TeamID?
+
     static func texture(for pickup: Pickup) -> SKTexture {
         if let cached = cache[pickup] { return cached }
+
+        // Drawn in code, in the viewer's colour - see TurretArt.icon. Not kept in
+        // this cache, because it is one picture per team and TurretArt keeps those.
+        if pickup == .item(.turret) {
+            return TurretArt.icon(for: viewer)
+        }
 
         let texture = SKTexture(imageNamed: assetName(for: pickup))
         texture.usesMipmaps = true
@@ -69,6 +82,7 @@ enum ItemArt {
         case .chest:   return "Chest"
         case .arcade(let kind):
             return kind == .mini ? "Mini Arcade" : "Arcade"
+        case .turret: return "Turret"
         case .perk(let which):
             switch which {
             // "Power-Up" rather than "Overdrive", which is what the code calls
@@ -98,6 +112,7 @@ enum ItemArt {
         case .item(.chest):      return "Chest"
         case .item(.arcade(.full)): return "Arcade"
         case .item(.arcade(.mini)): return "Mini Arcade"
+        case .item(.turret):        return "Turret"
         case .item(.perk(.overdrive)):     return "Perk"
         case .item(.perk(.strength)):      return "StrengthPerk"
         case .item(.perk(.speed)):         return "SpeedPerk"

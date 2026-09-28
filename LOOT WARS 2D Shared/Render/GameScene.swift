@@ -34,6 +34,7 @@ final class GameScene: SKScene {
     private let treeRenderer = TreeRenderer()
     private let blockRenderer = BlockRenderer()
     private let arcadeRenderer = ArcadeRenderer()
+    private let turretRenderer = TurretRenderer()
     private let lootboxRenderer = LootboxRenderer()
     private let chestRenderer = ChestRenderer()
     private let groundItemRenderer = GroundItemRenderer()
@@ -64,20 +65,6 @@ final class GameScene: SKScene {
     /// crate in reach. Only one is ever on screen.
     private let aimStick = JoystickNode(glyph: Glyphs.crosshair)
     private let openButton = ActionButtonNode(glyph: Glyphs.lootbox)
-
-    /// Uses whatever you have picked out of the hotbar, tucked above the corner.
-    /// Small, and under the thumb that is already on the right-hand side - the
-    /// whole point is healing, or lobbing a bomb, without reaching across to the
-    /// hotbar mid-fight.
-    ///
-    /// It shows the selected item's own art and issues useItem for that slot, so it
-    /// serves whatever gets picked out next without being taught about it.
-    private let itemButton = ActionButtonNode(glyph: Glyphs.lootbox,
-                                              radius: 40, grabRadius: 48)
-
-    /// What the small button is currently showing, so its glyph is only rebuilt
-    /// when the selection actually changes rather than every frame.
-    private var itemGlyph: ItemType?
 
     /// What that corner is currently for.
     private enum CornerAction: Equatable {
@@ -211,24 +198,15 @@ final class GameScene: SKScene {
     private let perkFlash = SKSpriteNode(color: .white, size: .zero)
 
 
-    /// How much healing sat in each slot last frame, so PICKING ONE UP can be
-    /// noticed. Per slot rather than a total: a bandage landing in an empty slot
-    /// and a bandage joining a stack are the same event, and both are worth arming.
-    private var lastHealingPerSlot: [Int] = []
-
-    /// The local player's health last frame, so being HIT can be noticed.
+    /// The hotbar slot picked out, waiting for a tile.
     ///
-    /// A moment rather than a state, which is what makes arming a heal safe: if the
-    /// game re-armed whenever nothing was selected, tapping a slot to put it away
-    /// would put it straight back, and the player could never have an empty hand.
-    private var lastLocalHealth: Int?
-
-    /// The hotbar slot picked out, waiting to be acted on.
+    /// ONLY EVER A CHEST OR A MACHINE now. Everything else is spent by the tap that
+    /// used to select it - see tapHotbar - so a selection means exactly one thing:
+    /// something is waiting to be told where to go.
     ///
     /// Scene state, not world state, and deliberately so: a selection is a thing
     /// this screen remembers between two taps, and the simulation never hears about
-    /// it. What crosses into Core is the finished intent - place a chest HERE, use
-    /// the thing in THAT slot.
+    /// it. What crosses into Core is the finished intent - place a chest HERE.
     private var selectedSlot: Int?
 
     /// Where the thing being placed is currently pointed.
@@ -237,6 +215,37 @@ final class GameScene: SKScene {
     /// this screen is holding between two moments of a gesture. What crosses into
     /// Core is the finished intent - put it HERE - and only on release.
     private var ghostOrigin: GridPoint?
+
+    /// Throws whatever throwable you have picked out, tucked above the corner.
+    ///
+    /// THIS BUTTON CAME BACK, and it is worth being precise about what was wrong
+    /// with it the first time, because "we removed it and put it back" is only not
+    /// a circle if something actually changed.
+    ///
+    /// It used to serve SEVEN item types. Which one it would spend depended on a
+    /// selection made on a bar at the other end of the screen, with nothing drawn
+    /// between the two to connect them - so the button had no fixed meaning, and
+    /// the game had to guess for you what should be in it (see the arming helpers
+    /// that went with it). That is what players could not follow, and all of it is
+    /// still gone: five of the seven are spent by the tap that used to select them.
+    ///
+    /// What is left is one job. It exists only while something throwable is in
+    /// hand, it wears that thing's own art, and it does the one thing a bomb needs
+    /// that a tap cannot do - go off in a direction you chose, with the blaster
+    /// still available while you choose it.
+    ///
+    /// The alternative was putting the throw on the aim stick: pull to aim, release
+    /// to throw. It reads beautifully written down and it is wrong in the hand.
+    /// Arming a bomb took the trigger away entirely, so you could not shoot back
+    /// while holding one, and every touch of the stick became a committed throw
+    /// with no way to change your mind - including touches you did not mean, since
+    /// a cancelled gesture releases exactly like a deliberate one.
+    private let throwButton = ActionButtonNode(glyph: Glyphs.lootbox,
+                                               radius: 40, grabRadius: 48)
+
+    /// What the throw button is currently showing, so its glyph is only rebuilt
+    /// when the item in hand changes rather than every frame.
+    private var throwGlyph: ItemType?
 
     /// What the ghost is aiming, so a fresh selection starts somewhere sensible
     /// rather than wherever the last one was left pointing.
@@ -252,6 +261,19 @@ final class GameScene: SKScene {
               let type = world?.localPlayer?.inventory.stack(at: slot)?.type,
               type.use == .mapTap else { return nil }
         return type
+    }
+
+    /// The slot holding something the aim stick would throw, if one is picked out.
+    ///
+    /// The mirror of placingType, and it reads from the inventory every time for
+    /// the same reason: a bomb spent, dropped or stored stops being throwable on
+    /// the same frame, so the stick goes back to shooting without anything having
+    /// to remember to put it back.
+    private var throwingSlot: Int? {
+        guard let slot = selectedSlot,
+              let type = world?.localPlayer?.inventory.stack(at: slot)?.type,
+              type.use == .thrown else { return nil }
+        return slot
     }
 
     /// How far into a match the drop hint will still offer itself. The opening
@@ -274,8 +296,8 @@ final class GameScene: SKScene {
     /// Which finger owns which control.
     private var moveTouch: UITouch?
     private var aimTouch: UITouch?
+    private var throwTouch: UITouch?
     private var openTouch: UITouch?
-    private var itemTouch: UITouch?
 
     /// The finger aiming something onto the map.
     ///
@@ -374,6 +396,10 @@ final class GameScene: SKScene {
         let generated = MapFactory.generate(seed: seed)
         world = World(generated: generated)
 
+        // Before anything draws an item, so a turret on the floor is in your
+        // colour from the first frame - see ItemArt.viewer.
+        ItemArt.viewer = world.localPlayer?.team
+
         // Before the first frame rather than on whichever frame first needs it -
         // see ArtFit.warm.
         ArtFit.warm(["Chest", "Arcade", "Mini Arcade"])
@@ -382,6 +408,7 @@ final class GameScene: SKScene {
         claimRenderer.build(claims: generated.claims)
         treeRenderer.build(patches: generated.trees)
         arcadeRenderer.build(mapHeight: generated.map.height)
+        turretRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(claimRenderer.node)
 
@@ -391,6 +418,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
+        worldLayer.addChild(turretRenderer.node)
         worldLayer.addChild(lootboxRenderer.node)
         worldLayer.addChild(chestRenderer.node)
         worldLayer.addChild(groundItemRenderer.node)
@@ -409,8 +437,8 @@ final class GameScene: SKScene {
         cameraController.node.addChild(aimStick)
         cameraController.node.addChild(openButton)
         openButton.isHidden = true
-        cameraController.node.addChild(itemButton)
-        itemButton.isHidden = true
+        cameraController.node.addChild(throwButton)
+        throwButton.isHidden = true
 
         cameraController.node.addChild(leaderboard)
         cameraController.node.addChild(matchPanel)
@@ -552,23 +580,22 @@ final class GameScene: SKScene {
         // touch BEFORE the aim stick (see touchesBegan), because it sits inside the
         // stick's 120pt grab radius and would otherwise never be pressed at all.
         // That priority then makes its OWN grab radius the hazard: no part of the
-        // stick you can see may fall inside it, or a thumb on the stick would heal
-        // you instead. So the centres must stay further apart than 48 + 62 = 110,
-        // and moving right buys some of that distance back - which is what lets it
-        // come down as far as it has.
-        itemButton.position = CGPoint(
+        // stick you can see may fall inside it, or a thumb meaning to aim would
+        // throw a bomb instead. So the centres must stay further apart than
+        // 48 + 62 = 110, and moving right buys some of that distance back - which
+        // is what lets it come down as far as it has.
+        throwButton.position = CGPoint(
             x: aimStick.position.x + JoystickNode.baseRadius - 40,
             y: aimStick.position.y + 115)
 
-
-        // The top-left corner itself, plus whatever the hardware is eating off the
-        // left edge. Everything in that corner is measured from this one point, so
-        // the block moves together.
         // Generously oversized rather than exactly the screen: the camera can be
         // mid-shake when this plays, and a rectangle cut to the glass would show a
         // hard edge sliding in from one side.
         perkFlash.size = CGSize(width: size.width * 1.3, height: size.height * 1.3)
 
+        // The top-left corner itself, plus whatever the hardware is eating off the
+        // left edge. Everything in that corner is measured from this one point, so
+        // the block moves together.
         let inset: CGFloat = 16
         let corner = CGPoint(x: -size.width / 2 + inset + safeLeft,
                              y: size.height / 2 - inset)
@@ -712,6 +739,7 @@ final class GameScene: SKScene {
         lootboxRenderer.sync(with: world)
         chestRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
+        turretRenderer.sync(with: world)
         groundItemRenderer.sync(with: world)
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world, heardFrom: ears)
@@ -728,21 +756,18 @@ final class GameScene: SKScene {
         // out of reach of it. Nothing else has to remember to do that.
         chestPanel.update(with: world)
 
-        // Forget a selection whose slot has emptied - spent, dropped, or stored in
-        // a chest. This is what takes the heal button away when the last dressing
-        // is used, and it stops a stale slot index acting on whatever lands there
-        // next.
+        // Forget a selection whose slot has emptied - the last chest placed,
+        // dropped, or stored in another chest. It stops a stale slot index arming
+        // the ghost for whatever lands there next.
         if let slot = selectedSlot,
            world.localPlayer?.inventory.stack(at: slot) == nil {
             selectedSlot = nil
         }
 
-        armHealingIfHit(in: world)
-        armHealingWhenFound(in: world)
         hotbar.setSelected(shopPanel.isOpen ? nil : selectedSlot)
 
         updateRightControl(with: world)
-        updateItemButton(with: world)
+        updateThrowButton(with: world)
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
         updateHint(with: world)
@@ -1032,6 +1057,11 @@ final class GameScene: SKScene {
                 chestRenderer.hit(id)
                 effectsRenderer.machineStruck(at: position)
 
+            case .turretHit(let id, let position):
+                // Sparks off the casing, the same as the other furniture.
+                turretRenderer.hit(id)
+                effectsRenderer.machineStruck(at: position)
+
             case .sealed(let team, let chests):
                 // Everybody's, not only yours. Eight bases close over a match and
                 // each one is a place that has just become worth breaking into -
@@ -1092,19 +1122,13 @@ final class GameScene: SKScene {
                 // interface instead of about the helmet.
                 SoundPlayer.shared.play(bought.isGear ? .upgrade : .purchase)
 
-                // A heal you just bought is a heal you are about to want.
-                //
-                // Buying one and then having to find it in the bar and pick it out
-                // before the button appears is two steps of admin between deciding
-                // to patch yourself up and doing it - and the second step is
-                // invisible, because nothing on screen says the corner button
-                // belongs to whichever slot is selected. Bought while hurt, in a
-                // shop you opened because you are hurt: arm it.
-                if bought.isHealing,
-                   let slot = world.localPlayer?.inventory.slots
-                       .firstIndex(where: { $0?.type == bought }) {
-                    selectedSlot = slot
-                }
+                // Nothing is armed here any more. A heal you just bought used to be
+                // selected for you, so the corner button would already be showing a
+                // bandage when you shut the shop - which was worth doing precisely
+                // because nothing on screen said that button belonged to the slot
+                // you had picked. There is no button, a tap on the bandage is the
+                // heal, and a slot left looking chosen for no reason would be the
+                // bar claiming something is in your hand when nothing is.
 
                 // Whichever of the two asked for it answers. The panel's confirm
                 // does nothing unless a card was pressed, and the prompt's does
@@ -1242,15 +1266,22 @@ final class GameScene: SKScene {
         moveStick.isHidden = false
 
         #if os(iOS) || os(tvOS)
-        guard aimTouch == nil, openTouch == nil else { return }
+        guard aimTouch == nil, openTouch == nil, throwTouch == nil else { return }
         #endif
         guard player.shootCooldown <= 0 else { return }
 
         // Asks the world the same questions the systems will, so the button can
         // never offer to open something the simulation would then refuse. Your own
         // chest wins over a crate: it is inside your base, and it is yours.
+        // A bomb in hand holds the corner, whatever you happen to be standing next
+        // to. The open button and the aim stick share this space, so a crate under
+        // your feet would otherwise take the stick away and leave you holding
+        // something with no way to throw it - and unlike the crate, the bomb is
+        // there because you chose it.
         let wanted: CornerAction
-        if let chest = world.reachableChest(for: player), chest.owner == player.team {
+        if throwingSlot != nil {
+            wanted = .aim
+        } else if let chest = world.reachableChest(for: player), chest.owner == player.team {
             // Only YOURS. Standing next to somebody else's leaves the corner on the
             // aim stick, which is the correct offer: shooting it is what opens it.
             wanted = .chest(chest.id)
@@ -1318,7 +1349,7 @@ final class GameScene: SKScene {
         aimStick.isHidden = true
         aimStick.end()
         openButton.isHidden = true
-        itemButton.isHidden = true
+        throwButton.isHidden = true
         hotbar.isHidden = true
         respawnBanner.isHidden = true
 
@@ -1326,110 +1357,51 @@ final class GameScene: SKScene {
         moveTouch = nil
         aimTouch = nil
         openTouch = nil
-        itemTouch = nil
+        throwTouch = nil
         pending = nil
         #endif
     }
 
-    /// Shows the picked-out item above the corner, or nothing.
+    /// Shows the throwable in hand, or nothing.
     ///
     /// Deliberately not folded into updateRightControl. That one guards against
     /// swapping the corner under a thumb, and those guards do not apply here: this
     /// button never swaps places with anything, so it can answer honestly every
     /// frame.
-    private func updateItemButton(with world: World) {
-        guard !world.isOver else { return }
-        guard let player = world.localPlayer,
+    ///
+    /// No cache on visibility, only on the glyph - which is the one thing here that
+    /// is costly to change. Re-applying isHidden every frame from what is wanted
+    /// right now is what makes it impossible for the node and a cache to disagree.
+    private func updateThrowButton(with world: World) {
+        guard !world.isOver,
               chestPanel.openChest == nil,
               !shopPanel.isOpen,
-              let slot = selectedSlot,
-              let stack = player.inventory.stack(at: slot),
-              stack.type.use == .actionButton else {
-            guard !itemButton.isHidden else { return }
-            itemButton.isHidden = true
-            itemButton.end()
-            itemGlyph = nil
+              let slot = throwingSlot,
+              let stack = world.localPlayer?.inventory.stack(at: slot) else {
+            guard !throwButton.isHidden else { return }
+            throwButton.isHidden = true
+            throwButton.end()
+            throwGlyph = nil
             return
         }
 
-        if itemGlyph != stack.type {
-            itemGlyph = stack.type
-            itemButton.setGlyph(ItemArt.texture(for: stack.type))
+        if throwGlyph != stack.type {
+            throwGlyph = stack.type
+            throwButton.setGlyph(ItemArt.texture(for: stack.type))
         }
 
-        itemButton.isHidden = false
-
-        // Faint at full health, matching the hotbar slot it came from - the answer
-        // is the actor's own, so what you see and what the simulation allows cannot
-        // disagree.
-        itemButton.setEnabled(player.canUse(slot: slot))
+        throwButton.isHidden = false
     }
 
-    /// Puts a heal in your hand the moment somebody shoots you, if your hand was
-    /// empty.
-    ///
-    /// On the HIT, not on being hurt. The difference matters: "hurt with nothing
-    /// selected" is a state that lasts until you patch up, so arming from it would
-    /// override the player every time they tried to put the heal away. Being shot
-    /// is an instant, it happens exactly when the answer to "what do I want in my
-    /// hand" changes, and it leaves anybody who deselects on purpose alone until
-    /// the next bullet.
-    ///
-    /// It never overrides a choice - a bomb you had ready stays ready - and WHICH
-    /// heal is ConsumableSystem's answer, the same one the bots get, so the game
-    /// cannot arm one thing and recommend another.
-    private func armHealingIfHit(in world: World) {
-        guard let player = world.localPlayer, player.isAlive else {
-            lastLocalHealth = nil
-            return
-        }
-
-        defer { lastLocalHealth = player.health }
-
-        guard let previous = lastLocalHealth, player.health < previous,
-              selectedSlot == nil,
-              chestPanel.openChest == nil, !shopPanel.isOpen,
-              let heal = ConsumableSystem.bestHeal(for: player) else { return }
-
-        selectedSlot = heal
-    }
-
-    /// Puts a heal in your hand the moment you pick one up, if your hand was empty.
-    ///
-    /// The other half of arming on a hit, and the same rule: fill an empty hand,
-    /// never override a choice. Walking over a bandage and having it land silently
-    /// in a slot you then have to find is the same two-step problem tapping solved
-    /// at low health - except this one happens when you are fine, which is exactly
-    /// when you would rather it was already sorted.
-    ///
-    /// Noticed rather than announced. Nothing in Core has to send a "you picked up
-    /// a bandage" message: a slot that holds more healing than it did last frame IS
-    /// the event, which is the same trick every renderer in this project uses.
-    private func armHealingWhenFound(in world: World) {
-        guard let player = world.localPlayer, player.isAlive else {
-            lastHealingPerSlot = []
-            return
-        }
-
-        let healing = player.inventory.slots.map { slot -> Int in
-            guard let stack = slot, stack.type.isHealing else { return 0 }
-            return stack.count
-        }
-
-        defer { lastHealingPerSlot = healing }
-
-        guard lastHealingPerSlot.count == healing.count,
-              selectedSlot == nil,
-              chestPanel.openChest == nil, !shopPanel.isOpen else { return }
-
-        // The slot that GAINED, so a bandage picked up while a medkit sits two
-        // slots along arms the bandage - the thing that just happened rather than
-        // whichever heal happens to be best.
-        for slot in healing.indices where healing[slot] > lastHealingPerSlot[slot] {
-            selectedSlot = slot
-            return
-        }
-    }
+    // GONE WITH THE OLD VERSION OF THAT BUTTON: the two helpers that used to put a
+    // heal in your hand for you - one on being hit, one on picking one up.
+    //
+    // Both were scaffolding for a control that served everything. "Arming" meant
+    // selecting a slot so the corner button would show a bandage, and it was worth
+    // doing precisely because the connection between the bar and that button was
+    // invisible: the game had to make the choice for you because the interface
+    // could not explain it. A tap that heals needs no arming, and there is nothing
+    // left for the game to guess - the button above shows the one thing it throws.
 
     /// Input becomes a Command. Later, AI brains and network packets produce their
     /// Commands exactly the same way, and the world cannot tell them apart.
@@ -1533,15 +1505,17 @@ extension GameScene {
             // button sits inside the stick's 120pt grab circle, so offering the
             // stick first would swallow every press aimed at it. Small precise
             // targets beat large forgiving ones; the stick loses nothing it needs.
-            if itemTouch == nil, !itemButton.isHidden,
-               itemButton.begin(atLocalPoint: touch.location(in: itemButton)) {
-                itemTouch = touch
+            if throwTouch == nil, !throwButton.isHidden,
+               throwButton.begin(atLocalPoint: touch.location(in: throwButton)) {
+                throwTouch = touch
 
-                // A one-shot action, so it fires on press. Refused politely when
-                // the button is faint - pressing a disabled control should do
-                // nothing rather than queue an intent the simulation will bin.
-                if itemButton.isEnabled, let slot = selectedSlot {
+                // A one-shot action, so it fires on PRESS. It throws along the aim
+                // you are holding, which is why the stick has to stay live while
+                // this is up - see updateRightControl, where a throwable in hand
+                // keeps the corner on the stick rather than on a crate.
+                if let slot = throwingSlot {
                     queuedCommands.append(.useItem(slot: slot))
+                    hotbar.acknowledge(slot)
                 }
                 continue
             }
@@ -1796,14 +1770,14 @@ extension GameScene {
             aimTouch = nil
         }
 
+        if let active = throwTouch, touches.contains(active) {
+            throwButton.end()
+            throwTouch = nil
+        }
+
         if let active = openTouch, touches.contains(active) {
             openButton.end()
             openTouch = nil
-        }
-
-        if let active = itemTouch, touches.contains(active) {
-            itemButton.end()
-            itemTouch = nil
         }
 
         // Nothing is committed when a run ends - every wall in it was laid as the
@@ -1842,10 +1816,40 @@ extension GameScene {
 
     /// Picks a slot out, or puts it back.
     ///
-    /// Nothing is spent by a tap on the hotbar any more - what acts on the picked
-    /// item is either the button or a tap on the map, and which of those belongs to
-    /// the item rather than to this screen (ItemType.use). Tapping the same slot
-    /// again puts it back, because changing your mind should not cost you the item.
+    /// A TAP USES IT. That is the whole of this screen's item handling now.
+    ///
+    /// There was a button above the bottom-right corner that spent whatever the
+    /// hotbar had picked out, and it went because players could not work out what
+    /// it was for. The diagnosis is already written into the commit that added the
+    /// heal shortcut below, which made exactly this change for exactly one item:
+    /// "two presses and an invisible rule stood between deciding to patch up and
+    /// patching up - pick the slot, then find the button above the corner, which
+    /// nothing on screen connects to the slot you picked." That was true of
+    /// bandages and it was true of everything else; only bandages got fixed.
+    ///
+    /// The reason it is safe to go further is that the button never ADDED anything.
+    /// Five of the seven things it could spend - a bandage, a medkit, a helmet, a
+    /// blaster, a power-up - need no aim at all. The other two, a bomb and a stink
+    /// bomb, are thrown along the aim you are already holding, which the button
+    /// read at the moment it was pressed and did nothing to set. So the second
+    /// press was never a second decision. It was a confirmation nobody had asked
+    /// for, sitting in a corner of the screen that had nothing to do with the bar
+    /// the item was in.
+    ///
+    /// The things that DO need a second decision keep one, and only those. A chest
+    /// and a machine need a tile; a bomb and a stink bomb need a direction. Neither
+    /// of those can be decided for you, which is exactly what separates them from
+    /// the five that can.
+    ///
+    /// The bomb is the one that came back. It was instant for a revision and it was
+    /// wrong, for a reason the analysis above got backwards: a bomb thrown along
+    /// "the aim you are already holding" is fine when you are already aiming and
+    /// useless when you are not, and you are usually not - the stick is idle most
+    /// of a match, and an idle stick leaves the aim pointing wherever you last
+    /// walked. So the old button was hiding a real gap, and removing it exposed it.
+    ///
+    /// Picking one out puts it on throwButton, which is a much smaller thing than
+    /// the control that used to live there - see its own note for what changed.
     private func tapHotbar(_ slot: Int) {
         guard let player = world.localPlayer,
               let stack = player.inventory.stack(at: slot) else {
@@ -1853,40 +1857,40 @@ extension GameScene {
             return
         }
 
-        // Something you own and cannot use: the tap is answered rather than obeyed.
+        // Something you own and cannot use right now: the tap is answered rather
+        // than obeyed. FIRST, because everything below it spends something.
         //
-        // BEFORE the heal shortcut and before the selection, because both of those
-        // would act on a slot the simulation is about to refuse - and picking out a
-        // helmet worse than the one you are wearing is not a thing anybody means to
-        // do. Actor.refusesTap decides WHICH; the wording below is this screen's,
-        // because Core does not hold sentences.
-        if player.refusesTap(slot: slot) {
+        // This is canUse directly, where it used to be a separate refusesTap that
+        // excused healing. That exemption existed because a tap merely SELECTED -
+        // picking a bandage out at full health was a reasonable thing to want, and
+        // the faint button was where the warning belonged. There is no button and
+        // no selecting any more, so a tap on a bandage at full health would throw
+        // it away, and the one answer both the hotbar and the simulation give is
+        // the right one again.
+        guard player.canUse(slot: slot) else {
             SoundPlayer.shared.play(.error)
             hotbar.refuse(slot: slot, saying: GameScene.refusal(for: stack.type))
             return
         }
 
-        // Hurt, and holding a bandage: the tap IS the heal.
-        //
-        // Two presses and an invisible rule stood between deciding to patch up and
-        // patching up - pick the slot, then find the button above the corner, which
-        // nothing on screen connects to the slot you picked. Below the threshold
-        // there is exactly one reason anybody touches a bandage, so the game stops
-        // asking. ConsumableSystem answers whether it can actually be spent, the
-        // same way it answers for the button and for a bot.
-        if stack.type.isHealing,
-           Double(player.health) < Double(player.maxHealth) * GameConfig.Player.tapHealBelow,
-           ConsumableSystem.canUse(slot: slot, actor: player) {
-            queuedCommands.append(.useItem(slot: slot))
-            hotbar.acknowledge(slot)
+        // Anything that still needs a decision out of you is PICKED OUT rather than
+        // spent, and what happens next depends on which decision it is: a bomb
+        // wants a direction and gets the aim stick, a chest wants a tile and gets
+        // the map. See ItemType.Use, throwingSlot and placingType.
+        guard stack.type.use == .instant else {
+            SoundPlayer.shared.play(.tap)
+            selectedSlot = (selectedSlot == slot) ? nil : slot
             return
         }
 
-        // On the CHANGE rather than on the tap, so putting a slot down sounds the
-        // same as picking one up - both are the selection moving, which is the
-        // thing this noise is about.
-        SoundPlayer.shared.play(.tap)
-        selectedSlot = (selectedSlot == slot) ? nil : slot
+        // Everything else goes now.
+        queuedCommands.append(.useItem(slot: slot))
+        hotbar.acknowledge(slot)
+
+        // Nothing stays picked out: there is nothing left for a selection to mean
+        // once the thing is spent, and a slot still looking chosen after its
+        // contents went would be the bar lying about what is in your hand.
+        selectedSlot = nil
     }
 
     /// Why a tap on this was refused, in as few words as will fit over the bar.
@@ -1906,7 +1910,7 @@ extension GameScene {
         case .blaster: return "Your blaster is better"
         case .perk:    return "One power-up at a time"
         case .bandage, .medkit: return "You are at full health"
-        case .bomb, .stink, .chest, .arcade: return "Not right now"
+        case .bomb, .stink, .chest, .arcade, .turret: return "Not right now"
         }
     }
 
@@ -1962,7 +1966,9 @@ extension GameScene {
 
     /// Taps while a chest is open: out of the chest, into the chest, or done.
     private func handleChestTouch(_ touch: UITouch) {
-        guard let id = chestPanel.openChest else { return }
+        guard let id = chestPanel.openChest,
+              let chest = world.chests[id],
+              let player = world.localPlayer else { return }
 
         if chestPanel.isBackButton(atLocalPoint: touch.location(in: chestPanel)) {
             chestPanel.close()
@@ -1970,13 +1976,61 @@ extension GameScene {
             return
         }
 
+        // Out of the chest.
+        //
+        // The answer is worked out HERE and the panel is told, which is the shape
+        // the shop already uses: a panel that decided for itself whether a tap had
+        // worked would be a second opinion about the same rules, and the two would
+        // eventually disagree. Asked against the same inventory the simulation will
+        // ask, one frame earlier.
         if let slot = chestPanel.slotIndex(atLocalPoint: touch.location(in: chestPanel)) {
+            guard let stack = chest.contents.stack(at: slot) else { return }
+
+            guard player.inventory.canAccept(stack.type) else {
+                chestPanel.refuse(slot: slot)
+                chestPanel.note("YOUR BAG IS FULL")
+                SoundPlayer.shared.play(.error)
+                return
+            }
+
             queuedCommands.append(.takeItem(chest: id, slot: slot))
+
+            // Flown to the hotbar, in the panel's own space.
+            //
+            // Converted FROM the hotbar rather than from the scene, which is the
+            // difference between right and nearly right: both nodes are children of
+            // the camera, so hotbar.position is in the camera's space and handing it
+            // to the panel as a scene point would put the parcel somewhere else
+            // entirely on any screen where the camera is not at the origin - which
+            // is every frame of a match.
+            chestPanel.confirm(slot: slot,
+                               flyingTo: chestPanel.convert(.zero, from: hotbar))
+            SoundPlayer.shared.play(.collect)
             return
         }
 
+        // And into it.
         if let slot = hotbar.slotIndex(atLocalPoint: touch.location(in: hotbar)) {
+            guard let stack = player.inventory.stack(at: slot) else { return }
+
+            guard let landing = chest.contents.firstFreeSlot(for: stack.type) else {
+                // The shake here, the words on the panel: the bar's own note would
+                // be drawn underneath the chest panel and never seen.
+                hotbar.deny(slot: slot)
+                chestPanel.note("THE CHEST IS FULL")
+                SoundPlayer.shared.play(.error)
+                return
+            }
+
             queuedCommands.append(.storeItem(chest: id, slot: slot))
+            hotbar.acknowledge(slot)
+
+            if let art = hotbar.artwork(inSlot: slot) {
+                chestPanel.receive(into: landing,
+                                   from: chestPanel.convert(.zero, from: hotbar),
+                                   artwork: art)
+            }
+            SoundPlayer.shared.play(.tap)
             return
         }
 

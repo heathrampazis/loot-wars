@@ -144,7 +144,7 @@ final class LeaderboardNode: SKNode {
             let mine = standing.team == you
 
             row.score.text = "\(standing.score)"
-            row.swatch.fillColor = RenderPalette.colour(for: standing.team)
+            row.swatch.fillColor = RenderPalette.vibrantColour(for: standing.team)
             row.highlight.isHidden = !mine
 
             // Your own row at full strength, everybody else's set back a little, so

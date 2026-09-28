@@ -62,6 +62,9 @@ enum Command {
     /// The tap already knows which slot it came from; this carries that through.
     case placeArcade(GridPoint, ArcadeKind)
 
+    /// Stand a carried turret up with its footprint starting at this tile.
+    case placeTurret(GridPoint)
+
     /// Move one item from a hotbar slot into an open chest, and back again.
     ///
     /// Both name the chest rather than assuming the nearest one. A panel can be

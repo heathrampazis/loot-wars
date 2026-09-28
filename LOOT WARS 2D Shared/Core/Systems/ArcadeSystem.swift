@@ -128,6 +128,9 @@ enum ArcadeSystem {
             guard !world.treeTiles.contains(tile) else { return false }
         }
 
+        // Never where it would box anybody in - see World.keepsBaseOpen.
+        guard world.keepsBaseOpen(placing: machine.tiles, for: actor.team) else { return false }
+
         // Nothing standing where it would appear - it is solid, and four or six
         // tiles of it.
         return !world.actors.values.contains {

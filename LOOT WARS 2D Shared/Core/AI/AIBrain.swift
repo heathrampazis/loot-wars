@@ -28,8 +28,11 @@ enum AIBrain {
         state.goalAge += dt
         state.lootCooldown = max(0, state.lootCooldown - dt)
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
-        state.raidUrgeTimer = max(0, state.raidUrgeTimer - dt)
-        state.huntUrgeTimer = max(0, state.huntUrgeTimer - dt)
+        // Faster while somebody else is running away with the match - see
+        // GameConfig.AI.leaderRush. Both the urges that point at the leader.
+        let rush = 1 + (world.runaway(against: actor.team)?.lead ?? 0) * GameConfig.AI.leaderRush
+        state.raidUrgeTimer = max(0, state.raidUrgeTimer - dt * rush)
+        state.huntUrgeTimer = max(0, state.huntUrgeTimer - dt * rush)
         state.stashCooldown = max(0, state.stashCooldown - dt)
         state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
@@ -47,6 +50,19 @@ enum AIBrain {
         if actor.secondsSinceHit < GameConfig.AI.combatRecency {
             state.fightCooldown = 0
         }
+
+        // A raid keeps its place in the queue while its owner is being fought off.
+        //
+        // The clock is PAUSED rather than merely generous, and the difference is
+        // the whole point: a defender who turns up is the most likely reason a raid
+        // takes a long time, so a hold that ran down during the fight would expire
+        // precisely in the case it exists to cover. Dealing with somebody is part
+        // of the raid, not an interruption to be charged for.
+        if !state.goal.isCombat, actor.secondsSinceHit >= GameConfig.AI.combatRecency {
+            state.raidHold = max(0, state.raidHold - dt)
+        }
+
+        if state.raidHold <= 0 { state.raidingBase = nil }
 
 
         if state.decisionTimer <= 0 {
@@ -67,6 +83,9 @@ enum AIBrain {
         // Steering runs every tick. Only committing to a direction twice a second
         // would let a bot sail straight past what it was walking to.
         steerTowardsGoal(&state, actor: actor, in: world)
+
+        // Before the obstacle pass, so a weave never steers into a wall.
+        dodgeWhileRaiding(&state, actor: actor, in: world)
 
         // Looking where you are going happens every tick, not on the decision timer.
         // Waiting up to three seconds to notice a tree is how a bot ends up grinding
@@ -108,6 +127,10 @@ enum AIBrain {
 
         if let stand = arcadeToPlace(actor: actor, in: world) {
             commands.append(.placeArcade(stand.origin, stand.kind))
+        }
+
+        if let origin = turretToPlace(actor: actor, in: world) {
+            commands.append(.placeTurret(origin))
         }
 
         if let tile = chestToPlace(actor: actor, in: world) {
@@ -250,7 +273,7 @@ enum AIBrain {
             // steerTowardsGoal drops it the moment either happens. A defender that
             // times out is a defender somebody can outwait.
             break
-        case .wreck:
+        case .wreck, .silence:
             // The same clock a crate gets. A machine that cannot be got at is
             // usually one behind a wall the bot has no way through.
             if state.goalAge > GameConfig.AI.lootPatience {
@@ -296,6 +319,22 @@ enum AIBrain {
             break
         }
 
+        // A base with nothing left standing in it is a base this bot has finished
+        // with, and it stops being remembered the moment it is picked clean rather
+        // than when the hold runs out.
+        //
+        // Gated on being THERE, which is the whole care needed here: out of range,
+        // remaining() would be answering about a base the bot cannot see, and a
+        // raid abandoned under fire would be forgotten at exactly the moment the
+        // memory exists to survive. And gated on nothing else - see remaining(),
+        // which deliberately has no opinion about the bot's own condition.
+        if let victim = state.raidingBase,
+           nearEnoughToReturn(to: victim, from: actor, in: world),
+           remaining(at: victim, for: actor, in: world) == nil {
+            state.raidingBase = nil
+            state.raidHold = 0
+        }
+
         var wanted = chooseGoal(for: actor, state: state, in: world)
 
         // Re-point at the current next wall rather than the one chosen minutes ago,
@@ -334,6 +373,18 @@ enum AIBrain {
         if wanted.isRaiding, !state.goal.isRaiding {
             state.raidUrgeTimer = Double.random(in: GameConfig.AI.raidUrgeInterval,
                                                 using: &world.rng)
+        }
+
+        // And it remembers WHOSE, which is the thing none of the raiding goals
+        // could say on their own - see AIState.raidingBase.
+        //
+        // Refreshed on every raiding goal rather than only on the first, so a bot
+        // that opens a wall, takes the chest and starts on the machine is holding a
+        // hold that reaches to the end of the job rather than one that started
+        // running down at the wall.
+        if wanted.isRaiding, let victim = base(of: wanted, in: world) {
+            state.raidingBase = victim
+            state.raidHold = GameConfig.AI.raidHold
         }
 
         // Same bargain for a hunt, and for the same reason: spent on setting off
@@ -401,7 +452,7 @@ enum AIBrain {
         case .fight, .retreat:
             return
 
-        case .raid, .robChest, .wreck:
+        case .raid, .robChest, .wreck, .silence:
             // Mid-raid, and this is the one thing worth NOT reacting to.
             //
             // A raider has spent a bomb, crossed the map and is standing in
@@ -671,19 +722,24 @@ enum AIBrain {
             return .build(wall)
         }
 
-        // Already inside somebody's base with the chest still full: finish the job.
+        // FINISH THE RAID YOU STARTED, whatever happened in the middle of it.
         //
-        // The same commitment a trip home gets, and for the same reason. Without
-        // it a bot that had just blown a hole in a wall would re-weigh the raid
-        // against every crate in sight on the very next decision and drift off,
-        // having done the expensive part and taken none of the reward. Bounded by
-        // the loot patience in changeOfMind, so it cannot become a bot standing
-        // outside a base it can never actually get into.
-        if case .robChest(let id) = state.goal,
-           let chest = world.chests[id],
-           chest.contents.slots.contains(where: { $0 != nil }),
-           (chest.position - actor.position).length <= GameConfig.AI.robRange {
-            return .robChest(id)
+        // This replaces a narrower version that only held onto one chest, and only
+        // while the goal was already .robChest. Everything it missed is what the
+        // bots were doing wrong: a wall bombed open and then walked away from, a
+        // machine left standing beside an emptied chest, and above all a raid that
+        // a fight had been declared on top of - because a fight REPLACES the goal,
+        // so the errand underneath it was simply gone by the time the shooting
+        // stopped.
+        //
+        // It asks a different question from the search below, deliberately. That
+        // one prices a base against every other base on the map and against the
+        // walk, which is the right question when choosing where to go and the wrong
+        // one when you are already standing in the wreckage of somebody's wall: the
+        // walk is nothing, the bomb is spent, and raidWorth has just been knocked
+        // down by the raid itself. So this asks only whether anything is LEFT.
+        if let unfinished = unfinishedRaid(for: actor, state: state, in: world) {
+            return unfinished
         }
 
         // Somebody's chest, and a way to it. This is the top of the aggression
@@ -788,7 +844,7 @@ enum AIBrain {
             case .blaster(let tier): return tier > actor.blaster
             // Always worth the walk: one perk is one perk whatever you are wearing.
             case .perk:              return true
-            case .bandage, .medkit, .bomb, .stink, .chest, .arcade: return false
+            case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .turret: return false
             }
         })
 
@@ -995,6 +1051,11 @@ enum AIBrain {
         // whose wall is shut has not broken in, it is trespassing on the lawn.
         guard world.baseIsBreached(team) else { return nil }
 
+        // Its turret first - see remaining(at:).
+        if let turret = turretStanding(at: team, nearest: actor.position, in: world) {
+            return .silence(turret.id)
+        }
+
         if let chest = world.chests(notOwnedBy: actor.team)
             .filter({ $0.owner == team && $0.contents.slots.contains { $0 != nil } })
             .min(by: { ($0.position - actor.position).length
@@ -1021,9 +1082,143 @@ enum AIBrain {
     /// permission required.
     ///
     /// Sorted, because this picks a target and targets decide outcomes.
+    /// Whose base a raiding goal is against.
+    ///
+    /// The wall case is the one that matters: a bombed wall is usually the FIRST
+    /// thing a bot does to a base, so it is where the memory has to start. Without
+    /// it the raid would only be remembered from the chest onwards, which is the
+    /// half that was already working.
+    private static func base(of goal: AIGoal, in world: World) -> TeamID? {
+        switch goal {
+        case .robChest(let id):
+            return world.chests[id]?.owner
+        case .wreck(let id):
+            return world.arcade(id)?.owner
+        case .silence(let id):
+            return world.turrets[id]?.owner
+        case .raid(let tile):
+            return world.map[tile].blockOwner
+        case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
+             .rearm, .defend, .hunt:
+            return nil
+        }
+    }
+
+    /// What is left to do at the base this bot is already raiding, or nil.
+    ///
+    /// The chest first and the machine second, and it is worth saying why rather
+    /// than leaving it to look arbitrary. Both are worth taking; the chest is the
+    /// one that can be defended, restocked and emptied by somebody else while you
+    /// are busy, so it is the one that stops being available. A machine standing in
+    /// a breached base will still be standing in thirty seconds.
+    ///
+    /// No scoring, no distance cost, no comparison against other bases - see the
+    /// call site. This is the question "is there anything still here", and the only
+    /// gates on it are the ones about whether the bot can act at all.
+    private static func unfinishedRaid(for actor: Actor,
+                                       state: AIState,
+                                       in world: World) -> AIGoal? {
+        guard let victim = state.raidingBase, victim != actor.team,
+              nearEnoughToReturn(to: victim, from: actor, in: world) else { return nil }
+
+        // The same supply floor the ordinary search uses. A bot on its last legs
+        // should be patching up rather than going back in, and this branch sits
+        // ABOVE the emergency supply run exactly as that one does.
+        guard actor.inventory.totalHealing(of: actor.maxHealth)
+                >= GameConfig.AI.emergencyHealingStock else { return nil }
+
+        return remaining(at: victim, for: actor, in: world)
+    }
+
+    /// Whether the bot is close enough to a base for the raid on it to still be a
+    /// raid rather than a walk.
+    private static func nearEnoughToReturn(to victim: TeamID,
+                                           from actor: Actor,
+                                           in world: World) -> Bool {
+        guard let claim = world.claim(for: victim) else { return false }
+        return (claim.centreTile.center - actor.position).length
+            <= GameConfig.AI.raidReturnRange
+    }
+
+    /// What is still standing at a base, with no opinion about whether this bot is
+    /// in any condition to take it.
+    ///
+    /// Split from the gates above it so that "there is nothing left here" and "I
+    /// cannot do anything about it right now" are two different answers. They were
+    /// one for a moment, and the bug that shape produces is precise: a bot driven
+    /// off with no bandages would have read its own empty pockets as the base being
+    /// stripped, forgotten the raid, and left.
+    private static func remaining(at victim: TeamID,
+                                  for actor: Actor,
+                                  in world: World) -> AIGoal? {
+        // The turret before anything else. Every second spent at a chest or a
+        // machine with one still standing is a second spent being shot, and a
+        // raid that ignores it ends with the raider carried out.
+        if let turret = turretStanding(at: victim, nearest: actor.position, in: world) {
+            return .silence(turret.id)
+        }
+
+        // A chest with something in it. Nearest, and sorted, because two chests at
+        // the same distance must not be broken by dictionary order.
+        var chest: Chest?
+        var shortest = Double.greatestFiniteMagnitude
+
+        let theirs = world.chests(notOwnedBy: actor.team)
+            .filter { $0.owner == victim }
+            .sorted { $0.id.raw < $1.id.raw }
+
+        for candidate in theirs {
+            guard candidate.contents.slots.contains(where: { $0 != nil }) else { continue }
+            let distance = (candidate.position - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            chest = candidate
+        }
+
+        if let chest { return .robChest(chest.id) }
+
+        // Then anything they were making money with.
+        var machine: Arcade?
+        shortest = Double.greatestFiniteMagnitude
+
+        for id in world.arcades.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let candidate = world.arcades[id], candidate.owner == victim else { continue }
+            let distance = (candidate.centre - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            machine = candidate
+        }
+
+        if let machine { return .wreck(machine.id) }
+
+        return nil
+    }
+
+    /// The nearest turret a base still has standing. Sorted, because this picks a
+    /// target and two at the same distance must not be split by dictionary order.
+    private static func turretStanding(at team: TeamID,
+                                       nearest point: Vec2,
+                                       in world: World) -> Turret? {
+        var best: Turret?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for id in world.turrets.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let turret = world.turrets[id], turret.owner == team else { continue }
+            let distance = (turret.centre - point).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = turret
+        }
+
+        return best
+    }
+
     private static func machineWorthWrecking(for actor: Actor, in world: World) -> Arcade? {
         guard actor.inventory.totalHealing(of: actor.maxHealth)
                 >= GameConfig.AI.emergencyHealingStock else { return nil }
+
+        // A runaway's machines at any distance - see chestWorthRobbing.
+        let runaway = world.runaway(against: actor.team)?.team
 
         var best: Arcade?
         var shortest = Double.greatestFiniteMagnitude
@@ -1035,7 +1230,8 @@ enum AIBrain {
                   world.baseIsBreached(owner) else { continue }
 
             let distance = (machine.centre - actor.position).length
-            guard distance < GameConfig.AI.robRange, distance < shortest else { continue }
+            guard distance < GameConfig.AI.robRange || owner == runaway,
+                  distance < shortest else { continue }
             shortest = distance
             best = machine
         }
@@ -1054,6 +1250,12 @@ enum AIBrain {
 
         let carryingAWayIn = actor.inventory.count(of: .bomb) > 0
 
+        // A runaway's base is worth any walk. robRange keeps an ordinary raid
+        // local; somebody doubling the field's score is not an ordinary target, and
+        // a leader whose base happened to be on the far side of the map from every
+        // bot was a leader nobody ever visited.
+        let runaway = world.runaway(against: actor.team)?.team
+
         var best: Chest?
         var bestScore = 0.0
 
@@ -1061,7 +1263,7 @@ enum AIBrain {
             guard carryingAWayIn || world.baseIsBreached(chest.owner) else { continue }
 
             let distance = (chest.position - actor.position).length
-            guard distance < GameConfig.AI.robRange else { continue }
+            guard distance < GameConfig.AI.robRange || chest.owner == runaway else { continue }
 
             // What the BASE is worth, not what this chest holds.
             //
@@ -1351,6 +1553,21 @@ enum AIBrain {
             // check sits above this.
             steer(&state, actor: actor, to: machine.centre)
 
+        case .silence(let id):
+            // Knocked out already, by this bot or anybody. Re-decide at once:
+            // whatever it was guarding is now open for business.
+            guard let turret = world.turrets[id] else {
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+                return
+            }
+
+            // Straight at it. Standing off at range is what the turret wants -
+            // it out-damages a bot in a long exchange - and closing the distance
+            // makes its slow barrel the thing that loses.
+            steer(&state, actor: actor, to: turret.centre)
+
         case .rearm(let id):
             // Emptied, or taken while the bot was walking. Re-decide immediately
             // rather than standing at a bare chest waiting out a timer.
@@ -1429,6 +1646,34 @@ enum AIBrain {
     private static func isHunt(_ goal: AIGoal) -> Bool {
         if case .hunt = goal { return true }
         return false
+    }
+
+    /// Weave, rather than walk a straight line, while raiding under fire.
+    ///
+    /// See GameConfig.AI.dodgeSwing. Only the FEET: where the blaster points is
+    /// shotToTake's business, so a raider can zig-zag at a chest and keep shooting
+    /// it. Each bot weaves on its own beat, offset by its id, so two raiders side
+    /// by side do not swing in step - and it is built off the match clock rather
+    /// than the generator, so it costs no random draws and cannot knock a seed out
+    /// of step.
+    private static func dodgeWhileRaiding(_ state: inout AIState, actor: Actor, in world: World) {
+        guard state.goal.isRaiding, underThreat(actor, in: world) else { return }
+
+        let beat = world.elapsed * 2 * Double.pi / GameConfig.AI.dodgePeriod
+        let swing = GameConfig.AI.dodgeSwing * sin(beat + Double(actor.id.raw) * 1.7)
+        state.desiredHeading = Vec2.fromAngle(state.desiredHeading.angle + swing)
+    }
+
+    /// Whether anything is shooting at this bot, or about to.
+    private static func underThreat(_ actor: Actor, in world: World) -> Bool {
+        if actor.secondsSinceHit < GameConfig.AI.dodgeMemory { return true }
+
+        if world.turrets.values.contains(where: { $0.target == actor.id }) { return true }
+
+        return world.actors.values.contains { other in
+            other.isAlive && other.team != actor.team
+                && (other.position - actor.position).length <= GameConfig.AI.dodgeRange
+        }
     }
 
     private static func steer(_ state: inout AIState, actor: Actor, to target: Vec2?) {
@@ -1694,7 +1939,7 @@ enum AIBrain {
         case .bandage, .medkit:
             return actor.inventory.totalHealing(of: actor.maxHealth)
                  < GameConfig.AI.buysHealingBelow
-        case .bomb, .stink, .chest, .arcade, .perk:
+        case .bomb, .stink, .chest, .arcade, .turret, .perk:
             return false
         }
     }
@@ -1720,6 +1965,13 @@ enum AIBrain {
            let origin = world.nextArcadeOrigin(for: actor.team,
                                                kind: kind,
                                                near: actor.position) {
+            return origin
+        }
+
+        // Then a turret, ahead of the chest it will be guarding: a chest stood up
+        // in a base with nothing watching it is the cheapest thing on the map.
+        if actor.inventory.firstSlot(holding: .turret) != nil,
+           let origin = world.nextTurretOrigin(for: actor.team, near: actor.position) {
             return origin
         }
 
@@ -1779,6 +2031,25 @@ enum AIBrain {
             return nil
         }
         return (origin, kind)
+    }
+
+    /// A spot to stand a carried turret on, from where the bot is now.
+    ///
+    /// The same rules a machine follows, for the same reason: not in an open
+    /// base, and only from arm's reach, so a bot stands it up on its way through
+    /// rather than making a special trip.
+    private static func turretToPlace(actor: Actor, in world: World) -> GridPoint? {
+        guard !world.baseIsBreached(actor.team) else { return nil }
+        guard actor.inventory.firstSlot(holding: .turret) != nil else { return nil }
+        guard let origin = world.nextTurretOrigin(for: actor.team,
+                                                  near: actor.position) else { return nil }
+
+        let turret = Turret(id: TurretID(-1), origin: origin, owner: actor.team)
+        guard (turret.centre - actor.position).length <= GameConfig.Build.reach + 1.5 else {
+            return nil
+        }
+        guard TurretSystem.canPlace(at: origin, by: actor, in: world) else { return nil }
+        return origin
     }
 
     /// The best thing in somebody else's chest that this bot could carry off.
@@ -1993,7 +2264,7 @@ enum AIBrain {
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
         case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
-             .rearm, .wreck, .defend, .hunt:
+             .rearm, .wreck, .silence, .defend, .hunt:
             target = nil
         }
 
@@ -2229,6 +2500,13 @@ enum AIBrain {
                                from: actor, in: world)
         }
 
+        // A turret is furniture that shoots back, and aimed at the same way: at
+        // the box, with no lead, because it does not move.
+        if case .silence(let id) = state.goal, let turret = world.turrets[id] {
+            return aimAtTarget(turret.centre, halfSpan: AIBrain.turretFaceInset,
+                               from: actor, in: world)
+        }
+
         // A chest is shot open, so robbing one is the same act as wrecking a
         // machine and goes through the same door. Its half-span is small - a chest
         // is under a tile across - so the aim is at very nearly its centre.
@@ -2249,7 +2527,7 @@ enum AIBrain {
         // .defend used to appear here as well as three lines up, where it binds.
         // The second one was unreachable and the compiler said so on every build.
         case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash,
-             .rearm, .wreck, .hunt:
+             .rearm, .wreck, .silence, .hunt:
             targetID = nil
         }
 
@@ -2350,6 +2628,10 @@ enum AIBrain {
     /// The same for a chest, which is under a tile across - so this is barely off
     /// its centre, and a bot shooting one is aiming at the box itself.
     private static let chestFaceInset: Double = 0.55
+
+    /// The same for a turret, whose footprint is two by two - a half-extent of
+    /// one tile, cleared from any angle.
+    private static let turretFaceInset: Double = 1.1
 
     private static func hasLineOfSight(from start: Vec2, to end: Vec2, in world: World) -> Bool {
         let delta = end - start

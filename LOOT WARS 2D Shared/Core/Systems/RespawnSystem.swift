@@ -41,9 +41,10 @@ enum RespawnSystem {
 
         // Back to the middle of your own claim - the one place on the map that is
         // always yours.
-        if let claim = world.claim(for: actor.team) {
-            actor.position = claim.centreTile.center
-        }
+        // The middle of your claim, unless your base has been furnished or walled
+        // so that the middle is somewhere you could not move from - see
+        // World.spawnPoint.
+        actor.position = world.spawnPoint(for: actor.team)
 
         // Topped up to whatever the clock says a respawn is worth by now.
         //
@@ -62,6 +63,11 @@ enum RespawnSystem {
                 actor.health = actor.maxHealth
             }
             if actor.blaster < kit.blaster { actor.blaster = kit.blaster }
+        }
+
+        // And something to heal with - see GameConfig.Player.respawnHeals.
+        for item in GameConfig.Player.respawnHealKit(at: world.matchProgress) {
+            _ = actor.inventory.add(item)
         }
 
         // A bot that died halfway across the map should not come back still

@@ -138,9 +138,13 @@ struct Actor {
 
     /// Whether the item in this hotbar slot can be used right now.
     ///
-    /// The one answer, asked by the systems that act on it and by the hotbar that
-    /// greys it out - so what the player sees and what the simulation allows can
-    /// never disagree.
+    /// The one answer, asked by the systems that act on it and by the tap on the
+    /// hotbar that raises it - so what the player is allowed to do and what the
+    /// simulation allows can never disagree.
+    ///
+    /// It said "the hotbar that greys it out" for a long time, then nothing greyed
+    /// out and a separate refusesTap answered the bar instead. Both of those are
+    /// gone; a tap on a slot spends what is in it, and this decides whether it may.
     func canUse(slot index: Int) -> Bool {
         guard isAlive,
               inventory.slots.indices.contains(index),
@@ -156,7 +160,7 @@ struct Actor {
         case .perk:
             return perk == nil
 
-        case .chest, .arcade:
+        case .chest, .arcade, .turret:
             // Always tappable. Whether either can go down HERE depends on the tile
             // you then pick, which is the placing system's call - the hotbar cannot
             // answer it and should not pretend to.
@@ -175,37 +179,19 @@ struct Actor {
         }
     }
 
-    /// Whether a tap on this slot should be ANSWERED WITH A NO rather than obeyed.
-    ///
-    /// The same question this used to answer as showsAsUnusable, put to a different
-    /// use, and the rename is the whole change: a helmet worse than the one you are
-    /// wearing used to sit grey in the bar and is now drawn like anything else, and
-    /// the refusal happens when you touch it. Nothing about WHICH items refuse has
-    /// moved - only when the player finds out.
-    ///
-    /// Greying was the honest version and it did not work. A row of four with two
-    /// of them faint reads as a bar that is half broken, the grey has to be learned
-    /// before it means anything, and it is smallest and least legible at exactly
-    /// the moment it matters - a glance down mid-fight. A tap that shakes red and
-    /// says why cannot be missed and needs no learning. The shop kept its greying,
-    /// and that is not an inconsistency: shopping is deciding at leisure between
-    /// things you do not own yet, where knowing before you reach is the point.
-    /// These are your own four items, and you reach for them without looking.
-    ///
-    /// Deliberately not the same question as canUse, and the healing carve-out is
-    /// why. A bandage at full health fails canUse, and refusing a tap on one would
-    /// be wrong: picking it out ahead of a fight is a reasonable thing to do, and
-    /// full health is the state you spend most of the match in. The use BUTTON
-    /// still asks canUse, so a bandage on a full bar is faint on the one control
-    /// that would spend it - which is where that warning belongs, because that is
-    /// the moment you would waste it.
-    func refusesTap(slot index: Int) -> Bool {
-        guard inventory.slots.indices.contains(index),
-              let stack = inventory.slots[index] else { return false }
-
-        if stack.type.isHealing { return false }
-        return !canUse(slot: index)
-    }
+    // refusesTap USED TO LIVE HERE, and it is worth saying what it was for and why
+    // it is gone rather than leaving a hole.
+    //
+    // It was canUse with healing excused: a bandage at full health fails canUse,
+    // and refusing a TAP on one would have been wrong while a tap only picked the
+    // slot out. Picking a bandage out before a fight is a reasonable thing to want,
+    // and the warning belonged on the button that would actually spend it.
+    //
+    // A tap spends it now - see GameScene.tapHotbar - so there is no gap left
+    // between what the screen allows and what the simulation allows, and canUse is
+    // the one answer again. Which is where it started: the note on canUse below
+    // still says it is "the one answer, asked by the systems that act on it and by
+    // the hotbar", and that is true once more.
 
     /// How well equipped this actor is, from 0 to 12.
     ///

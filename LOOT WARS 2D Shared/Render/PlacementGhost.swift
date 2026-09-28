@@ -93,6 +93,14 @@ final class PlacementGhost {
             sprite.position = CGPoint(x: width / 2 - fit.content.midX,
                                       y: -fit.size.height / 2 - fit.content.minY)
 
+        case .turret:
+            // The icon IS the turret, composed on the same two by two it will
+            // stand on, so the ghost fills its footprint exactly.
+            sprite.texture = TurretArt.icon(for: ItemArt.viewer)
+            sprite.size = CGSize(width: width, height: height)
+            sprite.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            sprite.position = CGPoint(x: width / 2, y: height / 2)
+
         default:
             let texture = ItemArt.texture(for: type)
             sprite.texture = texture

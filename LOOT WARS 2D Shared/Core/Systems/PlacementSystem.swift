@@ -29,6 +29,8 @@ enum PlacementSystem {
         switch type {
         case .arcade(let kind):
             return Footprint(width: kind.width, height: kind.height)
+        case .turret:
+            return Footprint(width: Turret.width, height: Turret.height)
         case .chest:
             return Footprint(width: 1, height: 1)
         default:
@@ -64,6 +66,7 @@ enum PlacementSystem {
         switch type {
         case .arcade(let kind):
             return ArcadeSystem.canPlace(at: origin, kind: kind, by: actor, in: world)
+        case .turret: return TurretSystem.canPlace(at: origin, by: actor, in: world)
         case .chest:  return ChestSystem.canPlace(at: origin, by: actor, in: world)
         default:      return false
         }
@@ -73,6 +76,7 @@ enum PlacementSystem {
     static func command(for type: ItemType, at origin: GridPoint) -> Command? {
         switch type {
         case .arcade(let kind): return .placeArcade(origin, kind)
+        case .turret: return .placeTurret(origin)
         case .chest:  return .placeChest(origin)
         default:      return nil
         }
@@ -95,6 +99,8 @@ enum PlacementSystem {
         switch type {
         case .arcade(let kind):
             start = world.nextArcadeOrigin(for: actor.team, kind: kind, near: actor.position)
+        case .turret:
+            start = world.nextTurretOrigin(for: actor.team, near: actor.position)
         case .chest:  start = world.nextChestTile(for: actor.team, near: actor.position)
         default:      return nil
         }

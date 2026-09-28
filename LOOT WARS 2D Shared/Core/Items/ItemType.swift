@@ -47,6 +47,16 @@ enum ItemType: Hashable {
     /// somebody could forget the mini.
     case arcade(ArcadeKind)
 
+    /// A gun you carry home and stand up in your own base - see Turret.
+    ///
+    /// Its own case rather than a third ArcadeKind, and it is worth saying why when
+    /// the mini machine went the other way. The mini is the same THING as the
+    /// cabinet at a different size - same job, same payout, different numbers - so
+    /// it is a kind. A turret shares the carrying and the placing and nothing else:
+    /// it does not pay out, it shoots. Folding it into ArcadeKind would have put a
+    /// "does this one shoot" question into every switch that asks about machines.
+    case turret
+
     /// Something you switch on for a while - see Perk.
     case perk(Perk)
 
@@ -72,6 +82,7 @@ enum ItemType: Hashable {
         // so a stack of them could never have meant anything.
         case .helmet, .blaster: return 1
         case .arcade: return 1
+        case .turret: return 1
         }
     }
 
@@ -135,7 +146,7 @@ enum ItemType: Hashable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .stink, .chest, .helmet, .blaster, .arcade, .perk: return 0
+        case .bomb, .stink, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
         }
     }
 
@@ -147,18 +158,30 @@ enum ItemType: Hashable {
     ///
     /// This replaced a boolean for "used the moment you tap it", which stopped
     /// being true of anything once the bomb moved to the button.
+    /// What the player has to DO to spend this.
+    ///
+    /// Named after the item's own requirement rather than after a control, which is
+    /// the correction. The cases used to be `actionButton` and `mapTap` - one of
+    /// them named a button that no longer exists, and when it went every item on it
+    /// became instant whether or not that suited it. A bomb is not instant; it is
+    /// aimed. The enum could not say so because it was describing the interface
+    /// instead of the item.
     enum Use {
-        /// The small button above the corner.
-        case actionButton
-        /// Tap the map to say where.
+        /// Nothing to decide. The tap on the hotbar spends it.
+        case instant
+        /// Needs a DIRECTION, so it is picked out and thrown along your aim with a
+        /// button of its own - see GameScene.throwButton.
+        case thrown
+        /// Needs a TILE. Tap the map to say where.
         case mapTap
     }
 
     var use: Use {
         switch self {
-        case .bandage, .medkit, .bomb, .stink, .helmet, .blaster, .perk: return .actionButton
+        case .bandage, .medkit, .helmet, .blaster, .perk: return .instant
+        case .bomb, .stink: return .thrown
         // Both want you to say WHERE.
-        case .chest, .arcade: return .mapTap
+        case .chest, .arcade, .turret: return .mapTap
         }
     }
 
@@ -166,7 +189,7 @@ enum ItemType: Hashable {
     var isGear: Bool {
         switch self {
         case .helmet, .blaster: return true
-        case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .perk: return false
+        case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .turret, .perk: return false
         }
     }
 

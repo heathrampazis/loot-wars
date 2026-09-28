@@ -21,7 +21,7 @@ enum BuildSystem {
                 // compile here until somebody has decided whether building cares
                 // about it.
                 case .move, .shoot, .openLootbox, .useItem,
-                     .placeChest, .placeArcade, .storeItem, .takeItem,
+                     .placeChest, .placeArcade, .placeTurret, .storeItem, .takeItem,
                      .dropItem, .buyItem, .sellItem:
                     break
                 }
