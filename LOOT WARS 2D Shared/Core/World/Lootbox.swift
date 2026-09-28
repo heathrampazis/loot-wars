@@ -24,6 +24,16 @@ struct Lootbox {
     /// from a distance, which is what the separate artwork is for.
     var rare = false
 
+    /// Whether this is a SUPPLY DROP: the golden crate that lands late in a
+    /// match, holds one piece of top-tier gear, and cannot be opened until its
+    /// countdown runs out - see SupplyDropSystem. It never comes back once opened.
+    var supply = false
+
+    /// Seconds until a supply drop can be opened. Zero for every ordinary crate.
+    var lockTimer: Double = 0
+
+    var isLocked: Bool { lockTimer > 0 }
+
     var position: Vec2 { tile.center }
 
     /// Lootboxes are solid. The size comes from GameConfig, and the renderer draws

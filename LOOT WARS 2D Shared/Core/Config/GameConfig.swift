@@ -2113,6 +2113,54 @@ enum GameConfig {
         static let damageTaken: Double = 0.72
     }
 
+    enum SupplyDrop {
+        /// When the first one lands, as a share of the match. Past half way, so
+        /// it lands on a map where everybody has gear worth fighting with and a
+        /// base worth leaving for a minute.
+        static let firstAt: Double = 0.55
+
+        /// Seconds between drops after the first, and how many a match gets.
+        /// Three over the back 45%: one every forty-five seconds or so, so there
+        /// is nearly always one to go and fight over in the closing minutes.
+        static let interval: Double = 45
+        static let maxDrops = 3
+
+        /// Seconds a drop is locked after it lands. Long enough for everybody who
+        /// saw it come down to get there - which is the point: the countdown is
+        /// what turns a crate into a fight.
+        static let unlockTime: Double = 20
+
+        /// Where they may land: within this share of the map's half-width of the
+        /// middle, which is the contested ground, and at least this many tiles
+        /// clear of every base, so nobody gets one delivered to their doorstep.
+        static let spread: Double = 0.62
+        static let baseClearance: Double = 5
+        /// And not on top of an earlier drop still waiting to be opened.
+        static let dropSpacing: Double = 12
+
+        /// What opening one pays, on top of the gear. More than a rare crate by a
+        /// distance - you usually have to win a fight to get your hands on it.
+        static let score = 50
+        static let tokens = 8
+
+        /// What is inside: ONE item, always a Mythical or Cosmic helmet or
+        /// blaster. Cosmic is the rarer half.
+        static let loot: [(pickup: Pickup, weight: Int)] = [
+            (.item(.helmet(.mythical)), 35),
+            (.item(.helmet(.cosmic)),   15),
+            (.item(.blaster(.five)),    35),
+            (.item(.blaster(.six)),     15)
+        ]
+
+        /// How far a bot will go to contest a LOCKED drop, in tiles. An open one
+        /// pulls bots from anywhere - see AIBrain.supplyWorthContesting.
+        static let botInterest: Double = 40
+
+        /// Inside this, a bot simply runs in and takes an open drop - it will not
+        /// stop to fight, even under fire. The hot-commodity rule.
+        static let botGrabRange: Double = 12
+    }
+
     enum Loot {
         /// Lootboxes scattered across the map.
         /// How much likelier a bomb is inside a rare crate, on top of the bandage

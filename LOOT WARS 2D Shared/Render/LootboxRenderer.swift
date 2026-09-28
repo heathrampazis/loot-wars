@@ -49,7 +49,8 @@ final class LootboxRenderer {
     }
 
     func sync(with world: World) {
-        for (id, box) in world.lootboxes where nodesByBox[id] == nil {
+        // Supply drops are drawn by SupplyDropRenderer.
+        for (id, box) in world.lootboxes where nodesByBox[id] == nil && !box.supply {
             makeNode(for: box)
         }
 

@@ -46,6 +46,9 @@ enum WorldEvent {
     /// between "this began a moment ago" and "this has six seconds left" is gone,
     /// and only one of those is worth interrupting somebody for.
     case jackpot(at: Vec2)
+    /// A supply drop has just been opened. Whoever opened it is already paid;
+    /// this is for the fanfare, which the crate simply vanishing cannot give.
+    case supplyDropOpened(at: Vec2)
 
     /// Somebody switched a power-up on.
     ///

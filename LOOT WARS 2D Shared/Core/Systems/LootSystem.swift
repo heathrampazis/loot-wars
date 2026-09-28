@@ -38,6 +38,17 @@ enum LootSystem {
 
                 world.removeLootbox(box.id)
 
+                // A supply drop pays its own way: one piece of the best gear in
+                // the game, and a fanfare - see SupplyDropSystem.
+                if box.supply {
+                    world.award(GameConfig.SupplyDrop.score, to: actor.team)
+                    world.awardTokens(GameConfig.SupplyDrop.tokens, to: id)
+                    world.spawnGroundItem(SupplyDropSystem.roll(using: &world.rng),
+                                          at: box.position)
+                    world.record(.supplyDropOpened(at: box.position))
+                    break
+                }
+
                 let rare = box.rare
                 world.award(rare ? GameConfig.Score.rareLootboxOpened
                                  : GameConfig.Score.lootboxOpened, to: actor.team)

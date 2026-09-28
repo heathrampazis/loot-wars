@@ -242,6 +242,11 @@ enum AIBrain {
         // Been walking at the same crate for a while and still not there? Something
         // is in the way that steering cannot solve. Give up and look elsewhere.
         switch state.goal {
+        case .loot(let id) where world.lootboxes[id]?.supply == true:
+            // No patience at a supply drop. Standing at a locked crate for twenty
+            // seconds is not a bot that is stuck, it is a bot that is waiting -
+            // which is the whole idea of one.
+            break
         case .loot, .collect:
             if state.goalAge > GameConfig.AI.lootPatience {
                 state.lootCooldown = GameConfig.AI.lootCooldown
@@ -448,9 +453,23 @@ enum AIBrain {
 
         guard state.fightCooldown <= 0 else { return }
 
+        // An open supply drop within reach is grabbed, not fought over: nothing
+        // seen - not even being shot - turns a bot away from the best item in the
+        // game when it is a few steps from it. See grabbableSupply.
+        if case .loot(let id) = state.goal,
+           let drop = world.lootboxes[id], drop.supply, !drop.isLocked,
+           (drop.position - actor.position).length <= GameConfig.SupplyDrop.botGrabRange {
+            return
+        }
+
         switch state.goal {
         case .fight, .retreat:
             return
+
+        case .loot(let id) where world.lootboxes[id]?.supply == true:
+            // On the way to a drop, the same rule as a raid: seeing somebody is
+            // not a reason to stop, being hit is.
+            guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
 
         case .raid, .robChest, .wreck, .silence:
             // Mid-raid, and this is the one thing worth NOT reacting to.
@@ -497,6 +516,13 @@ enum AIBrain {
 
     /// Priority order: staying alive, then fighting, then loot, then roaming.
     private static func chooseGoal(for actor: Actor, state: AIState, in world: World) -> AIGoal {
+        // An OPEN supply drop close by beats everything, fighting included. It is
+        // the hottest thing on the map, it goes to whoever touches it first, and a
+        // bot trading shots beside an open one is handing it to the player.
+        if let drop = grabbableSupply(for: actor, in: world) {
+            return .loot(drop.id)
+        }
+
         if state.fightCooldown <= 0, let enemy = nearestVisibleEnemy(to: actor, in: world) {
             let healthLeft = Double(actor.health) / Double(actor.maxHealth)
 
@@ -518,7 +544,9 @@ enum AIBrain {
             // is actually hitting it - the same rule reactToThreats applies, applied
             // here too, or the decision timer would undo on its own clock what the
             // threat scan had just declined to do.
-            let raiding = state.goal.isRaiding
+            // A supply run counts as a raid here: it is an errand worth not being
+            // distracted from.
+            let raiding = state.goal.isRaiding || isSupplyRun(state.goal, in: world)
             let underFire = actor.secondsSinceHit < GameConfig.AI.combatRecency
 
             if !(raiding && !underFire), shouldEngage(enemy, actor: actor, in: world) {
@@ -543,6 +571,14 @@ enum AIBrain {
         // defender who needed line of sight would be told about it after the raid.
         if let intruder = world.intruder(in: actor.team) {
             return .defend(intruder)
+        }
+
+        // A supply drop within reach. This high on purpose: it is the one thing
+        // on the map built to start a fight, and bots that let it go would simply
+        // hand the best gear in the game to whoever turned up - see
+        // SupplyDropSystem. Below defending, because your own base comes first.
+        if let drop = supplyWorthContesting(for: actor, in: world) {
+            return .loot(drop.id)
         }
 
         // Somebody has put a hole in a finished base. Everything else waits.
@@ -1466,11 +1502,53 @@ enum AIBrain {
         return type.isHealing
     }
 
+    /// The supply drop worth going for, or nil.
+    ///
+    /// A hot commodity: an OPEN one pulls every bot on the map whatever it is
+    /// carrying, because it will not be there for long. A locked one pulls any bot
+    /// within GameConfig.SupplyDrop.botInterest, and those need something to heal
+    /// with - they are walking into the fight the countdown was built to start.
+    private static func supplyWorthContesting(for actor: Actor, in world: World) -> Lootbox? {
+        let supplied = actor.inventory.totalHealing(of: actor.maxHealth)
+            >= GameConfig.AI.emergencyHealingStock
+
+        var best: Lootbox?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for drop in world.supplyDrops {
+            let distance = (drop.position - actor.position).length
+            if drop.isLocked {
+                guard supplied, distance < GameConfig.SupplyDrop.botInterest else { continue }
+            }
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = drop
+        }
+
+        return best
+    }
+
+    /// An open supply drop close enough to simply run in and take.
+    private static func grabbableSupply(for actor: Actor, in world: World) -> Lootbox? {
+        world.supplyDrops.first {
+            !$0.isLocked
+                && ($0.position - actor.position).length <= GameConfig.SupplyDrop.botGrabRange
+        }
+    }
+
+    private static func isSupplyRun(_ goal: AIGoal, in world: World) -> Bool {
+        guard case .loot(let id) = goal else { return false }
+        return world.lootboxes[id]?.supply == true
+    }
+
     private static func nearestCrate(to actor: Actor, in world: World) -> Lootbox? {
         var closest: Lootbox?
         var shortest = GameConfig.AI.lootSearchRange
 
-        for crate in world.lootboxes.values {
+        // Ordinary crates only. A supply drop is chosen on purpose, above, and a
+        // locked one found by accident would be walked at and waited on by a bot
+        // that only wanted a bandage.
+        for crate in world.lootboxes.values where !crate.supply {
             let distance = (crate.position - actor.position).length
             guard distance < shortest else { continue }
             shortest = distance

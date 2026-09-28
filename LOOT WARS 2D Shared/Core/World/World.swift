@@ -397,6 +397,9 @@ final class World {
         var shortest = Double.greatestFiniteMagnitude
 
         for box in lootboxes.values {
+            // A supply drop still counting down cannot be reached for, so the
+            // Open button, the rim and the bots all agree it is not open yet.
+            guard !box.isLocked else { continue }
             guard reach.intersects(box.hitbox) else { continue }
 
             let distance = (box.position - actor.position).length
@@ -413,11 +416,50 @@ final class World {
         lootboxes[id] = nil
         structuresChanged()
 
+        // A supply drop is a one-off. It lands, somebody takes it, it is gone.
+        guard !crate.supply else { return }
+
         // Crates come back. Without that, seven bots strip the map bare within a
         // minute and there is nothing left to play around.
         pendingLootboxes.append(PendingLootbox(tile: crate.tile,
                                                rare: crate.rare,
                                                timer: GameConfig.Loot.respawnDelay))
+    }
+
+    // MARK: - Supply drops
+
+    /// How many supply drops have landed this match - see SupplyDropSystem.
+    var supplyDropsSent = 0
+
+    /// Every supply drop on the map, oldest first.
+    var supplyDrops: [Lootbox] {
+        lootboxes.values.filter { $0.supply }.sorted { $0.id.raw < $1.id.raw }
+    }
+
+    @discardableResult
+    func spawnSupplyDrop(at tile: GridPoint) -> LootboxID {
+        let crate = Lootbox(id: LootboxID(nextLootboxID), tile: tile, rare: false,
+                            supply: true, lockTimer: GameConfig.SupplyDrop.unlockTime)
+        nextLootboxID += 1
+        lootboxes[crate.id] = crate
+        supplyDropsSent += 1
+        structuresChanged()
+        return crate.id
+    }
+
+    /// Whether an opened crate is waiting to come back on or right beside this
+    /// tile - so a supply drop never lands where a crate is about to reappear.
+    func awaitsCrate(near tile: GridPoint) -> Bool {
+        pendingLootboxes.contains { abs($0.tile.col - tile.col) <= 1 && abs($0.tile.row - tile.row) <= 1 }
+    }
+
+    /// Counts every supply drop's lock down.
+    func tickSupplyLocks(dt: Double) {
+        for id in lootboxes.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var crate = lootboxes[id], crate.supply, crate.isLocked else { continue }
+            crate.lockTimer = max(0, crate.lockTimer - dt)
+            lootboxes[id] = crate
+        }
     }
 
     func tickLootboxRespawns(dt: Double) {
@@ -1581,6 +1623,7 @@ final class World {
         ProjectileSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
         LootSystem.update(self, commands: everyone, dt: dt)
+        SupplyDropSystem.update(self, dt: dt)
         // After the sweep: a token paid out this tick should be lying there to be
         // seen, not swallowed instantly by whoever happens to be standing on it.
         ArcadeSystem.update(self, commands: everyone, dt: dt)
