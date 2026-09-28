@@ -68,22 +68,34 @@ enum TurretArt {
     /// The picture for the hotbar, the shop and the ground: all three pieces, with
     /// the barrel cocked up and to the right so it reads as a gun at thumb size.
     ///
-    /// Blue, because an item in your pocket belongs to nobody yet - and blue is one
-    /// of the three colours the rest of the interface is built from.
-    static let icon: SKTexture = {
+    /// In the colour of whoever is LOOKING - see ItemArt.viewer. A turret lying on
+    /// the floor belongs to nobody yet, and the question it has to answer is what
+    /// it will look like in your base, so it wears your colour from the moment you
+    /// see it. Nil (nobody in particular) falls back to blue.
+    static func icon(for team: TeamID?) -> SKTexture {
+        let key = team?.raw ?? -1
+        if let cached = icons[key] { return cached }
+
+        let made = makeIcon(colour: team.map { RenderPalette.colour(for: $0) } ?? iconColour)
+        icons[key] = made
+        return made
+    }
+
+    private static var icons: [Int: SKTexture] = [:]
+
+    private static func makeIcon(colour: SKColor) -> SKTexture {
         if UIImage(named: "Turret") != nil {
             let texture = SKTexture(imageNamed: "Turret")
             texture.usesMipmaps = true
             return texture
         }
 
-        let colour = TurretArt.iconColour
-        let u = TurretArt.unit
+        let u = unit
         let side = u * 2
-        let base = UIImage(named: "TurretBase") ?? TurretArt.bodyImage(colour: colour)
-        let gun = UIImage(named: "TurretBarrel") ?? TurretArt.barrelImage(colour: colour)
+        let base = UIImage(named: "TurretBase") ?? bodyImage(colour: colour)
+        let gun = UIImage(named: "TurretBarrel") ?? barrelImage(colour: colour)
         let top: UIImage? = UIImage(named: "TurretBarrel") == nil
-            ? TurretArt.capImage(colour: colour)
+            ? capImage(colour: colour)
             : nil
 
         // The barrel a little short, so cocked at forty-five degrees it stays
@@ -91,7 +103,7 @@ enum TurretArt {
         let reach = min(gun.size.width, 1.14 * u)
         let thickness = gun.size.height * reach / max(1, gun.size.width)
 
-        let image = TurretArt.render(CGSize(width: side, height: side)) { context in
+        let image = render(CGSize(width: side, height: side)) { context in
             base.draw(in: CGRect(x: 0, y: 0, width: side, height: side))
 
             // Image space runs top-down, so the pivot is measured from the top.
@@ -112,8 +124,8 @@ enum TurretArt {
             }
         }
 
-        return TurretArt.make(image)
-    }()
+        return make(image)
+    }
 
     // MARK: - Colour
 

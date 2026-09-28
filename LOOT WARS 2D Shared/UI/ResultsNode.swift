@@ -230,7 +230,7 @@ final class ResultsNode: SKNode {
         for (index, standing) in standings.enumerated() {
             let row = rows[index]
             row.score.text = "\(standing.score)"
-            row.swatch.fillColor = RenderPalette.colour(for: standing.team)
+            row.swatch.fillColor = RenderPalette.vibrantColour(for: standing.team)
             row.highlight.isHidden = standing.team != you
         }
     }
