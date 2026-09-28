@@ -57,18 +57,39 @@ enum WeaponSystem {
         }
     }
 
-    private static func aimAndFire(_ id: ActorID, towards direction: Vec2, in world: World) {
-        guard var actor = world.actors[id], actor.isAlive else { return }
+    /// Points the weapon, and nothing else.
+    ///
+    /// Split out of aimAndFire for a Command that aimed without firing - the aim
+    /// stick was going to throw bombs, and it had to steer without the blaster
+    /// going off. That did not survive contact (see GameScene.throwButton), and
+    /// the Command went with it.
+    ///
+    /// This stayed, because the split is worth having on its own: aimAndFire now
+    /// reads as the two things it does rather than as one block that happens to set
+    /// facing halfway down, and the next caller that wants to point somebody
+    /// without shooting has somewhere to go.
+    private static func point(_ id: ActorID, towards direction: Vec2,
+                              in world: World) -> Vec2? {
+        guard var actor = world.actors[id], actor.isAlive else { return nil }
 
         let aim = direction.normalized()
-        guard aim.length > 0 else { return }
+        guard aim.length > 0 else { return nil }
 
-        // Aiming happens whether or not the shot goes off. An actor waiting on its
-        // cooldown still has the blaster pointed at what it means to hit.
+        // Aiming happens whether or not a shot goes off. An actor waiting on its
+        // cooldown still has the blaster pointed at what it means to hit, and an
+        // actor lining up a bomb is doing the same thing with no trigger at all.
         actor.aim = aim
         if abs(aim.x) > 0.01 {
             actor.facesLeft = aim.x < 0
         }
+
+        world.actors[id] = actor
+        return aim
+    }
+
+    private static func aimAndFire(_ id: ActorID, towards direction: Vec2, in world: World) {
+        guard let aim = point(id, towards: direction, in: world),
+              var actor = world.actors[id] else { return }
 
         // The rate limit always applies - it is what makes a Blaster 6 different
         // from a Blaster 1. Running dry does not, unless GameConfig turns it back

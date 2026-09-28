@@ -272,12 +272,16 @@ final class ItemSlotNode: SKNode {
         ])), withKey: "rare")
     }
 
-    /// Rings the slot green while a tap on it would spend it.
+    /// Rings the slot green while what is in it is worth tapping.
     ///
     /// It breathes, which is the same signal the menu's button and the build ghost
     /// use: on a screen where everything else is still, the thing that moves is the
-    /// thing to press. It is also the only warning the player gets that a tap here
-    /// is no longer free, which matters more than the invitation.
+    /// thing to press.
+    ///
+    /// An INVITATION now rather than a warning. It used to say "a tap here is no
+    /// longer free", which was the important half while most taps merely selected;
+    /// every tap spends something now, so what is worth saying is which one is
+    /// worth spending - see HotbarNode.update.
     func setUrgent(_ urgent: Bool) {
         guard urgent != !urgentRing.isHidden else { return }
 
@@ -400,7 +404,8 @@ final class ItemSlotNode: SKNode {
     ///
     /// No dimming, here or anywhere else. A slot you cannot use right now looks
     /// exactly like one you can, and says so when it is tapped - see
-    /// Actor.refusesTap for why, and refuse() above for what the tap gets.
+    /// Actor.canUse for what a tap is allowed to do, and refuse() above for what a
+    /// tap it will not allow gets.
     func show(_ stack: ItemStack?) {
         guard let stack else {
             icon.isHidden = true
