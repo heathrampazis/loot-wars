@@ -480,6 +480,15 @@ enum GameConfig {
     /// a base a thing you do rather than a thing you give up on - and it is capped
     /// by the fact that somebody has to breach you first for it to be available.
     enum Base {
+        /// How many berths - spots an actor could stand, see World+Footing - a
+        /// respawn needs to be able to reach before it counts as somewhere you can
+        /// move from. Six is a little room, not a corridor.
+        static let spawnRoom = 6
+
+        /// How far past the claim's edge a respawn will look for room when the
+        /// base itself has none, in tiles.
+        static let spawnSearchMargin = 4
+
         static let sealed = 60
         static let sealedTokens = 8
         static let resealed = 20

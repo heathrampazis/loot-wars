@@ -67,6 +67,10 @@ enum ChestSystem {
             return false
         }
 
+        // Never where it would box anybody in, or cover the spot people respawn
+        // on - see World.keepsBaseOpen.
+        guard world.keepsBaseOpen(placing: [point], for: actor.team) else { return false }
+
         // A chest is solid, so one appearing under somebody would shove them out of
         // the way - yourself included.
         let box = Box(tile: point)

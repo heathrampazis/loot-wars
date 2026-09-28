@@ -609,8 +609,7 @@ final class World {
                           avoidingActors: Bool = true) -> GridPoint? {
         let ground = baseGround(of: team)
 
-        var best: GridPoint?
-        var shortest = Double.greatestFiniteMagnitude
+        var candidates: [(spot: GridPoint, distance: Double)] = []
 
         for origin in ground.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
             let turret = Turret(id: TurretID(-1), origin: origin, owner: team)
@@ -629,13 +628,12 @@ final class World {
             }
             guard fits else { continue }
 
-            let distance = (turret.centre - position).length
-            guard distance < shortest else { continue }
-            shortest = distance
-            best = origin
+            candidates.append((origin, (turret.centre - position).length))
         }
 
-        return best
+        return nearestOpen(candidates, for: team) {
+            Turret(id: TurretID(-1), origin: $0, owner: team).tiles
+        }
     }
 
     /// What there is worth taking in this team's base.
@@ -806,8 +804,7 @@ final class World {
                           avoidingActors: Bool = true) -> GridPoint? {
         let ground = baseGround(of: team)
 
-        var best: GridPoint?
-        var shortest = Double.greatestFiniteMagnitude
+        var candidates: [(spot: GridPoint, distance: Double)] = []
 
         for origin in ground.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
             let machine = Arcade(id: ArcadeID(-1), kind: kind, origin: origin,
@@ -829,13 +826,12 @@ final class World {
             }
             guard fits else { continue }
 
-            let distance = (machine.centre - position).length
-            guard distance < shortest else { continue }
-            shortest = distance
-            best = origin
+            candidates.append((origin, (machine.centre - position).length))
         }
 
-        return best
+        return nearestOpen(candidates, for: team) {
+            Arcade(id: ArcadeID(-1), kind: kind, origin: $0, owner: team, emitTimer: 0).tiles
+        }
     }
 
     /// The nearest chest you are standing close enough to open - anyone's.
@@ -899,8 +895,7 @@ final class World {
         let room = enclosure(of: team).room
         let ground = room.isEmpty ? claimTiles(of: team) : room
 
-        var best: GridPoint?
-        var shortest = Double.greatestFiniteMagnitude
+        var candidates: [(spot: GridPoint, distance: Double)] = []
 
         // Sorted, because Set iteration order is not stable and two runs of the
         // same seed have to put the chest in the same place.
@@ -927,13 +922,28 @@ final class World {
                 $0.isAlive && $0.hitbox.intersects(Box(tile: tile))
             }) else { continue }
 
-            let distance = (tile.center - position).length
-            guard distance < shortest else { continue }
-            shortest = distance
-            best = tile
+            candidates.append((tile, (tile.center - position).length))
         }
 
-        return best
+        return nearestOpen(candidates, for: team) { [$0] }
+    }
+
+    /// The nearest of these spots that would not box anybody in - see
+    /// keepsBaseOpen.
+    ///
+    /// Sorted by distance and then row and column, which is the same spot the old
+    /// strict-less-than scan in row order would have picked, so bases furnish
+    /// exactly as they did wherever that spot was fine. The flood fill behind
+    /// keepsBaseOpen is only paid for until one passes, which is nearly always the
+    /// first.
+    private func nearestOpen(_ candidates: [(spot: GridPoint, distance: Double)],
+                             for team: TeamID,
+                             covering tiles: (GridPoint) -> [GridPoint]) -> GridPoint? {
+        let ordered = candidates.sorted {
+            if $0.distance != $1.distance { return $0.distance < $1.distance }
+            return ($0.spot.row, $0.spot.col) < ($1.spot.row, $1.spot.col)
+        }
+        return ordered.first { keepsBaseOpen(placing: tiles($0.spot), for: team) }?.spot
     }
 
     /// How much of this team's wall is standing, 0 to 1.
