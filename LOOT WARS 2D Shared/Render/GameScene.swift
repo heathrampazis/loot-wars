@@ -36,6 +36,15 @@ final class GameScene: SKScene {
     private let arcadeRenderer = ArcadeRenderer()
     private let turretRenderer = TurretRenderer()
     private let lootboxRenderer = LootboxRenderer()
+    private let supplyRenderer = SupplyDropRenderer()
+    private let supplyCompass = SupplyCompassNode()
+
+    /// How many supply drops this screen has already called out, so each one is
+    /// announced once, on the frame it lands.
+    private var supplyDropsAnnounced = 0
+
+    /// Drops already called out as open, so each one is only shouted about once.
+    private var supplyDropsCalledOpen: Set<LootboxID> = []
     private let chestRenderer = ChestRenderer()
     private let groundItemRenderer = GroundItemRenderer()
     private let bombRenderer = BombRenderer()
@@ -420,6 +429,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(arcadeRenderer.node)
         worldLayer.addChild(turretRenderer.node)
         worldLayer.addChild(lootboxRenderer.node)
+        worldLayer.addChild(supplyRenderer.node)
         worldLayer.addChild(chestRenderer.node)
         worldLayer.addChild(groundItemRenderer.node)
         worldLayer.addChild(bombRenderer.node)
@@ -446,6 +456,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(shopPanel)
         cameraController.node.addChild(quickBuy)
         cameraController.node.addChild(hint)
+        cameraController.node.addChild(supplyCompass)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -482,6 +493,53 @@ final class GameScene: SKScene {
     /// Nothing here decides which way up the phone is. It reads both numbers and
     /// applies each to its own side, so whichever edge is eaten is the edge that
     /// moves and the other one stays where it was.
+    /// Supply drops: called out when one lands, and pointed at from the edge of
+    /// the screen while it is out of sight - see SupplyCompassNode.
+    private func updateSupplyDrops() {
+        // A fresh match starts the count again.
+        if world.supplyDropsSent < supplyDropsAnnounced {
+            supplyDropsAnnounced = 0
+            supplyDropsCalledOpen = []
+        }
+
+        // And again the moment one opens, which is when it matters: whoever gets
+        // there first takes it.
+        for drop in world.supplyDrops where !drop.isLocked && !supplyDropsCalledOpen.contains(drop.id) {
+            supplyDropsCalledOpen.insert(drop.id)
+            SoundPlayer.shared.play(.notification)
+            hint.show("SUPPLY DROP IS OPEN", seconds: 2.2)
+        }
+
+        if world.supplyDropsSent > supplyDropsAnnounced {
+            supplyDropsAnnounced = world.supplyDropsSent
+            SoundPlayer.shared.play(.notification)
+            hint.show("SUPPLY DROP INCOMING", seconds: 2.4)
+        }
+
+        // Where each drop is relative to the middle of the screen, in the screen
+        // points the interface is laid out in: the camera's scale undone, since
+        // the interface hangs off the camera and is not zoomed with the map.
+        let zoom = max(GridGeometry.zoom(for: size), 0.0001)
+        let eye = cameraController.node.position
+
+        let targets = world.supplyDrops.map { drop -> SupplyCompassNode.Target in
+            let spot = GridGeometry.point(for: drop.position)
+            return SupplyCompassNode.Target(
+                id: drop.id,
+                offset: CGPoint(x: (spot.x - eye.x) / zoom, y: (spot.y - eye.y) / zoom),
+                secondsLeft: drop.isLocked ? Int(drop.lockTimer.rounded(.up)) : nil)
+        }
+
+        // Kept in from the edges, the notch and the home bar, so a marker is
+        // never half off the glass.
+        let edge: CGFloat = 38
+        let bounds = CGRect(x: -size.width / 2 + safeLeft + edge,
+                            y: -size.height / 2 + edge,
+                            width: size.width - safeLeft - safeRight - edge * 2,
+                            height: size.height - edge * 2)
+        supplyCompass.update(targets: targets, bounds: bounds)
+    }
+
     private var safeLeft: CGFloat {
         #if os(iOS) || os(tvOS)
         return view?.safeAreaInsets.left ?? 0
@@ -737,6 +795,8 @@ final class GameScene: SKScene {
         blockRenderer.sync(with: world)
         blueprint.sync(with: world, dt: frameDelta)
         lootboxRenderer.sync(with: world)
+        supplyRenderer.sync(with: world)
+        updateSupplyDrops()
         chestRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
         turretRenderer.sync(with: world)
@@ -993,6 +1053,13 @@ final class GameScene: SKScene {
 
             case .jackpot(let position):
                 effectsRenderer.jackpot(at: position)
+
+            case .supplyDropOpened(let position):
+                // The biggest crate in the game going off, heard from wherever it
+                // happened - somebody across the map just got a Cosmic.
+                effectsRenderer.jackpot(at: position)
+                bombRenderer.flash(at: position)
+                SoundPlayer.shared.play(.complete, at: position, heardFrom: ears)
 
             case .perkStarted(let perk, let user):
                 // The steady trail comes off the world state a frame later; this is
