@@ -15,13 +15,20 @@ enum ItemArt {
 
     private static var cache: [Pickup: SKTexture] = [:]
 
+    /// The team whose eyes the items are being drawn for - the local player's.
+    ///
+    /// Only matters for the one item drawn in a team colour, the turret, which
+    /// shows up in YOUR colour on the floor, in the hotbar and in the shop, so it
+    /// already looks like part of your base. Set by GameScene when a match starts.
+    static var viewer: TeamID?
+
     static func texture(for pickup: Pickup) -> SKTexture {
         if let cached = cache[pickup] { return cached }
 
-        // Drawn in code until the catalogue has a picture for it - see TurretArt.
+        // Drawn in code, in the viewer's colour - see TurretArt.icon. Not kept in
+        // this cache, because it is one picture per team and TurretArt keeps those.
         if pickup == .item(.turret) {
-            cache[pickup] = TurretArt.icon
-            return TurretArt.icon
+            return TurretArt.icon(for: viewer)
         }
 
         let texture = SKTexture(imageNamed: assetName(for: pickup))

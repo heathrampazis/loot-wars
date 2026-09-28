@@ -396,6 +396,10 @@ final class GameScene: SKScene {
         let generated = MapFactory.generate(seed: seed)
         world = World(generated: generated)
 
+        // Before anything draws an item, so a turret on the floor is in your
+        // colour from the first frame - see ItemArt.viewer.
+        ItemArt.viewer = world.localPlayer?.team
+
         // Before the first frame rather than on whichever frame first needs it -
         // see ArtFit.warm.
         ArtFit.warm(["Chest", "Arcade", "Mini Arcade"])
