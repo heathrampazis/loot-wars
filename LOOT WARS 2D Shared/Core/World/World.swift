@@ -107,6 +107,13 @@ final class World {
 
     private var nextArcadeID = 0
 
+    /// Guns standing in bases. Keyed for the reason machines are: they come and go
+    /// mid-match, and an array indexed while something is being destroyed is a bug
+    /// waiting for the second one.
+    var turrets: [TurretID: Turret] = [:]
+
+    private var nextTurretID = 0
+
     private(set) var lootboxes: [LootboxID: Lootbox] = [:]
     var chests: [ChestID: Chest] = [:]
     private(set) var groundItems: [GroundItemID: GroundItem] = [:]
@@ -441,6 +448,7 @@ final class World {
         if lootboxes.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         if arcades.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         if chests.values.contains(where: { $0.hitbox.contains(point) }) { return true }
+        if turrets.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         return false
     }
 
@@ -485,6 +493,7 @@ final class World {
         for crate in lootboxes.values { cover(crate.hitbox) }
         for machine in arcades.values { cover(machine.hitbox) }
         for chest in chests.values { cover(chest.hitbox) }
+        for turret in turrets.values { cover(turret.hitbox) }
 
         structureTileCache = (structureRevision, tiles)
         return tiles
@@ -496,6 +505,7 @@ final class World {
         if lootboxes.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
         if arcades.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
         if chests.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
+        if turrets.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
         return false
     }
 
@@ -536,6 +546,79 @@ final class World {
     func removeArcade(_ id: ArcadeID) {
         arcades[id] = nil
         structuresChanged()
+    }
+
+    // MARK: - Turrets
+
+    @discardableResult
+    func spawnTurret(at origin: GridPoint, owner: TeamID) -> TurretID {
+        let turret = Turret(id: TurretID(nextTurretID), origin: origin, owner: owner)
+        nextTurretID += 1
+        turrets[turret.id] = turret
+        structuresChanged()
+        return turret.id
+    }
+
+    func removeTurret(_ id: TurretID) {
+        turrets[id] = nil
+        structuresChanged()
+    }
+
+    func hasTurret(_ team: TeamID) -> Bool {
+        turrets.values.contains { $0.owner == team }
+    }
+
+    /// The one person on a team, for a turret's shots to be credited to.
+    ///
+    /// A turret is not an actor, and a projectile has to say who fired it - that
+    /// is what pays a kill and what stops a bullet hitting its own side. Teams are
+    /// one person each, so a turret's shots are that person's: they bought it,
+    /// carried it home and stood it up, and a kill it makes while they are across
+    /// the map is theirs in every way that matters to a scoreboard.
+    ///
+    /// Sorted, because a dictionary's order must never decide who gets paid.
+    func actorID(of team: TeamID) -> ActorID? {
+        actors.keys.sorted { $0.raw < $1.raw }.first { actors[$0]?.team == team }
+    }
+
+    /// Where a turret would go in this team's base, nearest to a point - the
+    /// machine's search for a two-by-two, asked of a turret's own footprint.
+    ///
+    /// Written out rather than borrowed from nextArcadeOrigin with a mini's size,
+    /// which would work today and is exactly the coupling that stops working the
+    /// day somebody resizes the mini.
+    func nextTurretOrigin(for team: TeamID,
+                          near position: Vec2,
+                          avoidingActors: Bool = true) -> GridPoint? {
+        let ground = baseGround(of: team)
+
+        var best: GridPoint?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for origin in ground.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
+            let turret = Turret(id: TurretID(-1), origin: origin, owner: team)
+
+            if avoidingActors, actors.values.contains(where: {
+                $0.isAlive && $0.hitbox.intersects(turret.hitbox)
+            }) { continue }
+
+            var fits = true
+            for tile in turret.tiles {
+                guard ground.contains(tile),
+                      tile != claims[team]?.centreTile,
+                      map[tile] == .floor,
+                      !structureOccupies(tile),
+                      !treeTiles.contains(tile) else { fits = false; break }
+            }
+            guard fits else { continue }
+
+            let distance = (turret.centre - position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = origin
+        }
+
+        return best
     }
 
     /// What there is worth taking in this team's base.
@@ -964,6 +1047,23 @@ final class World {
             if let origin = nextArcadeOrigin(for: team, kind: kind, near: centre) {
                 spawnArcade(at: origin, kind: kind, owner: team)
             }
+        }
+
+        // And a turret, on the same terms and for the same reason: a bot is
+        // credited with the errand rather than made to run it, and only when its
+        // base has none, so this is a floor and not a supply.
+        //
+        // Not every base. See GameConfig.Turret.botShare - part of what makes
+        // raiding interesting is the base that turns out to have nothing guarding
+        // it, and a turret in every one of them would make it a fact of the map.
+        //
+        // Placed AFTER the machine rather than before, so that in a cramped base the
+        // thing that earns gets the floor space and the thing that guards it takes
+        // what is left.
+        if ownedByABot, !hasTurret(team),
+           Double.random(in: 0..<1, using: &rng) < GameConfig.Turret.botShare,
+           let origin = nextTurretOrigin(for: team, near: centre) {
+            spawnTurret(at: origin, owner: team)
         }
 
         return placed
@@ -1440,6 +1540,7 @@ final class World {
         // After the sweep: a token paid out this tick should be lying there to be
         // seen, not swallowed instantly by whoever happens to be standing on it.
         ArcadeSystem.update(self, commands: everyone, dt: dt)
+        TurretSystem.update(self, commands: everyone, dt: dt)
         // After movement, so a dose lands on where somebody actually ended up
         // rather than on where they started the tick.
         GasSystem.update(self, dt: dt)
@@ -1475,7 +1576,7 @@ final class World {
                         actor.facesLeft = input.x < 0
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
-                     .placeChest, .placeArcade, .storeItem, .takeItem,
+                     .placeChest, .placeArcade, .placeTurret, .storeItem, .takeItem,
                      .dropItem, .buyItem, .sellItem:
                     break   // other systems' business, not movement's
                 }

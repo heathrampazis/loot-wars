@@ -32,6 +32,9 @@ enum AIGoal: Equatable {
     case rearm(ChestID)
     /// Stand in somebody's base and shoot their machine apart.
     case wreck(ArcadeID)
+    /// Knock out somebody's turret, because nothing else in that base can be
+    /// taken while it is shooting at you.
+    case silence(TurretID)
     /// Get home, because somebody is in your base.
     case defend(ActorID)
 
@@ -72,7 +75,7 @@ enum AIGoal: Equatable {
     /// so the urge is spent once per break-in rather than once per thing broken.
     var isRaiding: Bool {
         switch self {
-        case .robChest, .wreck, .raid: return true
+        case .robChest, .wreck, .silence, .raid: return true
         default: return false
         }
     }
@@ -97,6 +100,7 @@ enum AIGoal: Equatable {
         switch self {
         case .rearm: return "re-arm"
         case .wreck: return "wreck"
+        case .silence: return "silence"
         case .defend: return "defend"
         case .wander: return "roam"
         case .loot: return "loot"

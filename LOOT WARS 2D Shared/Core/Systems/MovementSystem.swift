@@ -76,6 +76,16 @@ enum MovementSystem {
         for chest in world.chests.values {
             push(&actor, outOf: chest.hitbox, in: world)
         }
+
+        // Turrets, which are the fourth kind of box and the one this list would
+        // have silently missed. World.structureBlocks already knew about them -
+        // this function asks the structures one type at a time instead, which is
+        // exactly the shape World's own note warns about: a new kind added to five
+        // places, four of them right. Without this line every figure in the game
+        // walked straight through a turret while the bullets bounced off it.
+        for turret in world.turrets.values {
+            push(&actor, outOf: turret.hitbox, in: world)
+        }
     }
 
     /// Box against box: find how deeply the two overlap on each axis and push back

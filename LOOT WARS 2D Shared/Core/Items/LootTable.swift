@@ -224,6 +224,12 @@ enum LootTable {
         rows.append((pickup: .item(.arcade(.mini)),
                      weight: GameConfig.Loot.miniArcadeWeight))
 
+        // A turret, from the same crates for the same reason: something you find
+        // rather than go looking for. The bots are handed one on seal most of the
+        // time; this is how everybody else gets theirs.
+        rows.append((pickup: .item(.turret),
+                     weight: GameConfig.Loot.turretWeight))
+
         // A rare crate cannot hand you a bandage.
         //
         // This is what makes opening one worth the walk. The bandage row comes out

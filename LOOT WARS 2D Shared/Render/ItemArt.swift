@@ -18,6 +18,12 @@ enum ItemArt {
     static func texture(for pickup: Pickup) -> SKTexture {
         if let cached = cache[pickup] { return cached }
 
+        // Drawn in code until the catalogue has a picture for it - see TurretArt.
+        if pickup == .item(.turret) {
+            cache[pickup] = TurretArt.icon
+            return TurretArt.icon
+        }
+
         let texture = SKTexture(imageNamed: assetName(for: pickup))
         texture.usesMipmaps = true
         cache[pickup] = texture
@@ -69,6 +75,7 @@ enum ItemArt {
         case .chest:   return "Chest"
         case .arcade(let kind):
             return kind == .mini ? "Mini Arcade" : "Arcade"
+        case .turret: return "Turret"
         case .perk(let which):
             switch which {
             // "Power-Up" rather than "Overdrive", which is what the code calls
@@ -98,6 +105,7 @@ enum ItemArt {
         case .item(.chest):      return "Chest"
         case .item(.arcade(.full)): return "Arcade"
         case .item(.arcade(.mini)): return "Mini Arcade"
+        case .item(.turret):        return "Turret"
         case .item(.perk(.overdrive)):     return "Perk"
         case .item(.perk(.strength)):      return "StrengthPerk"
         case .item(.perk(.speed)):         return "SpeedPerk"

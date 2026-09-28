@@ -109,6 +109,12 @@ enum BombSystem {
     private static func hitsSomething(_ point: Vec2, in world: World) -> Bool {
         if world.map.isOccupied(GridPoint(containing: point)) { return true }
         if world.arcades.values.contains(where: { $0.hitbox.contains(point) }) { return true }
+
+        // A turret stops a bomb and takes the blast - it is the thing you throw one
+        // AT. Left out, a bomb lobbed at a turret would sail through it and go off
+        // in the wall behind, and the aiming line would show it doing so.
+        if world.turrets.values.contains(where: { $0.hitbox.contains(point) }) { return true }
+
         return world.trees.contains { $0.contains(point) }
     }
 
@@ -177,6 +183,27 @@ enum BombSystem {
             let hurt = Int((Double(GameConfig.Chest.bombDamage) * share).rounded())
             ChestSystem.hit(id, for: max(1, hurt),
                             by: bomb.owner, of: bomb.team, in: world)
+        }
+
+        // Turrets, which take a blast the way a chest does - most of one, never all
+        // of it. See GameConfig.Turret.bombDamage for why a bomb must not simply
+        // clear one: it could then be done from outside the wall, and the defence
+        // would never fire a shot.
+        //
+        // Measured to the nearest point of its body rather than its centre, which is
+        // what a two-tile thing needs: a bomb going off against its side is a direct
+        // hit, not a near miss a tile away.
+        for id in world.turrets.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let turret = world.turrets[id] else { continue }
+
+            let nearest = turret.hitbox.closestPoint(to: bomb.position)
+            let distance = (nearest - bomb.position).length
+            guard distance <= radius else { continue }
+
+            let share = 1 - (distance / radius)
+            let hurt = Int((Double(GameConfig.Turret.bombDamage) * share).rounded())
+            TurretSystem.hit(id, for: max(1, hurt),
+                             by: bomb.owner, of: bomb.team, in: world)
         }
 
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {

@@ -349,6 +349,9 @@ enum GameConfig {
             .chest: 14,
             .arcade(.full): 24,
             .arcade(.mini): 14,
+            // Priced with the mini machine, the thing it is found beside and worth
+            // about the same to a base.
+            .turret: 16,
 
             // The power-up. Never on the shelf - the whole point of a perk is that
             // it is found - but the shop still makes an offer for one, because
@@ -2072,6 +2075,16 @@ enum GameConfig {
         /// worth breaking into, and that used to be seven bases out of eight.
         static let miniArcadeWeight = 26
 
+        /// A turret, out of any crate, a little rarer than a mini machine.
+        ///
+        /// Rarer because it is worth more to a base than a mini - it keeps the other
+        /// things in it safe - and because the bots are handed one on seal three
+        /// times in four already. At 20 against the mini's 26 it is about one crate
+        /// in seventeen, a little over one a match: enough that most players will
+        /// find one, few enough that a second is a decision about whether to double
+        /// up or carry it for later.
+        static let turretWeight = 20
+
         /// Share of crates on the map that are the good ones.
         ///
         /// One in eight. At one in six they were everywhere, and a thing you see
@@ -2750,6 +2763,91 @@ enum GameConfig {
         /// How far a machine keeps from any claim. Tokens are supposed to be worth
         /// leaving home for.
         static let claimClearance: Double = 5
+    }
+
+    enum Turret {
+        /// How far it can see and shoot, in tiles.
+        ///
+        /// Eight, which is most of a base from one corner and nowhere near the whole
+        /// of a fight. Two thirds of a blaster's twelve on purpose: a player who
+        /// out-ranges it can stand off and take it apart, which is what makes a
+        /// turret something to deal with rather than something to avoid.
+        static let range: Double = 8
+
+        /// Damage per shot and shots a second.
+        ///
+        /// A Blaster 2's bullet at under half a player's rate - 16 at 2.2 a second,
+        /// 35 a second against the 54 of the weakest blaster anybody carries. Enough
+        /// to take a bare-headed raider in about three seconds of standing still,
+        /// which is the point: the raid step that takes time is the step it
+        /// punishes. Nowhere near enough to win a straight duel with somebody who
+        /// turns round and shoots back, which is the other point.
+        static let damage = 16
+        static let fireRate: Double = 2.2
+
+        /// How fast the barrel swings, in radians a second, and how close to on
+        /// target it has to be before it fires.
+        ///
+        /// It TRACKS rather than snapping, and the turn rate is a real mechanic as
+        /// well as the look: somebody running across its front can get most of the
+        /// way before it has come round, while somebody standing still at a chest
+        /// is under fire within half a second. The tolerance is loose because a
+        /// bullet is not a laser, and a turret that waited to be perfect would
+        /// hardly ever shoot.
+        static let turnRate: Double = 4.0
+        static let fireTolerance: Double = 0.18
+
+        /// How fast an idle barrel sweeps, in radians a second. Slow - one full turn
+        /// every twelve seconds or so - so it reads as watching rather than spinning.
+        static let idleSweep: Double = 0.5
+
+        /// How finely the line of sight is checked, in tiles. A quarter: finer than
+        /// the thinnest thing that stops a bullet, which is a wall tile.
+        static let sightStep: Double = 0.25
+
+        /// How far past its centre a shot starts - see Turret.muzzle. Clear of its
+        /// own two-tile body with a little to spare.
+        static let muzzleReach: Double = 1.25
+
+        /// How much punishment it takes.
+        ///
+        /// 300: a little over three seconds of a Blaster 3 standing still, while it
+        /// shoots back at 35 a second. Raised from 220, which went down before it
+        /// had really made its point - a turret should be something a raider has
+        /// to commit to, not something they clip on the way past. A fair duel
+        /// against somebody with good gear, a losing one for somebody fresh off a
+        /// respawn. Still under a machine's 340 because it fights back and a
+        /// machine does not.
+        static let health = 300
+
+        /// Taken off it by a bomb at the centre of the blast, falling off to nothing
+        /// at the rim.
+        ///
+        /// Most of one and never all of it, for the reason the chest's number gives:
+        /// a bomb that burst it outright would let a raider clear it through the
+        /// hole from outside, and the defence would never get to fire a shot.
+        static let bombDamage = 170
+
+        /// A turret left alone mends, as a machine does. See Arcade.mendDelay.
+        static let mendDelay: Double = 5
+        static let mendPortion: Double = 0.12
+        static let mendTick: Double = 1.0
+
+        /// What breaking one pays whoever did it.
+        ///
+        /// Between a mini machine and a cabinet: it is worth more to its owner than
+        /// a small machine, since it is the thing keeping everything else in the
+        /// base safe, and less than a cabinet, which is the base's whole income.
+        static let destroyedReward = 8
+        static let destroyedScore = 60
+
+        /// How often a bot's base is handed one on seal.
+        ///
+        /// Three bases in four. Every bot base defended identically would make the
+        /// turret a fact of the map rather than a thing some bases have - and part
+        /// of what makes raiding interesting is the base that turns out to have
+        /// nothing guarding it.
+        static let botShare: Double = 0.75
     }
 
     enum Blaster {
