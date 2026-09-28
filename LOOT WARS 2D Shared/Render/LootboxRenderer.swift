@@ -36,6 +36,10 @@ final class LootboxRenderer {
     /// outline that is permanently half visible and never animates.
     private var lit: LootboxID?
 
+    /// Whether this renderer has caught up with the world once. A rare crate that
+    /// appears after that has just respawned rare mid-match, and gets an entrance.
+    private var hasSynced = false
+
     private static let rimName = "reach"
 
 
@@ -52,7 +56,9 @@ final class LootboxRenderer {
         // Supply drops are drawn by SupplyDropRenderer.
         for (id, box) in world.lootboxes where nodesByBox[id] == nil && !box.supply {
             makeNode(for: box)
+            if hasSynced, box.rare { arrive(id) }
         }
+        hasSynced = true
 
         for (id, sprite) in Array(nodesByBox) where world.lootboxes[id] == nil {
             nodesByBox[id] = nil
@@ -124,19 +130,40 @@ final class LootboxRenderer {
         // Blue rather than gold, because a rare crate is a crate with better GEAR
         // in it rather than a jackpot, and it should read as worth crossing the map
         // for rather than as worth abandoning a fight for.
+        //
+        // PURPLE now, the Mythical colour, and more of it: rare crates are an event
+        // rather than a feature of the map (see GameConfig.Loot.rareChance), so the
+        // few there are have to be unmistakable. A wide soft halo, a tighter
+        // bright pool breathing on top of it, and purple sparkles winking in and
+        // out around the box.
         if box.rare {
+            let purple = RenderPalette.colour(of: .mythical)
+
+            let halo = SKSpriteNode(texture: GlowArt.pool)
+            halo.size = CGSize(width: size.width * 3.6, height: size.width * 3.6)
+            halo.color = purple
+            halo.colorBlendFactor = 1
+            halo.alpha = 0.35
+            halo.zPosition = -1.1
+            sprite.addChild(halo)
+            halo.run(.repeatForever(.sequence([
+                .group([.fadeAlpha(to: 0.2, duration: 1.3), .scale(to: 0.92, duration: 1.3)]),
+                .group([.fadeAlpha(to: 0.35, duration: 1.3), .scale(to: 1.0, duration: 1.3)])
+            ])))
+
             let glow = SKSpriteNode(texture: GlowArt.pool)
-            glow.size = CGSize(width: size.width * 2.1, height: size.height * 2.1)
-            glow.color = RenderPalette.colour(of: .legendary)
+            glow.size = CGSize(width: size.width * 2.3, height: size.width * 1.9)
+            glow.color = purple
             glow.colorBlendFactor = 1
-            glow.alpha = 0.7
+            glow.alpha = 0.8
             glow.zPosition = -1
             sprite.addChild(glow)
-
             glow.run(.repeatForever(.sequence([
-                .group([.fadeAlpha(to: 0.45, duration: 1.1), .scale(to: 0.9, duration: 1.1)]),
-                .group([.fadeAlpha(to: 0.7, duration: 1.1), .scale(to: 1.0, duration: 1.1)])
+                .group([.fadeAlpha(to: 0.5, duration: 0.9), .scale(to: 0.88, duration: 0.9)]),
+                .group([.fadeAlpha(to: 0.8, duration: 0.9), .scale(to: 1.0, duration: 0.9)])
             ])))
+
+            sparkle(around: sprite, size: size, colour: purple, seed: box.id.raw)
         }
 
         idle(sprite, for: box)
@@ -155,6 +182,65 @@ final class LootboxRenderer {
     /// A rare crate knocks harder and more often. It already glows; this is the
     /// same claim made in movement, and movement is what carries at the distance
     /// where the glow is just a smudge of blue.
+    /// Purple stars winking in and out around a rare crate, forever. Each one pops
+    /// up somewhere near the box, twinkles and fades; they come a few a second, at
+    /// uneven gaps, so the effect glitters rather than ticks.
+    private func sparkle(around sprite: SKSpriteNode, size: CGSize, colour: SKColor, seed: Int) {
+        let spawn = SKAction.run { [weak sprite] in
+            guard let sprite else { return }
+            let star = SKSpriteNode(texture: ImpactArt.star)
+            let side = CGFloat.random(in: 7...12)
+            star.size = CGSize(width: side, height: side)
+            star.color = colour
+            star.colorBlendFactor = 0.45
+            star.blendMode = .add
+            star.zPosition = 3
+            star.position = CGPoint(x: CGFloat.random(in: -size.width * 0.75...size.width * 0.75),
+                                    y: CGFloat.random(in: -size.height * 0.5...size.height * 1.1))
+            star.setScale(0.2)
+            star.alpha = 0
+            sprite.addChild(star)
+            star.run(.sequence([
+                .group([.fadeIn(withDuration: 0.15), .scale(to: 1, duration: 0.15),
+                        .rotate(byAngle: 0.8, duration: 0.5)]),
+                .group([.fadeOut(withDuration: 0.35), .scale(to: 0.3, duration: 0.35),
+                        .moveBy(x: 0, y: 6, duration: 0.35)]),
+                .removeFromParent()
+            ]))
+        }
+
+        sprite.run(.sequence([
+            .wait(forDuration: Double(seed % 5) * 0.13),
+            .repeatForever(.sequence([spawn, .wait(forDuration: 0.28, withRange: 0.3)]))
+        ]), withKey: "sparkle")
+    }
+
+    /// A rare crate that has just respawned rare mid-match: it pops up out of a
+    /// purple flash, so it is noticed by anybody looking that way.
+    private func arrive(_ id: LootboxID) {
+        guard let sprite = nodesByBox[id] else { return }
+
+        let flash = SKSpriteNode(texture: GlowArt.pool)
+        flash.size = CGSize(width: sprite.size.width * 2, height: sprite.size.width * 2)
+        flash.color = RenderPalette.colour(of: .mythical)
+        flash.colorBlendFactor = 1
+        flash.blendMode = .add
+        flash.position = sprite.position
+        flash.zPosition = sprite.zPosition + 0.5
+        node.addChild(flash)
+        flash.run(.sequence([
+            .group([.scale(to: 2.4, duration: 0.45), .fadeOut(withDuration: 0.45)]),
+            .removeFromParent()
+        ]))
+
+        sprite.setScale(0.1)
+        sprite.run(.sequence([
+            .scale(to: 1.25, duration: 0.14),
+            .scale(to: 0.94, duration: 0.08),
+            .scale(to: 1, duration: 0.1)
+        ]))
+    }
+
     private func idle(_ sprite: SKSpriteNode, for box: Lootbox) {
         let phase = Double(box.id.raw % 13) * 0.31
         let lean = box.rare ? 0.05 : 0.035

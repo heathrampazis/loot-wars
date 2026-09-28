@@ -354,10 +354,10 @@ extension MapFactory {
             }
             if tooClose { continue }
 
-            // Rolled per crate rather than counted out, so the map does not always
-            // hold exactly the same number of good ones - and drawn from the
-            // world's own generator, so a seed still replays exactly.
-            let rare = Double.random(in: 0..<1, using: &rng) < GameConfig.Loot.rareShare
+            // A few start rare; most rare ones turn up later, as crates respawn -
+            // see GameConfig.Loot.rareChance. Drawn from the world's own
+            // generator, so a seed still replays exactly.
+            let rare = Double.random(in: 0..<1, using: &rng) < GameConfig.Loot.startingRareShare
             placed.append(Lootbox(id: LootboxID(placed.count), tile: tile, rare: rare))
         }
 
