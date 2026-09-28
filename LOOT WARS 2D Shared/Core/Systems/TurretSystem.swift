@@ -116,7 +116,7 @@ enum TurretSystem {
                 continue
             }
 
-            let wanted = (target.position - turret.centre).angle
+            let wanted = (aimPoint(at: target, from: turret) - turret.centre).angle
             let error = shortestAngle(from: turret.heading, to: wanted)
             let step = GameConfig.Turret.turnRate * dt
 
@@ -174,6 +174,22 @@ enum TurretSystem {
     /// Not its own side, not the dead, not somebody still spawn-protected, not out
     /// of range, and not behind anything. The last is the one that shapes the whole
     /// defence - see the note at the top of this file.
+    /// Where to point to hit somebody who is moving: where they will be when the
+    /// shot arrives, near enough.
+    ///
+    /// The same sum the bots aim with - see AIBrain.shotToTake - with the lead cut
+    /// to GameConfig.Turret.leadShare, so walking in a straight line gets you shot
+    /// and changing direction does not.
+    private static func aimPoint(at target: Actor, from turret: Turret) -> Vec2 {
+        let away = (target.position - turret.centre).length
+        let flight = max(0, away - GameConfig.Turret.muzzleReach)
+            / GameConfig.Blaster.projectileSpeed
+        let speed = GameConfig.Player.moveSpeed * target.speedMultiplier
+        let drift = target.moveInput.clampedToUnit()
+            * (speed * flight * GameConfig.Turret.leadShare)
+        return target.position + drift
+    }
+
     private static func canEngage(_ id: ActorID, from turret: Turret, in world: World) -> Bool {
         guard let actor = world.actors[id],
               actor.isAlive,
@@ -183,6 +199,16 @@ enum TurretSystem {
         let towards = actor.position - turret.centre
         let distance = towards.length
         guard distance > 0.01, distance <= GameConfig.Turret.range else { return false }
+
+        // Not from off the edge of the player's screen. Its reach is a blaster's
+        // now, and a landscape phone shows far less than that above and below you,
+        // so without this a turret you have never seen could open up on you. The
+        // same rule the bots fire under - see AIBrain.canOpenFire.
+        if id == world.localPlayerID {
+            let half = world.visibleHalfExtent
+            guard abs(towards.x) <= half.x * GameConfig.AI.visibleMargin,
+                  abs(towards.y) <= half.y * GameConfig.AI.visibleMargin else { return false }
+        }
 
         return clearShot(from: turret, along: towards * (1 / distance),
                          for: distance, in: world)

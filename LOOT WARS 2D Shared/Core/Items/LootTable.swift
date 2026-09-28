@@ -51,8 +51,8 @@ enum LootTable {
     /// wearing an Epic, the thing on the ground is worth nothing, and opening
     /// crates - which is most of what anybody does between fights - stops paying.
     ///
-    /// Three bands. The rule they follow is not "better loot later", which would
-    /// undo the ladder; it is "nothing WORTHLESS later". The floor comes up so what
+    /// Four bands. The first three follow a rule that is not "better loot later",
+    /// which would undo the ladder; it is "nothing WORTHLESS later". The floor comes up so what
     /// you find is at least usable, the frequency of gear comes DOWN, and the
     /// weight goes to healing.
     ///
@@ -68,6 +68,17 @@ enum LootTable {
     /// at the exact point in a match where being alive matters most.
     ///
     /// Bombs go the other way: about one crate in FOUR early, one in five late.
+    ///
+    /// THE ENDGAME BAND (from 0.75). The rule above - "nothing worthless later",
+    /// with the top of the ladder bought rather than found - made for a closing
+    /// minute where a good player was in Mythical gear and everybody they met was
+    /// in Epic, and the result was never in doubt. The last quarter now hands
+    /// out top-half gear and a lot of healing, so the final fights are between
+    /// people who are all properly kitted and all able to patch up, and are won
+    /// by playing rather than by having got there first. Mythical and Blaster 5
+    /// are findable here, at a low weight; a rare crate's upgrade can reach Cosmic
+    /// and Blaster 6 in this band only, which is the one place the "never found"
+    /// rule is deliberately broken.
     ///
     /// Up by a fifth across the board, and the early band most of all, because the
     /// opening minutes are where the shape of a match is decided: a base goes up,
@@ -111,7 +122,7 @@ enum LootTable {
             (.item(.blaster(.two)),      26),
             (.item(.blaster(.three)),    12)
         ]),
-        (0.70, [
+        (0.55, [
             (.item(.bandage), 96),
             (.item(.medkit),  34),
             (.item(.bomb),    52),
@@ -132,6 +143,21 @@ enum LootTable {
             (.item(.helmet(.legendary)), 10),
             (.item(.blaster(.three)),    16),
             (.item(.blaster(.four)),      6)
+        ]),
+        (0.75, [
+            // Healing up hard - medkits most of all - so a late fight is two
+            // people trading heals rather than whoever landed the first volley.
+            (.item(.bandage), 92),
+            (.item(.medkit),  58),
+            (.item(.bomb),    46),
+            (.item(.stink),   12),
+
+            // Gear is commoner here than in any other band, and a rung up: the
+            // point of this band is that everybody finishes the match kitted out.
+            (.item(.helmet(.legendary)), 24),
+            (.item(.helmet(.mythical)),   8),
+            (.item(.blaster(.four)),     20),
+            (.item(.blaster(.five)),      8)
         ])
     ]
 

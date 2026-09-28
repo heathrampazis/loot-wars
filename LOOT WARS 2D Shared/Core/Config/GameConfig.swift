@@ -719,24 +719,46 @@ enum GameConfig {
         /// people wearing it stopped being challenged.
         ///
         /// So a respawn is topped UP to a floor that rises with the clock. It never
-        /// takes anything away - what you kept, you keep - and the floor stays well
-        /// under what the shop and the chests are handing out by then, so it is a
-        /// way back INTO the fight rather than a replacement for having won one.
+        /// takes anything away - what you kept, you keep. It used to stay well under
+        /// what the shop and the chests hand out; it now climbs to the top half of
+        /// the ladder by the end, for the reason given below.
         /// Everybody respawns to the same floor, bots included, which is what stops
         /// the last minute filling up with free kills.
         static let respawnFloor: [(progress: Double, helmet: HelmetTier, blaster: BlasterTier)] = [
-            // Cut right back, because death now takes everything and a generous
-            // floor would hand most of it straight back. What is left is the
-            // anti-spectator valve and nothing more: enough that somebody killed in
-            // the last minute is not walking into gunfire bare-headed with no time
-            // to do anything about it, and far short of a rebuild.
+            // Raised a long way, on purpose, and it is the main lever on a match
+            // a strong player was winning at a walk. Death takes everything, and
+            // the bots die far more often than a good player does - so under the
+            // old floor (Epic and a Blaster 3, and only in the last forty-five
+            // seconds) the seven of them spent the back half of every match
+            // walking out of their bases in starter kit, while the player who had
+            // stayed alive was in Mythical. The fights that decided the match were
+            // not fights.
             //
-            // The real floor is your own chest, which is the entire point. This one
-            // exists for the player who has no base left to go back to - and it is
-            // deliberately worse than what one trip home would give them.
-            (0.60, .common, .two),
-            (0.85, .epic,   .three)
+            // It is still the same floor for everybody, player included, and it
+            // still never takes anything away. What changes is that by the closing
+            // minutes nobody is under-geared: everyone is in the top half of the
+            // ladder, and gear stops being the reason a fight is won.
+            (0.30, .common,    .two),
+            (0.50, .epic,      .three),
+            (0.70, .legendary, .four),
+            (0.85, .mythical,  .five)
         ]
+
+        /// Healing handed back on a respawn, by how far the match has run.
+        ///
+        /// The gear floor's partner. A respawn late in the match used to come
+        /// back with empty pockets, so even a well-geared bot lost the first
+        /// exchange it walked into and had nothing to recover with. Topped up, not
+        /// added to: a respawn starts with empty pockets anyway, so this is simply
+        /// what is in them. Same for everybody.
+        static let respawnHeals: [(progress: Double, items: [ItemType])] = [
+            (0.45, [.bandage, .bandage]),
+            (0.70, [.bandage, .bandage, .medkit, .medkit])
+        ]
+
+        static func respawnHealKit(at progress: Double) -> [ItemType] {
+            respawnHeals.last(where: { progress >= $0.progress })?.items ?? []
+        }
 
         /// What a respawn is worth right now, or nil in the opening half when it is
         /// worth nothing at all.
@@ -985,7 +1007,10 @@ enum GameConfig {
         /// used to. More attempts is the counterweight to that rather than a buff
         /// on top of it: about the same number of chests changing hands, arrived at
         /// by trying more often and succeeding less.
-        static let bombSupplyInterval: Double = 32
+        ///
+        /// Down again to 26, with the raid urge below. Bases now have turrets that
+        /// hit back, so fewer raids land; the supply line has to keep up.
+        static let bombSupplyInterval: Double = 26
 
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
@@ -1218,7 +1243,12 @@ enum GameConfig {
         /// and a half. A ceiling rather than a count - most never find a target in
         /// range, and of those that do, a good many now end with somebody putting a
         /// shot into the raider two seconds from the chest.
-        static let raidUrgeInterval: ClosedRange<Double> = 26...45
+        ///
+        /// 20...36 now, and faster still while somebody is running away with the
+        /// match - see leaderRush. The complaint was that the player was never
+        /// raided at all, and a clock this slow meant most bots got four or five
+        /// goes a match, most of which went on each other.
+        static let raidUrgeInterval: ClosedRange<Double> = 20...36
 
         /// How far a bot will travel for an enemy chest it could get at.
         ///
@@ -1352,7 +1382,10 @@ enum GameConfig {
         /// sixteen, so a player who kept moving was never followed by anything. A
         /// good player therefore chose every fight they were in, which is most of
         /// what dominating a match consists of.
-        static let huntsLeaderAt: Double = 0.45
+        ///
+        /// 0.38 now, from 0.45: the hunting starts a little earlier in a runaway,
+        /// while it is still a contest rather than a formality.
+        static let huntsLeaderAt: Double = 0.38
 
         /// How long between one bot's hunts.
         ///
@@ -1446,7 +1479,45 @@ enum GameConfig {
         /// stocked one forty-five tiles further off - most of the width of the map,
         /// which makes them the target - while a bot standing next to a rich base
         /// still opens the one in front of it rather than trekking across the world.
-        static let leaderWorth: Double = 45
+        ///
+        /// Raised to 100. At 45 a runaway's base was one option among several and
+        /// usually lost to a nearer bot base, so the player doubling everybody's
+        /// score was never once broken into. At 100 a full runaway is THE target:
+        /// worth more than any stocked bot base, and - past leaderChaseAt - worth
+        /// crossing the whole map for (see AIBrain.chestWorthRobbing).
+        static let leaderWorth: Double = 100
+
+        /// How much faster the raid and hunt urges come round while somebody else
+        /// is running away with the match, at a full runaway lead.
+        ///
+        /// The adaptive half of the difficulty, and deliberately a change in what
+        /// bots DO rather than in how strong they are: nobody gets more damage or
+        /// health for being behind. At 1.5 a bot facing a full runaway gets the
+        /// itch two and a half times as often, and since the leader's base and the
+        /// leader are now what that itch points at, the pressure lands on them.
+        /// An ordinary match reads well under leaderChaseAt and never feels it.
+        static let leaderRush: Double = 1.5
+
+        // MARK: - Dodging
+
+        /// A raider being shot at weaves rather than walking a straight line.
+        ///
+        /// Before this a raider under fire walked dead straight at the chest, which
+        /// is the easiest thing in the game to hit - anybody leading their shot, or
+        /// any turret, landed nearly all of them. Now the heading swings either
+        /// side of the line on a short beat, which throws a leading aim off
+        /// without costing much ground.
+        ///
+        /// Swing in radians either side, period in seconds for one full weave.
+        /// Kept inside what a bot can turn (turnRate) so the swing is not damped
+        /// into a wobble.
+        static let dodgeSwing: Double = 0.85
+        static let dodgePeriod: Double = 1.2
+
+        /// What counts as being under threat: hit this recently, or an enemy this
+        /// close, or a turret with this bot in its sights.
+        static let dodgeMemory: Double = 1.5
+        static let dodgeRange: Double = 9
 
         /// The lead at which somebody is worth chasing wherever they are.
         ///
@@ -2768,11 +2839,16 @@ enum GameConfig {
     enum Turret {
         /// How far it can see and shoot, in tiles.
         ///
-        /// Eight, which is most of a base from one corner and nowhere near the whole
-        /// of a fight. Two thirds of a blaster's twelve on purpose: a player who
-        /// out-ranges it can stand off and take it apart, which is what makes a
-        /// turret something to deal with rather than something to avoid.
-        static let range: Double = 8
+        /// Level with a blaster's twelve. It was eight, two thirds of a blaster, on
+        /// the theory that out-ranging it was the skill - and in practice that was
+        /// the whole counter: stand at ten tiles, shoot it to bits, never take a
+        /// hit. A turret you can dismantle from outside its reach is scenery.
+        ///
+        /// Walls still block it both ways, so it guards the room and the doorway
+        /// rather than the open ground around a base. And it will not open up on
+        /// the player from off the edge of their screen - see TurretSystem.canEngage
+        /// - which is the same courtesy the bots extend.
+        static let range: Double = 12
 
         /// Damage per shot and shots a second.
         ///
@@ -2782,8 +2858,23 @@ enum GameConfig {
         /// which is the point: the raid step that takes time is the step it
         /// punishes. Nowhere near enough to win a straight duel with somebody who
         /// turns round and shoots back, which is the other point.
-        static let damage = 16
-        static let fireRate: Double = 2.2
+        ///
+        /// Raised to 20 at 2.4 a second - 48 a second, up from 35 - alongside the
+        /// turret learning to lead its shots. The two together are what turned it
+        /// from something raiders walked past into something they have to deal
+        /// with: the damage was never the real problem, the misses were.
+        static let damage = 20
+        static let fireRate: Double = 2.4
+
+        /// How much of a moving target's travel it aims ahead for, as a share of
+        /// a perfect lead.
+        ///
+        /// It used to aim at where you ARE, and a shot takes most of a second to
+        /// cross its range, so anybody simply walking was never hit. Not the whole
+        /// lead: at ninety per cent a steady walk still gets clipped, while
+        /// changing direction - actually dodging - beats it, which is the skill it
+        /// should be asking for.
+        static let leadShare: Double = 0.9
 
         /// How fast the barrel swings, in radians a second, and how close to on
         /// target it has to be before it fires.
@@ -2794,7 +2885,7 @@ enum GameConfig {
         /// is under fire within half a second. The tolerance is loose because a
         /// bullet is not a laser, and a turret that waited to be perfect would
         /// hardly ever shoot.
-        static let turnRate: Double = 4.0
+        static let turnRate: Double = 5.0
         static let fireTolerance: Double = 0.18
 
         /// How fast an idle barrel sweeps, in radians a second. Slow - one full turn
@@ -2818,7 +2909,10 @@ enum GameConfig {
         /// against somebody with good gear, a losing one for somebody fresh off a
         /// respawn. Still under a machine's 340 because it fights back and a
         /// machine does not.
-        static let health = 300
+        ///
+        /// Up again to 360, with the bomb pulled back below, so that clearing one
+        /// takes a bomb AND a proper exchange of fire rather than either alone.
+        static let health = 360
 
         /// Taken off it by a bomb at the centre of the blast, falling off to nothing
         /// at the rim.
@@ -2826,7 +2920,9 @@ enum GameConfig {
         /// Most of one and never all of it, for the reason the chest's number gives:
         /// a bomb that burst it outright would let a raider clear it through the
         /// hole from outside, and the defence would never get to fire a shot.
-        static let bombDamage = 170
+        ///
+        /// 150 of its 360 now. A bomb softens it; it does not do the job.
+        static let bombDamage = 150
 
         /// A turret left alone mends, as a machine does. See Arcade.mendDelay.
         static let mendDelay: Double = 5
@@ -2843,11 +2939,11 @@ enum GameConfig {
 
         /// How often a bot's base is handed one on seal.
         ///
-        /// Three bases in four. Every bot base defended identically would make the
-        /// turret a fact of the map rather than a thing some bases have - and part
-        /// of what makes raiding interesting is the base that turns out to have
-        /// nothing guarding it.
-        static let botShare: Double = 0.75
+        /// Nine in ten, up from three in four: an unguarded bot base was the easy
+        /// meal that let a good player run away with a match. The odd one without
+        /// is still worth keeping - part of what makes raiding interesting is the
+        /// base that turns out to have nothing guarding it.
+        static let botShare: Double = 0.9
     }
 
     enum Blaster {
