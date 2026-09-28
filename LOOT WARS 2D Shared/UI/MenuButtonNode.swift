@@ -50,8 +50,9 @@ final class MenuButtonNode: SKNode {
     /// The part that moves: the slab and its icon, as one.
     private let face = SKNode()
 
-    /// The soft shadow under it, which stays put while the face moves.
-    private let shadow: SKSpriteNode
+    /// The drop shadow under it, which stays put while the face moves: a wide soft
+    /// one for depth and a tight dark one where the button meets the ground.
+    private let shadow: SKNode
 
     /// How far the face sinks when pressed.
     private let sink: CGFloat
@@ -76,7 +77,7 @@ final class MenuButtonNode: SKNode {
         self.weight = .primary
         self.box = CGSize(width: width, height: height)
         self.sink = max(3, height * 0.04)
-        self.shadow = MenuButtonNode.makeShadow(width: width, height: height,
+        self.shadow = MenuButtonNode.dropShadow(width: width, height: height,
                                                 corner: height * MenuButtonNode.primaryCorner)
         super.init()
 
@@ -97,7 +98,7 @@ final class MenuButtonNode: SKNode {
         self.weight = .secondary
         self.box = CGSize(width: side, height: side)
         self.sink = max(2.5, side * 0.05)
-        self.shadow = MenuButtonNode.makeShadow(width: side, height: side,
+        self.shadow = MenuButtonNode.dropShadow(width: side, height: side,
                                                 corner: side * MenuButtonNode.secondaryCorner)
         super.init()
 
@@ -143,15 +144,42 @@ final class MenuButtonNode: SKNode {
         return node
     }
 
-    /// A soft dark blur the same shape as the button, a little below it.
+    /// The drop shadow: two blurred copies of the button's shape, below it.
     ///
-    /// Drawn once into a texture and blurred there, rather than an SKEffectNode
+    /// Two layers because that is what makes a shadow look like a shadow rather
+    /// than a smudge. The wide soft one says the button is lifted off the map; the
+    /// tight dark one, barely offset, is where it would touch the ground, and gives
+    /// the edge underneath a crisp base to sit on.
+    ///
+    /// Drawn once into textures and blurred there, rather than an SKEffectNode
     /// blurring live - it never changes, so there is nothing to recompute, and an
     /// effect node crops its blur to its children's bounds, which cuts the soft
     /// edge off exactly where it should be fading out.
-    private static func makeShadow(width: CGFloat, height: CGFloat, corner: CGFloat) -> SKSpriteNode {
-        let blur = max(4, height * 0.07)
-        let pad = blur * 2.5
+    private static func dropShadow(width: CGFloat, height: CGFloat, corner: CGFloat) -> SKNode {
+        let node = SKNode()
+        node.zPosition = -1
+
+        // Soft: well below the button, blurred wide.
+        let soft = shadowLayer(width: width, height: height, corner: corner,
+                               blur: max(5, height * 0.10))
+        soft.alpha = 0.34
+        soft.position = CGPoint(x: 0, y: -max(4, height * 0.08))
+        node.addChild(soft)
+
+        // Contact: just under the bottom edge, barely blurred.
+        let contact = shadowLayer(width: width * 0.97, height: height, corner: corner,
+                                  blur: max(2, height * 0.025))
+        contact.alpha = 0.30
+        contact.position = CGPoint(x: 0, y: -max(2, height * 0.035))
+        node.addChild(contact)
+
+        return node
+    }
+
+    /// One blurred, black, button-shaped layer.
+    private static func shadowLayer(width: CGFloat, height: CGFloat,
+                                    corner: CGFloat, blur: CGFloat) -> SKSpriteNode {
+        let pad = blur * 3
         let canvas = CGSize(width: width + pad * 2, height: height + pad * 2)
 
         let format = UIGraphicsImageRendererFormat.default()
@@ -164,19 +192,26 @@ final class MenuButtonNode: SKNode {
                          cornerRadius: corner).fill()
         }
 
+        // Blurred through Core Image directly, into a fresh image the same size as
+        // the canvas. The padding is transparent, so clamping the edges costs
+        // nothing and keeps the blur from fading in from the border.
         var texture = SKTexture(image: image)
-        if let filter = CIFilter(name: "CIGaussianBlur") {
-            // In the texture's pixels, which are twice its points.
-            filter.setValue(blur * format.scale, forKey: kCIInputRadiusKey)
-            texture = texture.applying(filter)
+        if let source = image.cgImage {
+            let input = CIImage(cgImage: source)
+            let blurred = input.clampedToExtent()
+                .applyingGaussianBlur(sigma: Double(blur * format.scale) / 2)
+                .cropped(to: input.extent)
+            if let output = shadowContext.createCGImage(blurred, from: input.extent) {
+                texture = SKTexture(cgImage: output)
+            }
         }
 
-        let node = SKSpriteNode(texture: texture, size: canvas)
-        node.alpha = 0.26
-        node.position = CGPoint(x: 0, y: -max(3, height * 0.05))
-        node.zPosition = -1
-        return node
+        return SKSpriteNode(texture: texture, size: canvas)
     }
+
+    /// One Core Image context for every shadow on the screen - they are
+    /// expensive to make and there is no reason to make more than one.
+    private static let shadowContext = CIContext()
 
     /// The play mark, drawn rather than typed. A triangle with rounded corners and
     /// its optical centre nudged right: a triangle centred on its bounding box
@@ -245,9 +280,10 @@ final class MenuButtonNode: SKNode {
         ])
         push.timingMode = .easeOut
 
+        // The shadow pulls in as the face comes down to meet it.
         shadow.run(.sequence([
-            .group([.scale(to: 0.94, duration: 0.05), .fadeAlpha(to: 0.4, duration: 0.05)]),
-            .group([.scale(to: 1, duration: 0.18), .fadeAlpha(to: 0.26, duration: 0.18)])
+            .scale(to: 0.93, duration: 0.05),
+            .scale(to: 1, duration: 0.18)
         ]))
 
         face.run(.sequence([push, .run(done)]))
