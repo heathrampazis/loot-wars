@@ -34,6 +34,7 @@ final class GameScene: SKScene {
     private let treeRenderer = TreeRenderer()
     private let blockRenderer = BlockRenderer()
     private let arcadeRenderer = ArcadeRenderer()
+    private let turretRenderer = TurretRenderer()
     private let lootboxRenderer = LootboxRenderer()
     private let chestRenderer = ChestRenderer()
     private let groundItemRenderer = GroundItemRenderer()
@@ -403,6 +404,7 @@ final class GameScene: SKScene {
         claimRenderer.build(claims: generated.claims)
         treeRenderer.build(patches: generated.trees)
         arcadeRenderer.build(mapHeight: generated.map.height)
+        turretRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(claimRenderer.node)
 
@@ -412,6 +414,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
+        worldLayer.addChild(turretRenderer.node)
         worldLayer.addChild(lootboxRenderer.node)
         worldLayer.addChild(chestRenderer.node)
         worldLayer.addChild(groundItemRenderer.node)
@@ -732,6 +735,7 @@ final class GameScene: SKScene {
         lootboxRenderer.sync(with: world)
         chestRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
+        turretRenderer.sync(with: world)
         groundItemRenderer.sync(with: world)
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world, heardFrom: ears)
@@ -1047,6 +1051,11 @@ final class GameScene: SKScene {
                 // being shot has to read differently from a person being shot, or
                 // the screen says somebody is in there taking it.
                 chestRenderer.hit(id)
+                effectsRenderer.machineStruck(at: position)
+
+            case .turretHit(let id, let position):
+                // Sparks off the casing, the same as the other furniture.
+                turretRenderer.hit(id)
                 effectsRenderer.machineStruck(at: position)
 
             case .sealed(let team, let chests):
@@ -1897,7 +1906,7 @@ extension GameScene {
         case .blaster: return "Your blaster is better"
         case .perk:    return "One power-up at a time"
         case .bandage, .medkit: return "You are at full health"
-        case .bomb, .stink, .chest, .arcade: return "Not right now"
+        case .bomb, .stink, .chest, .arcade, .turret: return "Not right now"
         }
     }
 

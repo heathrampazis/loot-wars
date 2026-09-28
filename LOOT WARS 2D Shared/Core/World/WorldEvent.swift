@@ -75,6 +75,9 @@ enum WorldEvent {
     /// because it is the same event - see ChestRenderer.hit.
     case chestHit(ChestID, at: Vec2)
 
+    /// A turret taking a hit and surviving it. The machine's event, for a turret.
+    case turretHit(TurretID, at: Vec2)
+
     /// A chest broken open by somebody who did not own it.
     case chestCracked(at: Vec2, items: Int)
 

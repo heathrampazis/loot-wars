@@ -123,6 +123,10 @@ enum AIBrain {
             commands.append(.placeArcade(stand.origin, stand.kind))
         }
 
+        if let origin = turretToPlace(actor: actor, in: world) {
+            commands.append(.placeTurret(origin))
+        }
+
         if let tile = chestToPlace(actor: actor, in: world) {
             commands.append(.placeChest(tile))
         }
@@ -263,7 +267,7 @@ enum AIBrain {
             // steerTowardsGoal drops it the moment either happens. A defender that
             // times out is a defender somebody can outwait.
             break
-        case .wreck:
+        case .wreck, .silence:
             // The same clock a crate gets. A machine that cannot be got at is
             // usually one behind a wall the bot has no way through.
             if state.goalAge > GameConfig.AI.lootPatience {
@@ -442,7 +446,7 @@ enum AIBrain {
         case .fight, .retreat:
             return
 
-        case .raid, .robChest, .wreck:
+        case .raid, .robChest, .wreck, .silence:
             // Mid-raid, and this is the one thing worth NOT reacting to.
             //
             // A raider has spent a bomb, crossed the map and is standing in
@@ -834,7 +838,7 @@ enum AIBrain {
             case .blaster(let tier): return tier > actor.blaster
             // Always worth the walk: one perk is one perk whatever you are wearing.
             case .perk:              return true
-            case .bandage, .medkit, .bomb, .stink, .chest, .arcade: return false
+            case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .turret: return false
             }
         })
 
@@ -1041,6 +1045,11 @@ enum AIBrain {
         // whose wall is shut has not broken in, it is trespassing on the lawn.
         guard world.baseIsBreached(team) else { return nil }
 
+        // Its turret first - see remaining(at:).
+        if let turret = turretStanding(at: team, nearest: actor.position, in: world) {
+            return .silence(turret.id)
+        }
+
         if let chest = world.chests(notOwnedBy: actor.team)
             .filter({ $0.owner == team && $0.contents.slots.contains { $0 != nil } })
             .min(by: { ($0.position - actor.position).length
@@ -1079,6 +1088,8 @@ enum AIBrain {
             return world.chests[id]?.owner
         case .wreck(let id):
             return world.arcade(id)?.owner
+        case .silence(let id):
+            return world.turrets[id]?.owner
         case .raid(let tile):
             return world.map[tile].blockOwner
         case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
@@ -1134,6 +1145,13 @@ enum AIBrain {
     private static func remaining(at victim: TeamID,
                                   for actor: Actor,
                                   in world: World) -> AIGoal? {
+        // The turret before anything else. Every second spent at a chest or a
+        // machine with one still standing is a second spent being shot, and a
+        // raid that ignores it ends with the raider carried out.
+        if let turret = turretStanding(at: victim, nearest: actor.position, in: world) {
+            return .silence(turret.id)
+        }
+
         // A chest with something in it. Nearest, and sorted, because two chests at
         // the same distance must not be broken by dictionary order.
         var chest: Chest?
@@ -1168,6 +1186,25 @@ enum AIBrain {
         if let machine { return .wreck(machine.id) }
 
         return nil
+    }
+
+    /// The nearest turret a base still has standing. Sorted, because this picks a
+    /// target and two at the same distance must not be split by dictionary order.
+    private static func turretStanding(at team: TeamID,
+                                       nearest point: Vec2,
+                                       in world: World) -> Turret? {
+        var best: Turret?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for id in world.turrets.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let turret = world.turrets[id], turret.owner == team else { continue }
+            let distance = (turret.centre - point).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = turret
+        }
+
+        return best
     }
 
     private static func machineWorthWrecking(for actor: Actor, in world: World) -> Arcade? {
@@ -1499,6 +1536,21 @@ enum AIBrain {
             // breaks off to deal with anybody who turns up, because the fight
             // check sits above this.
             steer(&state, actor: actor, to: machine.centre)
+
+        case .silence(let id):
+            // Knocked out already, by this bot or anybody. Re-decide at once:
+            // whatever it was guarding is now open for business.
+            guard let turret = world.turrets[id] else {
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+                return
+            }
+
+            // Straight at it. Standing off at range is what the turret wants -
+            // it out-damages a bot in a long exchange - and closing the distance
+            // makes its slow barrel the thing that loses.
+            steer(&state, actor: actor, to: turret.centre)
 
         case .rearm(let id):
             // Emptied, or taken while the bot was walking. Re-decide immediately
@@ -1843,7 +1895,7 @@ enum AIBrain {
         case .bandage, .medkit:
             return actor.inventory.totalHealing(of: actor.maxHealth)
                  < GameConfig.AI.buysHealingBelow
-        case .bomb, .stink, .chest, .arcade, .perk:
+        case .bomb, .stink, .chest, .arcade, .turret, .perk:
             return false
         }
     }
@@ -1869,6 +1921,13 @@ enum AIBrain {
            let origin = world.nextArcadeOrigin(for: actor.team,
                                                kind: kind,
                                                near: actor.position) {
+            return origin
+        }
+
+        // Then a turret, ahead of the chest it will be guarding: a chest stood up
+        // in a base with nothing watching it is the cheapest thing on the map.
+        if actor.inventory.firstSlot(holding: .turret) != nil,
+           let origin = world.nextTurretOrigin(for: actor.team, near: actor.position) {
             return origin
         }
 
@@ -1928,6 +1987,25 @@ enum AIBrain {
             return nil
         }
         return (origin, kind)
+    }
+
+    /// A spot to stand a carried turret on, from where the bot is now.
+    ///
+    /// The same rules a machine follows, for the same reason: not in an open
+    /// base, and only from arm's reach, so a bot stands it up on its way through
+    /// rather than making a special trip.
+    private static func turretToPlace(actor: Actor, in world: World) -> GridPoint? {
+        guard !world.baseIsBreached(actor.team) else { return nil }
+        guard actor.inventory.firstSlot(holding: .turret) != nil else { return nil }
+        guard let origin = world.nextTurretOrigin(for: actor.team,
+                                                  near: actor.position) else { return nil }
+
+        let turret = Turret(id: TurretID(-1), origin: origin, owner: actor.team)
+        guard (turret.centre - actor.position).length <= GameConfig.Build.reach + 1.5 else {
+            return nil
+        }
+        guard TurretSystem.canPlace(at: origin, by: actor, in: world) else { return nil }
+        return origin
     }
 
     /// The best thing in somebody else's chest that this bot could carry off.
@@ -2142,7 +2220,7 @@ enum AIBrain {
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
         case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
-             .rearm, .wreck, .defend, .hunt:
+             .rearm, .wreck, .silence, .defend, .hunt:
             target = nil
         }
 
@@ -2378,6 +2456,13 @@ enum AIBrain {
                                from: actor, in: world)
         }
 
+        // A turret is furniture that shoots back, and aimed at the same way: at
+        // the box, with no lead, because it does not move.
+        if case .silence(let id) = state.goal, let turret = world.turrets[id] {
+            return aimAtTarget(turret.centre, halfSpan: AIBrain.turretFaceInset,
+                               from: actor, in: world)
+        }
+
         // A chest is shot open, so robbing one is the same act as wrecking a
         // machine and goes through the same door. Its half-span is small - a chest
         // is under a tile across - so the aim is at very nearly its centre.
@@ -2398,7 +2483,7 @@ enum AIBrain {
         // .defend used to appear here as well as three lines up, where it binds.
         // The second one was unreachable and the compiler said so on every build.
         case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash,
-             .rearm, .wreck, .hunt:
+             .rearm, .wreck, .silence, .hunt:
             targetID = nil
         }
 
@@ -2499,6 +2584,10 @@ enum AIBrain {
     /// The same for a chest, which is under a tile across - so this is barely off
     /// its centre, and a bot shooting one is aiming at the box itself.
     private static let chestFaceInset: Double = 0.55
+
+    /// The same for a turret, whose footprint is two by two - a half-extent of
+    /// one tile, cleared from any angle.
+    private static let turretFaceInset: Double = 1.1
 
     private static func hasLineOfSight(from start: Vec2, to end: Vec2, in world: World) -> Bool {
         let delta = end - start

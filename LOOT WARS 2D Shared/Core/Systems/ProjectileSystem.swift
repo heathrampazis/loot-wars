@@ -42,6 +42,7 @@ enum ProjectileSystem {
             // IS the feature.
             if hitArcade(by: projectile, in: world) { continue }
             if hitChest(by: projectile, in: world) { continue }
+            if hitTurret(by: projectile, in: world) { continue }
 
             // Crates and machines are solid, so they stop a shot too - otherwise
             // bullets sail through something you demonstrably cannot walk through.
@@ -112,6 +113,24 @@ enum ProjectileSystem {
 
             ChestSystem.hit(id, for: projectile.damage,
                             by: projectile.owner, of: projectile.team, in: world)
+            return true
+        }
+
+        return false
+    }
+
+    /// Damages somebody else's turret the shot landed on. Your own still stops the
+    /// bullet - which is also what its OWN shots rely on not happening, and why a
+    /// turret fires from a muzzle outside its body. See Turret.muzzle.
+    ///
+    /// Sorted, because this hands out damage and damage decides who scores.
+    private static func hitTurret(by projectile: Projectile, in world: World) -> Bool {
+        for id in world.turrets.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let turret = world.turrets[id],
+                  turret.hitbox.contains(projectile.position) else { continue }
+
+            TurretSystem.hit(id, for: projectile.damage,
+                             by: projectile.owner, of: projectile.team, in: world)
             return true
         }
 

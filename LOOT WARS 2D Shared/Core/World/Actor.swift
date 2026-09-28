@@ -160,7 +160,7 @@ struct Actor {
         case .perk:
             return perk == nil
 
-        case .chest, .arcade:
+        case .chest, .arcade, .turret:
             // Always tappable. Whether either can go down HERE depends on the tile
             // you then pick, which is the placing system's call - the hotbar cannot
             // answer it and should not pretend to.
