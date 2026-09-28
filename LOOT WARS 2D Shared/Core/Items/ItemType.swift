@@ -147,16 +147,28 @@ enum ItemType: Hashable {
     ///
     /// This replaced a boolean for "used the moment you tap it", which stopped
     /// being true of anything once the bomb moved to the button.
+    /// What the player has to DO to spend this.
+    ///
+    /// Named after the item's own requirement rather than after a control, which is
+    /// the correction. The cases used to be `actionButton` and `mapTap` - one of
+    /// them named a button that no longer exists, and when it went every item on it
+    /// became instant whether or not that suited it. A bomb is not instant; it is
+    /// aimed. The enum could not say so because it was describing the interface
+    /// instead of the item.
     enum Use {
-        /// The small button above the corner.
-        case actionButton
-        /// Tap the map to say where.
+        /// Nothing to decide. The tap on the hotbar spends it.
+        case instant
+        /// Needs a DIRECTION, so it is picked out and thrown along your aim with a
+        /// button of its own - see GameScene.throwButton.
+        case thrown
+        /// Needs a TILE. Tap the map to say where.
         case mapTap
     }
 
     var use: Use {
         switch self {
-        case .bandage, .medkit, .bomb, .stink, .helmet, .blaster, .perk: return .actionButton
+        case .bandage, .medkit, .helmet, .blaster, .perk: return .instant
+        case .bomb, .stink: return .thrown
         // Both want you to say WHERE.
         case .chest, .arcade: return .mapTap
         }
