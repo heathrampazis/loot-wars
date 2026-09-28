@@ -1223,6 +1223,27 @@ enum GameConfig {
         /// something in it is the only thing on the map that repays crossing it.
         static let robRange: Double = 40
 
+        /// How long a bot keeps coming back to a base it has started on.
+        ///
+        /// Generous, because what it is paying for is already spent: by the time
+        /// this is running the bot has crossed the map and usually put a bomb
+        /// through a wall, and the whole complaint it answers is bots abandoning
+        /// raids they had already done the expensive part of. Half a minute is
+        /// long enough to survive a fight and still finish, short enough that a bot
+        /// which genuinely cannot get in gives up rather than orbiting a base for
+        /// the rest of the match.
+        ///
+        /// It does not tick down during a fight - see AIBrain.think - so a raid
+        /// interrupted by a long scrap is not quietly timed out by it.
+        static let raidHold: Double = 30
+
+        /// How far outside a base a bot will still consider itself mid-raid.
+        ///
+        /// Well past the walls, because being driven back is the normal way a raid
+        /// is interrupted: a bot that only counted as raiding while standing inside
+        /// would lose the thread exactly when it most needs to keep it.
+        static let raidReturnRange: Double = 22
+
         /// What a raider thinks a base is worth, and what the walk costs.
         ///
         /// Raids used to be chosen by NEARNESS alone - the closest reachable chest

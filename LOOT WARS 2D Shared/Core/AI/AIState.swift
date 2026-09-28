@@ -121,6 +121,26 @@ struct AIState {
     /// match.
     var huntUrgeTimer: Double = 0
 
+    /// Whose base this bot is in the middle of taking apart, and how long it will
+    /// keep coming back to it.
+    ///
+    /// THE MISSING MEMORY. Every raiding goal was a fact about one target - this
+    /// chest, this machine, this wall - and nothing above them said which BASE the
+    /// bot was working over. So a raid was three separate errands that happened to
+    /// be in the same place, and the moment any one of them finished or was
+    /// interrupted the bot re-weighed the whole map from scratch. It had blown a
+    /// hole in somebody's wall, which is the expensive part, and then wandered off
+    /// past the chest it had opened the wall to reach.
+    ///
+    /// The hold is what lets a fight happen in the middle of one. reactToThreats
+    /// takes the bot off the raid when somebody shoots at it - which is correct,
+    /// and was the other half of the problem, because whatever it had been doing
+    /// was forgotten by the time the fight ended. This survives the fight, so the
+    /// raid is something the bot returns to rather than something the fight
+    /// replaced. It does not run down while the fighting lasts - see AIBrain.think.
+    var raidingBase: TeamID?
+    var raidHold: Double = 0
+
     /// Where the quarry was last actually SEEN.
     ///
     /// A hunt walks at this and not at the quarry's live position, which is the
