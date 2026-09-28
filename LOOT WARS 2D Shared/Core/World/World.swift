@@ -212,6 +212,23 @@ final class World {
     /// Its own scale for the same reason. One constant serving both meant the
     /// thresholds on either side were not comparable numbers, and a max-based
     /// measure is far more easily saturated than a mean-based one.
+    /// Whoever is furthest ahead of the field, other than `team`, and by how
+    /// much - or nil when nobody is past GameConfig.AI.leaderChaseAt.
+    ///
+    /// Asked from a bot's point of view: "is somebody running away with this, and
+    /// is it not me". Teams in id order, so a tie resolves the same way every run.
+    func runaway(against team: TeamID) -> (team: TeamID, lead: Double)? {
+        var best: (team: TeamID, lead: Double)?
+
+        for other in TeamID.all where other != team {
+            let ahead = lead(of: other)
+            guard ahead >= GameConfig.AI.leaderChaseAt, ahead > (best?.lead ?? 0) else { continue }
+            best = (other, ahead)
+        }
+
+        return best
+    }
+
     func behind(_ team: TeamID) -> Double {
         min(1, max(0, Double(bestScore - score(for: team)) / GameConfig.AI.deficitScale))
     }

@@ -64,6 +64,11 @@ enum RespawnSystem {
             if actor.blaster < kit.blaster { actor.blaster = kit.blaster }
         }
 
+        // And something to heal with - see GameConfig.Player.respawnHeals.
+        for item in GameConfig.Player.respawnHealKit(at: world.matchProgress) {
+            _ = actor.inventory.add(item)
+        }
+
         // A bot that died halfway across the map should not come back still
         // pointed the way it was going. Face it out of its own base and let it
         // choose again shortly.

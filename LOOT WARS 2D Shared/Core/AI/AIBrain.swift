@@ -28,8 +28,11 @@ enum AIBrain {
         state.goalAge += dt
         state.lootCooldown = max(0, state.lootCooldown - dt)
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
-        state.raidUrgeTimer = max(0, state.raidUrgeTimer - dt)
-        state.huntUrgeTimer = max(0, state.huntUrgeTimer - dt)
+        // Faster while somebody else is running away with the match - see
+        // GameConfig.AI.leaderRush. Both the urges that point at the leader.
+        let rush = 1 + (world.runaway(against: actor.team)?.lead ?? 0) * GameConfig.AI.leaderRush
+        state.raidUrgeTimer = max(0, state.raidUrgeTimer - dt * rush)
+        state.huntUrgeTimer = max(0, state.huntUrgeTimer - dt * rush)
         state.stashCooldown = max(0, state.stashCooldown - dt)
         state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
@@ -80,6 +83,9 @@ enum AIBrain {
         // Steering runs every tick. Only committing to a direction twice a second
         // would let a bot sail straight past what it was walking to.
         steerTowardsGoal(&state, actor: actor, in: world)
+
+        // Before the obstacle pass, so a weave never steers into a wall.
+        dodgeWhileRaiding(&state, actor: actor, in: world)
 
         // Looking where you are going happens every tick, not on the decision timer.
         // Waiting up to three seconds to notice a tree is how a bot ends up grinding
@@ -1211,6 +1217,9 @@ enum AIBrain {
         guard actor.inventory.totalHealing(of: actor.maxHealth)
                 >= GameConfig.AI.emergencyHealingStock else { return nil }
 
+        // A runaway's machines at any distance - see chestWorthRobbing.
+        let runaway = world.runaway(against: actor.team)?.team
+
         var best: Arcade?
         var shortest = Double.greatestFiniteMagnitude
 
@@ -1221,7 +1230,8 @@ enum AIBrain {
                   world.baseIsBreached(owner) else { continue }
 
             let distance = (machine.centre - actor.position).length
-            guard distance < GameConfig.AI.robRange, distance < shortest else { continue }
+            guard distance < GameConfig.AI.robRange || owner == runaway,
+                  distance < shortest else { continue }
             shortest = distance
             best = machine
         }
@@ -1240,6 +1250,12 @@ enum AIBrain {
 
         let carryingAWayIn = actor.inventory.count(of: .bomb) > 0
 
+        // A runaway's base is worth any walk. robRange keeps an ordinary raid
+        // local; somebody doubling the field's score is not an ordinary target, and
+        // a leader whose base happened to be on the far side of the map from every
+        // bot was a leader nobody ever visited.
+        let runaway = world.runaway(against: actor.team)?.team
+
         var best: Chest?
         var bestScore = 0.0
 
@@ -1247,7 +1263,7 @@ enum AIBrain {
             guard carryingAWayIn || world.baseIsBreached(chest.owner) else { continue }
 
             let distance = (chest.position - actor.position).length
-            guard distance < GameConfig.AI.robRange else { continue }
+            guard distance < GameConfig.AI.robRange || chest.owner == runaway else { continue }
 
             // What the BASE is worth, not what this chest holds.
             //
@@ -1630,6 +1646,34 @@ enum AIBrain {
     private static func isHunt(_ goal: AIGoal) -> Bool {
         if case .hunt = goal { return true }
         return false
+    }
+
+    /// Weave, rather than walk a straight line, while raiding under fire.
+    ///
+    /// See GameConfig.AI.dodgeSwing. Only the FEET: where the blaster points is
+    /// shotToTake's business, so a raider can zig-zag at a chest and keep shooting
+    /// it. Each bot weaves on its own beat, offset by its id, so two raiders side
+    /// by side do not swing in step - and it is built off the match clock rather
+    /// than the generator, so it costs no random draws and cannot knock a seed out
+    /// of step.
+    private static func dodgeWhileRaiding(_ state: inout AIState, actor: Actor, in world: World) {
+        guard state.goal.isRaiding, underThreat(actor, in: world) else { return }
+
+        let beat = world.elapsed * 2 * Double.pi / GameConfig.AI.dodgePeriod
+        let swing = GameConfig.AI.dodgeSwing * sin(beat + Double(actor.id.raw) * 1.7)
+        state.desiredHeading = Vec2.fromAngle(state.desiredHeading.angle + swing)
+    }
+
+    /// Whether anything is shooting at this bot, or about to.
+    private static func underThreat(_ actor: Actor, in world: World) -> Bool {
+        if actor.secondsSinceHit < GameConfig.AI.dodgeMemory { return true }
+
+        if world.turrets.values.contains(where: { $0.target == actor.id }) { return true }
+
+        return world.actors.values.contains { other in
+            other.isAlive && other.team != actor.team
+                && (other.position - actor.position).length <= GameConfig.AI.dodgeRange
+        }
     }
 
     private static func steer(_ state: inout AIState, actor: Actor, to target: Vec2?) {
