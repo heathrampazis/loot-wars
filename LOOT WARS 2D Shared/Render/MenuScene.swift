@@ -270,59 +270,37 @@ final class MenuScene: SKScene {
 
         let middle = CGPoint(x: size.width / 2, y: size.height / 2)
 
-        // Sized off the SHORTER side, so the block keeps its proportions on a tall
-        // phone and an iPad alike rather than growing only sideways.
-        let unit = min(size.width, size.height)
+        // Laid out straight off Heath's mock-up, as shares of one unit: the
+        // screen's height, or its width over 1.9 on anything squarer than the
+        // mock-up was drawn at (an iPad), so the whole arrangement shrinks as one
+        // rather than the buttons running off the sides.
+        let unit = min(size.height, size.width / 1.9)
 
-        let playWidth = min(size.width * 0.46, 300)
-        let playHeight = max(52, min(unit * 0.15, 64))
-        let iconSide = max(44, min(unit * 0.125, 54))
+        // The name near the top, the wide play button dead centre, the two
+        // squares under it either side of the middle.
+        buildWordmark(centredOn: CGPoint(x: middle.x, y: middle.y + unit * 0.346),
+                      fontSize: unit * 0.15)
 
-        let gapUnderMark: CGFloat = unit * 0.09
-        let gapUnderPlay: CGFloat = unit * 0.06
+        let squareSide = unit * 0.184
+        buildButtons(centredOn: middle,
+                     playSize: CGSize(width: unit * 0.645, height: unit * 0.301),
+                     squareSide: squareSide,
+                     squareOffset: unit * 0.144,
+                     squareRowY: middle.y - unit * 0.316)
 
-        // The whole stack is centred as a block, so a tall screen gets more air
-        // around it rather than wider gaps inside it.
-        let markHeight = unit * 0.20
-        let block = markHeight + gapUnderMark + playHeight + gapUnderPlay + iconSide
-        var y = middle.y + block / 2
-
-        y -= markHeight / 2
-        buildWordmark(centredOn: CGPoint(x: middle.x, y: y), height: markHeight)
-        y -= markHeight / 2 + gapUnderMark
-
-        y -= playHeight / 2
-        buildButtons(centredOn: CGPoint(x: middle.x, y: y),
-                     playSize: CGSize(width: playWidth, height: playHeight),
-                     iconSide: iconSide,
-                     iconRowY: y - playHeight / 2 - gapUnderPlay - iconSide / 2)
-
-        buildRecord(centredOn: CGPoint(x: middle.x, y: middle.y - block / 2 - unit * 0.07))
+        buildRecord()
 
         if sheet.parent == nil { addChild(sheet) }
         sheet.position = middle
         sheet.layOut(for: size)
     }
 
-    /// The name, as TYPE.
+    /// The name, as TYPE: "loot wars", one line, lower case, heavy black - as
+    /// Heath drew it. It has been a drawn logo, then two stacked lines of tracked
+    /// capitals; the mock-up settled it.
     ///
-    /// It was a drawn logo and before that a single line of black type, and it is
-    /// two lines of tracked white type now. The picture went because a wordmark is
-    /// not a thing this game needs an artist for: the name is two four-letter words
-    /// of equal length, which is the one case where stacking them gives you a solid
-    /// rectangle of type for free - and a solid rectangle of heavy letterforms IS
-    /// the logo. Anything drawn on top of that was decoration on a shape that was
-    /// already doing the job.
-    ///
-    /// Wide tracking and tight leading, which is the whole look: the letters are
-    /// pushed apart and the lines pulled together, so the block reads as one mark
-    /// rather than as a sentence. It is also the only treatment that survives being
-    /// rendered at any size on any screen, which a bitmap does not.
-    ///
-    /// It floats, and that is all it does. The old one floated, swayed and shrugged
-    /// on three clocks, which was charming when it was the only thing on the screen
-    /// and is noise now that there is a map moving behind it.
-    private func buildWordmark(centredOn centre: CGPoint, height: CGFloat) {
+    /// It floats, and that is all it does - there is a map moving behind it.
+    private func buildWordmark(centredOn centre: CGPoint, fontSize: CGFloat) {
         wordmark.removeAllActions()
         wordmark.removeAllChildren()
         wordmark.removeFromParent()
@@ -331,28 +309,20 @@ final class MenuScene: SKScene {
         wordmark.setScale(1)
         addChild(wordmark)
 
-        // Not named `size`: that is the scene's own, and a local shadowing it three
-        // lines above a layout calculation is a trap left for whoever edits next.
-        let type = height * 0.48
-        let leading = type * 0.86
+        // One line, lower case, heavy black type - the mock-up. Helvetica Neue
+        // Bold because that is what it was drawn in; the system bold if a device
+        // ever lacks it.
+        let font = UIFont(name: "HelveticaNeue-Bold", size: fontSize)
+            ?? UIFont.systemFont(ofSize: fontSize, weight: .bold)
 
-        for (index, word) in ["LOOT", "WARS"].enumerated() {
-            let line = SKLabelNode()
-            line.attributedText = MenuButtonNode.text(word, size: type,
-                                                      weight: .heavy,
-                                                      colour: RenderPalette.menuInk)
-            line.verticalAlignmentMode = .center
-            line.horizontalAlignmentMode = .center
-
-            // No nudge any more. That correction existed because tracking adds its
-            // space after the LAST letter too, so a tracked line sits half a space
-            // left of true centre - and the tracking is gone with the rest of the
-            // styling. Two untracked words of four letters each, set in the same
-            // face at the same size, centre themselves.
-            line.position = CGPoint(x: 0,
-                                    y: index == 0 ? leading / 2 : -leading / 2)
-            wordmark.addChild(line)
-        }
+        let line = SKLabelNode()
+        line.attributedText = NSAttributedString(string: "loot wars", attributes: [
+            .font: font,
+            .foregroundColor: RenderPalette.menuInk
+        ])
+        line.verticalAlignmentMode = .center
+        line.horizontalAlignmentMode = .center
+        wordmark.addChild(line)
 
         wordmark.alpha = 0
         wordmark.run(.fadeIn(withDuration: 0.3))
@@ -365,30 +335,28 @@ final class MenuScene: SKScene {
 
     private func buildButtons(centredOn playCentre: CGPoint,
                               playSize: CGSize,
-                              iconSide: CGFloat,
-                              iconRowY: CGFloat) {
+                              squareSide: CGFloat,
+                              squareOffset: CGFloat,
+                              squareRowY: CGFloat) {
         for old in [playButton, infoButton, settingsButton] { old?.removeFromParent() }
 
-        let play = MenuButtonNode(primary: "PLAY",
-                                  width: playSize.width, height: playSize.height,
+        let play = MenuButtonNode(play: playSize.width, height: playSize.height,
                                   tone: RenderPalette.menuPlay)
         play.position = playCentre
         play.zPosition = 10
         addChild(play)
         playButton = play
 
-        let info = MenuButtonNode(secondary: Glyphs.info, diameter: iconSide,
+        let info = MenuButtonNode(glyph: Glyphs.info, side: squareSide,
                                   tone: RenderPalette.menuInfo)
-        let settings = MenuButtonNode(secondary: Glyphs.gear, diameter: iconSide,
+        let settings = MenuButtonNode(glyph: Glyphs.gear, side: squareSide,
                                       tone: RenderPalette.menuSettings)
 
-        // Side by side under the pill, with enough air between them that a thumb
-        // cannot mean both. They are the same size and sit on the same line because
-        // they are the same KIND of thing - ranking them against each other would
-        // be a third level of hierarchy on a screen that needs two.
-        let gap = iconSide * 0.55
-        info.position = CGPoint(x: playCentre.x - (iconSide + gap) / 2, y: iconRowY)
-        settings.position = CGPoint(x: playCentre.x + (iconSide + gap) / 2, y: iconRowY)
+        // Either side of the middle, on one line: the same kind of thing, so the
+        // same size - ranking them against each other would be a third level of
+        // hierarchy on a screen that needs two.
+        info.position = CGPoint(x: playCentre.x - squareOffset, y: squareRowY)
+        settings.position = CGPoint(x: playCentre.x + squareOffset, y: squareRowY)
 
         for button in [info, settings] {
             button.zPosition = 10
@@ -407,23 +375,47 @@ final class MenuScene: SKScene {
         play.breathe(after: 0.5)
     }
 
-    /// What the game remembers about you. Nothing at all, the first time.
-    private func buildRecord(centredOn centre: CGPoint) {
+    /// What the game remembers about you, tucked into the top-right corner.
+    /// Nothing at all the first time.
+    ///
+    /// Two right-aligned lines - best score over matches played - so it reads as
+    /// a small stat block rather than a sentence, and stays out of the way of the
+    /// title and the buttons. Inset from the safe area, so it never sits under
+    /// the notch or the rounded corner.
+    private func buildRecord() {
         childNode(withName: "record")?.removeFromParent()
         guard Prefs.matchesFinished > 0 else { return }
 
         let matches = Prefs.matchesFinished
         let played = "\(matches) MATCH\(matches == 1 ? "" : "ES")"
 
-        let label = SKLabelNode()
-        label.name = "record"
-        label.attributedText = MenuButtonNode.text("BEST \(Prefs.bestScore)   ·   \(played)",
+        let margin: CGFloat = 18
+        let right = size.width - (view?.safeAreaInsets.right ?? 0) - margin
+        let top = size.height - (view?.safeAreaInsets.top ?? 0) - margin
+
+        let record = SKNode()
+        record.name = "record"
+        record.position = CGPoint(x: right, y: top)
+        record.zPosition = 10
+
+        let best = SKLabelNode()
+        best.attributedText = MenuButtonNode.text("BEST \(Prefs.bestScore)",
+                                                  size: 15, weight: .bold,
+                                                  colour: SKColor(white: 0, alpha: 0.62))
+        best.horizontalAlignmentMode = .right
+        best.verticalAlignmentMode = .top
+        record.addChild(best)
+
+        let count = SKLabelNode()
+        count.attributedText = MenuButtonNode.text(played,
                                                    size: 12, weight: .semibold,
-                                                   colour: SKColor(white: 0, alpha: 0.42))
-        label.verticalAlignmentMode = .center
-        label.position = centre
-        label.zPosition = 10
-        addChild(label)
+                                                   colour: SKColor(white: 0, alpha: 0.45))
+        count.horizontalAlignmentMode = .right
+        count.verticalAlignmentMode = .top
+        count.position = CGPoint(x: 0, y: -20)
+        record.addChild(count)
+
+        addChild(record)
     }
 
     // Type for this whole screen lives in MenuButtonNode.text - one helper, one

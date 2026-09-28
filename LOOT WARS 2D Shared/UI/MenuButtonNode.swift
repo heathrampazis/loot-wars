@@ -2,41 +2,35 @@
 //  MenuButtonNode.swift
 //  Loot Wars
 //
-//  The menu's buttons, built the way the game draws everything else: flat colour,
-//  a heavy black outline, and a darker lip underneath that the button presses down
-//  onto.
+//  The menu's buttons, drawn to Heath's mock-up: a chunky rounded slab of flat
+//  colour, edged in a darker shade of itself, sitting on a soft shadow - and an
+//  icon, no words.
 //
-//  THE EDGE IS A DARKER SHADE OF THE FILL, not a black outline. That was the
-//  previous version, on the reasoning that the whole map is drawn as flat colour
-//  inside a heavy black line - every figure, crate, chest and health bar - so a
-//  button without one is the only object on screen that is not part of the game.
+//  THE EDGE IS A DARKER SHADE OF THE FILL, not a black outline. A black line round
+//  a sprite on grass separates it from a background it has to survive; round a
+//  button it is a colour the button does not otherwise contain, and reads as an
+//  object that was outlined rather than one that was moulded. The edge sits INSIDE
+//  the shape, so the button's outer size is exactly the size it was laid out at.
 //
-//  The reasoning was right about the map and wrong about the button. A black line
-//  round a sprite on grass is separating it from a background it has to survive;
-//  a black line round a button is a colour the button does not otherwise contain,
-//  and it reads as an object that was outlined rather than one that was moulded.
-//  The same shape edged in its own colour taken down to 0.72 brightness reads as a
-//  raised surface with a side to it - which is what a button is.
+//  The shadow replaces the old lip. The lip was a hard darker copy of the shape
+//  underneath, which the mock-up does not have: there the buttons float a little
+//  above the map on a soft blur. A press pushes the face down towards its shadow
+//  and the shadow tightens, which is the same "somewhere to go" the lip gave a
+//  finger, in the new look.
 //
-//  The lip is the second half of it, and it is what makes a press feel like
-//  something. A button drawn as one flat shape can only answer a finger by changing
-//  size, which is a thing shapes do and not a thing buttons do. A shape standing on
-//  a darker shape of itself has somewhere to GO: it drops onto its own shadow and
-//  comes back up. That is the oldest trick in game UI and it is still the best one.
-//
-//  PRIMARY is the wide pill, SECONDARY a small circle with a glyph. One type rather
-//  than two, because the difference between them is entirely fill, size and
-//  contents - and two classes sharing a press animation is how a press animation
-//  ends up with two slightly different timings that nobody meant.
+//  PRIMARY is the wide slab with a play mark, SECONDARY a rounded square with a
+//  glyph. One type rather than two, because the difference between them is
+//  entirely proportion and contents - and two classes sharing a press animation is
+//  how a press animation ends up with two slightly different timings.
 //
 //  Not ActionButtonNode, which is the in-game control: that one knows about grab
-//  radii wider than itself because it is pressed by a thumb that is also steering,
-//  and about being drawn faint when the simulation would refuse it. Neither is true
-//  here. A menu button is pressed by somebody looking at it.
+//  radii wider than itself because it is pressed by a thumb that is also steering.
+//  A menu button is pressed by somebody looking at it.
 //
 
 import SpriteKit
 import UIKit
+import CoreImage
 
 final class MenuButtonNode: SKNode {
 
@@ -45,119 +39,81 @@ final class MenuButtonNode: SKNode {
         case secondary
     }
 
-    /// The tap target, in this node's own space. Measured from what was drawn
-    /// rather than written down twice - see GameScene, where exactly that pair
-    /// coming apart is a recurring note.
+    /// The tap target, in this node's own space.
     ///
-    /// NOT called `size`. SKNode has no such property today, so it would compile -
-    /// but SKSpriteNode does, and this project has a sibling note worth honouring:
-    /// a `listener` declared on an SKScene subclass collided with SpriteKit's own
-    /// and the file simply would not build, which is a class of error nothing here
-    /// can catch before Xcode. A name of one's own costs nothing.
+    /// NOT called `size` - see the note on SKScene's `listener` in the project
+    /// notes. A name of one's own costs nothing.
     private(set) var box: CGSize
 
     private let weight: Weight
 
-    /// The part that moves. Everything the player reads is on here, so the whole
-    /// face drops as one rather than the fill moving out from under its own label.
+    /// The part that moves: the slab and its icon, as one.
     private let face = SKNode()
 
-    /// How far the face falls when pressed, which is exactly the lip's depth - so
-    /// a pressed button sits flush on its own shadow rather than somewhere near it.
-    private let lipDepth: CGFloat
+    /// The soft shadow under it, which stays put while the face moves.
+    private let shadow: SKSpriteNode
 
-    /// Accessibility takes a touch that starts near a small button and is heading
-    /// for it. Generous on the secondaries because they are barely fifty points
-    /// across, which is Apple's floor rather than a comfortable target.
+    /// How far the face sinks when pressed.
+    private let sink: CGFloat
+
+    /// Accessibility takes a touch that starts near a button and is heading for it.
     private static let slop: CGFloat = 12
+
+    // MARK: - Proportions, measured off the mock-up
+
+    /// Edge thickness and corner radius as shares of the button's HEIGHT. The wide
+    /// one has a thinner edge relative to itself than the squares do, because at
+    /// the same absolute weight both edges read as the same line.
+    private static let primaryEdge: CGFloat = 0.057
+    private static let primaryCorner: CGFloat = 0.17
+    private static let secondaryEdge: CGFloat = 0.093
+    private static let secondaryCorner: CGFloat = 0.22
 
     // MARK: - Building
 
-    /// The wide one: a play triangle, a gap, and a word.
-    init(primary title: String, width: CGFloat, height: CGFloat,
-         tone: RenderPalette.MenuTone) {
+    /// The wide one, with a play mark.
+    init(play width: CGFloat, height: CGFloat, tone: RenderPalette.MenuTone) {
         self.weight = .primary
         self.box = CGSize(width: width, height: height)
-        self.lipDepth = max(4, height * 0.11)
+        self.sink = max(3, height * 0.04)
+        self.shadow = MenuButtonNode.makeShadow(width: width, height: height,
+                                                corner: height * MenuButtonNode.primaryCorner)
         super.init()
 
-        // A rounded rectangle, not a pill. A shape whose ends are half-circles has
-        // no straight run along the top and bottom for the edge to read as a side,
-        // so the whole thing goes back to looking like an outlined outline. This is
-        // round enough to be friendly and square enough to have faces.
-        let radius = height * 0.30
-        let shape = CGRect(x: -width / 2, y: -height / 2, width: width, height: height)
-
-        let outline = max(3, height * 0.07)
-
-        addChild(MenuButtonNode.lip(shape, radius: radius, tone: tone,
-                                    drop: lipDepth, outline: outline))
+        addChild(shadow)
         addChild(face)
 
-        let body = SKShapeNode(rect: shape, cornerRadius: radius)
-        body.fillColor = tone.face
-        body.strokeColor = tone.edge
-        body.lineWidth = outline
-        face.addChild(body)
+        face.addChild(MenuButtonNode.slab(width: width, height: height,
+                                          edge: height * MenuButtonNode.primaryEdge,
+                                          corner: height * MenuButtonNode.primaryCorner,
+                                          tone: tone))
 
-        // The triangle and the word are laid out as one row and centred together,
-        // rather than the word centred with a triangle hung off it. A button with
-        // centred text and a mark to the left of it looks off-centre, because it is.
-        let glyphSide = height * 0.30
-        let gap = height * 0.22
-
-        let label = SKLabelNode()
-        label.attributedText = MenuButtonNode.text(title, size: height * 0.34,
-                                                   weight: .bold, colour: .white)
-        label.verticalAlignmentMode = .center
-        label.horizontalAlignmentMode = .left
-
-        let row = glyphSide + gap + label.frame.width
-        let triangle = MenuButtonNode.play(side: glyphSide)
-
-        triangle.position = CGPoint(x: -row / 2 + glyphSide / 2, y: 0)
-        label.position = CGPoint(x: -row / 2 + glyphSide + gap, y: 0)
-
-        face.addChild(triangle)
-        face.addChild(label)
+        let mark = MenuButtonNode.play(side: height * 0.36)
+        face.addChild(mark)
     }
 
-    /// A small one: a circle and a glyph.
-    init(secondary glyph: SKTexture, diameter: CGFloat,
-         tone: RenderPalette.MenuTone) {
+    /// A small square one, with a glyph.
+    init(glyph: SKTexture, side: CGFloat, tone: RenderPalette.MenuTone) {
         self.weight = .secondary
-        self.box = CGSize(width: diameter, height: diameter)
-        self.lipDepth = max(3.5, diameter * 0.11)
+        self.box = CGSize(width: side, height: side)
+        self.sink = max(2.5, side * 0.05)
+        self.shadow = MenuButtonNode.makeShadow(width: side, height: side,
+                                                corner: side * MenuButtonNode.secondaryCorner)
         super.init()
 
-        let radius = diameter / 2
-        let shape = CGRect(x: -radius, y: -radius, width: diameter, height: diameter)
-
-        let outline = max(3, diameter * 0.075)
-
-        addChild(MenuButtonNode.lip(shape, radius: radius, tone: tone,
-                                    drop: lipDepth, outline: outline))
+        addChild(shadow)
         addChild(face)
 
-        let body = SKShapeNode(circleOfRadius: radius)
-        body.fillColor = tone.face
-        body.strokeColor = tone.edge
-        body.lineWidth = outline
-        face.addChild(body)
+        face.addChild(MenuButtonNode.slab(width: side, height: side,
+                                          edge: side * MenuButtonNode.secondaryEdge,
+                                          corner: side * MenuButtonNode.secondaryCorner,
+                                          tone: tone))
 
-        // Hierarchy is carried by SIZE, not by fill. These were hollow outlines for
-        // one revision, on the argument that only the thing you came to press
-        // should be solid; what that actually reads as is two disabled controls.
-        // Three solid buttons where one is three times the others says the same
-        // thing without anything looking switched off.
-        let side = diameter * 0.42
-        let mark = SKSpriteNode(texture: glyph,
-                                size: CGSize(width: side, height: side))
+        let iconSide = side * 0.46
+        let mark = SKSpriteNode(texture: glyph, size: CGSize(width: iconSide, height: iconSide))
 
-        // The glyphs are drawn white in Glyphs.swift and used white here, so the
-        // tint is a no-op today. It is set anyway rather than left to chance: a
-        // sprite carrying somebody else's texture and no opinion about its own
-        // colour is a sprite that changes when the texture does.
+        // The glyphs are drawn white in Glyphs.swift. Tinted white anyway, so a
+        // change of texture cannot quietly change the colour.
         mark.color = .white
         mark.colorBlendFactor = 1
         face.addChild(mark)
@@ -167,25 +123,57 @@ final class MenuButtonNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// The side the face stands on: the same shape in the edge colour, sitting
-    /// lower, so what shows below the face is the button's own thickness. Drawn once and never moved - the FACE is what moves,
-    /// and a lip that moved with it would be a button with no depth that happened
-    /// to be two shapes.
-    private static func lip(_ shape: CGRect,
-                            radius: CGFloat,
-                            tone: RenderPalette.MenuTone,
-                            drop: CGFloat,
-                            outline: CGFloat) -> SKShapeNode {
-        let node = SKShapeNode(rect: shape, cornerRadius: radius)
-        node.fillColor = tone.edge
-        node.strokeColor = tone.edge
+    /// The button itself: flat fill, edged inside in a darker shade.
+    ///
+    /// SKShapeNode strokes straddle the path, so the path is inset by half the
+    /// edge - the outside of the edge then lands exactly on the laid-out size.
+    private static func slab(width: CGFloat,
+                             height: CGFloat,
+                             edge: CGFloat,
+                             corner: CGFloat,
+                             tone: RenderPalette.MenuTone) -> SKShapeNode {
+        let inset = edge / 2
+        let rect = CGRect(x: -width / 2 + inset, y: -height / 2 + inset,
+                          width: width - edge, height: height - edge)
 
-        // The SAME weight as the face, handed in rather than recomputed. A lip
-        // drawn with a thinner line than the shape standing on it reads as two
-        // objects that do not quite belong together, which is the one thing a
-        // shadow must never look like.
-        node.lineWidth = outline
-        node.position = CGPoint(x: 0, y: -drop)
+        let node = SKShapeNode(rect: rect, cornerRadius: max(0, corner - inset))
+        node.fillColor = tone.face
+        node.strokeColor = tone.edge
+        node.lineWidth = edge
+        return node
+    }
+
+    /// A soft dark blur the same shape as the button, a little below it.
+    ///
+    /// Drawn once into a texture and blurred there, rather than an SKEffectNode
+    /// blurring live - it never changes, so there is nothing to recompute, and an
+    /// effect node crops its blur to its children's bounds, which cuts the soft
+    /// edge off exactly where it should be fading out.
+    private static func makeShadow(width: CGFloat, height: CGFloat, corner: CGFloat) -> SKSpriteNode {
+        let blur = max(4, height * 0.07)
+        let pad = blur * 2.5
+        let canvas = CGSize(width: width + pad * 2, height: height + pad * 2)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        format.scale = 2
+
+        let image = UIGraphicsImageRenderer(size: canvas, format: format).image { _ in
+            SKColor.black.setFill()
+            UIBezierPath(roundedRect: CGRect(x: pad, y: pad, width: width, height: height),
+                         cornerRadius: corner).fill()
+        }
+
+        var texture = SKTexture(image: image)
+        if let filter = CIFilter(name: "CIGaussianBlur") {
+            // In the texture's pixels, which are twice its points.
+            filter.setValue(blur * format.scale, forKey: kCIInputRadiusKey)
+            texture = texture.applying(filter)
+        }
+
+        let node = SKSpriteNode(texture: texture, size: canvas)
+        node.alpha = 0.26
+        node.position = CGPoint(x: 0, y: -max(3, height * 0.05))
         node.zPosition = -1
         return node
     }
@@ -212,19 +200,15 @@ final class MenuButtonNode: SKNode {
 
     /// A slow bob on the primary, and nothing on the secondaries.
     ///
-    /// It RISES off its lip rather than growing, which is the difference between
-    /// playful and merely animated: a button that swells reads as a thing being
-    /// zoomed; one that lifts and settles reads as a thing that weighs something.
-    /// The lip stays put, so the shadow under it opens and closes as it moves.
-    ///
-    /// On a screen with three controls, the one that moves is the one you press.
-    /// Bobbing all three would say they are equally important, which is the one
-    /// thing this layout exists to deny.
+    /// It RISES off its shadow rather than growing: a button that swells reads as
+    /// a thing being zoomed; one that lifts and settles reads as a thing that
+    /// weighs something. On a screen with three controls, the one that moves is
+    /// the one you press.
     func breathe(after delay: TimeInterval) {
         guard weight == .primary else { return }
 
         let rise = SKAction.sequence([
-            .moveTo(y: lipDepth * 0.42, duration: 1.15),
+            .moveTo(y: sink * 0.8, duration: 1.15),
             .moveTo(y: 0, duration: 1.15)
         ])
         rise.timingMode = .easeInEaseOut
@@ -237,50 +221,42 @@ final class MenuButtonNode: SKNode {
 
     func contains(localPoint point: CGPoint) -> Bool {
         let slop = MenuButtonNode.slop
-        switch weight {
-        case .primary:
-            return abs(point.x) <= box.width / 2 + slop
-                && abs(point.y) <= box.height / 2 + slop
-        case .secondary:
-            return hypot(point.x, point.y) <= box.width / 2 + slop
-        }
+        return abs(point.x) <= box.width / 2 + slop
+            && abs(point.y) <= box.height / 2 + slop
     }
 
-    /// Down onto the lip, then back up past where it started, then settle.
+    /// Down towards its shadow with a squash, then back up past where it started,
+    /// then settle. The shadow tightens as the face comes down to meet it.
     ///
-    /// Position rather than scale, which is the change that made this feel like a
-    /// button. A scale press is a shape acknowledging a touch; this is a thing
-    /// being pushed in and springing out, and the lip going out of sight underneath
-    /// it is what sells the push.
-    ///
-    /// It overshoots because a button that returns exactly to where it started
-    /// reads as having been let go of rather than as having sprung back.
-    ///
-    /// Takes a completion rather than the caller running the press and acting on
-    /// the next line, which is the bug the old menu records: presenting a scene on
-    /// the same frame plays the animation on a node already being torn down, and
-    /// the screen simply changes. Two tenths of a second is nothing to wait and is
-    /// the difference between a button and a hotspot.
+    /// Takes a completion rather than the caller acting on the next line:
+    /// presenting a scene on the same frame plays the animation on a node already
+    /// being torn down, and the screen simply changes.
     func press(then done: @escaping () -> Void) {
-        face.removeAction(forKey: "breathe")
         face.removeAllActions()
+        shadow.removeAllActions()
 
         let push = SKAction.sequence([
-            .moveTo(y: -lipDepth, duration: 0.05),
-            .moveTo(y: lipDepth * 0.35, duration: 0.10),
-            .moveTo(y: 0, duration: 0.08)
+            .group([.moveTo(y: -sink, duration: 0.05),
+                    .scaleX(to: 1.03, y: 0.94, duration: 0.05)]),
+            .group([.moveTo(y: sink * 0.5, duration: 0.10),
+                    .scaleX(to: 0.98, y: 1.03, duration: 0.10)]),
+            .group([.moveTo(y: 0, duration: 0.08),
+                    .scale(to: 1, duration: 0.08)])
         ])
         push.timingMode = .easeOut
+
+        shadow.run(.sequence([
+            .group([.scale(to: 0.94, duration: 0.05), .fadeAlpha(to: 0.4, duration: 0.05)]),
+            .group([.scale(to: 1, duration: 0.18), .fadeAlpha(to: 0.26, duration: 0.18)])
+        ]))
 
         face.run(.sequence([push, .run(done)]))
     }
 
     /// Type, which SKLabelNode can only style through an attributed string.
     ///
-    /// THE SYSTEM FONT, plain. It was AvenirNext tracked wide, then the system face
-    /// at Black weight with tracking on top. Both were a font doing work the layout
-    /// should be doing: on a screen this simple the type has one job, which is to
-    /// be read instantly and get out of the way. Bold, no tracking, nothing else.
+    /// Still used by the sheet and the record line under the buttons; the buttons
+    /// themselves no longer carry words.
     static func text(_ string: String,
                      size: CGFloat,
                      weight: UIFont.Weight,

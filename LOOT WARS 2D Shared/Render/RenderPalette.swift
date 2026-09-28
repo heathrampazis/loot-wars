@@ -57,12 +57,17 @@ enum RenderPalette {
     /// edge, close enough that it is obviously the same colour and not a border
     /// somebody chose separately - which is what a black outline looked like, and
     /// why it went.
-    static let menuPlay = MenuTone(face: rgb(0x22, 0xB0, 0x4E),
-                                   edge: rgb(0x18, 0x7F, 0x38))
-    static let menuInfo = MenuTone(face: rgb(0x2E, 0x9B, 0xFF),
-                                   edge: rgb(0x21, 0x70, 0xB8))
-    static let menuSettings = MenuTone(face: rgb(0xA8, 0x55, 0xF7),
-                                       edge: rgb(0x79, 0x3D, 0xB2))
+    ///
+    /// SUPERSEDED by Heath's mock-up: green, blue and orange, the brighter of the
+    /// two versions he drew. The softer set, matching the team colours on the
+    /// map exactly, was: green 3DA17D / 2F7C61, blue 6AB1FE / 4D86C3,
+    /// orange FF935D / D0784F - swap these back to try it.
+    static let menuPlay = MenuTone(face: rgb(0x00, 0xA6, 0x7A),
+                                   edge: rgb(0x00, 0x84, 0x61))
+    static let menuInfo = MenuTone(face: rgb(0x4F, 0xB3, 0xFF),
+                                   edge: rgb(0x3A, 0x8B, 0xD2))
+    static let menuSettings = MenuTone(face: rgb(0xFF, 0x8B, 0x4F),
+                                       edge: rgb(0xE0, 0x75, 0x49))
 
     /// Near-black rather than black. A true black on a light ground vibrates at
     /// large sizes, which is exactly the size the wordmark is set at.
