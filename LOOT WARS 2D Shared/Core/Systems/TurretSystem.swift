@@ -41,6 +41,9 @@ enum TurretSystem {
     static func canPlace(at origin: GridPoint, by actor: Actor, in world: World) -> Bool {
         guard actor.inventory.firstSlot(holding: .turret) != nil else { return false }
 
+        // Two to a base - see GameConfig.Base.maxTurrets.
+        guard world.turretCount(ownedBy: actor.team) < GameConfig.Base.maxTurrets else { return false }
+
         guard let claim = world.claim(for: actor.team),
               claim.contains(GridPoint(containing: actor.feet)) else { return false }
 
@@ -142,9 +145,9 @@ enum TurretSystem {
                                       team: turret.owner,
                                       position: turret.muzzle(pointing: direction),
                                       velocity: direction * GameConfig.Blaster.projectileSpeed,
-                                      damage: GameConfig.Turret.damage)
+                                      damage: turret.shotDamage)
 
-                turret.cooldown = 1.0 / GameConfig.Turret.fireRate
+                turret.cooldown = 1.0 / turret.fireRate
             }
 
             world.turrets[id] = turret
@@ -297,7 +300,7 @@ enum TurretSystem {
 
             turret.secondsSinceHit += dt
 
-            guard turret.health < GameConfig.Turret.health,
+            guard turret.health < turret.maxHealth,
                   turret.secondsSinceHit >= GameConfig.Turret.mendDelay else {
                 world.turrets[id] = turret
                 continue
@@ -311,8 +314,8 @@ enum TurretSystem {
 
             turret.mendTimer = GameConfig.Turret.mendTick
 
-            let portion = Double(GameConfig.Turret.health) * GameConfig.Turret.mendPortion
-            turret.health = min(GameConfig.Turret.health,
+            let portion = Double(turret.maxHealth) * GameConfig.Turret.mendPortion
+            turret.health = min(turret.maxHealth,
                                 turret.health + max(1, Int(portion.rounded())))
             world.turrets[id] = turret
         }

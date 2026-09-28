@@ -569,7 +569,14 @@ final class World {
 
     @discardableResult
     func spawnTurret(at origin: GridPoint, owner: TeamID) -> TurretID {
-        let turret = Turret(id: TurretID(nextTurretID), origin: origin, owner: owner)
+        var turret = Turret(id: TurretID(nextTurretID), origin: origin, owner: owner)
+
+        // A bot's turret is the stronger kind - see GameConfig.Turret.botHealth.
+        if isBotTeam(owner) {
+            turret.fortified = true
+            turret.health = turret.maxHealth
+        }
+
         nextTurretID += 1
         turrets[turret.id] = turret
         structuresChanged()
@@ -583,6 +590,15 @@ final class World {
 
     func hasTurret(_ team: TeamID) -> Bool {
         turrets.values.contains { $0.owner == team }
+    }
+
+    func turretCount(ownedBy team: TeamID) -> Int {
+        turrets.values.reduce(0) { $0 + ($1.owner == team ? 1 : 0) }
+    }
+
+    /// Whether this team is played by a bot rather than a person.
+    func isBotTeam(_ team: TeamID) -> Bool {
+        actors.values.contains { $0.team == team && $0.ai != nil }
     }
 
     /// The one person on a team, for a turret's shots to be credited to.
@@ -1012,7 +1028,8 @@ final class World {
         let room = enclosure(of: team).room
         guard !room.isEmpty else { return 0 }
 
-        let wanted = GameConfig.Base.chestsOnSeal(forRoomOf: room.count)
+        let wanted = min(GameConfig.Base.chestsOnSeal(forRoomOf: room.count),
+                         GameConfig.Base.maxChests)
         let centre = claims[team]?.centreTile.center ?? .zero
         let ownedByABot = actors.values.contains { $0.team == team && $0.ai != nil }
         var placed = 0

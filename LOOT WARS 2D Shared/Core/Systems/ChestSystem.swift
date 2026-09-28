@@ -44,6 +44,9 @@ enum ChestSystem {
     static func canPlace(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
         guard actor.inventory.firstSlot(holding: .chest) != nil else { return false }
 
+        // Two to a base - see GameConfig.Base.maxChests.
+        guard world.chestCount(ownedBy: actor.team) < GameConfig.Base.maxChests else { return false }
+
         // No requirement that the wall be shut, and that is a deliberate reversal.
         //
         // It was a hard rule here for one commit, to stop anybody strolling into a

@@ -1961,7 +1961,11 @@ enum AIBrain {
         // moment it is down and a chest only holds what you put in it. Either size
         // will do - a mini earns less but earns immediately, and a bot holding one
         // of each stands the first one it finds up and comes back for the other.
+        //
+        // Each only while the base has room for another - see
+        // GameConfig.Base.maxChests - or a bot carries it home forever.
         if let kind = carriedArcade(of: actor),
+           !PlacementSystem.baseIsFull(for: .arcade(kind), team: actor.team, in: world),
            let origin = world.nextArcadeOrigin(for: actor.team,
                                                kind: kind,
                                                near: actor.position) {
@@ -1971,11 +1975,13 @@ enum AIBrain {
         // Then a turret, ahead of the chest it will be guarding: a chest stood up
         // in a base with nothing watching it is the cheapest thing on the map.
         if actor.inventory.firstSlot(holding: .turret) != nil,
+           !PlacementSystem.baseIsFull(for: .turret, team: actor.team, in: world),
            let origin = world.nextTurretOrigin(for: actor.team, near: actor.position) {
             return origin
         }
 
-        guard actor.inventory.firstSlot(holding: .chest) != nil else { return nil }
+        guard actor.inventory.firstSlot(holding: .chest) != nil,
+              !PlacementSystem.baseIsFull(for: .chest, team: actor.team, in: world) else { return nil }
         return world.nextChestTile(for: actor.team, near: actor.position)
     }
 

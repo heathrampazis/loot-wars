@@ -43,6 +43,14 @@ struct Turret {
 
     var health: Int = GameConfig.Turret.health
 
+    /// Whether it stands in a bot's base, which makes it tougher and deadlier -
+    /// see GameConfig.Turret.botHealth. Set once, when it is stood up.
+    var fortified: Bool = false
+
+    var maxHealth: Int { fortified ? GameConfig.Turret.botHealth : GameConfig.Turret.health }
+    var shotDamage: Int { fortified ? GameConfig.Turret.botDamage : GameConfig.Turret.damage }
+    var fireRate: Double { fortified ? GameConfig.Turret.botFireRate : GameConfig.Turret.fireRate }
+
     /// Which way the barrel is pointing, in radians, and where it is trying to
     /// point. The barrel TURNS rather than snapping, which is most of what makes
     /// one read as a thing that has noticed you - see TurretSystem.track.
