@@ -23,13 +23,30 @@ import UIKit
 protocol MenuSheetContent: AnyObject {
     var node: SKNode { get }
 
-    /// Lays the content out for a card this wide and says how tall it came out.
-    /// The node's origin is the top-centre of the space it is given; content
-    /// grows downwards from there.
-    func layOut(width: CGFloat) -> CGFloat
+    /// How wide the card should be on this screen, or nil for the sheet's usual
+    /// width. The How to Play pages ask for more room than a list of switches.
+    func preferredCardWidth(for screen: CGSize) -> CGFloat?
+
+    /// Lays the content out for a card this wide and says how tall it came out,
+    /// never more than `maxHeight`. The node's origin is the top-centre of the
+    /// space it is given; content grows downwards from there.
+    func layOut(width: CGFloat, maxHeight: CGFloat) -> CGFloat
 
     /// A tap on the card, in the content node's own space.
     func tap(at point: CGPoint)
+
+    /// A finger dragging across the card, in the content node's own space - for
+    /// content that swipes. Most content ignores these.
+    func dragBegan(at point: CGPoint)
+    func dragMoved(to point: CGPoint)
+    func dragEnded(at point: CGPoint)
+}
+
+extension MenuSheetContent {
+    func preferredCardWidth(for screen: CGSize) -> CGFloat? { nil }
+    func dragBegan(at point: CGPoint) {}
+    func dragMoved(to point: CGPoint) {}
+    func dragEnded(at point: CGPoint) {}
 }
 
 // MARK: - Settings
@@ -57,7 +74,7 @@ final class SettingsSheetContent: MenuSheetContent {
     /// can say it worked and not offer to do it twice.
     private var tipsReset = false
 
-    func layOut(width: CGFloat) -> CGFloat {
+    func layOut(width: CGFloat, maxHeight: CGFloat) -> CGFloat {
         self.width = width
         node.removeAllChildren()
 
@@ -207,7 +224,7 @@ final class AboutSheetContent: MenuSheetContent {
 
     private var width: CGFloat = 0
 
-    func layOut(width: CGFloat) -> CGFloat {
+    func layOut(width: CGFloat, maxHeight: CGFloat) -> CGFloat {
         self.width = width
         node.removeAllChildren()
 
