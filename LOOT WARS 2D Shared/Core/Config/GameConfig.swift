@@ -168,7 +168,9 @@ enum GameConfig {
         /// Four, plus a token a tier, so a bare kill on somebody with nothing still
         /// clears the cheapest rung in the shop at six. What it no longer does is
         /// pay for two rungs before the purse is even counted.
-        static let perKill = 4
+        ///
+        /// REDUCED (token pass): 4 -> 3.
+        static let perKill = 3
 
         /// And more for a better-equipped victim, on the same nought-to-twelve scale
         /// the score bounty uses. Somebody fully kitted pays 20 tokens against a
@@ -186,7 +188,8 @@ enum GameConfig {
         static let perLootbox = 1
 
         /// A rare one is worth going out of your way for, and this is part of why.
-        static let perRareLootbox = 4
+        /// REDUCED (token pass): 4 -> 3.
+        static let perRareLootbox = 3
 
         /// Tokens for cracking somebody's chest. Still more than a rare crate,
         /// because a rare crate does not shoot back.
@@ -202,7 +205,10 @@ enum GameConfig {
         /// raid can pay off when the chest turns out to be full of bandages. At 24
         /// a raid is most of a helmet, which is what makes the trip worth planning
         /// rather than worth taking if you happen to be passing.
-        static let perChestRaided = 24
+        ///
+        /// REDUCED (token pass): 24 -> 15. Still the best-paying single act, but
+        /// no longer most of a helmet in one go.
+        static let perChestRaided = 15
     }
 
     /// What tokens buy.
@@ -503,7 +509,8 @@ enum GameConfig {
         static let spawnSearchMargin = 4
 
         static let sealed = 60
-        static let sealedTokens = 8
+        /// REDUCED (token pass): 8 -> 4.
+        static let sealedTokens = 4
         static let resealed = 20
 
         /// The least ground a wall has to enclose before it counts as a base.
@@ -1960,7 +1967,11 @@ enum GameConfig {
         /// losing dies most, so they would lose most score, and the match would be
         /// decided in its first two minutes. It also punishes fighting, in a game
         /// whose whole second half is meant to be fighting.
-        static let tokenShare: Double = 1.0
+        ///
+        /// REDUCED (token pass): 1.0 -> 0.5. Killing a bot used to hand over its
+        /// whole purse, which is where a good player's income snowballed. Half
+        /// spills; the other half stays with the victim.
+        static let tokenShare: Double = 0.5
 
         /// The odds that one item off a carried healing stack lands on the ground.
         ///
@@ -2152,7 +2163,8 @@ enum GameConfig {
         /// What opening one pays, on top of the gear. More than a rare crate by a
         /// distance - you usually have to win a fight to get your hands on it.
         static let score = 50
-        static let tokens = 8
+        /// REDUCED (token pass): 8 -> 5 - the gear is the prize.
+        static let tokens = 5
 
         /// What is inside: ONE item, always a Mythical or Cosmic helmet or
         /// blaster. Cosmic is the rarer half.
@@ -2718,7 +2730,9 @@ enum GameConfig {
         /// standing behind a finished wall now pays about one token every two
         /// seconds rather than one every four - which is what turns it from a
         /// twenty-four token ornament into the reason to own a base.
-        static let emitInterval: Double = 3.2
+        /// REDUCED (token pass): 3.2 -> 3.9. Machines were the biggest single
+        /// source of tokens and let a player buy the ladder far too early.
+        static let emitInterval: Double = 3.9
 
         /// What a shut wall is worth, as a multiplier on the interval.
         ///
@@ -2734,7 +2748,10 @@ enum GameConfig {
         /// bigger share of the difference - a third faster than an open machine, at
         /// 2.4 seconds a token against 3.2 - so the reward for owning one goes to
         /// whoever is actually around to work it.
-        static let sealedInterval: Double = 0.75
+        /// REDUCED (token pass): 0.75 -> 1.0. A sealed base no longer makes its
+        /// machines faster, only safer - camping your own machine was about 40% of
+        /// a player's income.
+        static let sealedInterval: Double = 1.0
 
         /// How much slower a mini pays, as a multiplier on the interval.
         ///
@@ -2825,7 +2842,8 @@ enum GameConfig {
         /// PRIZE rather than thinning the odds keeps it a thing you spot on the
         /// grass and change your route for, which is the whole reason it exists.
         static let goldenValue = 5
-        static let goldenChance = 0.08
+        /// REDUCED (token pass): 8% -> 5%.
+        static let goldenChance = 0.05
 
         /// A jackpot: how long one lasts, how often each map machine rolls for one,
         /// and the chance it takes.
@@ -2921,7 +2939,8 @@ enum GameConfig {
         /// near this and the rate is whatever crowding allows. It caps what
         /// accumulates while you are somewhere ELSE - which is the thing that should
         /// have a limit on it.
-        static let basePileCeiling = 6
+        /// REDUCED (token pass): 6 -> 4, so leaving a base to bank is worth less.
+        static let basePileCeiling = 4
 
         /// How far off a tile's centre a token is nudged when it has to share.
         ///
@@ -3073,7 +3092,8 @@ enum GameConfig {
         /// Between a mini machine and a cabinet: it is worth more to its owner than
         /// a small machine, since it is the thing keeping everything else in the
         /// base safe, and less than a cabinet, which is the base's whole income.
-        static let destroyedReward = 8
+        /// REDUCED (token pass): 8 -> 5.
+        static let destroyedReward = 5
         static let destroyedScore = 60
 
         /// How often a bot's base is handed one on seal.
