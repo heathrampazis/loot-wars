@@ -123,6 +123,10 @@ final class MenuScene: SKScene {
     private var settingsButton: MenuButtonNode?
     private let sheet = MenuSheetNode()
 
+    /// The settings page and the About page behind it - see SettingsSheetContent.
+    private let settingsContent = SettingsSheetContent()
+    private let aboutContent = AboutSheetContent()
+
     /// Set once the scene has handed the game over, so a second tap on a button
     /// that is still animating cannot present a second match.
     private var starting = false
@@ -134,6 +138,16 @@ final class MenuScene: SKScene {
     }
 
     override func didMove(to view: SKView) {
+        // Settings to About and back, inside the one sheet.
+        settingsContent.onAbout = { [weak self] in
+            guard let self else { return }
+            self.sheet.show(title: "ABOUT", content: self.aboutContent)
+        }
+        aboutContent.onBack = { [weak self] in
+            guard let self else { return }
+            self.sheet.show(title: "SETTINGS", content: self.settingsContent)
+        }
+
         // Before anything asks for a sound. See SoundPlayer.warm.
         SoundPlayer.shared.warm()
 
@@ -433,9 +447,13 @@ final class MenuScene: SKScene {
         // makes it a sheet rather than a picture of one: nothing behind it can be
         // pressed through it.
         if sheet.isOpen {
-            if sheet.closes(localPoint: touch.location(in: sheet)) {
+            let local = touch.location(in: sheet)
+            if sheet.closes(localPoint: local) {
                 SoundPlayer.shared.play(.exit)
                 sheet.dismiss()
+            } else {
+                // On the card: the settings rows take their own taps.
+                sheet.tap(localPoint: local)
             }
             return
         }
@@ -485,7 +503,7 @@ final class MenuScene: SKScene {
             settings.press { [weak self] in
                 guard let self else { return }
                 self.sheet.open(title: "SETTINGS",
-                                message: "Coming soon.",
+                                content: self.settingsContent,
                                 on: self.size)
             }
         }

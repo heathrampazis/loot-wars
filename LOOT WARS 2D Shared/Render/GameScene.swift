@@ -627,10 +627,15 @@ final class GameScene: SKScene {
         }
 
         let margin: CGFloat = 110
-        moveStick.position = CGPoint(x: -size.width / 2 + margin,
+
+        // Left-handed controls (Settings) mirror the two sticks, and the throw
+        // button goes with the aim stick. Everything else stays where it is.
+        let side: CGFloat = Prefs.leftHanded ? -1 : 1
+
+        moveStick.position = CGPoint(x: -side * (size.width / 2 - margin),
                                      y: -size.height / 2 + margin)
         // Same corner: they take it in turns rather than sharing it.
-        aimStick.position = CGPoint(x: size.width / 2 - margin,
+        aimStick.position = CGPoint(x: side * (size.width / 2 - margin),
                                     y: -size.height / 2 + margin)
         openButton.position = aimStick.position
 
@@ -645,7 +650,7 @@ final class GameScene: SKScene {
         // 48 + 62 = 110, and moving right buys some of that distance back - which
         // is what lets it come down as far as it has.
         throwButton.position = CGPoint(
-            x: aimStick.position.x + JoystickNode.baseRadius - 40,
+            x: aimStick.position.x + side * (JoystickNode.baseRadius - 40),
             y: aimStick.position.y + 115)
 
         // Generously oversized rather than exactly the screen: the camera can be
