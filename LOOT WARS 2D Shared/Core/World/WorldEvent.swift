@@ -80,6 +80,8 @@ enum WorldEvent {
 
     /// A turret taking a hit and surviving it. The machine's event, for a turret.
     case turretHit(TurretID, at: Vec2)
+    /// A player has shot their own wall without breaking it yet - see WallSystem.
+    case wallHit(GridPoint, at: Vec2)
 
     /// A chest broken open by somebody who did not own it.
     case chestCracked(at: Vec2, items: Int)

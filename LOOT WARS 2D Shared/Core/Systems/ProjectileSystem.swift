@@ -31,7 +31,12 @@ enum ProjectileSystem {
 
             // Walls stop bullets - including your own. You can walk through your
             // base, but you cannot shoot through it.
-            if world.map.isOccupied(GridPoint(containing: projectile.position)) { continue }
+            let tile = GridPoint(containing: projectile.position)
+            if world.map.isOccupied(tile) {
+                // Stopped, as before - and a player's own wall takes the hit.
+                WallSystem.shot(tile, by: projectile, in: world)
+                continue
+            }
 
             if world.trees.contains(where: { $0.contains(projectile.position) }) { continue }
 

@@ -145,7 +145,8 @@ enum TurretSystem {
                                       team: turret.owner,
                                       position: turret.muzzle(pointing: direction),
                                       velocity: direction * GameConfig.Blaster.projectileSpeed,
-                                      damage: turret.shotDamage)
+                                      damage: turret.shotDamage,
+                                      fromTurret: true)
 
                 turret.cooldown = 1.0 / turret.fireRate
             }
