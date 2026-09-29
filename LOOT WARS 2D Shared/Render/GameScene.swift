@@ -35,6 +35,7 @@ final class GameScene: SKScene {
     private let blockRenderer = BlockRenderer()
     private let arcadeRenderer = ArcadeRenderer()
     private let turretRenderer = TurretRenderer()
+    private let wallDamageRenderer = WallDamageRenderer()
     private let lootboxRenderer = LootboxRenderer()
     private let supplyRenderer = SupplyDropRenderer()
     private let supplyCompass = SupplyCompassNode()
@@ -426,6 +427,7 @@ final class GameScene: SKScene {
 
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
+        worldLayer.addChild(wallDamageRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
         worldLayer.addChild(turretRenderer.node)
         worldLayer.addChild(lootboxRenderer.node)
@@ -793,6 +795,7 @@ final class GameScene: SKScene {
         }
 
         blockRenderer.sync(with: world)
+        wallDamageRenderer.sync(with: world)
         blueprint.sync(with: world, dt: frameDelta)
         lootboxRenderer.sync(with: world)
         supplyRenderer.sync(with: world)
@@ -1127,6 +1130,11 @@ final class GameScene: SKScene {
             case .turretHit(let id, let position):
                 // Sparks off the casing, the same as the other furniture.
                 turretRenderer.hit(id)
+                effectsRenderer.machineStruck(at: position)
+
+            case .wallHit(let tile, let position):
+                // Your own wall, being shot down on purpose.
+                blockRenderer.hit(at: tile)
                 effectsRenderer.machineStruck(at: position)
 
             case .sealed(let team, let chests):

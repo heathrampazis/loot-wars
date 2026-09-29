@@ -27,4 +27,9 @@ struct Projectile {
     /// Tiles left before it fizzles out. Counting distance rather than seconds means
     /// range stays the same if projectile speed is ever tuned.
     var distanceRemaining: Double
+
+    /// Fired by a turret rather than by a person holding the blaster. Credited
+    /// to the team's actor like any shot, but it never hurts its own team's walls
+    /// - see WallSystem.
+    var fromTurret: Bool = false
 }

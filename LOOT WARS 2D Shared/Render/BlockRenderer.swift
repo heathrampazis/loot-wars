@@ -233,6 +233,21 @@ final class BlockRenderer {
         ])), withKey: "shudder")
     }
 
+    /// A player's shot landing on their own wall: a quick flash and squash, so
+    /// it reads as the wall taking the hit rather than simply eating the bullet.
+    func hit(at point: GridPoint) {
+        guard let wall = walls[point] else { return }
+        let sprite = wall.sprite
+        sprite.removeAction(forKey: "hit")
+        sprite.color = .white
+        sprite.run(.sequence([
+            .group([.colorize(withColorBlendFactor: 0.7, duration: 0.04),
+                    .scaleX(to: 1.06, y: 0.92, duration: 0.04)]),
+            .group([.colorize(withColorBlendFactor: 0, duration: 0.14),
+                    .scale(to: 1, duration: 0.14)])
+        ]), withKey: "hit")
+    }
+
     /// - Parameter settling: whether to put the wall back. False when it is about
     ///   to be removed anyway, so the crumble picks up from where the squeeze got
     ///   to rather than from a wall that has just sprung back to full size.

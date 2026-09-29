@@ -1651,6 +1651,17 @@ enum GameConfig {
     }
 
     enum Build {
+        /// How much blaster damage a player's own wall takes before it breaks
+        /// when they shoot it - see WallSystem. Sixty: five shots from a starter
+        /// blaster, two from the best, so it is quick when you mean it.
+        static let wallShotHealth = 60
+
+        /// Seconds without a shot before a damaged wall is whole again, so stray
+        /// shots in a fight never add up to a hole you did not mean to make. The
+        /// health bar goes with it. Two, down from four: the bar was hanging about
+        /// after you had stopped shooting.
+        static let wallMendDelay: Double = 2
+
         /// How long a bot goes without thinking about its base after a trip home.
         ///
         /// Long gaps, and more walls per trip. Short frequent trips finish a base

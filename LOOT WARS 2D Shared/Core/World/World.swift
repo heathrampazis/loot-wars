@@ -1523,14 +1523,16 @@ final class World {
         groundItems = surviving
     }
 
-    func spawnProjectile(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2, damage: Int) {
+    func spawnProjectile(owner: ActorID, team: TeamID, position: Vec2, velocity: Vec2,
+                         damage: Int, fromTurret: Bool = false) {
         let projectile = Projectile(id: ProjectileID(nextProjectileID),
                                     owner: owner,
                                     team: team,
                                     position: position,
                                     velocity: velocity,
                                     damage: damage,
-                                    distanceRemaining: GameConfig.Blaster.range)
+                                    distanceRemaining: GameConfig.Blaster.range,
+                                    fromTurret: fromTurret)
         nextProjectileID += 1
         projectiles.append(projectile)
     }
@@ -1608,7 +1610,13 @@ final class World {
         guard map.contains(point), map[point] != tile else { return }
         map[point] = tile
         mapRevision += 1
+
+        // Whatever stands here now has taken no shots - see WallSystem.
+        wallDamage[point] = nil
     }
+
+    /// Damage players have shot into their own walls, by tile - see WallSystem.
+    var wallDamage: [GridPoint: WallDamage] = [:]
 
     /// Advances the whole game by exactly one fixed step.
     func step(commands: [ActorID: [Command]], dt: Double) {
@@ -1629,6 +1637,7 @@ final class World {
         ShopSystem.update(self, commands: everyone)
         MovementSystem.update(self, dt: dt)
         ProjectileSystem.update(self, dt: dt)
+        WallSystem.update(self, dt: dt)
         // After movement, so picking things up uses where you actually ended up.
         LootSystem.update(self, commands: everyone, dt: dt)
         SupplyDropSystem.update(self, dt: dt)
