@@ -50,8 +50,6 @@ struct Actor {
 
     var isAlive: Bool { respawnTimer == nil }
 
-    var ammo: Int = GameConfig.Blaster.magazineSize
-
     /// Counts down to the next portion of health handed back at home - see
     /// CombatSystem.recover. Reset whenever you stop qualifying, so the first
     /// portion always arrives a full interval after you get there.
@@ -115,10 +113,6 @@ struct Actor {
 
     /// Seconds until this actor may fire again.
     var shootCooldown: Double = 0
-
-    /// Counts down to the next bullet coming back. Reset to the recharge delay on
-    /// every shot, so firing keeps pushing the refill away.
-    var rechargeTimer: Double = 0
 
     /// This actor's collision box, in tile space.
     ///

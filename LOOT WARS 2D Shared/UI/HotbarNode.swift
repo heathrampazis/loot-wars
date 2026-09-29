@@ -27,18 +27,6 @@ final class HotbarNode: SKNode {
         return CGSize(width: count * slotSize + (count - 1) * gap, height: slotSize)
     }
 
-    /// Sell mode: every slot wears the shop's offer for it, and a tap sells rather
-    /// than selects.
-    ///
-    /// NOTHING TURNS THIS ON at the moment, and it is kept rather than deleted on
-    /// purpose. It was how you sold things while the shop was open, and the shop
-    /// stopped doing that for a good reason - the bar and the panel were two
-    /// interfaces with two rules stacked on one screen - but selling by holding a
-    /// slot could easily want a way to SHOW what a slot is worth before you commit
-    /// to it, and this is that, already built and already matching the rest of the
-    /// bar.
-    private(set) var selling = false
-
     private var slots: [ItemSlotNode] = []
 
     /// The payout currently climbing out of each slot, so a second sale out of the
@@ -206,13 +194,6 @@ final class HotbarNode: SKNode {
         slots[index].flinch()
     }
 
-    /// Turns the bar into a sell counter, or back into a bar.
-    func setSelling(_ selling: Bool) {
-        guard selling != self.selling else { return }
-        self.selling = selling
-        lastInventory = nil      // force the prices on or off
-    }
-
     /// Shakes a slot red and says nothing.
     ///
     /// The wordless half of refuse, for a no that some OTHER panel is explaining.
@@ -321,7 +302,7 @@ final class HotbarNode: SKNode {
             < Double(player.maxHealth) * GameConfig.Player.tapHealBelow
 
         for (index, stack) in player.inventory.slots.enumerated() {
-            let spends = urgent && !selling && player.isAlive
+            let spends = urgent && player.isAlive
                 && stack?.type.isHealing == true
 
             slots[index].setUrgent(spends)
@@ -338,12 +319,6 @@ final class HotbarNode: SKNode {
 
         for (index, stack) in player.inventory.slots.enumerated() {
             slots[index].show(stack)
-
-            if selling, let stack {
-                slots[index].setPrice(ShopSystem.sellPrice(of: stack.type))
-            } else {
-                slots[index].setPrice(nil)
-            }
         }
     }
 }

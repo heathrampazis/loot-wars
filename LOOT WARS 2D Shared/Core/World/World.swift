@@ -45,10 +45,6 @@ final class World {
     /// networked host would answer it somewhere else again.
     var isOver: Bool { timeRemaining <= 0 }
 
-    /// Who won, and by how much. Just the standings with a nicer name at the point
-    /// where they stop changing.
-    var winner: TeamID? { standings.first?.team }
-
     /// Read freely, but change only through setTile, so the renderer always knows
     /// when the map has moved on.
     private(set) var map: TileMap
@@ -564,16 +560,6 @@ final class World {
 
         structureTileCache = (structureRevision, tiles)
         return tiles
-    }
-
-    /// The same question asked of an area rather than a point, for the things that
-    /// reason about whole tiles - building, and putting a chest down.
-    func structureIntersects(_ box: Box) -> Bool {
-        if lootboxes.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
-        if arcades.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
-        if chests.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
-        if turrets.values.contains(where: { $0.hitbox.intersects(box) }) { return true }
-        return false
     }
 
     // MARK: - Chests

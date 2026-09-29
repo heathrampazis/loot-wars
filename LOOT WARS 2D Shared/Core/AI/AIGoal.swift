@@ -62,14 +62,6 @@ enum AIGoal: Equatable {
         return false
     }
 
-    /// Whether this is a raid on somebody's chest. Used to tell a NEW raid from a
-    /// raid already under way, so the urge is spent once per trip rather than once
-    /// per tick.
-    var isRob: Bool {
-        if case .robChest = self { return true }
-        return false
-    }
-
     /// Whether this is business inside somebody else's base - emptying it or
     /// breaking it. Used to tell "already raiding" from "thinking about raiding",
     /// so the urge is spent once per break-in rather than once per thing broken.

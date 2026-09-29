@@ -31,12 +31,10 @@ enum RespawnSystem {
     private static func respawn(_ actor: inout Actor, in world: World) {
         actor.respawnTimer = nil
         actor.health = actor.maxHealth
-        actor.ammo = GameConfig.Blaster.magazineSize
         actor.invulnerability = GameConfig.Player.spawnProtection
 
         actor.moveInput = .zero
         actor.shootCooldown = 0
-        actor.rechargeTimer = 0
         actor.secondsSinceHit = 999
 
         // Back to the middle of your own claim - the one place on the map that is

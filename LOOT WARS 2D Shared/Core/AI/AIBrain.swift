@@ -1797,7 +1797,7 @@ enum AIBrain {
         // bot its shot, so this is a reposition rather than a surrender.
         let ranges = fightRanges(for: actor, in: world)
 
-        if gap < ranges.minimum || actor.ammo <= 0 {
+        if gap < ranges.minimum {
             let escape = breakOffPoint(for: actor, awayFrom: enemy, in: world) - actor.position
             state.desiredHeading = escape.length > 0.01
                 ? escape.normalized()
@@ -2574,7 +2574,7 @@ enum AIBrain {
     /// with the blaster holstered is exactly what made bots look terrified; now a
     /// withdrawal is a fighting withdrawal.
     private static func shotToTake(state: AIState, actor: Actor, in world: World) -> Vec2? {
-        guard state.reactionTimer <= 0, actor.ammo > 0 else { return nil }
+        guard state.reactionTimer <= 0 else { return nil }
 
         // A machine is shot at exactly the way a person is, and this is the only
         // branch that leaves before the lead calculation below - because furniture

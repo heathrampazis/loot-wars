@@ -175,7 +175,6 @@ enum RenderPalette {
     static let hotbarSlot = SKColor(white: 0.0, alpha: 0.42)
     /// The stack-count badge reuses the health pink.
     static let countBadge = rgb(0xFF, 0x51, 0x7B)
-    static let ammoBar   = rgb(0x3E, 0xA1, 0x80)
 
     // Loot rarity: grey, green, blue, purple, gold, in that order and no other.
     //
@@ -384,13 +383,6 @@ enum RenderPalette {
     /// map that already has plenty - and so it cannot be mistaken for a rarity, a
     /// team, a power-up or money, which is every other colour in this file.
     static let sealLight = rgb(0xFF, 0xF3, 0xD2)
-
-    /// The colour of yes, and the colour of no, for anything you press.
-    ///
-    /// One pair, used by the sell button, the shop's price pills and the buy
-    /// outlines alike - so "you can do this" looks the same everywhere it is said,
-    /// which is the only way a colour ever comes to mean anything.
-    static let sellButton = rgb(0x3F, 0xB9, 0x50)
 
     /// The plate under an offer the game is making you.
     ///

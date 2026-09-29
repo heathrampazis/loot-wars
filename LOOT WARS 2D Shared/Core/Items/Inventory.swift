@@ -11,8 +11,6 @@ struct Inventory: Equatable {
 
     private(set) var slots: [ItemStack?] = Array(repeating: nil, count: slotCount)
 
-    var isFull: Bool { slots.allSatisfy { $0 != nil } }
-
     /// Total healing carried, in health points. What a bot uses to decide whether
     /// it is stocked well enough to go looking for a fight.
     func totalHealing(of maxHealth: Int) -> Int {

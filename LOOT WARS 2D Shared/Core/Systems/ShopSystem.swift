@@ -72,7 +72,6 @@ enum ShopSystem {
         case .shelf(let items):
             return items
 
-
         case .upgrades:
             var offers: [GameConfig.Shop.Item] = []
 
@@ -156,17 +155,6 @@ enum ShopSystem {
         // nowhere in sight, which is exactly the situation this feature is for.
         guard let price = price(of: type) ?? GameConfig.Shop.offShelf[type] else { return 0 }
         return max(1, Int((Double(price) * GameConfig.Shop.sellShare).rounded(.down)))
-    }
-
-    /// Everything this actor is carrying, with what the shop would give for it.
-    ///
-    /// Indexed by slot, because that is what a sale names - two slots can hold the
-    /// same item and only one of them should shrink.
-    static func sellOffers(for actor: Actor) -> [(slot: Int, stack: ItemStack, price: Int)] {
-        (0..<Inventory.slotCount).compactMap { slot in
-            guard let stack = actor.inventory.stack(at: slot) else { return nil }
-            return (slot: slot, stack: stack, price: sellPrice(of: stack.type))
-        }
     }
 
     private static func sell(from slot: Int, by id: ActorID, in world: World) {

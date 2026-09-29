@@ -65,7 +65,6 @@ enum GameConfig {
 
         static let chestPlaced = 15
 
-
         /// Cracking somebody else's chest open. Paid once, for the whole act.
         ///
         /// Sized as roughly two items' worth of the old per-item rate plus the
@@ -1093,9 +1092,6 @@ enum GameConfig {
         static let worthChasingGear = 2
         static let worthChasingAtRange = 5
 
-
-
-
         /// How often a bot looks around for enemies, in seconds. Threats cannot
         /// wait for the ordinary decision timer - up to three seconds to notice
         /// someone shooting at you is most of why fights never started - but line
@@ -1447,8 +1443,6 @@ enum GameConfig {
         /// mark is dropped and the hunt falls back on the quarry's base. Small,
         /// because "where they were" is a spot and not an area.
         static let huntArrival: Double = 1.5
-
-
 
         /// This is the counterweight to a runaway leader. Get far enough ahead and
         /// seven opponents start preferring you, which is also what makes their kill
@@ -1925,7 +1919,6 @@ enum GameConfig {
 
         static let maximumChance = 0.80
 
-
         /// The share of your unspent tokens that spills on the ground when you die.
         ///
         /// All of it, and it SPILLS rather than evaporating. Tokens that simply
@@ -2259,23 +2252,6 @@ enum GameConfig {
         /// crates steadily. Bots still get theirs on seal, so this is what makes a
         /// turret in YOUR base something you earned.
         static let turretWeight = 9
-
-        /// Share of crates on the map that are the good ones.
-        ///
-        /// One in eight. At one in six they were everywhere, and a thing you see
-        /// constantly is not rare however it is drawn - the glow stopped meaning
-        /// anything within a minute. At one in fourteen, where this began, a whole
-        /// match turned up under one machine between eight players and the economy
-        /// those machines drive never started. One in eight is the closest this can
-        /// sit to "everywhere" while a glowing crate is still worth changing
-        /// direction for: a map of forty holds five.
-        ///
-        /// Rolled per crate rather than counted out, so no two maps hold the same
-        /// number.
-        ///
-        /// SUPERSEDED by startingRareShare, rareChance and maxRareCrates. Kept for
-        /// reference.
-        static let rareShare: Double = 0.125
 
         /// Share of crates that start the match rare: about one in fourteen, two or
         /// three on a map of forty. Enough that there is something purple to go for in the
@@ -3152,31 +3128,5 @@ enum GameConfig {
         /// hit detection arrives with health at M5.
         static let projectileRadius: Double = 0.18
 
-        /// Whether running dry is a thing that happens at all.
-        ///
-        /// Off. The bar was a second resource to watch in a game whose fights last
-        /// four seconds, and what it actually did was punish the player for holding
-        /// a trigger the bots were never going to hold - they fire in bursts by
-        /// nature, so the mechanic taxed exactly one of the eight actors on the map.
-        ///
-        /// The machinery below stays, and stays wired: the magazine, the recharge
-        /// delay and the drip are all still here and still correct. Only the check
-        /// that stops a shot is skipped, and the bar is not drawn. Turning this back
-        /// on is one word, which is the point of leaving it in.
-        static let usesAmmo = false
-
-        /// Shots you can fire before running dry.
-        ///
-        /// Scaled up with the fire rate, so a magazine still lasts about four and a
-        /// half seconds of holding the trigger - and each shot now takes a smaller
-        /// bite out of the bar, so it drains at a pace you can read.
-        static let magazineSize = 20
-
-        /// Quiet time after your last shot before ammo starts coming back. This is
-        /// what makes bursts better than holding the trigger down.
-        static let rechargeDelay: Double = 1.0
-
-        /// Seconds per bullet once recharging has started.
-        static let rechargeInterval: Double = 0.35
     }
 }

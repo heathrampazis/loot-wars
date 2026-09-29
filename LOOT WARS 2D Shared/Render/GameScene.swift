@@ -207,7 +207,6 @@ final class GameScene: SKScene {
     /// the game on an iPad.
     private let perkFlash = SKSpriteNode(color: .white, size: .zero)
 
-
     /// The hotbar slot picked out, waiting for a tile.
     ///
     /// ONLY EVER A CHEST OR A MACHINE now. Everything else is spent by the tap that
@@ -970,8 +969,7 @@ final class GameScene: SKScene {
         // sold - see resolveHold - on the same principle the build lesson follows:
         // being told something is not the same as being able to do it.
         holdHintsLeft -= 1
-        hint.show(GameScene.holdSells ? "HOLD AN ITEM TO SELL IT"
-                                      : "HOLD AN ITEM TO DROP IT")
+        hint.show("HOLD AN ITEM TO SELL IT")
     }
 
     /// Points the camera at whoever it should be watching.
@@ -1341,7 +1339,6 @@ final class GameScene: SKScene {
         shopButton.isHidden = false
         hotbar.isHidden = false
         leaderboard.isHidden = false
-
 
         moveStick.isHidden = false
 
@@ -1778,20 +1775,6 @@ extension GameScene {
         pending = nil
     }
 
-    /// What a long press on a hotbar slot does.
-    ///
-    /// Both answers are built and only one is wired up, which is deliberate. This
-    /// gesture used to throw the item on the floor, and dropping is still the
-    /// honest reading of it - you can pick the thing back up, you can hand it to
-    /// somebody, and nothing about it is irreversible. Selling is the more USEFUL
-    /// reading: what a full bag is actually full of is junk, and a bandage on the
-    /// grass helps nobody while three tokens do.
-    ///
-    /// Which of those feels better is not a question anybody can answer by
-    /// thinking about it, so the drop path stays exactly where it is - Command,
-    /// LootSystem and all - and this one line decides which of them a hold means.
-    private static let holdSells = true
-
     /// Turns a finger that has stayed put into the second meaning of that gesture:
     /// take your own wall back down, or turn the item into tokens.
     private func resolveHold(at now: TimeInterval) {
@@ -1825,8 +1808,7 @@ extension GameScene {
 
             blockRenderer.release(settling: !coming)
         case .hotbar(let slot):
-            queuedCommands.append(GameScene.holdSells ? .sellItem(slot: slot)
-                                                      : .dropItem(slot: slot))
+            queuedCommands.append(.sellItem(slot: slot))
             hotbar.endHold()
 
             // Somebody who has done it once knows how to do it - this match, and

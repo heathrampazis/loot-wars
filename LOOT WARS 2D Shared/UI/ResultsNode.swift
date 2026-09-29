@@ -235,12 +235,12 @@ final class ResultsNode: SKNode {
         }
     }
 
-    private static func ordinal(_ n: Int) -> String {
-        switch n {
-        case 1: return "1ST"
-        case 2: return "2ND"
-        case 3: return "3RD"
-        default: return "\(n)TH"
-        }
+}
+
+extension ResultsNode {
+    static func ordinal(_ number: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .ordinal
+        return formatter.string(from: NSNumber(value: number))?.uppercased() ?? "\(number)"
     }
 }

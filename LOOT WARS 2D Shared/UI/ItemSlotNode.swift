@@ -65,21 +65,6 @@ final class ItemSlotNode: SKNode {
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
-    /// The SELL button, shown only while the shop is open.
-    ///
-    /// A green tab in the top-right corner - opposite the count badge - carrying a
-    /// plus, a number and a token.
-    ///
-    /// Third attempt at this, and the two failures are worth keeping. A plain price
-    /// in the corner said what a thing was worth without ever saying it could be
-    /// sold, so it read as a caption. A green bar across the FOOT of the slot said
-    /// it loudly and covered the bottom third of the item doing it - and an item
-    /// you cannot see is a poor thing to be deciding about. The corner is the only
-    /// place on a 66-point square that is both obvious and empty, and the badge
-    /// already proves it works: nobody has ever failed to notice a stack count.
-    private let sellButton = SKNode()
-    private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
-
     /// Local origin is the centre of the slot.
     init(side: CGFloat) {
         self.side = side
@@ -155,57 +140,6 @@ final class ItemSlotNode: SKNode {
         count.zPosition = 1
         badge.addChild(count)
 
-        // Overhangs its corner slightly, which is what stops it reading as part of
-        // the artwork underneath.
-        let tabHeight = side * 0.28
-        let tabWidth = side * 0.66
-
-        sellButton.position = CGPoint(
-            x: side / 2 - tabWidth / 2 + side * 0.04,
-            y: side / 2 - tabHeight / 2 + side * 0.04
-        )
-
-        sellButton.zPosition = 3
-        sellButton.isHidden = true
-        addChild(sellButton)
-
-        let pill = SKShapeNode(
-            path: CGPath(
-                roundedRect: CGRect(
-                    x: -tabWidth / 2,
-                    y: -tabHeight / 2,
-                    width: tabWidth,
-                    height: tabHeight
-                ),
-                cornerWidth: tabHeight / 2,
-                cornerHeight: tabHeight / 2,
-                transform: nil
-            )
-        )
-
-        // No outline. A stroke round something this small is most of its width, and
-        // four of them in a row read as a fence rather than as four buttons - the
-        // green is doing the work and does not need help.
-        pill.fillColor = RenderPalette.sellButton
-        pill.strokeColor = .clear
-        sellButton.addChild(pill)
-
-        price.fontSize = tabHeight * 0.66
-        price.fontColor = .white
-        price.horizontalAlignmentMode = .center
-        price.verticalAlignmentMode = .center
-        price.position = CGPoint(x: -tabWidth * 0.16, y: 0)
-        price.zPosition = 1
-        sellButton.addChild(price)
-
-        let token = SKSpriteNode(texture: ItemArt.texture(for: .token(1)))
-        token.size = ItemArt.size(
-            of: ItemArt.texture(for: .token(1)),
-            fittingInto: tabHeight * 0.8
-        )
-        token.position = CGPoint(x: tabWidth * 0.26, y: 0)
-        token.zPosition = 1
-        sellButton.addChild(token)
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -389,17 +323,6 @@ final class ItemSlotNode: SKNode {
         run(.scale(to: restingScale, duration: 0.12), withKey: "scale")
     }
 
-    /// Shows or hides the sell button, and what it would pay.
-    func setPrice(_ tokens: Int?) {
-        guard let tokens, tokens > 0 else {
-            sellButton.isHidden = true
-            return
-        }
-
-        sellButton.isHidden = false
-        price.text = "+\(tokens)"
-    }
-
     /// Draws what is in the slot, or empties it.
     ///
     /// No dimming, here or anywhere else. A slot you cannot use right now looks
@@ -411,7 +334,6 @@ final class ItemSlotNode: SKNode {
             icon.isHidden = true
             enchant.isHidden = true
             badge.isHidden = true
-            sellButton.isHidden = true
 
             // An empty slot is a hole in the bar, not an item of no value.
             glow.isHidden = true

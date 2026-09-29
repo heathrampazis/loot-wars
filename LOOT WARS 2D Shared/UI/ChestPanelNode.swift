@@ -386,13 +386,6 @@ final class ChestPanelNode: SKNode {
         return nil
     }
 
-    /// Where a slot sits in this panel's own space, and what is drawn in it. Both
-    /// are asked by the scene to fly an item between this panel and the hotbar.
-    func slotCentre(_ index: Int) -> CGPoint? {
-        guard slots.indices.contains(index) else { return nil }
-        return slots[index].position
-    }
-
     func artwork(inSlot index: Int) -> (texture: SKTexture, size: CGSize)? {
         guard slots.indices.contains(index) else { return nil }
         return slots[index].artwork

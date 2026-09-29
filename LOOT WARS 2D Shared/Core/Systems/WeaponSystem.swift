@@ -38,22 +38,7 @@ enum WeaponSystem {
                 actor.shootCooldown = max(0, actor.shootCooldown - dt)
             }
 
-            recharge(&actor, dt: dt)
-
             world.actors[id] = actor
-        }
-    }
-
-    /// Ammo comes back on its own, but only once you stop shooting: the timer is
-    /// pushed back to the full delay on every shot, then drips a bullet at a time.
-    private static func recharge(_ actor: inout Actor, dt: Double) {
-        guard actor.ammo < GameConfig.Blaster.magazineSize else { return }
-
-        actor.rechargeTimer -= dt
-
-        while actor.rechargeTimer <= 0 && actor.ammo < GameConfig.Blaster.magazineSize {
-            actor.ammo += 1
-            actor.rechargeTimer += GameConfig.Blaster.rechargeInterval
         }
     }
 
@@ -94,16 +79,12 @@ enum WeaponSystem {
         // The rate limit always applies - it is what makes a Blaster 6 different
         // from a Blaster 1. Running dry does not, unless GameConfig turns it back
         // on; see Blaster.usesAmmo for why it is off.
-        guard actor.shootCooldown <= 0,
-              !GameConfig.Blaster.usesAmmo || actor.ammo > 0 else {
+        guard actor.shootCooldown <= 0 else {
             world.actors[id] = actor
             return
         }
 
-        if GameConfig.Blaster.usesAmmo { actor.ammo -= 1 }
         actor.shootCooldown = 1.0 / GameConfig.Blaster.fireRate
-        // Firing pushes the refill back out to the full delay.
-        actor.rechargeTimer = GameConfig.Blaster.rechargeDelay
         world.actors[id] = actor
 
         world.spawnProjectile(

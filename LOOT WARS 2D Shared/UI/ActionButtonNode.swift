@@ -38,7 +38,6 @@ final class ActionButtonNode: SKNode {
     private let glyph = SKSpriteNode()
 
     private(set) var isPressed = false
-    private(set) var isEnabled = true
 
     init(glyph texture: SKTexture,
          radius: CGFloat = 62,
@@ -92,15 +91,6 @@ final class ActionButtonNode: SKNode {
             ? min(glyphSize / art.width, glyphSize / art.height)
             : 1
         glyph.size = CGSize(width: art.width * scale, height: art.height * scale)
-    }
-
-    /// Drawn faint when the simulation would refuse the press, exactly as a hotbar
-    /// slot greys out - so a button you can see but not use looks the part rather
-    /// than looking broken.
-    func setEnabled(_ enabled: Bool) {
-        guard enabled != isEnabled else { return }
-        isEnabled = enabled
-        alpha = enabled ? 1.0 : 0.4
     }
 
     /// - Parameter localPoint: the touch, in this node's own coordinate space.
