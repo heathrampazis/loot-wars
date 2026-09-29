@@ -2249,7 +2249,40 @@ enum GameConfig {
         ///
         /// Rolled per crate rather than counted out, so no two maps hold the same
         /// number.
+        ///
+        /// SUPERSEDED by startingRareShare, rareChance and maxRareCrates. Kept for
+        /// reference.
         static let rareShare: Double = 0.125
+
+        /// Share of crates that start the match rare: about one in fourteen, two or
+        /// three on a map of forty. Enough that there is something purple to go for in the
+        /// opening, few enough that it is still a find.
+        static let startingRareShare: Double = 0.07
+
+        /// The chance a crate comes back RARE when it respawns, by how far the
+        /// match has run.
+        ///
+        /// Rare crates are an event now rather than a feature of the map: none in
+        /// the opening, a trickle from the middle on, a few more towards the end
+        /// when the gear inside matters most. Rolled per respawn with the world's
+        /// generator, so a seed replays.
+        static func rareChance(at progress: Double) -> Double {
+            guard progress >= rareFrom else { return 0 }
+            let along = min(1, (progress - rareFrom) / (1 - rareFrom))
+            return rareChanceEarly + (rareChanceLate - rareChanceEarly) * along
+        }
+        ///
+        /// Loosened after the first pass - none until 30%, 3% rising to 10%, at
+        /// most three - which left whole matches with barely one in sight. Now:
+        /// from 15%, 10% rising to 22%, at most four; about three in the
+        /// opening map.
+        static let rareFrom: Double = 0.15
+        static let rareChanceEarly: Double = 0.10
+        static let rareChanceLate: Double = 0.22
+
+        /// The most rare crates standing on the map at once, so a lucky run of
+        /// respawns cannot carpet the map with them.
+        static let maxRareCrates = 4
 
         /// How heavily ONE of the three plain power-ups sits in a crate's table,
         /// by how far the match has run.

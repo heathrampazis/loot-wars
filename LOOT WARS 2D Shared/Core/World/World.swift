@@ -121,10 +121,8 @@ final class World {
     /// An opened crate, waiting to come back in the same spot.
     private struct PendingLootbox {
         let tile: GridPoint
-        /// A rare crate comes back rare. The spot is what was rare, not the box -
-        /// otherwise the good crates would quietly disappear over a match as each
-        /// one was opened and replaced with an ordinary one.
-        let rare: Bool
+        // No rarity carried: whether it comes back rare is rolled on the way
+        // back - see tickLootboxRespawns and GameConfig.Loot.rareChance.
         var timer: Double
     }
 
@@ -422,7 +420,6 @@ final class World {
         // Crates come back. Without that, seven bots strip the map bare within a
         // minute and there is nothing left to play around.
         pendingLootboxes.append(PendingLootbox(tile: crate.tile,
-                                               rare: crate.rare,
                                                timer: GameConfig.Loot.respawnDelay))
     }
 
@@ -477,17 +474,28 @@ final class World {
 
             // Crates are solid, so one appearing under somebody would shove them
             // out of the way. Wait for them to move on instead.
+            // Rare or not is decided HERE, on the way back, by how far the match
+            // has run - see GameConfig.Loot.rareChance - and never past the cap.
+            // Rolled only once the spot is clear, so waiting for somebody to move
+            // off it does not get extra chances at a rare one.
             let crate = Lootbox(id: LootboxID(nextLootboxID),
                                 tile: pending.tile,
-                                rare: pending.rare)
+                                rare: false)
             if actors.values.contains(where: { $0.isAlive && $0.hitbox.intersects(crate.hitbox) }) {
                 pending.timer = 1
                 stillWaiting.append(pending)
                 continue
             }
 
+            var placed = crate
+            let rareStanding = lootboxes.values.filter { $0.rare }.count
+            if rareStanding < GameConfig.Loot.maxRareCrates {
+                placed.rare = Double.random(in: 0..<1, using: &rng)
+                    < GameConfig.Loot.rareChance(at: matchProgress)
+            }
+
             nextLootboxID += 1
-            lootboxes[crate.id] = crate
+            lootboxes[placed.id] = placed
             structuresChanged()
         }
 
