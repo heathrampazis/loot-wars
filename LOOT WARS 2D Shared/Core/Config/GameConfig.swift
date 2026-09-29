@@ -2254,10 +2254,10 @@ enum GameConfig {
         /// reference.
         static let rareShare: Double = 0.125
 
-        /// Share of crates that start the match rare: one in twenty, about two on
-        /// a map of forty. Enough that there is something purple to go for in the
+        /// Share of crates that start the match rare: about one in fourteen, two or
+        /// three on a map of forty. Enough that there is something purple to go for in the
         /// opening, few enough that it is still a find.
-        static let startingRareShare: Double = 0.05
+        static let startingRareShare: Double = 0.07
 
         /// The chance a crate comes back RARE when it respawns, by how far the
         /// match has run.
@@ -2274,10 +2274,11 @@ enum GameConfig {
         ///
         /// Loosened after the first pass - none until 30%, 3% rising to 10%, at
         /// most three - which left whole matches with barely one in sight. Now:
-        /// from 15%, 8% rising to 18%, at most four.
+        /// from 15%, 10% rising to 22%, at most four; about three in the
+        /// opening map.
         static let rareFrom: Double = 0.15
-        static let rareChanceEarly: Double = 0.08
-        static let rareChanceLate: Double = 0.18
+        static let rareChanceEarly: Double = 0.10
+        static let rareChanceLate: Double = 0.22
 
         /// The most rare crates standing on the map at once, so a lucky run of
         /// respawns cannot carpet the map with them.
