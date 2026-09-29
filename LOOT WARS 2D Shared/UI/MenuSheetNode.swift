@@ -4,13 +4,10 @@
 //
 //  A card that slides up over the menu, for the things that are not playing.
 //
-//  EMPTY ON PURPOSE, for now. Info and Settings both open one of these and both
-//  are a heading and a line saying so. That is a deliberate half-step rather than
-//  an oversight: the buttons, the layout, the animation, the dismissal and the
-//  hit-testing are the part that is tedious to get right and the part that does not
-//  change when the contents arrive. What goes inside is a decision about the GAME -
-//  which settings are worth having, how much of the game needs explaining - and
-//  making that decision badly now would be harder to undo than leaving the room.
+//  Holds either a line of text (Info, for now: a heading and "coming soon") or a
+//  piece of content that lays itself out and takes its own taps - the settings
+//  and the About page behind them, see SettingsSheetContent. The card grows to fit
+//  whatever it is holding, within the screen.
 //
 //  A sheet rather than a scene, which is the same call MenuScene makes about
 //  itself: a second scene means a second background, a second layout pass and a way
@@ -36,11 +33,21 @@ final class MenuSheetNode: SKNode {
     private let body = SKLabelNode()
     private let close = SKNode()
 
+    /// What the card is showing: a line of text, or content.
+    private var message: String?
+    private var content: MenuSheetContent?
+
     /// What the card was drawn at, for the hit test.
     private var cardSize: CGSize = .zero
     private var closeCentre: CGPoint = .zero
+    private var screen: CGSize = .zero
 
     private static let closeRadius: CGFloat = 22
+
+    /// Room at the top of the card for the heading and the X, and at the bottom
+    /// below content.
+    private static let headerHeight: CGFloat = 68
+    private static let footerHeight: CGFloat = 18
 
     override init() {
         super.init()
@@ -51,29 +58,27 @@ final class MenuSheetNode: SKNode {
         scrim.zPosition = 0
         addChild(scrim)
 
-        // Near-white, because the screen it sits on is light now. A dark card over
-        // a light menu is a hole rather than a sheet - it reads as the screen
-        // behind having been switched off rather than as something laid on top.
-        // Edged in a darker shade of its own fill, the way the buttons are - see
-        // MenuButtonNode. Nothing on this screen wears a colour it is not already
-        // made of.
+        // Near-white, because the screen it sits on is light. Edged in a darker
+        // shade of its own fill, the way the buttons are - see MenuButtonNode.
         card.zPosition = 1
         card.fillColor = SKColor(white: 0.99, alpha: 1)
         card.strokeColor = SKColor(white: 0.78, alpha: 1)
         card.lineWidth = 3
         addChild(card)
 
+        // Everything on the card is a child of it, so it all rides the card's
+        // slide up rather than the card arriving underneath its own contents.
         heading.verticalAlignmentMode = .center
         heading.zPosition = 2
-        addChild(heading)
+        card.addChild(heading)
 
         body.verticalAlignmentMode = .center
         body.numberOfLines = 0
         body.zPosition = 2
-        addChild(body)
+        card.addChild(body)
 
         close.zPosition = 2
-        addChild(close)
+        card.addChild(close)
 
         // An X of two crossed bars, drawn rather than typed for the reason Glyphs
         // gives: a multiplication sign, a letter x and a dingbat are three different
@@ -98,19 +103,30 @@ final class MenuSheetNode: SKNode {
     /// because a menu is the one screen somebody rotates the device on while
     /// looking at it.
     func layOut(for screen: CGSize) {
+        self.screen = screen
         scrim.size = CGSize(width: screen.width * 1.4, height: screen.height * 1.4)
 
         let width = min(screen.width * 0.72, 460)
-        let height = min(screen.height * 0.62, 280)
+        let inner = width - 56
+        let height: CGFloat
+
+        if let content {
+            let wanted = content.layOut(width: inner)
+            height = min(MenuSheetNode.headerHeight + wanted + MenuSheetNode.footerHeight,
+                         screen.height - 24)
+            content.node.position = CGPoint(x: 0, y: height / 2 - MenuSheetNode.headerHeight)
+        } else {
+            height = min(screen.height * 0.62, 280)
+        }
         cardSize = CGSize(width: width, height: height)
 
         card.path = CGPath(roundedRect: CGRect(x: -width / 2, y: -height / 2,
                                                width: width, height: height),
                            cornerWidth: 22, cornerHeight: 22, transform: nil)
 
-        heading.position = CGPoint(x: 0, y: height / 2 - 44)
+        heading.position = CGPoint(x: 0, y: height / 2 - 38)
         body.position = CGPoint(x: 0, y: 4)
-        body.preferredMaxLayoutWidth = width - 56
+        body.preferredMaxLayoutWidth = inner
 
         closeCentre = CGPoint(x: width / 2 - 26, y: height / 2 - 26)
         close.position = closeCentre
@@ -118,14 +134,55 @@ final class MenuSheetNode: SKNode {
 
     // MARK: - Showing
 
+    /// A heading and a line of text.
     func open(title: String, message: String, on screen: CGSize) {
+        setContents(title: title, message: message, content: nil)
         layOut(for: screen)
+        present()
+    }
+
+    /// A heading and a page of content that takes its own taps.
+    func open(title: String, content: MenuSheetContent, on screen: CGSize) {
+        setContents(title: title, message: nil, content: content)
+        layOut(for: screen)
+        present()
+    }
+
+    /// Swaps what an open sheet is showing - Settings to About and back - with a
+    /// quick cross-fade rather than closing and reopening.
+    func show(title: String, content: MenuSheetContent) {
+        guard isOpen else { return }
+
+        let fade: TimeInterval = 0.1
+        card.run(.sequence([
+            .group([.fadeAlpha(to: 0.0, duration: fade), .scale(to: 0.97, duration: fade)]),
+            .run { [weak self] in
+                guard let self else { return }
+                self.setContents(title: title, message: nil, content: content)
+                self.layOut(for: self.screen)
+            },
+            .group([.fadeAlpha(to: 1, duration: fade), .scale(to: 1, duration: fade)])
+        ]))
+    }
+
+    private func setContents(title: String, message: String?, content: MenuSheetContent?) {
+        self.content?.node.removeFromParent()
+        self.message = message
+        self.content = content
 
         heading.attributedText = MenuSheetNode.text(title, size: 22, weight: .bold,
                                                     colour: RenderPalette.menuInk)
-        body.attributedText = MenuSheetNode.text(message, size: 14, weight: .regular,
+        body.attributedText = MenuSheetNode.text(message ?? "", size: 14, weight: .regular,
                                                  colour: SKColor(white: 0, alpha: 0.45))
+        body.isHidden = message == nil
 
+        if let content {
+            content.node.zPosition = 2
+            card.addChild(content.node)
+        }
+    }
+
+    private func present() {
         isOpen = true
         isHidden = false
         removeAllActions()
@@ -133,6 +190,8 @@ final class MenuSheetNode: SKNode {
         // The card comes up from slightly below and the scrim just fades. Moving
         // both would be the whole screen lurching; moving neither would be a card
         // that was simply already there.
+        card.alpha = 1
+        card.setScale(1)
         card.position = CGPoint(x: 0, y: -18)
         run(.fadeIn(withDuration: 0.16))
         card.run(.moveTo(y: 0, duration: 0.22))
@@ -147,8 +206,10 @@ final class MenuSheetNode: SKNode {
         card.run(.moveTo(y: -14, duration: 0.14))
     }
 
+    // MARK: - Touches
+
     /// Whether this tap was the X, or anywhere off the card - both of which close
-    /// it. A tap ON the card does nothing, which is what stops a stray finger
+    /// it. A tap ON the card does nothing here, which is what stops a stray finger
     /// inside the sheet dismissing the thing it was reading.
     func closes(localPoint point: CGPoint) -> Bool {
         let onClose = hypot(point.x - closeCentre.x, point.y - closeCentre.y)
@@ -160,9 +221,12 @@ final class MenuSheetNode: SKNode {
         return onClose || !onCard
     }
 
-    /// The system face, like everything else on this screen - see
-    /// MenuButtonNode.text for why. Centred and leaded, which is the one thing this
-    /// needs that a button label does not.
+    /// A tap on the card that did not close it, handed to whatever it holds.
+    func tap(localPoint point: CGPoint) {
+        guard let content else { return }
+        content.tap(at: convert(point, to: content.node))
+    }
+
     /// The system face, plain, like everything else on this screen - see
     /// MenuButtonNode.text. Centred and leaded, which is the one thing this needs
     /// that a button label does not.

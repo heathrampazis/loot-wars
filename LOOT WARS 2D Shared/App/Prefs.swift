@@ -32,6 +32,8 @@ enum Prefs {
         static let taughtSelling  = "taughtSelling"
         static let taughtHolding  = "taughtHolding"
         static let lessonsVersion = "lessonsVersion"
+        static let soundOn = "soundOn"
+        static let leftHanded = "leftHanded"
     }
 
     /// Bumped whenever a lesson CHANGES, which wipes every "you have seen this"
@@ -115,8 +117,23 @@ enum Prefs {
         bestScore = max(bestScore, score)
     }
 
-    /// For testing on a device, and for the day there is a settings screen with a
-    /// "show me the tips again" line in it.
+    // MARK: - Settings
+
+    /// Sound on or off - every sound goes through SoundPlayer, which asks this.
+    /// On until somebody turns it off, so a missing value means on.
+    static var soundOn: Bool {
+        get { store.object(forKey: Key.soundOn) as? Bool ?? true }
+        set { store.set(newValue, forKey: Key.soundOn) }
+    }
+
+    /// Mirror the controls: move stick on the right, aim stick on the left. Read
+    /// by GameScene when it lays the controls out at the start of a match.
+    static var leftHanded: Bool {
+        get { store.bool(forKey: Key.leftHanded) }
+        set { store.set(newValue, forKey: Key.leftHanded) }
+    }
+
+    /// The "Show tips again" row in Settings.
     static func forgetLessons() {
         taughtSelling = false
         taughtHolding = false

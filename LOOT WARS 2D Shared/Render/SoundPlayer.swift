@@ -213,6 +213,10 @@ final class SoundPlayer {
     }
 
     private func start(_ sound: Sound, volume: Float, pan: Float, urgent: Bool = false) {
+        // Sound off in Settings. Checked here, the one door every sound comes
+        // through, so nothing can slip past it.
+        guard Prefs.soundOn else { return }
+
         guard let buffer = buffers[sound],
               let pool = nodes[sound], !pool.isEmpty else { return }
 
