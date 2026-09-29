@@ -127,6 +127,9 @@ final class MenuScene: SKScene {
     private let settingsContent = SettingsSheetContent()
     private let aboutContent = AboutSheetContent()
 
+    /// How to Play, behind the Info button - see HowToPlayContent.
+    private let howToPlay = HowToPlayContent()
+
     /// Set once the scene has handed the game over, so a second tap on a button
     /// that is still animating cannot present a second match.
     private var starting = false
@@ -452,8 +455,10 @@ final class MenuScene: SKScene {
                 SoundPlayer.shared.play(.exit)
                 sheet.dismiss()
             } else {
-                // On the card: the settings rows take their own taps.
+                // On the card: the settings rows take their own taps, and the
+                // How to Play pages start a swipe.
                 sheet.tap(localPoint: local)
+                sheet.dragBegan(localPoint: local)
             }
             return
         }
@@ -490,7 +495,7 @@ final class MenuScene: SKScene {
             info.press { [weak self] in
                 guard let self else { return }
                 self.sheet.open(title: "HOW TO PLAY",
-                                message: "Coming soon.",
+                                content: self.howToPlay,
                                 on: self.size)
             }
             return
@@ -507,6 +512,23 @@ final class MenuScene: SKScene {
                                 on: self.size)
             }
         }
+    }
+
+    // Swipes on the sheet - the How to Play pages. Nothing else on this screen
+    // follows a finger.
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard sheet.isOpen, let touch = touches.first else { return }
+        sheet.dragMoved(localPoint: touch.location(in: sheet))
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard sheet.isOpen, let touch = touches.first else { return }
+        sheet.dragEnded(localPoint: touch.location(in: sheet))
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard sheet.isOpen, let touch = touches.first else { return }
+        sheet.dragEnded(localPoint: touch.location(in: sheet))
     }
     #endif
 }

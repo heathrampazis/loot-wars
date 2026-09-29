@@ -4,9 +4,9 @@
 //
 //  A card that slides up over the menu, for the things that are not playing.
 //
-//  Holds either a line of text (Info, for now: a heading and "coming soon") or a
-//  piece of content that lays itself out and takes its own taps - the settings
-//  and the About page behind them, see SettingsSheetContent. The card grows to fit
+//  Holds either a line of text or a piece of content that lays itself out and
+//  takes its own taps and swipes - the settings and the About page behind them
+//  (SettingsSheetContent), and the How to Play pages (HowToPlayContent). The card grows to fit
 //  whatever it is holding, within the screen.
 //
 //  A sheet rather than a scene, which is the same call MenuScene makes about
@@ -106,14 +106,15 @@ final class MenuSheetNode: SKNode {
         self.screen = screen
         scrim.size = CGSize(width: screen.width * 1.4, height: screen.height * 1.4)
 
-        let width = min(screen.width * 0.72, 460)
+        let width = content?.preferredCardWidth(for: screen) ?? min(screen.width * 0.72, 460)
         let inner = width - 56
         let height: CGFloat
 
         if let content {
-            let wanted = content.layOut(width: inner)
-            height = min(MenuSheetNode.headerHeight + wanted + MenuSheetNode.footerHeight,
-                         screen.height - 24)
+            let most = screen.height - 24
+            let room = most - MenuSheetNode.headerHeight - MenuSheetNode.footerHeight
+            let wanted = content.layOut(width: inner, maxHeight: room)
+            height = min(MenuSheetNode.headerHeight + wanted + MenuSheetNode.footerHeight, most)
             content.node.position = CGPoint(x: 0, y: height / 2 - MenuSheetNode.headerHeight)
         } else {
             height = min(screen.height * 0.62, 280)
@@ -225,6 +226,23 @@ final class MenuSheetNode: SKNode {
     func tap(localPoint point: CGPoint) {
         guard let content else { return }
         content.tap(at: convert(point, to: content.node))
+    }
+
+    /// A finger dragging on the card, handed on the same way - see
+    /// HowToPlayContent, which swipes between pages.
+    func dragBegan(localPoint point: CGPoint) {
+        guard let content else { return }
+        content.dragBegan(at: convert(point, to: content.node))
+    }
+
+    func dragMoved(localPoint point: CGPoint) {
+        guard let content else { return }
+        content.dragMoved(to: convert(point, to: content.node))
+    }
+
+    func dragEnded(localPoint point: CGPoint) {
+        guard let content else { return }
+        content.dragEnded(at: convert(point, to: content.node))
     }
 
     /// The system face, plain, like everything else on this screen - see
