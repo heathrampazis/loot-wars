@@ -101,10 +101,18 @@ final class BombRenderer {
         guard (bomb.position - last).length >= gap else { return }
         lastSpark[bomb.id] = bomb.position
 
-        spark(at: bomb.position, along: bomb.velocity, kind: bomb.kind, heat: heat)
+        // From the lit end of the fuse on a real bomb, which spins with the
+        // sprite; from the middle of a stink bomb, which has no fuse.
+        let origin: CGPoint
+        if bomb.kind == .blast, let sprite = nodesByBomb[bomb.id] {
+            origin = sprite.convert(BombRenderer.fuseTip(of: sprite), to: node)
+        } else {
+            origin = GridGeometry.point(for: bomb.position)
+        }
+        spark(at: origin, along: bomb.velocity, kind: bomb.kind, heat: heat)
     }
 
-    private func spark(at position: Vec2, along velocity: Vec2, kind: Bomb.Kind, heat: Double) {
+    private func spark(at position: CGPoint, along velocity: Vec2, kind: Bomb.Kind, heat: Double) {
         // Broken into named steps rather than written as one expression. This file
         // has cost an afternoon to a Swift type-checker timeout on exactly this
         // shape before - a compound of literals, range bounds and a Double, inside
@@ -115,7 +123,7 @@ final class BombRenderer {
 
         let flare = SKSpriteNode(texture: ImpactArt.star,
                                  size: CGSize(width: side, height: side))
-        flare.position = GridGeometry.point(for: position)
+        flare.position = position
 
         // Under the bomb, so the bomb stays the thing you are looking at.
         flare.zPosition = 8
@@ -161,6 +169,56 @@ final class BombRenderer {
         ]))
     }
 
+    /// Where the end of the fuse is on the Bomb artwork, as a share of the
+    /// sprite's size from its centre. Measured off the art when it was drawn -
+    /// move the fuse in Bomb.png and this has to move with it.
+    private static let fuseTipShare = CGPoint(x: 0.359, y: 0.422)
+
+    private static func fuseTip(of sprite: SKSpriteNode) -> CGPoint {
+        CGPoint(x: sprite.size.width * fuseTipShare.x, y: sprite.size.height * fuseTipShare.y)
+    }
+
+    /// The spark on the fuse: a hot glow with a star in it that flickers - it
+    /// swells and shrinks and turns on an uneven beat, so it fizzes rather than
+    /// pulses.
+    private static func fuseSpark(size side: CGFloat, at point: CGPoint) -> SKNode {
+        let root = SKNode()
+        root.position = point
+        root.zPosition = 1
+
+        let glow = SKSpriteNode(texture: GlowArt.pool)
+        glow.size = CGSize(width: side * 0.75, height: side * 0.75)
+        glow.color = RenderPalette.blast
+        glow.colorBlendFactor = 1
+        glow.blendMode = .add
+        root.addChild(glow)
+        glow.run(.repeatForever(.sequence([
+            .group([.scale(to: 1.25, duration: 0.06), .fadeAlpha(to: 1, duration: 0.06)]),
+            .group([.scale(to: 0.8, duration: 0.09), .fadeAlpha(to: 0.6, duration: 0.09)])
+        ])))
+
+        let star = SKSpriteNode(texture: ImpactArt.star)
+        star.size = CGSize(width: side * 0.42, height: side * 0.42)
+        star.color = RenderPalette.treasure
+        star.colorBlendFactor = 0.35
+        star.zPosition = 1
+        root.addChild(star)
+        star.run(.repeatForever(.sequence([
+            .group([.scale(to: 1.3, duration: 0.05), .rotate(byAngle: 0.9, duration: 0.05)]),
+            .group([.scale(to: 0.7, duration: 0.07), .rotate(byAngle: 0.6, duration: 0.07)]),
+            .group([.scale(to: 1.1, duration: 0.04), .rotate(byAngle: -0.4, duration: 0.04)]),
+            .scale(to: 0.85, duration: 0.06)
+        ])))
+
+        let core = SKShapeNode(circleOfRadius: side * 0.06)
+        core.fillColor = .white
+        core.strokeColor = .clear
+        core.zPosition = 2
+        root.addChild(core)
+
+        return root
+    }
+
     private func makeNode(for bomb: Bomb) -> SKSpriteNode {
         let side = GridGeometry.length(ofTiles: GameConfig.Bomb.spriteSize)
 
@@ -172,6 +230,13 @@ final class BombRenderer {
 
         // Tumbling reads as thrown rather than fired.
         sprite.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 0.9)))
+
+        // A lit fuse: a spark fizzing on the end of the rope for as long as the
+        // bomb is in the air. A child of the sprite, so it spins round with it
+        // and stays on the rope's end.
+        if bomb.kind == .blast {
+            sprite.addChild(BombRenderer.fuseSpark(size: side, at: BombRenderer.fuseTip(of: sprite)))
+        }
 
         node.addChild(sprite)
         nodesByBomb[bomb.id] = sprite
