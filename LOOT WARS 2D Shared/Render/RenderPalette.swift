@@ -92,7 +92,7 @@ enum RenderPalette {
     static let floorLight = rgb(0xC0, 0xDD, 0x7A)
     static let floorDark  = rgb(0xAF, 0xCC, 0x71)
     static let terrain    = rgb(0x6F, 0x8F, 0x4B)   // impassable scenery
-    static let background = rgb(0x7E, 0x9A, 0x5C)   // only visible past the map edge
+    static let background = rgb(0x7A, 0x8F, 0x4F)   // only past the drawn overhang; matches its darkest ground
 
     // The ground colours for one biome: the floor checker, the map edge, and footstep tufts.
     struct BiomeTones {
