@@ -456,9 +456,14 @@ enum AIBrain {
         // An open supply drop within reach is grabbed, not fought over: nothing
         // seen - not even being shot - turns a bot away from the best item in the
         // game when it is a few steps from it. See grabbableSupply.
+        //
+        // Unless somebody else is going to get there first. Then the drop is lost
+        // to the run, and the only way to win it is to shoot them - which the case
+        // below lets happen, because this bot is at the drop.
         if case .loot(let id) = state.goal,
            let drop = world.lootboxes[id], drop.supply, !drop.isLocked,
-           (drop.position - actor.position).length <= GameConfig.SupplyDrop.botGrabRange {
+           (drop.position - actor.position).length <= GameConfig.SupplyDrop.botGrabRange,
+           firstInLine(for: drop, actor: actor, in: world) {
             return
         }
 
@@ -469,7 +474,13 @@ enum AIBrain {
         case .loot(let id) where world.lootboxes[id]?.supply == true:
             // On the way to a drop, the same rule as a raid: seeing somebody is
             // not a reason to stop, being hit is.
-            guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
+            //
+            // AT the drop it is the opposite. Everybody there is waiting for the
+            // same crate, and standing politely in a crowd until it opens is not a
+            // plan - the crate goes to whoever is still alive. So near it, any
+            // enemy in sight is reason enough. See contestedDrop.
+            guard contestedDrop(near: actor, in: world) != nil
+                    || actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
 
         case .raid, .robChest, .wreck, .silence:
             // Mid-raid, and this is the one thing worth NOT reacting to.
@@ -505,8 +516,10 @@ enum AIBrain {
             state.goal = .retreat(from: enemy.id)
         } else {
             // Spotting somebody is no longer a reason to drop everything. It has to
-            // be a fight worth interrupting a trip home for.
-            guard shouldEngage(enemy, actor: actor, in: world) else { return }
+            // be a fight worth interrupting a trip home for - or a rival for a drop
+            // this bot is standing at.
+            guard shouldEngage(enemy, actor: actor, in: world)
+                    || isRivalForDrop(enemy, actor: actor, in: world) else { return }
             state.goal = .fight(enemy.id)
         }
 
@@ -519,8 +532,17 @@ enum AIBrain {
         // An OPEN supply drop close by beats everything, fighting included. It is
         // the hottest thing on the map, it goes to whoever touches it first, and a
         // bot trading shots beside an open one is handing it to the player.
+        //
+        // Unless somebody is going to beat it there. Then the run is lost and the
+        // only way to the crate is through them, so it shoots whoever is nearest
+        // the crate instead.
         if let drop = grabbableSupply(for: actor, in: world) {
-            return .loot(drop.id)
+            if firstInLine(for: drop, actor: actor, in: world) {
+                return .loot(drop.id)
+            }
+            if let rival = nearestRival(to: drop, for: actor, in: world) {
+                return .fight(rival.id)
+            }
         }
 
         if state.fightCooldown <= 0, let enemy = nearestVisibleEnemy(to: actor, in: world) {
@@ -546,10 +568,17 @@ enum AIBrain {
             // threat scan had just declined to do.
             // A supply run counts as a raid here: it is an errand worth not being
             // distracted from.
-            let raiding = state.goal.isRaiding || isSupplyRun(state.goal, in: world)
+            //
+            // Only on the WAY to one, though. Once it is there, the people around
+            // the drop are the competition and are fought - see contestedDrop.
+            let atDrop = contestedDrop(near: actor, in: world) != nil
+            let raiding = state.goal.isRaiding
+                || (isSupplyRun(state.goal, in: world) && !atDrop)
             let underFire = actor.secondsSinceHit < GameConfig.AI.combatRecency
+            let rival = isRivalForDrop(enemy, actor: actor, in: world)
 
-            if !(raiding && !underFire), shouldEngage(enemy, actor: actor, in: world) {
+            if !(raiding && !underFire),
+               rival || shouldEngage(enemy, actor: actor, in: world) {
                 return .fight(enemy.id)
             }
         }
@@ -1555,6 +1584,51 @@ enum AIBrain {
         }
     }
 
+    /// Whether no enemy will reach this drop clearly before this bot does.
+    ///
+    /// Any living enemy, seen or not: this is a race to a point both of them know
+    /// about, not a question of who has spotted whom. "Clearly" is
+    /// SupplyDrop.botBeatenBy, so two bots a step apart both still run for it.
+    private static func firstInLine(for drop: Lootbox, actor: Actor, in world: World) -> Bool {
+        let mine = (drop.position - actor.position).length
+        return !world.actors.values.contains {
+            $0.team != actor.team && $0.isAlive
+                && ($0.position - drop.position).length
+                    + GameConfig.SupplyDrop.botBeatenBy < mine
+        }
+    }
+
+    /// The enemy nearest a drop - the one about to take it. Sorted by id first, so
+    /// two the same distance away are never split by dictionary order.
+    private static func nearestRival(to drop: Lootbox, for actor: Actor, in world: World) -> Actor? {
+        var best: Actor?
+        var shortest = Double.greatestFiniteMagnitude
+
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let other = world.actors[id], other.team != actor.team, other.isAlive,
+                  other.invulnerability <= 0 else { continue }
+            let distance = (other.position - drop.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = other
+        }
+
+        return best
+    }
+
+    /// The supply drop this bot is standing at, if it is standing at one.
+    private static func contestedDrop(near actor: Actor, in world: World) -> Lootbox? {
+        world.supplyDrops.first {
+            ($0.position - actor.position).length <= GameConfig.SupplyDrop.botContestRadius
+        }
+    }
+
+    /// Whether this enemy is competing with this bot for the drop it is at.
+    private static func isRivalForDrop(_ enemy: Actor, actor: Actor, in world: World) -> Bool {
+        guard let drop = contestedDrop(near: actor, in: world) else { return false }
+        return (enemy.position - drop.position).length <= GameConfig.SupplyDrop.botContestRadius
+    }
+
     private static func isSupplyRun(_ goal: AIGoal, in world: World) -> Bool {
         guard case .loot(let id) = goal else { return false }
         return world.lootboxes[id]?.supply == true
@@ -1585,6 +1659,11 @@ enum AIBrain {
             return
 
         case .loot(let id):
+            if let drop = world.lootboxes[id], drop.supply,
+               drop.lockTimer > GameConfig.SupplyDrop.botMoveInAt {
+                holdNear(drop, state: &state, actor: actor)
+                return
+            }
             steer(&state, actor: actor, to: world.lootboxes[id]?.position)
 
         case .collect(let id):
@@ -1770,6 +1849,33 @@ enum AIBrain {
         return world.actors.values.contains { other in
             other.isAlive && other.team != actor.team
                 && (other.position - actor.position).length <= GameConfig.AI.dodgeRange
+        }
+    }
+
+    /// Waits out a locked supply drop at a distance instead of on top of it.
+    ///
+    /// Walks in to SupplyDrop.botHoldRadius and then circles there, the way a bot
+    /// circles in a fight - moving, so it is hard to hit, and spread round the
+    /// crate so the bots waiting can see and shoot each other. Moves in for the
+    /// crate itself only in the last seconds of the lock.
+    private static func holdNear(_ drop: Lootbox, state: inout AIState, actor: Actor) {
+        let fromDrop = actor.position - drop.position
+        let gap = fromDrop.length
+        let hold = GameConfig.SupplyDrop.botHoldRadius
+
+        guard gap > 0.01 else {
+            state.desiredHeading = Vec2(x: state.strafeDirection, y: 0)
+            return
+        }
+
+        let outward = fromDrop.normalized()
+
+        if gap > hold + 1 {
+            state.desiredHeading = outward * -1
+        } else if gap < hold - 1 {
+            state.desiredHeading = outward
+        } else {
+            state.desiredHeading = Vec2(x: -outward.y, y: outward.x) * state.strafeDirection
         }
     }
 
