@@ -4,8 +4,9 @@
 //
 //  Arrows on the edge of the screen pointing at supply drops you cannot see.
 //
-//  One marker per drop: a gold badge with the crate in it, an arrow on the side
-//  facing the drop, and the countdown underneath - or OPEN once it can be taken.
+//  One marker per drop: a gold badge with the crate in it and an arrow on the
+//  side facing the drop. No countdown here - that lives over the crate itself -
+//  but the marker pulses once the drop can be opened.
 //  It rides round the edge of the screen as you move, and goes away the moment
 //  the drop itself comes into view, where the crate's own badge takes over.
 //
@@ -23,15 +24,14 @@ final class SupplyCompassNode: SKNode {
         let id: LootboxID
         /// Where the drop is, relative to the middle of the screen, in points.
         let offset: CGPoint
-        /// Whole seconds until it opens, or nil once it can be opened.
+        /// Whole seconds until it opens, or nil once it can be opened. Only whether
+        /// it is open is shown here; the number is drawn over the crate.
         let secondsLeft: Int?
     }
 
     private final class Marker {
         let root = SKNode()
         let arrow: SKShapeNode
-        let label = SKLabelNode()
-        var text = ""
         var open = false
 
         init(radius: CGFloat) {
@@ -93,23 +93,12 @@ final class SupplyCompassNode: SKNode {
             marker.root.position = CGPoint(x: centre.x + dx * scale, y: centre.y + dy * scale)
             marker.arrow.zRotation = atan2(dy, dx)
 
-            setText(on: marker, secondsLeft: target.secondsLeft)
+            setOpen(on: marker, open: target.secondsLeft == nil)
         }
     }
 
-    private func setText(on marker: Marker, secondsLeft: Int?) {
-        let text = secondsLeft.map { "\($0)" } ?? "OPEN"
-        guard text != marker.text else { return }
-        marker.text = text
-
-        marker.label.attributedText = NSAttributedString(string: text, attributes: [
-            .font: UIFont.systemFont(ofSize: 12, weight: .heavy),
-            .foregroundColor: SKColor.white,
-            .strokeColor: SKColor.black,
-            .strokeWidth: -4.0
-        ])
-
-        let open = secondsLeft == nil
+    /// Pulses the marker once its drop can be opened, and stops it if it is not.
+    private func setOpen(on marker: Marker, open: Bool) {
         guard open != marker.open else { return }
         marker.open = open
 
@@ -147,12 +136,6 @@ final class SupplyCompassNode: SKNode {
                                              height: art.width > 0 ? width * art.height / art.width : width))
         icon.zPosition = 1
         marker.root.addChild(icon)
-
-        marker.label.verticalAlignmentMode = .top
-        marker.label.horizontalAlignmentMode = .center
-        marker.label.position = CGPoint(x: 0, y: -radius - 3)
-        marker.label.zPosition = 2
-        marker.root.addChild(marker.label)
 
         // Arrives with a pop, so a new drop off to one side is noticed.
         marker.root.setScale(0.2)

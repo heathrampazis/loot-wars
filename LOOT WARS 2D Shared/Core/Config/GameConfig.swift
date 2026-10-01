@@ -2195,8 +2195,27 @@ enum GameConfig {
         static let botInterest: Double = 40
 
         /// Inside this, a bot simply runs in and takes an open drop - it will not
-        /// stop to fight, even under fire. The hot-commodity rule.
+        /// stop to fight, even under fire. The hot-commodity rule. Only for a bot
+        /// that is first in line - see botBeatenBy.
         static let botGrabRange: Double = 12
+
+        /// Within this of a drop, in tiles, every enemy is a rival for it. A bot
+        /// here fights anybody it can see, whatever they are wearing, because
+        /// whoever is left standing when it opens is whoever gets it.
+        static let botContestRadius: Double = 12
+
+        /// How far from a LOCKED drop a bot waits, in tiles. It circles at this
+        /// distance rather than standing on the crate, so a crowd forms a ring
+        /// with sight lines across it instead of a huddle.
+        static let botHoldRadius: Double = 5
+
+        /// Seconds left on the lock when waiting bots stop circling and move in.
+        static let botMoveInAt: Double = 2.5
+
+        /// How much nearer an enemy has to be to an open drop, in tiles, before a
+        /// bot stops running for it and shoots them instead. Running at a crate
+        /// somebody else will reach first just hands it to them.
+        static let botBeatenBy: Double = 2
     }
 
     enum Loot {
