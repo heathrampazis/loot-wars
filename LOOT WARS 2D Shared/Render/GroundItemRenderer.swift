@@ -37,7 +37,11 @@ final class GroundItemRenderer {
         return widthInTiles
     }
 
-    private var nodesByItem: [GroundItemID: SKSpriteNode] = [:]
+    // Each item's root node: ground glow, beam and the bobbing sprite.
+    private var nodesByItem: [GroundItemID: SKNode] = [:]
+
+    // How tall the light beam above an item is, in tiles; the same for every rarity.
+    private static let beamHeight: Double = 0.9
 
     func sync(with world: World) {
         for (id, item) in world.groundItems {
@@ -86,10 +90,14 @@ final class GroundItemRenderer {
 
         let box = GridGeometry.length(ofTiles: GroundItemRenderer.width(of: item.pickup))
 
+        // The glow and beam stay on the ground while only the item itself bobs.
+        let root = SKNode()
+        root.position = GridGeometry.point(for: item.position)
+        root.zPosition = 4
+
         let sprite = SKSpriteNode(texture: texture,
                                   size: ItemArt.size(of: texture, fittingInto: box))
-        sprite.position = GridGeometry.point(for: item.position)
-        sprite.zPosition = 4
+        root.addChild(sprite)
 
         // A pool of light under it, the colour of what it is. This is the whole
         // rarity indicator on the map: at the size an item is drawn you cannot read
@@ -108,8 +116,8 @@ final class GroundItemRenderer {
             glow.color = RenderPalette.treasure
             glow.colorBlendFactor = 1
             glow.alpha = 0.85
-            glow.zPosition = -1
-            sprite.addChild(glow)
+            glow.zPosition = -0.3
+            root.addChild(glow)
 
             glow.run(.repeatForever(.sequence([
                 .group([.fadeAlpha(to: 0.5, duration: 0.7), .scale(to: 0.85, duration: 0.7)]),
@@ -118,27 +126,54 @@ final class GroundItemRenderer {
         }
 
         if case .item(let type) = item.pickup {
-            let glow = SKSpriteNode(texture: GlowArt.pool)
-            glow.size = CGSize(width: box * 1.5, height: box * 1.5)
-            glow.color = RenderPalette.colour(of: type.rarity)
-            glow.colorBlendFactor = 1
-            glow.alpha = 0.85
-            glow.zPosition = -1
-            sprite.addChild(glow)
-
-            // A slow breath, so it reads as something glowing rather than as a
-            // sticker printed on the grass. Offset per item by its own id, or
-            // twenty items would pulse in unison like a warning light.
+            let colour = RenderPalette.colour(of: type.rarity)
+            // Offset per item, so twenty items on the floor do not pulse in unison.
             let phase = Double(item.id.raw % 7) * 0.14
-            glow.run(.sequence([
-                .wait(forDuration: phase),
-                .repeatForever(.sequence([
-                    .group([.fadeAlpha(to: 0.55, duration: 0.9),
-                            .scale(to: 0.88, duration: 0.9)]),
-                    .group([.fadeAlpha(to: 0.85, duration: 0.9),
-                            .scale(to: 1.0, duration: 0.9)])
-                ]))
-            ]))
+
+            // A bright pool on the ground, bigger than the item.
+            let glow = SKSpriteNode(texture: GlowArt.pool)
+            glow.size = CGSize(width: box * 2.0, height: box * 1.3)
+            glow.position = CGPoint(x: 0, y: -box * 0.3)
+            glow.color = colour
+            glow.colorBlendFactor = 1
+            glow.alpha = 1
+            glow.zPosition = -0.3
+            root.addChild(glow)
+
+            // A crisp ring round it, so the colour still reads against busy ground.
+            let ring = SKShapeNode(ellipseOf: CGSize(width: box * 1.25, height: box * 0.55))
+            ring.position = glow.position
+            ring.fillColor = .clear
+            ring.strokeColor = colour
+            ring.lineWidth = 2.5
+            ring.alpha = 0.9
+            ring.zPosition = -0.2
+            root.addChild(ring)
+
+            // A short pillar of light rising out of it, in the rarity colour.
+            let tall = GridGeometry.length(ofTiles: GroundItemRenderer.beamHeight)
+            let beam = SKSpriteNode(texture: GlowArt.beam)
+            beam.size = CGSize(width: box * 0.95, height: tall)
+            beam.anchorPoint = CGPoint(x: 0.5, y: 0)
+            beam.position = glow.position
+            beam.color = colour
+            beam.colorBlendFactor = 1
+            beam.alpha = 0.95
+            beam.zPosition = -0.1
+            root.addChild(beam)
+
+            let breathe: (CGFloat, CGFloat, CGFloat) -> SKAction = { low, high, scale in
+                .sequence([
+                    .wait(forDuration: phase),
+                    .repeatForever(.sequence([
+                        .group([.fadeAlpha(to: low, duration: 0.9), .scale(to: scale, duration: 0.9)]),
+                        .group([.fadeAlpha(to: high, duration: 0.9), .scale(to: 1.0, duration: 0.9)])
+                    ]))
+                ])
+            }
+            glow.run(breathe(0.7, 1.0, 0.9))
+            ring.run(breathe(0.55, 0.9, 1.08))
+            beam.run(breathe(0.7, 0.95, 1.0))
         }
 
         // The same sheen the hotbar puts on it, so a power-up is recognisable
@@ -179,7 +214,7 @@ final class GroundItemRenderer {
             ]))
         }
 
-        node.addChild(sprite)
-        nodesByItem[item.id] = sprite
+        node.addChild(root)
+        nodesByItem[item.id] = root
     }
 }

@@ -62,6 +62,9 @@ final class ItemSlotNode: SKNode {
     /// already said in colour: the rarity pool, the sell tab, the dimming.
     private let urgentRing: SKShapeNode
 
+    // The slot's own background in the item's rarity colour, with a matching border.
+    private let rarityPlate: SKShapeNode
+
     private let badge = SKNode()
     private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
@@ -92,6 +95,10 @@ final class ItemSlotNode: SKNode {
                                          width: side, height: side),
                             cornerRadius: side * 0.182)
 
+        rarityPlate = SKShapeNode(rect: CGRect(x: -side / 2, y: -side / 2,
+                                               width: side, height: side),
+                                  cornerRadius: side * 0.182)
+
         urgentRing = SKShapeNode(rect: CGRect(x: -side / 2 - 2, y: -side / 2 - 2,
                                               width: side + 4, height: side + 4),
                                  cornerRadius: side * 0.2)
@@ -114,8 +121,14 @@ final class ItemSlotNode: SKNode {
         flash.zPosition = 5
         addChild(flash)
 
-        glow.size = CGSize(width: side * 0.92, height: side * 0.92)
+        rarityPlate.lineWidth = 3
+        rarityPlate.zPosition = 0.2
+        rarityPlate.isHidden = true
+        addChild(rarityPlate)
+
+        glow.size = CGSize(width: side * 1.05, height: side * 1.05)
         glow.colorBlendFactor = 1
+        glow.zPosition = 0.5
         glow.isHidden = true
         addChild(glow)
 
@@ -268,7 +281,7 @@ final class ItemSlotNode: SKNode {
 
         glow.run(.repeatForever(.sequence([
             .group([.fadeAlpha(to: 1.0, duration: 1.4), .scale(to: 1.12, duration: 1.4)]),
-            .group([.fadeAlpha(to: 0.7, duration: 1.4), .scale(to: 1.0, duration: 1.4)])
+            .group([.fadeAlpha(to: 0.8, duration: 1.4), .scale(to: 1.0, duration: 1.4)])
         ])), withKey: "rare")
     }
 
@@ -414,14 +427,20 @@ final class ItemSlotNode: SKNode {
             sellButton.isHidden = true
 
             // An empty slot is a hole in the bar, not an item of no value.
+            rarityPlate.isHidden = true
             glow.isHidden = true
             glow.removeAllActions()
             return
         }
 
+        let colour = RenderPalette.colour(of: stack.type.rarity)
+        rarityPlate.isHidden = false
+        rarityPlate.fillColor = colour.withAlphaComponent(0.5)
+        rarityPlate.strokeColor = colour
+
         glow.isHidden = false
-        glow.color = RenderPalette.colour(of: stack.type.rarity)
-        glow.alpha = 0.75
+        glow.color = colour
+        glow.alpha = 0.95
         breathe(for: stack.type.rarity)
 
         let texture = ItemArt.texture(for: stack.type)
