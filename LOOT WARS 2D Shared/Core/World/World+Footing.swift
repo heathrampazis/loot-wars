@@ -95,9 +95,12 @@ extension World {
     /// And nothing anybody could walk to from the centre before may be cut off
     /// after: no pockets, no sealed corners, no ring round the middle.
     ///
-    /// Measured within the claim. Your own walls do not stop you - you walk
-    /// through them - so what can box somebody in is furniture, stone and trees,
-    /// and all of that that matters is inside the claim.
+    /// Measured over the claim plus a margin round it, not the claim alone. Your
+    /// own walls do not stop you - you walk through them - so a gap between a
+    /// machine and your wall is not a pocket: you step through the wall and walk
+    /// round the outside. Measured inside the claim only, that walk round did not
+    /// exist, and a perfectly usable spot next to the wall was refused for
+    /// "cutting off" ground you could reach in two steps.
     func keepsBaseOpen(placing tiles: [GridPoint], for team: TeamID) -> Bool {
         guard let claim = claims[team] else { return true }
         let centre = claim.centreTile
@@ -107,7 +110,7 @@ extension World {
                                    GridPoint(col: centre.col, row: centre.row + 1)]
         guard !tiles.contains(where: { pad.contains($0) }) else { return false }
 
-        let bounds = footprint(of: claim)
+        let bounds = footprint(of: claim, grownBy: World.openCheckMargin)
         let blocked = Set(tiles)
         let anchors = spawnAnchors(of: centre)
 
@@ -153,11 +156,18 @@ extension World {
         [GridPoint(col: centre.col, row: centre.row - 1), centre]
     }
 
-    private func footprint(of claim: BaseClaim) -> Set<GridPoint> {
+    /// How far past the claim keepsBaseOpen looks for a way round.
+    ///
+    /// Three: enough to walk round anything that stands at a claim's edge, and
+    /// still a small search (fifteen by fifteen).
+    private static let openCheckMargin = 3
+
+    private func footprint(of claim: BaseClaim, grownBy margin: Int) -> Set<GridPoint> {
         var tiles: Set<GridPoint> = []
-        for col in 0..<claim.size {
-            for row in 0..<claim.size {
-                tiles.insert(GridPoint(col: claim.origin.col + col, row: claim.origin.row + row))
+        for col in -margin..<(claim.size + margin) {
+            for row in -margin..<(claim.size + margin) {
+                let tile = GridPoint(col: claim.origin.col + col, row: claim.origin.row + row)
+                if map.contains(tile) { tiles.insert(tile) }
             }
         }
         return tiles
