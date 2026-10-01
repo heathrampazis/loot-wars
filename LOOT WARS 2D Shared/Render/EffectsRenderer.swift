@@ -26,6 +26,9 @@ final class EffectsRenderer {
 
     let node = SKNode()
 
+    // Which biome is underfoot, so footstep tufts match the ground; set when a match starts.
+    var biomes: BiomeMap?
+
     /// Where each actor's feet were last frame, and how far they have walked since
     /// the last footfall. Kept here rather than read off the actor because it is a
     /// question about the PICTURE - how often to disturb the grass - and Core has
@@ -552,7 +555,7 @@ final class EffectsRenderer {
     }
 
     private func plant(at position: Vec2) {
-        let tuft = SKSpriteNode(texture: GrassArt.tuft)
+        let tuft = SKSpriteNode(texture: GrassArt.tuft(for: biomes?.biome(at: position) ?? .plains))
         tuft.size = CGSize(width: GridGeometry.length(ofTiles: 0.42),
                            height: GridGeometry.length(ofTiles: 0.30))
         tuft.position = GridGeometry.point(for: position)

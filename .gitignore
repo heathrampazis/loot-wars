@@ -23,3 +23,6 @@ xcuserdata/
 # ---- Dependency managers (not used yet, harmless) ----
 Pods/
 Carthage/Build/
+
+# ---- Previews the Claude app saves into this folder ----
+Claude outputs/
