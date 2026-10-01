@@ -682,9 +682,10 @@ enum AIBrain {
             return next
         }
 
+        // The urge picks a BASE, not a chest: an empty chest is no reason to leave a player alone.
         if state.raidUrgeTimer <= 0,
-           let chest = chestWorthRobbing(for: actor, in: world) {
-            return .robChest(chest.id)
+           let raid = raidGoal(for: actor, in: world) {
+            return raid
         }
 
         // A machine standing in a base somebody has already opened.
@@ -965,45 +966,7 @@ enum AIBrain {
             let score = world.raidWorth(of: team) - toBase * GameConfig.AI.raidDistanceCost
             guard score > bestScore else { continue }
 
-            let spots = world.lootSpots(of: team)
-            guard !spots.isEmpty else { continue }
-
-            var tile: GridPoint?
-            var closest = Double.greatestFiniteMagnitude
-
-            // The wall AS BUILT, not as planned.
-            //
-            // This read baseLayouts - the schematic the tutorial draws - and that
-            // is a plan, not a fact. Bots follow it, so for seven bases the two
-            // agreed and the bug was invisible. A player can build any shape they
-            // like inside their claim, and when they do, every tile in this loop
-            // comes back with no block on it, no candidate survives, and the base
-            // is skipped entirely. Build off-plan and you were unbombable.
-            //
-            // wallInTheWay two functions down already asks the enclosure for
-            // exactly this reason and says so in its own comment. This is the same
-            // question and now gets the same authority.
-            //
-            // Sorted, because a Set has no order and the minimum below would
-            // otherwise resolve differently between two runs of the same seed.
-            for candidate in world.enclosure(of: team).wall
-                .sorted(by: { ($0.col, $0.row) < ($1.col, $1.row) }) {
-                guard world.map[candidate].blockOwner != nil else { continue }
-
-                let toLoot = spots
-                    .map { (candidate.center - $0).length }
-                    .min() ?? Double.greatestFiniteMagnitude
-                let toBot = (candidate.center - actor.position).length
-
-                // Near the loot, and near the bot: the tile whose removal actually
-                // opens a way through to it.
-                let placement = toLoot + toBot * 0.5
-                guard placement < closest else { continue }
-                closest = placement
-                tile = candidate
-            }
-
-            guard let tile else { continue }
+            guard let tile = breachTile(into: team, for: actor, in: world) else { continue }
             bestScore = score
             bestTile = tile
         }
@@ -1244,6 +1207,44 @@ enum AIBrain {
             guard distance < shortest else { continue }
             shortest = distance
             best = turret
+        }
+
+        return best
+    }
+
+    // The best enemy base to raid right now, priced by World.raidWorth (machines, an intact wall,
+    // neglect, the lead, and whether a person owns it), and the first job there.
+    private static func raidGoal(for actor: Actor, in world: World) -> AIGoal? {
+        guard actor.inventory.totalHealing(of: actor.maxHealth)
+                >= GameConfig.AI.emergencyHealingStock else { return nil }
+
+        let hasBomb = actor.inventory.count(of: .bomb) > 0
+        let runaway = world.runaway(against: actor.team)?.team
+
+        var best: AIGoal?
+        var bestScore = Double(GameConfig.AI.raidWorthOpening)
+
+        for (team, claim) in world.claims.sorted(by: { $0.key.raw < $1.key.raw })
+        where team != actor.team {
+            let distance = (claim.centreTile.center - actor.position).length
+            guard distance < GameConfig.AI.robRange || team == runaway else { continue }
+
+            let score = world.raidWorth(of: team) - distance * GameConfig.AI.raidDistanceCost
+            guard score > bestScore else { continue }
+
+            // Already open: straight to its turret, chests or machines. Shut: bomb the wall.
+            let goal: AIGoal?
+            if world.baseIsBreached(team) {
+                goal = remaining(at: team, for: actor, in: world)
+            } else if hasBomb, let wall = breachTile(into: team, for: actor, in: world) {
+                goal = .raid(wall)
+            } else {
+                goal = nil
+            }
+
+            guard let goal else { continue }
+            bestScore = score
+            best = goal
         }
 
         return best
@@ -2230,18 +2231,50 @@ enum AIBrain {
 
     // MARK: - Raiding
 
-    /// A wall worth blowing open, or nil.
-    ///
-    /// Three things have to be true at once: the bot is carrying a bomb, it is
-    /// already near somebody else's claim, and that claim actually has a wall
-    /// standing. Without the last one a bot would trudge to an empty patch of
-    /// ground and stand there looking pleased with itself.
-    /// A wall worth blowing open.
-    ///
-    /// Prefers a base with a chest in it, and that preference is the difference
-    /// between raiding and vandalism. Bombing a wall for its own sake achieves
-    /// nothing anyone can see; bombing the wall in front of a full chest is the
-    /// whole point of carrying a bomb.
+    // The wall tile whose removal opens the way to this base's loot, as the wall is actually built.
+    private static func breachTile(into team: TeamID, for actor: Actor, in world: World) -> GridPoint? {
+        let spots = world.lootSpots(of: team)
+        guard !spots.isEmpty else { return nil }
+
+        var tile: GridPoint?
+        var closest = Double.greatestFiniteMagnitude
+
+        // The wall AS BUILT, not as planned.
+        //
+        // This read baseLayouts - the schematic the tutorial draws - and that
+        // is a plan, not a fact. Bots follow it, so for seven bases the two
+        // agreed and the bug was invisible. A player can build any shape they
+        // like inside their claim, and when they do, every tile in this loop
+        // comes back with no block on it, no candidate survives, and the base
+        // is skipped entirely. Build off-plan and you were unbombable.
+        //
+        // wallInTheWay two functions down already asks the enclosure for
+        // exactly this reason and says so in its own comment. This is the same
+        // question and now gets the same authority.
+        //
+        // Sorted, because a Set has no order and the minimum below would
+        // otherwise resolve differently between two runs of the same seed.
+        for candidate in world.enclosure(of: team).wall
+            .sorted(by: { ($0.col, $0.row) < ($1.col, $1.row) }) {
+            guard world.map[candidate].blockOwner != nil else { continue }
+
+            let toLoot = spots
+                .map { (candidate.center - $0).length }
+                .min() ?? Double.greatestFiniteMagnitude
+            let toBot = (candidate.center - actor.position).length
+
+            // Near the loot, and near the bot: the tile whose removal actually
+            // opens a way through to it.
+            let placement = toLoot + toBot * 0.5
+            guard placement < closest else { continue }
+            closest = placement
+            tile = candidate
+        }
+
+        return tile
+    }
+
+    // A wall worth bombing when carrying a bomb: the best-priced base first, else the nearest wall.
     private static func raidTarget(for actor: Actor, in world: World) -> GridPoint? {
         guard actor.inventory.count(of: .bomb) > 0 else { return nil }
 
