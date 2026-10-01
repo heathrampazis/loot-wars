@@ -190,8 +190,9 @@ final class HowToPlayContent: MenuSheetContent {
         let y = -pictureHeight / 2
         leftArrow.position = CGPoint(x: -width / 2 + 22, y: y)
         rightArrow.position = CGPoint(x: width / 2 - 22, y: y)
-        leftArrow.zPosition = 5
-        rightArrow.zPosition = 5
+        // Above the picture, which is a little match with its own interface in it.
+        leftArrow.zPosition = 3000
+        rightArrow.zPosition = 3000
         node.addChild(leftArrow)
         node.addChild(rightArrow)
     }

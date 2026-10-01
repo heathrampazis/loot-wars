@@ -1023,7 +1023,7 @@ final class GameScene: SKScene {
     /// rather than walked, so a wall that is two tiles thick somewhere - or that has
     /// an awkward spur - still sweeps once round instead of stalling where the
     /// walk would have had to choose a direction.
-    private static func sweptRound(_ ring: Set<GridPoint>) -> [GridPoint] {
+    static func sweptRound(_ ring: Set<GridPoint>) -> [GridPoint] {
         let count = Double(ring.count)
         let mid = ring.reduce(Vec2.zero) { running, tile in
             Vec2(x: running.x + Double(tile.col) / count,

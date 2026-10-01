@@ -16,7 +16,7 @@ final class ClaimRenderer {
 
     let node = SKNode()
 
-    private static let tintAlpha: CGFloat = 0.29
+    static let tintAlpha: CGFloat = 0.29
 
     func build(claims: [TeamID: BaseClaim]) {
         node.removeAllChildren()

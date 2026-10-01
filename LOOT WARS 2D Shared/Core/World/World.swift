@@ -458,10 +458,13 @@ final class World {
         lootboxes.values.filter { $0.supply }.sorted { $0.id.raw < $1.id.raw }
     }
 
+    /// - Parameter seconds: how long it stays locked. Always the full countdown in
+    ///   a match; the How to Play picture shortens it so the scene fits a loop.
     @discardableResult
-    func spawnSupplyDrop(at tile: GridPoint) -> LootboxID {
+    func spawnSupplyDrop(at tile: GridPoint,
+                         lockedFor seconds: Double = GameConfig.SupplyDrop.unlockTime) -> LootboxID {
         let crate = Lootbox(id: LootboxID(nextLootboxID), tile: tile, rare: false,
-                            supply: true, lockTimer: GameConfig.SupplyDrop.unlockTime)
+                            supply: true, lockTimer: seconds)
         nextLootboxID += 1
         lootboxes[crate.id] = crate
         supplyDropsSent += 1
