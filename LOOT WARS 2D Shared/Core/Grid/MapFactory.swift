@@ -20,6 +20,8 @@ struct GeneratedMap {
     let map: TileMap
     let claims: [TeamID: BaseClaim]
     let trees: [TreePatch]
+    // Which biome each tile is in; only the look and the tree density depend on it.
+    let biomes: BiomeMap
     let lootboxes: [Lootbox]
     let arcades: [Arcade]
     /// The wall plan each team builds to, in the order it lays them.
@@ -39,7 +41,10 @@ enum MapFactory {
 
         sealEdges(of: &map)
         let (claims, localTeam) = makeClaims(in: map, using: &rng)
-        let trees = plantTrees(in: map, avoiding: claims, using: &rng)
+        // After the bases, so region borders can bend round them.
+        let biomes = BiomeFactory.generate(width: map.width, height: map.height,
+                                           seed: seed, around: claims)
+        let trees = plantTrees(in: map, biomes: biomes, avoiding: claims, using: &rng)
         // Machines first: they are big and there are only a handful, so they get
         // the pick of the open ground. Crates then fit around them.
         let arcades = placeArcades(in: map, avoiding: claims, and: trees, using: &rng)
@@ -56,6 +61,7 @@ enum MapFactory {
         return GeneratedMap(map: map,
                             claims: claims,
                             trees: trees,
+                            biomes: biomes,
                             lootboxes: lootboxes,
                             arcades: arcades,
                             baseLayouts: baseLayouts,
@@ -175,16 +181,25 @@ enum MapFactory {
     // MARK: - Trees
 
     private static func plantTrees(in map: TileMap,
+                                   biomes: BiomeMap,
                                    avoiding claims: [TeamID: BaseClaim],
                                    using rng: inout SeededRandom) -> [TreePatch] {
         var planted: [TreePatch] = []
 
+        // treePatchCount is for an all-plains map; scale it by how dense this map's biomes are.
+        let density = GameConfig.Biomes.treeDensity
+        let densest = density.values.max() ?? 1
+        let shares = biomes.shares
+        // Summed in case order, so floating point never makes two devices disagree.
+        let average = Biome.allCases.reduce(0.0) { $0 + (shares[$1] ?? 0) * (density[$1] ?? 1) }
+        let target = Int((Double(GameConfig.Map.treePatchCount) * average).rounded())
+
         // Placement can fail, so try more often than we need and stop once we have
         // enough. A fixed attempt budget means generation always terminates.
-        let attempts = GameConfig.Map.treePatchCount * 25
+        let attempts = target * 40
 
         for _ in 0..<attempts {
-            guard planted.count < GameConfig.Map.treePatchCount else { break }
+            guard planted.count < target else { break }
 
             let size = GameConfig.Map.treePatchSizes.randomElement(using: &rng) ?? 2
             let factor = GameConfig.Trees.collisionRadiusFactor[size] ?? 0.85
@@ -197,6 +212,8 @@ enum MapFactory {
                                       using: &rng)
             let clockwise = Bool.random(using: &rng)
             let startAngle = Double.random(in: 0..<(2 * .pi), using: &rng)
+            // Kept in proportion to the local biome's density; drawn every time so the order stays fixed.
+            let keep = Double.random(in: 0..<1, using: &rng)
 
             let candidate = TreePatch(
                 origin: GridPoint(col: col, row: row),
@@ -206,21 +223,32 @@ enum MapFactory {
                 initialRotation: startAngle
             )
 
-            guard isClear(candidate, of: planted, and: claims) else { continue }
+            let local = density[biomes.biome(at: candidate.centre)] ?? 1
+            guard keep < local / densest else { continue }
+
+            guard isClear(candidate, of: planted, and: claims, biomes: biomes) else { continue }
             planted.append(candidate)
         }
 
         return planted
     }
 
+    private static func treeGap(in biome: Biome) -> Double {
+        GameConfig.Biomes.treeGap[biome] ?? GameConfig.Trees.spacing
+    }
+
     /// A clump needs clear space around it: away from other clumps so they read as
     /// separate, and away from every claim so nobody is ever penned into their base.
     private static func isClear(_ candidate: TreePatch,
                                 of planted: [TreePatch],
-                                and claims: [TeamID: BaseClaim]) -> Bool {
+                                and claims: [TeamID: BaseClaim],
+                                biomes: BiomeMap) -> Bool {
+        let ownGap = treeGap(in: biomes.biome(at: candidate.centre))
         for other in planted {
             let delta = candidate.centre - other.centre
-            let minimum = candidate.radius + other.radius + GameConfig.Trees.spacing
+            // The wider of the two biomes' gaps, so a forest edge stays walkable from both sides.
+            let gap = max(ownGap, treeGap(in: biomes.biome(at: other.centre)))
+            let minimum = candidate.radius + other.radius + gap
             if delta.length < minimum { return false }
         }
 

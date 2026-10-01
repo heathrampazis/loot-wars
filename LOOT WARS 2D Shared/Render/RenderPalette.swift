@@ -94,6 +94,35 @@ enum RenderPalette {
     static let terrain    = rgb(0x6F, 0x8F, 0x4B)   // impassable scenery
     static let background = rgb(0x7E, 0x9A, 0x5C)   // only visible past the map edge
 
+    // The ground colours for one biome: the floor checker, the map edge, and footstep tufts.
+    struct BiomeTones {
+        let light: SKColor
+        let dark: SKColor
+        let edge: SKColor
+        let tuftOuter: SKColor
+        let tuftInner: SKColor
+    }
+
+    static func tones(for biome: Biome) -> BiomeTones {
+        switch biome {
+        case .plains:
+            return BiomeTones(light: floorLight, dark: floorDark, edge: terrain,
+                              tuftOuter: terrain, tuftInner: floorDark)
+        case .forest:
+            return BiomeTones(light: rgb(0xA8, 0xC6, 0x68), dark: rgb(0x9A, 0xB8, 0x5F),
+                              edge: rgb(0x58, 0x78, 0x3A),
+                              tuftOuter: rgb(0x58, 0x78, 0x3A), tuftInner: rgb(0x8C, 0xAA, 0x56))
+        case .snow:
+            return BiomeTones(light: rgb(0xEE, 0xF5, 0xFA), dark: rgb(0xE1, 0xEC, 0xF4),
+                              edge: rgb(0xAE, 0xC4, 0xD4),
+                              tuftOuter: rgb(0xC3, 0xD5, 0xE3), tuftInner: rgb(0xFF, 0xFF, 0xFF))
+        case .desert:
+            return BiomeTones(light: rgb(0xEB, 0xD7, 0xA2), dark: rgb(0xE0, 0xC9, 0x8F),
+                              edge: rgb(0xC4, 0xA2, 0x66),
+                              tuftOuter: rgb(0xC4, 0xA2, 0x66), tuftInner: rgb(0xE8, 0xD3, 0x9C))
+        }
+    }
+
     // Teams. An actor and the walls it builds are the same colour on purpose -
     // at a glance you should be able to tell whose base you are standing in.
     private static let teams: [SKColor] = [

@@ -830,6 +830,32 @@ enum GameConfig {
         static let halfDepth: Double = 0.86
     }
 
+    // How the map is split into plains, forest, snow and desert regions.
+    enum Biomes {
+        // Regions per map; every biome gets at least one, the rest come from extraRegionPool.
+        static let regionCount = 6
+        static let extraRegionPool: [Biome] = [.plains, .plains, .forest, .snow, .desert]
+
+        // Tiles kept between region centres, and between a centre and the map edge.
+        static let siteSpacing: Double = 16
+        static let siteMargin = 4
+
+        // Size in tiles of the wobble grid, and how far in tiles it bends region edges.
+        static let warpCell = 7
+        static let warpStrength: Double = 4.5
+
+        // Radius in tiles of the round clearing round each base that takes the base's biome.
+        static let baseClearing: Double = 8
+
+        // Trees per area relative to plains; forests are dense, deserts sparse.
+        static let treeDensity: [Biome: Double] = [.plains: 1.0, .forest: 3.0,
+                                                   .snow: 1.0, .desert: 0.45]
+
+        // Clear tiles kept between two clumps, where it differs from Trees.spacing.
+        // Forest gaps are wider than a person is tall, so its many trees are always walkable.
+        static let treeGap: [Biome: Double] = [.forest: 2.1, .desert: 1.0]
+    }
+
     enum Trees {
         /// Collision radius as a fraction of half a clump's width, per clump size.
         /// Chosen to sit between the star art's inner and outer radius.

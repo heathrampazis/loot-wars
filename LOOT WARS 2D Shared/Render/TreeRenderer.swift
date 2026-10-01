@@ -19,35 +19,43 @@ final class TreeRenderer {
 
     let node = SKNode()
 
-    /// Art for each clump size. Add a row to support a new size.
-    private static let assetNames: [Int: String] = [
-        2: "Tree1",
-        3: "Tree2"
+    // Art for each biome and clump size; cacti stand in for trees in the desert.
+    private static let assetNames: [Biome: [Int: String]] = [
+        .plains: [2: "Tree1", 3: "Tree2"],
+        .forest: [2: "ForestTree1", 3: "ForestTree2"],
+        .snow: [2: "SnowTree1", 3: "SnowTree2"],
+        .desert: [2: "Cactus1", 3: "Cactus2"]
     ]
 
-    private var textureCache: [Int: SKTexture] = [:]
+    private struct TextureKey: Hashable {
+        let biome: Biome
+        let size: Int
+    }
 
-    func build(patches: [TreePatch]) {
+    private var textureCache: [TextureKey: SKTexture] = [:]
+
+    func build(patches: [TreePatch], biomes: BiomeMap) {
         node.removeAllChildren()
 
         for patch in patches {
             let side = GridGeometry.length(ofTiles: Double(patch.size))
+            let biome = biomes.biome(at: patch.centre)
 
-            let sprite = SKSpriteNode(texture: texture(forSize: patch.size),
+            let sprite = SKSpriteNode(texture: texture(for: TextureKey(biome: biome, size: patch.size)),
                                       size: CGSize(width: side, height: side))
-            // Centred, so it turns about its own middle - which is also where the
-            // collision circle sits.
             sprite.position = GridGeometry.point(for: patch.centre)
             sprite.zRotation = CGFloat(patch.initialRotation)
             sprite.zPosition = 2    // above the ground and claim tints, below walls
 
-            sprite.run(spinAction(radiansPerSecond: patch.spin))
+            // Cacti stand still; only leafy trees sway round.
+            if biome != .desert {
+                sprite.run(spinAction(radiansPerSecond: patch.spin))
+            }
 
             node.addChild(sprite)
         }
     }
 
-    /// A full turn, repeated forever. Direction comes from the sign of the speed.
     private func spinAction(radiansPerSecond: Double) -> SKAction {
         let fullTurn = 2 * Double.pi
         let duration = fullTurn / abs(radiansPerSecond)
@@ -58,16 +66,14 @@ final class TreeRenderer {
         )
     }
 
-    private func texture(forSize size: Int) -> SKTexture {
-        if let cached = textureCache[size] { return cached }
+    private func texture(for key: TextureKey) -> SKTexture {
+        if let cached = textureCache[key] { return cached }
 
-        let name = TreeRenderer.assetNames[size] ?? "Tree1"
+        let name = TreeRenderer.assetNames[key.biome]?[key.size] ?? "Tree1"
         let texture = SKTexture(imageNamed: name)
-        // The art is far larger than it is ever drawn, so let the GPU pick a
-        // properly downscaled level instead of resampling the full image each frame.
         texture.usesMipmaps = true
 
-        textureCache[size] = texture
+        textureCache[key] = texture
         return texture
     }
 }

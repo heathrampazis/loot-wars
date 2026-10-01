@@ -414,9 +414,10 @@ final class GameScene: SKScene {
         // see ArtFit.warm.
         ArtFit.warm(["Chest", "Arcade", "Mini Arcade"])
 
-        tileRenderer.build(from: generated.map)
+        tileRenderer.build(from: generated.map, biomes: generated.biomes)
         claimRenderer.build(claims: generated.claims)
-        treeRenderer.build(patches: generated.trees)
+        treeRenderer.build(patches: generated.trees, biomes: generated.biomes)
+        effectsRenderer.biomes = generated.biomes
         arcadeRenderer.build(mapHeight: generated.map.height)
         turretRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)

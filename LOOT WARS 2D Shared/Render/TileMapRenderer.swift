@@ -21,10 +21,10 @@ final class TileMapRenderer {
 
     let node = SKNode()
 
-    func build(from map: TileMap) {
+    func build(from map: TileMap, biomes: BiomeMap) {
         node.removeAllChildren()
 
-        let texture = SKTexture(image: bakeImage(of: map))
+        let texture = SKTexture(image: bakeImage(of: map, biomes: biomes))
         // Without this the GPU smears the tiny image into mush when it scales up.
         texture.filteringMode = .nearest
 
@@ -42,7 +42,7 @@ final class TileMapRenderer {
     }
 
     /// One pixel per tile.
-    private func bakeImage(of map: TileMap) -> UIImage {
+    private func bakeImage(of map: TileMap, biomes: BiomeMap) -> UIImage {
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1        // exactly map.width x map.height pixels
         format.opaque = true
@@ -58,7 +58,8 @@ final class TileMapRenderer {
             for row in 0..<map.height {
                 for col in 0..<map.width {
                     let tile = map[GridPoint(col: col, row: row)]
-                    cgContext.setFillColor(colour(for: tile, col: col, row: row).cgColor)
+                    cgContext.setFillColor(colour(for: tile, col: col, row: row,
+                                                  biomes: biomes).cgColor)
 
                     // Images run top-down, tile space runs bottom-up, so flip the row.
                     cgContext.fill(CGRect(x: CGFloat(col),
@@ -70,15 +71,23 @@ final class TileMapRenderer {
         }
     }
 
-    private func colour(for tile: TileType, col: Int, row: Int) -> SKColor {
+    private func colour(for tile: TileType, col: Int, row: Int, biomes: BiomeMap) -> SKColor {
+        let point = GridPoint(col: col, row: row)
+        let biome = biomes[point]
+
         switch tile {
         case .stone:
-            return RenderPalette.terrain
+            return RenderPalette.tones(for: biome).edge
         case .floor, .block:
             // Blocks get plain ground baked underneath them; they are drawn as
             // sprites on top, because they come and go during a match.
             // A checkerboard makes it obvious you are actually moving.
-            return (col + row) % 2 == 0 ? RenderPalette.floorLight : RenderPalette.floorDark
+            return checker(biome, col: col, row: row)
         }
+    }
+
+    private func checker(_ biome: Biome, col: Int, row: Int) -> SKColor {
+        let tones = RenderPalette.tones(for: biome)
+        return (col + row) % 2 == 0 ? tones.light : tones.dark
     }
 }

@@ -178,9 +178,9 @@ final class MenuScene: SKScene {
     private func buildScenery() {
         let generated = MapFactory.generate(seed: UInt64.random(in: 0..<UInt64.max))
 
-        tiles.build(from: generated.map)
+        tiles.build(from: generated.map, biomes: generated.biomes)
         claims.build(claims: generated.claims)
-        trees.build(patches: generated.trees)
+        trees.build(patches: generated.trees, biomes: generated.biomes)
 
         // The trees, settled and deepened.
         //
@@ -196,11 +196,12 @@ final class MenuScene: SKScene {
         // The tint is the look. The art is a pale green against a pale green lawn,
         // which is right on the map - a tree is scenery and should not shout - and
         // washed out here, where the veil lifts everything and takes what little
-        // separation they had. Pulled a third of the way towards the deep green
-        // this game already uses for impassable scenery, they read as woods again.
-        for sprite in trees.node.children.compactMap({ $0 as? SKSpriteNode }) {
+        // separation they had. Pulled a third of the way towards their biome's edge
+        // colour, they read as woods again. Sprites are added one per patch, in order.
+        let sprites = trees.node.children.compactMap { $0 as? SKSpriteNode }
+        for (sprite, patch) in zip(sprites, generated.trees) {
             sprite.removeAllActions()
-            sprite.color = RenderPalette.terrain
+            sprite.color = RenderPalette.tones(for: generated.biomes.biome(at: patch.centre)).edge
             sprite.colorBlendFactor = 0.34
         }
 
