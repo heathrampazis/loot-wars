@@ -132,7 +132,7 @@ final class GroundItemRenderer {
 
             // A bright pool on the ground, bigger than the item.
             let glow = SKSpriteNode(texture: GlowArt.pool)
-            glow.size = CGSize(width: box * 2.0, height: box * 1.3)
+            glow.size = CGSize(width: box * 2.3, height: box * 1.5)
             glow.position = CGPoint(x: 0, y: -box * 0.3)
             glow.color = colour
             glow.colorBlendFactor = 1
@@ -140,8 +140,18 @@ final class GroundItemRenderer {
             glow.zPosition = -0.3
             root.addChild(glow)
 
+            // A smaller, denser core in the middle of the pool, so the colour is rich where it matters.
+            let core = SKSpriteNode(texture: GlowArt.pool)
+            core.size = CGSize(width: box * 1.3, height: box * 0.8)
+            core.position = glow.position
+            core.color = colour
+            core.colorBlendFactor = 1
+            core.alpha = 1
+            core.zPosition = -0.25
+            root.addChild(core)
+
             // A crisp ring round it, so the colour still reads against busy ground.
-            let ring = SKShapeNode(ellipseOf: CGSize(width: box * 1.25, height: box * 0.55))
+            let ring = SKShapeNode(ellipseOf: CGSize(width: box * 1.35, height: box * 0.6))
             ring.position = glow.position
             ring.fillColor = .clear
             ring.strokeColor = colour
@@ -172,6 +182,7 @@ final class GroundItemRenderer {
                 ])
             }
             glow.run(breathe(0.7, 1.0, 0.9))
+            core.run(breathe(0.75, 1.0, 1.1))
             ring.run(breathe(0.55, 0.9, 1.08))
             beam.run(breathe(0.7, 0.95, 1.0))
         }
