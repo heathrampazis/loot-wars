@@ -33,6 +33,11 @@ final class ActorRenderer {
     private static let barOutlineInTiles = BarArt.outlineInTiles
     private static let barGapInTiles: Double = 0.08
 
+    // Seconds an enemy's bar stays up after they were last hit; yours never hides.
+    private static let enemyBarLingers: Double = 3
+    // Seconds an enemy's bar takes to fade out once it has lingered.
+    private static let enemyBarFade: Double = 0.4
+
     /// How far you walk per step, in tiles, and how high the figure rises on one.
     ///
     /// The stride is shared with EffectsRenderer, which puts a tuft of disturbed
@@ -150,12 +155,17 @@ final class ActorRenderer {
         /// pulled. Nothing has to be announced.
         var lastShotCooldown: Double = 0
 
+        // The whole overhead bar, track and fill, so it can be shown and hidden as one.
+        let bar: SKNode
+
         init(sprite: SKSpriteNode,
              healthFill: SKShapeNode,
+             bar: SKNode,
              blaster: SKSpriteNode,
              goalLabel: SKLabelNode?) {
             self.sprite = sprite
             self.healthFill = healthFill
+            self.bar = bar
             self.blaster = blaster
             self.goalLabel = goalLabel
         }
@@ -191,6 +201,15 @@ final class ActorRenderer {
             nodes.ring.position = nodes.root.position
             nodes.ring.isHidden = nodes.root.isHidden
             nodes.ring.alpha = nodes.root.alpha
+
+            // Enemy bars pop up when hit and fade once they have gone a while untouched.
+            let showBar = id == world.localPlayerID
+                || actor.secondsSinceHit < ActorRenderer.enemyBarLingers
+            if showBar {
+                nodes.bar.alpha = 1
+            } else if nodes.bar.alpha > 0 {
+                nodes.bar.alpha = max(0, nodes.bar.alpha - CGFloat(dt / ActorRenderer.enemyBarFade))
+            }
 
             // The walk. Distance covered since the last frame turns the cycle, so
             // the bob is tied to the ground rather than to the clock: stop and it
@@ -357,6 +376,7 @@ final class ActorRenderer {
 
         let nodes = ActorNodes(sprite: sprite,
                                healthFill: fill,
+                               bar: bar,
                                blaster: blaster,
                                goalLabel: goalLabel)
 
