@@ -215,7 +215,7 @@ final class GroundItemRenderer {
         //
         // Only tokens: a bandage that popped and spun would read as being thrown at
         // you, and everything else on the ground was dropped rather than issued.
-        if case .token = item.pickup {
+        if case .token = item.pickup, item.launchedFrom == nil {
             sprite.setScale(0.1)
             sprite.zRotation = -0.9
             sprite.run(.group([
@@ -227,5 +227,57 @@ final class GroundItemRenderer {
 
         node.addChild(root)
         nodesByItem[item.id] = root
+
+        // Flung rather than dropped: something that burst out of a machine flies
+        // from the cabinet to where it lands - see GroundItem.launchedFrom.
+        if let source = item.launchedFrom {
+            launch(root, sprite: sprite, from: source, id: item.id)
+        }
     }
+
+    /// Sends a freshly spawned item flying from a point to where it lies.
+    ///
+    /// A quadratic curve run at a steady pace is exactly the path of something
+    /// thrown, so no easing is wanted on the flight itself. Staggered by id, so a
+    /// machine's coins leave it one after another rather than as one lump, and
+    /// spun in flight with a little squash where they land. Drawn above the
+    /// machines while in the air, then dropped back to the ground layer.
+    private func launch(_ root: SKNode, sprite: SKSpriteNode, from source: Vec2, id: GroundItemID) {
+        let start = GridGeometry.point(for: source)
+        let end = root.position
+        let lift = GridGeometry.length(ofTiles: GroundItemRenderer.launchLift)
+
+        let path = CGMutablePath()
+        path.move(to: start)
+        path.addQuadCurve(to: end,
+                          control: CGPoint(x: (start.x + end.x) / 2,
+                                           y: max(start.y, end.y) + lift))
+
+        let delay = 0.1 + Double(id.raw % 6) * 0.05
+        let flight = GroundItemRenderer.launchDuration
+        let spin: CGFloat = id.raw % 2 == 0 ? .pi * 2 : -.pi * 2
+
+        root.position = start
+        root.setScale(0)
+        root.zPosition = 15
+
+        root.run(.sequence([
+            .wait(forDuration: delay),
+            .group([.follow(path, asOffset: false, orientToPath: false, duration: flight),
+                    .scale(to: 1, duration: 0.1)]),
+            .run { [weak root] in root?.zPosition = 4 }
+        ]))
+
+        sprite.run(.sequence([
+            .wait(forDuration: delay),
+            .rotate(byAngle: spin, duration: flight),
+            .scaleX(to: 1.3, y: 0.75, duration: 0.06),
+            .scaleX(to: 1, y: 1, duration: 0.14)
+        ]))
+    }
+
+    /// How high a flung item arcs above its start and end, in tiles, and how
+    /// long it is in the air.
+    private static let launchLift: Double = 1.4
+    private static let launchDuration: Double = 0.45
 }

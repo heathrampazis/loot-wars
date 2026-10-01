@@ -1127,6 +1127,14 @@ final class GameScene: SKScene {
                 arcadeRenderer.hit(id)
                 effectsRenderer.machineStruck(at: position)
 
+            case .machineDestroyed(_, let position):
+                // The cabinet's own break-up and the coins flying out of it are
+                // drawn by the renderers off the world; this is the shower of gold
+                // over the top, which says "money came out of that" from across
+                // the map.
+                effectsRenderer.jackpot(at: position)
+                SoundPlayer.shared.play(.pop, at: position, heardFrom: ears)
+
             case .chestHit(let id, let position):
                 // The machine's answer, for the same reason it has one: a chest
                 // being shot has to read differently from a person being shot, or

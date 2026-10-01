@@ -191,9 +191,7 @@ enum BombSystem {
                   !isShielded(machine.hitbox.closestPoint(to: origin),
                               from: origin, by: cover) else { continue }
 
-            world.removeArcade(machineID)
-            world.award(machine.kind.destroyedScore, to: bomb.team)
-            world.awardTokens(machine.kind.destroyedReward, to: bomb.owner)
+            ArcadeSystem.destroy(machineID, by: bomb.team, in: world)
         }
 
         // Chests, which take damage rather than bursting outright - see
