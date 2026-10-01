@@ -81,14 +81,22 @@ enum BombSystem {
         var stillFlying: [Bomb] = []
 
         for var bomb in world.bombs {
+            let before = bomb.position
             let step = bomb.velocity * dt
             bomb.position = bomb.position + step
             bomb.distanceRemaining -= step.length
 
-            // Out of throw, or it hit something. Either way it goes off where it
-            // is - a bomb that ran out of arc still explodes rather than vanishing.
-            if bomb.distanceRemaining <= 0 || hitsSomething(bomb.position, in: world) {
-                detonate(bomb, in: world)
+            // It hit something: it goes off against the face it struck, so the
+            // blast is measured from the side it arrived on - see isShielded.
+            if hitsSomething(bomb.position, in: world) {
+                detonate(bomb, from: before, in: world)
+                continue
+            }
+
+            // Out of throw. A bomb that ran out of arc still explodes rather than
+            // vanishing.
+            if bomb.distanceRemaining <= 0 {
+                detonate(bomb, from: bomb.position, in: world)
                 continue
             }
 
@@ -120,7 +128,10 @@ enum BombSystem {
 
     // MARK: - Detonation
 
-    private static func detonate(_ bomb: Bomb, in world: World) {
+    /// - Parameter origin: where the blast spreads from, for deciding what is
+    ///   behind cover. The last open point the bomb passed through, so a bomb
+    ///   that struck a wall is on the near side of it rather than inside it.
+    private static func detonate(_ bomb: Bomb, from origin: Vec2, in world: World) {
         // A stink bomb stops here. It takes nothing off the map, hurts nobody on
         // landing and kills nothing standing next to it - all of its effect is the
         // cloud it leaves behind, which is what makes it a way of taking GROUND
@@ -134,6 +145,20 @@ enum BombSystem {
         let radius = GameConfig.Bomb.blastRadius
         let reach = Int(radius.rounded(.up))
         let centre = GridPoint(containing: bomb.position)
+
+        // What stood in the way BEFORE anything came down. Read first, because
+        // the walls this blast destroys still took the blast - a wall soaks up the
+        // bomb, and the turret or machine behind it is untouched. Blowing the wall
+        // open is the bomb's job; getting at what is behind it is the next one.
+        var cover: Set<GridPoint> = []
+        for dCol in (-reach - 1)...(reach + 1) {
+            for dRow in (-reach - 1)...(reach + 1) {
+                let tile = GridPoint(col: centre.col + dCol, row: centre.row + dRow)
+                if world.map.isOccupied(tile) || world.treeTiles.contains(tile) {
+                    cover.insert(tile)
+                }
+            }
+        }
 
         // Walls only. Terrain and trees survive - a bomb that could open the map
         // edge would make the whole ring of claims meaningless.
@@ -162,7 +187,9 @@ enum BombSystem {
             guard let machine = world.arcades[machineID],
                   let owner = machine.owner,
                   owner != bomb.team,
-                  machine.hitbox.expanded(by: radius).contains(bomb.position) else { continue }
+                  machine.hitbox.expanded(by: radius).contains(bomb.position),
+                  !isShielded(machine.hitbox.closestPoint(to: origin),
+                              from: origin, by: cover) else { continue }
 
             world.removeArcade(machineID)
             world.award(machine.kind.destroyedScore, to: bomb.team)
@@ -177,7 +204,8 @@ enum BombSystem {
             guard let chest = world.chests[id] else { continue }
 
             let distance = (chest.position - bomb.position).length
-            guard distance <= radius else { continue }
+            guard distance <= radius,
+                  !isShielded(chest.position, from: origin, by: cover) else { continue }
 
             let share = 1 - (distance / radius)
             let hurt = Int((Double(GameConfig.Chest.bombDamage) * share).rounded())
@@ -198,7 +226,9 @@ enum BombSystem {
 
             let nearest = turret.hitbox.closestPoint(to: bomb.position)
             let distance = (nearest - bomb.position).length
-            guard distance <= radius else { continue }
+            guard distance <= radius,
+                  !isShielded(turret.hitbox.closestPoint(to: origin),
+                              from: origin, by: cover) else { continue }
 
             let share = 1 - (distance / radius)
             let hurt = Int((Double(GameConfig.Turret.bombDamage) * share).rounded())
@@ -210,7 +240,8 @@ enum BombSystem {
             guard let actor = world.actors[id], actor.isAlive else { continue }
 
             let distance = (actor.position - bomb.position).length
-            guard distance <= radius else { continue }
+            guard distance <= radius,
+                  !isShielded(actor.position, from: origin, by: cover) else { continue }
 
             // Falls off towards the edge, so being caught at the rim is a warning
             // rather than a death sentence.
@@ -220,5 +251,23 @@ enum BombSystem {
         }
 
         world.record(.blast(at: bomb.position))
+    }
+
+    /// Whether something solid stands between the blast and this point.
+    ///
+    /// Walks the straight line in tenth-of-a-tile steps and stops just short of
+    /// the target, so a thing standing flush against the inside of a wall is
+    /// still behind it. Steps rather than an exact grid walk because a blast is a
+    /// few tiles across at most - forty-odd checks against a set - and the answer
+    /// only ever needs to be "is a wall in the way".
+    private static func isShielded(_ target: Vec2, from origin: Vec2, by cover: Set<GridPoint>) -> Bool {
+        let span = target - origin
+        let steps = max(1, Int((span.length / 0.1).rounded(.up)))
+
+        for index in 1..<steps {
+            let point = origin + span * (Double(index) / Double(steps))
+            if cover.contains(GridPoint(containing: point)) { return true }
+        }
+        return false
     }
 }
