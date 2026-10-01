@@ -158,6 +158,55 @@ enum ArcadeSystem {
         return true
     }
 
+    // MARK: - Breaking
+
+    /// Takes a machine off the map and spills its reward on the ground.
+    ///
+    /// The points go to the team that broke it, straight away, because points are
+    /// the score. The TOKENS do not: they burst out of the cabinet and land round
+    /// the wreck, and somebody has to walk over them. That makes breaking a machine
+    /// the start of a scramble rather than a transaction, and a raider who breaks
+    /// one and is shot before collecting has paid for it and been paid nothing.
+    ///
+    /// The one place a machine is broken, so a bullet and a bomb cannot pay out
+    /// differently.
+    static func destroy(_ id: ArcadeID, by team: TeamID, in world: World) {
+        guard let machine = world.arcades[id] else { return }
+
+        world.removeArcade(id)
+        world.award(machine.kind.destroyedScore, to: team)
+
+        let value = GameConfig.Arcade.tokenValue
+        let count = max(1, machine.kind.destroyedReward / max(1, value))
+
+        // Spread evenly round the wreck with a little wobble, so the coins fan out
+        // rather than clumping on one side. Drawn from the world's generator, so a
+        // replay spills them in the same places.
+        let turn = 2 * Double.pi / Double(count)
+        let start = Double.random(in: 0..<turn, using: &world.rng)
+        let nearest = GameConfig.Arcade.spillNearest
+        let furthest = GameConfig.Arcade.spillFurthest
+
+        for index in 0..<count {
+            var spot = machine.centre
+
+            for _ in 0..<GameConfig.Drops.scatterAttempts {
+                let angle = start + Double(index) * turn
+                    + Double.random(in: -0.35...0.35, using: &world.rng)
+                let distance = Double.random(in: nearest...furthest, using: &world.rng)
+                let candidate = machine.centre + Vec2.fromAngle(angle) * distance
+                if world.isClearForDrop(candidate) {
+                    spot = candidate
+                    break
+                }
+            }
+
+            world.spawnGroundItem(.token(value), at: spot, from: machine.centre)
+        }
+
+        world.record(.machineDestroyed(id, at: machine.centre))
+    }
+
     private static func place(_ world: World, commands: [ActorID: [Command]]) {
         for (id, list) in commands {
             for command in list {

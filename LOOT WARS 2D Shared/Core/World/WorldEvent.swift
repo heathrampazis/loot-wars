@@ -74,6 +74,10 @@ enum WorldEvent {
     /// A machine taking a bullet and surviving it.
     case machineHit(ArcadeID, at: Vec2)
 
+    /// A machine broken apart, by a bullet or a bomb. Its tokens are already on
+    /// the ground by the time this is read - see ArcadeSystem.destroy.
+    case machineDestroyed(ArcadeID, at: Vec2)
+
     /// A chest taking a hit and surviving it. The machine's event, for a chest,
     /// because it is the same event - see ChestRenderer.hit.
     case chestHit(ChestID, at: Vec2)

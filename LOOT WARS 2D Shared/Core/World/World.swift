@@ -1483,13 +1483,19 @@ final class World {
     /// - Parameter lifetime: how long it lies there, defaulting to the item's own
     ///   answer. Overridden for tokens paid out inside a base that is shut - see
     ///   ArcadeSystem, where the point is that they can safely pile up.
-    func spawnGroundItem(_ pickup: Pickup, at position: Vec2, lifetime: Double? = nil) {
+    /// - Parameter origin: where it was flung from, for the screen to animate -
+    ///   see GroundItem.launchedFrom. Changes nothing about where it lies.
+    func spawnGroundItem(_ pickup: Pickup,
+                         at position: Vec2,
+                         lifetime: Double? = nil,
+                         from origin: Vec2? = nil) {
         let id = GroundItemID(nextGroundItemID)
         nextGroundItemID += 1
         groundItems[id] = GroundItem(id: id,
                                      pickup: pickup,
                                      position: position,
-                                     timeRemaining: lifetime ?? pickup.groundLifetime)
+                                     timeRemaining: lifetime ?? pickup.groundLifetime,
+                                     launchedFrom: origin)
     }
 
     /// Flings a drop clear of a point.

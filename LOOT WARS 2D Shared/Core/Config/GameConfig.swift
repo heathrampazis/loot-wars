@@ -2675,6 +2675,16 @@ enum GameConfig {
 
         static let miniDestroyedReward = 3
 
+        /// How far from a broken machine's middle its tokens land, in tiles.
+        ///
+        /// The reward is SPILLED rather than paid: it lands on the grass around
+        /// the wreck, one token at a time, and whoever walks over it has it. So
+        /// breaking a machine and dying before you pick anything up pays nobody
+        /// but whoever gets there next - quite possibly its owner. Out past the
+        /// footprint's edge, so the coins visibly fly OUT of the cabinet.
+        static let spillNearest = 1.0
+        static let spillFurthest = 1.9
+
         /// How much shooting a machine takes to break.
         ///
         /// 520, doubled, because at 260 a Blaster 6 finished one in 1.6 seconds and
