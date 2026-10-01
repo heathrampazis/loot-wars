@@ -62,12 +62,12 @@ extension ItemType {
         case .medkit:  return .epic
 
         // The key to somebody else's base, and the entire second half of the game
-        // is behind that door. Worth crossing a map for in a way no helmet is.
-        case .bomb:    return .epic
+        // is behind that door. Worth crossing a map for in a way no helmet is, so
+        // it wears purple: a find, not a supply.
+        case .bomb:    return .mythical
 
-        // A rung above a bomb: rarer in every table it appears in, and the only
-        // thing in the game that takes ground away from somebody without taking
-        // any of the map with it.
+        // A rung below a bomb. It takes ground away from somebody for a while, but
+        // it cannot open a base, and opening a base is what the colour is about.
         case .stink:   return .legendary
 
         // The safest income on the map once it is standing behind a wall, and the

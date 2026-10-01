@@ -574,7 +574,24 @@ enum GameConfig {
         /// finished wall with nothing to do. It is also most of why bombs FELT
         /// rare: for two of a five-minute match there were none, so the supply a
         /// player actually experienced was squeezed into the back three.
-        static let bombGrace: Double = 90
+        ///
+        /// Thirty now, for the same reason taken further: ninety seconds was nearly
+        /// a third of the match with no bombs anywhere, and then a flood once they
+        /// arrived. Thirty seconds lets them start turning up early, and
+        /// bombRampEnd keeps that start a trickle rather than a flood - nobody
+        /// has a wall worth blowing open yet anyway.
+        static let bombGrace: Double = 30
+
+        /// When the bomb supply reaches full strength, in seconds.
+        ///
+        /// From bombGrace to here a crate's bomb row climbs from bombStartShare
+        /// of its weight to all of it, so the supply grows in rather than
+        /// switching on. The bots' free top-up waits for this too, which keeps
+        /// their raiding starting where it always has.
+        static let bombRampEnd: Double = 90
+
+        /// How much of its weight the bomb row carries the moment bombs start.
+        static let bombStartShare: Double = 0.35
     }
 
     enum Map {
@@ -2195,6 +2212,18 @@ enum GameConfig {
         /// with nothing in it you would throw away and gear as the usual answer.
         static let rareBombBoost: Double = 1.15
 
+        /// The most bombs that may be lying on the ground at once.
+        ///
+        /// Late in a match every bot is carrying one and dying often, so death
+        /// drops alone used to carpet the map. At the cap, crates roll without the
+        /// bomb row and bodies drop none; once one is picked up or expires, they
+        /// come back.
+        static let maxLooseBombs = 2
+
+        /// How many stink bombs a crate hands out when it rolls one. Matches
+        /// ItemType.maxStack for a stink bomb, so a crate fills one slot.
+        static let stinkBombsPerCrate = 2
+
         /// How heavily a machine sits in a rare crate's table.
         ///
         /// Better than one rare crate in four now, with rare crates at one in eight
@@ -2570,29 +2599,30 @@ enum GameConfig {
         /// into somebody's base and breaking their chest under fire was a couple of
         /// bandages. That is a crate, and a crate costs nothing.
         ///
-        /// 46 of 146 now, just under a third, against 42 for bandages. With three
+        /// 46 of 142 now (bombs trimmed from 26 to 22 so they stay a find), a
+        /// third, against 42 for bandages. With three
         /// or four items in a fresh chest and the best three of them coming out,
         /// 73% of chests hand over a piece of gear, against 43% before - modelled
         /// over 200,000 chests rather than guessed at. The rest still pay in
         /// healing and bombs, which is what lets you keep raiding.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 26), (.stink, 12),
+                (.bandage, 42), (.medkit, 20), (.bomb, 22), (.stink, 12),
                 (.helmet(.common), 15), (.helmet(.epic), 8),
                 (.blaster(.two),   15), (.blaster(.three), 8)
             ]),
             (0.35, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 26), (.stink, 12),
+                (.bandage, 42), (.medkit, 20), (.bomb, 22), (.stink, 12),
                 (.helmet(.common), 8), (.helmet(.epic), 15),
                 (.blaster(.two),   15), (.blaster(.three), 8)
             ]),
             (0.65, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 26), (.stink, 12),
+                (.bandage, 42), (.medkit, 20), (.bomb, 22), (.stink, 12),
                 (.helmet(.epic), 15), (.helmet(.legendary), 8),
                 (.blaster(.three), 15), (.blaster(.four), 8)
             ]),
             (0.85, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 26), (.stink, 12),
+                (.bandage, 42), (.medkit, 20), (.bomb, 22), (.stink, 12),
                 (.helmet(.legendary), 15), (.helmet(.mythical), 8),
                 (.blaster(.four), 15), (.blaster(.five), 8)
             ])

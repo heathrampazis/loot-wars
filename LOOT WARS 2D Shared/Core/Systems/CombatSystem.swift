@@ -259,7 +259,12 @@ enum CombatSystem {
             // which made winning that fight strangely empty - they had crossed a
             // map to break your wall open and the tool for it simply stopped
             // existing.
+            //
+            // A bomb also waits for room on the ground - see Loot.maxLooseBombs.
+            // Late fights are where most deaths happen, and without the cap they
+            // were where most bombs came from.
             case .bomb, .stink:
+                guard stack.type != .bomb || world.roomForLooseBomb else { break }
                 drop(.item(stack.type), chance: GameConfig.Drops.suppliesChance,
                      at: actor.position, in: world)
 

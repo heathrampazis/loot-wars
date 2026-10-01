@@ -67,7 +67,12 @@ enum LootTable {
     /// crate that cannot meaningfully patch you up is a crate that does not matter
     /// at the exact point in a match where being alive matters most.
     ///
-    /// Bombs go the other way: about one crate in FOUR early, one in five late.
+    /// Bombs are nearly flat across the bands now, and scarce - about one crate
+    /// in six or seven once the supply is up, one in seven or eight late. A bomb is a
+    /// Mythical find and should feel like one. They used to be front-loaded (one in
+    /// four early) to make up for the grace period, which only produced a flood
+    /// the moment it ended. The early climb is World.bombShare's job instead, and
+    /// the late glut is held off by Loot.maxLooseBombs.
     ///
     /// THE ENDGAME BAND (from 0.75). The rule above - "nothing worthless later",
     /// with the top of the ladder bought rather than found - made for a closing
@@ -92,7 +97,7 @@ enum LootTable {
         (0.00, [
             (.item(.bandage), 88),
             (.item(.medkit),  22),
-            (.item(.bomb),    92),
+            (.item(.bomb),    52),
             (.item(.stink),   18),
 
             // Three helmet rows became two, at the same total weight, so gear is
@@ -106,7 +111,7 @@ enum LootTable {
         (0.35, [
             (.item(.bandage), 88),
             (.item(.medkit),  24),
-            (.item(.bomb),    78),
+            (.item(.bomb),    50),
             (.item(.stink),   16),
 
             // The Blaster 2 is gone: by now everybody has better, so that row was a
@@ -125,7 +130,7 @@ enum LootTable {
         (0.55, [
             (.item(.bandage), 96),
             (.item(.medkit),  34),
-            (.item(.bomb),    52),
+            (.item(.bomb),    44),
             (.item(.stink),   14),
 
             // Legendary is where the crates stop, and everything above it is bought.
@@ -149,7 +154,7 @@ enum LootTable {
             // people trading heals rather than whoever landed the first volley.
             (.item(.bandage), 92),
             (.item(.medkit),  58),
-            (.item(.bomb),    46),
+            (.item(.bomb),    40),
             (.item(.stink),   12),
 
             // Gear is commoner here than in any other band, and a rung up: the
@@ -166,10 +171,9 @@ enum LootTable {
     }
 
     /// - Parameters:
-    ///   - bombs: false during the opening grace period, when the bomb row is
-    ///     dropped and the rest of the table is renormalised around it. Everything
-    ///     else simply becomes correspondingly likelier, which is what should
-    ///     happen - a crate still gives you something.
+    ///   - bombShare: how much of its weight the bomb row keeps, nought to one -
+    ///     see World.bombShare. At nought the row is dropped and the rest of the
+    ///     table is renormalised around it, so a crate still gives you something.
     ///   - progress: how far the match has run, which picks the band above.
     /// The good crates.
     ///
@@ -198,20 +202,25 @@ enum LootTable {
         }
     }
 
-    static func roll(bombs: Bool,
+    static func roll(bombShare: Double,
                      at progress: Double,
                      rare: Bool = false,
                      using rng: inout SeededRandom) -> Pickup {
-        let rolled = plain(bombs: bombs, at: progress, rare: rare, using: &rng)
+        let rolled = plain(bombShare: bombShare, at: progress, rare: rare, using: &rng)
         return rare ? upgraded(rolled) : rolled
     }
 
-    private static func plain(bombs: Bool,
+    private static func plain(bombShare: Double,
                               at progress: Double,
                               rare: Bool,
                               using rng: inout SeededRandom) -> Pickup {
         let table = table(at: progress)
-        var rows = bombs ? table : table.filter { $0.pickup != .item(.bomb) }
+        let share = min(1, max(0, bombShare))
+        var rows = table.compactMap { row -> (pickup: Pickup, weight: Int)? in
+            guard row.pickup == .item(.bomb) else { return row }
+            let weight = Int((Double(row.weight) * share).rounded())
+            return weight > 0 ? (pickup: row.pickup, weight: weight) : nil
+        }
 
         // The power-ups, added here rather than written into every band by hand.
         //
