@@ -243,16 +243,16 @@ enum RenderPalette {
         // Pale steel, and deliberately the quietest thing on the map. It barely
         // separates from the grass, which is the correct amount of attention for a
         // rung that means "you will find another one in a minute".
-        rgb(0xC2, 0xC9, 0xCE),   // common
+        rgb(0xA3, 0xAD, 0xB8),   // common
 
         // An emerald rather than the lime the artwork wears. A lime pool sat within
         // a hair of the floor tile on every measure and vanished under the item it
         // was meant to be advertising; pulling the hue cool and the value down puts
         // it at 1.9 against the grass while still reading as the green everybody
         // expects on the second rung.
-        rgb(0x22, 0xB0, 0x4E),   // epic
-        rgb(0x2E, 0x9B, 0xFF),   // legendary
-        rgb(0xA8, 0x55, 0xF7),   // mythical
+        rgb(0x2B, 0xDE, 0x6A),   // epic
+        rgb(0x2C, 0xA6, 0xFF),   // legendary
+        rgb(0xC2, 0x58, 0xFF),   // mythical
 
         // Gold, and the weakest hue here against this particular map - a yellow
         // pool on yellow-green grass is the one fight a colour cannot win. That is
@@ -260,7 +260,7 @@ enum RenderPalette {
         // by its twinkle and confirmed by its colour, rather than the other way
         // round. Pulled deeper than the token gold for the same reason, and kept as
         // its own value so the two can drift apart without either being dragged.
-        rgb(0xF5, 0xA3, 0x10)    // cosmic
+        rgb(0xFF, 0xBE, 0x1A)    // cosmic
     ]
 
     static func colour(of rarity: Rarity) -> SKColor {

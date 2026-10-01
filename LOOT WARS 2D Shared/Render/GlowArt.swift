@@ -58,4 +58,42 @@ enum GlowArt {
         texture.usesMipmaps = true
         return texture
     }()
+
+    // A pillar of light rising from a loot item: bright at the foot and in the middle,
+    // fading out towards the top and the sides. Painted white and tinted where it is used.
+    static let beam: SKTexture = {
+        let size = CGSize(width: 64, height: 256)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            let cg = context.cgContext
+            let space = CGColorSpaceCreateDeviceRGB()
+
+            let across = [SKColor(white: 1, alpha: 0).cgColor,
+                          SKColor(white: 1, alpha: 0.55).cgColor,
+                          SKColor(white: 1, alpha: 1).cgColor,
+                          SKColor(white: 1, alpha: 0.55).cgColor,
+                          SKColor(white: 1, alpha: 0).cgColor]
+            guard let sides = CGGradient(colorsSpace: space, colors: across as CFArray,
+                                         locations: [0, 0.3, 0.5, 0.7, 1]) else { return }
+            cg.drawLinearGradient(sides, start: CGPoint(x: 0, y: 0),
+                                  end: CGPoint(x: size.width, y: 0), options: [])
+
+            // Images run top-down, so the foot of the beam is the bottom edge.
+            cg.setBlendMode(.destinationIn)
+            let up = [SKColor(white: 1, alpha: 0).cgColor,
+                      SKColor(white: 1, alpha: 0.75).cgColor,
+                      SKColor(white: 1, alpha: 1).cgColor]
+            guard let fade = CGGradient(colorsSpace: space, colors: up as CFArray,
+                                        locations: [0, 0.45, 1]) else { return }
+            cg.drawLinearGradient(fade, start: CGPoint(x: 0, y: 0),
+                                  end: CGPoint(x: 0, y: size.height), options: [])
+        }
+
+        let texture = SKTexture(image: image)
+        texture.usesMipmaps = true
+        return texture
+    }()
 }
