@@ -50,7 +50,7 @@ enum AISystem {
         // Bots wait out the grace period like everybody else. A floor under the
         // bomb supply that ignored it would simply move the raiding it was meant to
         // hold back onto the bots.
-        guard world.bombsAllowed else { return }
+        guard world.bombsAtFullSupply else { return }
         guard var state = actor.ai else { return }
 
         state.bombSupplyTimer -= dt

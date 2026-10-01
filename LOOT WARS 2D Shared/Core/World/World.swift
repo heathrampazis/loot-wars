@@ -24,6 +24,31 @@ final class World {
     /// got round by finding a chest instead of a crate.
     var bombsAllowed: Bool { elapsed >= GameConfig.Match.bombGrace }
 
+    /// Whether the bomb supply has finished ramping up - see Match.bombRampEnd.
+    var bombsAtFullSupply: Bool { elapsed >= GameConfig.Match.bombRampEnd }
+
+    /// How many bombs are lying on the ground right now.
+    var looseBombCount: Int {
+        groundItems.values.filter { $0.pickup == .item(.bomb) }.count
+    }
+
+    /// Whether another bomb may land on the ground - see Loot.maxLooseBombs.
+    var roomForLooseBomb: Bool { looseBombCount < GameConfig.Loot.maxLooseBombs }
+
+    /// How much of its weight a crate's bomb row carries right now, nought to one.
+    ///
+    /// Nothing before the grace period ends, then a climb from
+    /// Match.bombStartShare to full by Match.bombRampEnd, and nothing again
+    /// while the ground already holds its share of bombs.
+    var bombShare: Double {
+        guard bombsAllowed, roomForLooseBomb else { return 0 }
+        let start = GameConfig.Match.bombGrace
+        let span = max(1, GameConfig.Match.bombRampEnd - start)
+        let t = min(1, max(0, (elapsed - start) / span))
+        let low = GameConfig.Match.bombStartShare
+        return low + (1 - low) * t
+    }
+
     /// Seconds left on the clock, floored at zero.
     var timeRemaining: Double { max(0, GameConfig.Match.duration - elapsed) }
 
