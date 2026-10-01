@@ -702,20 +702,11 @@ final class World {
         }
     }
 
-    /// What there is worth taking in this team's base.
-    ///
-    /// The one place a base is priced, so the bot deciding WHETHER to cross the map
-    /// and the bot deciding WHICH wall to open cannot come to different conclusions
-    /// about which base is the rich one. It counts the things a raider actually
-    /// leaves with: items sitting in chests, and a machine, which pays out on being
-    /// destroyed whether or not anything else in the base survives.
+    // What there is worth raiding in this team's base: its machines. The one place a base is
+    // priced, so every raiding decision agrees on which base is the rich one.
     func lootValue(of team: TeamID) -> Int {
+        // What is in the chests does not count: raiders come for the points, not the items.
         var value = 0
-
-        for chest in chests.values where chest.owner == team {
-            let items = chest.contents.slots.compactMap { $0 }.reduce(0) { $0 + $1.count }
-            value += items * GameConfig.AI.chestItemWorth
-        }
 
         // Every machine, not "does it have one". A base can hold several now, and
         // a room with three in it is worth more to break into than a room with one
@@ -778,6 +769,9 @@ final class World {
         // are - see World.lead, which says the same of all eight teams.
         worth += lead(of: team) * GameConfig.AI.leaderWorth
 
+        // People are raided as readily as bots, whatever they have banked.
+        if !isBotTeam(team) { worth += GameConfig.AI.playerBaseWorth }
+
         return worth
     }
 
@@ -795,8 +789,7 @@ final class World {
         var spots: [Vec2] = []
 
         for id in chests.keys.sorted(by: { $0.raw < $1.raw }) {
-            guard let chest = chests[id], chest.owner == team,
-                  chest.contents.slots.contains(where: { $0 != nil }) else { continue }
+            guard let chest = chests[id], chest.owner == team else { continue }
             spots.append(chest.position)
         }
 

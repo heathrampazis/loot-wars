@@ -1332,47 +1332,19 @@ enum GameConfig {
         /// would lose the thread exactly when it most needs to keep it.
         static let raidReturnRange: Double = 22
 
-        /// What a raider thinks a base is worth, and what the walk costs.
-        ///
-        /// Raids used to be chosen by NEARNESS alone - the closest reachable chest
-        /// won, whatever was in it - so a base with one bandage in it beat a base
-        /// across the way holding four items and a machine. Nobody was ever robbed
-        /// for being rich, which is the one reason a base should be robbed at all,
-        /// and hoarding was therefore free.
-        ///
-        /// Now a target is worth what is in it, less what it costs to get there.
-        /// The units are arbitrary and only the RATIO matters: at ten a point and a
-        /// tile a point, an item is worth ten tiles of walking, so a four-item
-        /// chest pulls a raider four times as far as a one-item chest. A machine
-        /// counts for more than any single item - it is the only thing in a base
-        /// that is worth raiding even when the chests are bare.
-        static let chestItemWorth = 10
+        // What a standing machine adds to a base's worth as a target; arcades are the main
+        // reason to raid, since wrecking one pays points and cuts the owner's income.
+        static let machineWorth = 40
 
-        /// What a standing machine adds to a base's worth as a target.
-        ///
-        /// Two and a half items, and most of that is the DENIAL rather than the
-        /// take. Wrecking one pays 40 points and 5 tokens, and the bank standing
-        /// beside it is a handful more - but what it really does is remove the
-        /// owner's best income until they rebuild, and that is worth crossing a map
-        /// for whatever the chests hold.
-        ///
-        /// Unchanged when the wrecking reward was cut from 25 tokens to 5, because
-        /// the reward was never the reason: this number is about how attractive a
-        /// base LOOKS to a raider, and a base with a machine in it is exactly as
-        /// worth visiting as it was.
-        ///
-        /// One number now. There used to be two of these - this and a machineWorth
-        /// further down - because the chest search and the wall search had each
-        /// grown their own price for a base, which is the very thing lootValue's
-        /// comment says must not happen. They happened to agree at 25. Both paths
-        /// read World.raidWorth now, so this is the survivor.
-        static let machineWorth = 25
+        // Extra worth on a base a person owns, so bots raid the player for points even when
+        // there is nothing in their chests.
+        static let playerBaseWorth: Double = 20
 
         /// And what a mini adds. Counted per machine rather than once for the base
         /// now that a base can hold several - see World.lootValue, where a room
         /// with three machines in it correctly prices above one with a single
         /// cabinet.
-        static let miniMachineWorth = 14
+        static let miniMachineWorth = 24
 
         /// What a base gains as a target for every second nobody has touched it,
         /// and the most it can gain.
