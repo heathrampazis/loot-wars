@@ -71,9 +71,9 @@ enum ItemType: Hashable {
         // slot left to give.
         case .medkit:  return 3
         case .bomb:    return 3
-        // Same as a bomb: both are thrown, and a pocket of four of anything thrown
-        // decides a fight on its own.
-        case .stink:   return 3
+        // Two: they come out of a crate as a pair (see Loot.stinkBombsPerCrate),
+        // so one crate fills one slot exactly.
+        case .stink:   return 2
         // One apiece. You can only have one running, so a second in the same slot
         // would be a queue - and a queue of power-ups is a different game.
         case .perk:    return 1

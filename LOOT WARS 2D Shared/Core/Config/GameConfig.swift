@@ -2220,6 +2220,10 @@ enum GameConfig {
         /// come back.
         static let maxLooseBombs = 2
 
+        /// How many stink bombs a crate hands out when it rolls one. Matches
+        /// ItemType.maxStack for a stink bomb, so a crate fills one slot.
+        static let stinkBombsPerCrate = 2
+
         /// How heavily a machine sits in a rare crate's table.
         ///
         /// Better than one rare crate in four now, with rare crates at one in eight

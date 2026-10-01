@@ -60,11 +60,21 @@ enum LootSystem {
                 // raiding somebody, and raiding has to stay the best thing you can
                 // do with a minute. It is also the difference between a crate you
                 // cross the map for and a crate you camp.
-                world.spawnGroundItem(LootTable.roll(bombShare: world.bombShare,
-                                                     at: world.matchProgress,
-                                                     rare: rare,
-                                                     using: &world.rng),
-                                      at: box.position)
+                let pickup = LootTable.roll(bombShare: world.bombShare,
+                                            at: world.matchProgress,
+                                            rare: rare,
+                                            using: &world.rng)
+                world.spawnGroundItem(pickup, at: box.position)
+
+                // The one exception: a stink bomb comes as a pair. The second is
+                // flung just clear so both can be seen, and walking over the crate
+                // spot picks them both up.
+                if pickup == .item(.stink) {
+                    for _ in 1..<GameConfig.Loot.stinkBombsPerCrate {
+                        world.spawnGroundItem(pickup,
+                                              at: world.scatteredSpot(near: box.position))
+                    }
+                }
                 break   // one box per tick, however many times it was asked
             }
         }
