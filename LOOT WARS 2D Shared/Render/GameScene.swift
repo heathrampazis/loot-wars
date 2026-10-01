@@ -1355,15 +1355,13 @@ final class GameScene: SKScene {
         // Asks the world the same questions the systems will, so the button can
         // never offer to open something the simulation would then refuse. Your own
         // chest wins over a crate: it is inside your base, and it is yours.
-        // A bomb in hand holds the corner, whatever you happen to be standing next
-        // to. The open button and the aim stick share this space, so a crate under
-        // your feet would otherwise take the stick away and leave you holding
-        // something with no way to throw it - and unlike the crate, the bomb is
-        // there because you chose it.
+        //
+        // A bomb in hand no longer has a say here. It used to hold the corner on
+        // the stick, back when the stick was the only way to throw one; now the
+        // bomb has its own button above the corner, so picking one out must not
+        // stop you opening the chest or crate you are standing at.
         let wanted: CornerAction
-        if throwingSlot != nil {
-            wanted = .aim
-        } else if let chest = world.reachableChest(for: player), chest.owner == player.team {
+        if let chest = world.reachableChest(for: player), chest.owner == player.team {
             // Only YOURS. Standing next to somebody else's leaves the corner on the
             // aim stick, which is the correct offer: shooting it is what opens it.
             wanted = .chest(chest.id)
@@ -1591,10 +1589,9 @@ extension GameScene {
                throwButton.begin(atLocalPoint: touch.location(in: throwButton)) {
                 throwTouch = touch
 
-                // A one-shot action, so it fires on PRESS. It throws along the aim
-                // you are holding, which is why the stick has to stay live while
-                // this is up - see updateRightControl, where a throwable in hand
-                // keeps the corner on the stick rather than on a crate.
+                // A one-shot action, so it fires on PRESS, along the aim you are
+                // holding. Next to a chest or crate the corner offers that instead
+                // of the stick, and the throw goes along your last aim.
                 if let slot = throwingSlot {
                     queuedCommands.append(.useItem(slot: slot))
                     hotbar.acknowledge(slot)
