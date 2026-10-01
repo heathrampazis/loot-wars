@@ -1055,10 +1055,7 @@ enum AIBrain {
             return .silence(turret.id)
         }
 
-        if let chest = world.chests(notOwnedBy: actor.team)
-            .filter({ $0.owner == team && $0.contents.slots.contains { $0 != nil } })
-            .min(by: { ($0.position - actor.position).length
-                     < ($1.position - actor.position).length }) {
+        if let chest = chestToBreak(at: team, for: actor, in: world) {
             return .robChest(chest.id)
         }
 
@@ -1157,28 +1154,14 @@ enum AIBrain {
             return .silence(turret.id)
         }
 
-        // A chest with something in it. Nearest, and sorted, because two chests at
-        // the same distance must not be broken by dictionary order.
-        var chest: Chest?
-        var shortest = Double.greatestFiniteMagnitude
-
-        let theirs = world.chests(notOwnedBy: actor.team)
-            .filter { $0.owner == victim }
-            .sorted { $0.id.raw < $1.id.raw }
-
-        for candidate in theirs {
-            guard candidate.contents.slots.contains(where: { $0 != nil }) else { continue }
-            let distance = (candidate.position - actor.position).length
-            guard distance < shortest else { continue }
-            shortest = distance
-            chest = candidate
+        // Their chests, every one of them - see chestToBreak.
+        if let chest = chestToBreak(at: victim, for: actor, in: world) {
+            return .robChest(chest.id)
         }
-
-        if let chest { return .robChest(chest.id) }
 
         // Then anything they were making money with.
         var machine: Arcade?
-        shortest = Double.greatestFiniteMagnitude
+        var shortest = Double.greatestFiniteMagnitude
 
         for id in world.arcades.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let candidate = world.arcades[id], candidate.owner == victim else { continue }
@@ -1191,6 +1174,41 @@ enum AIBrain {
         if let machine { return .wreck(machine.id) }
 
         return nil
+    }
+
+    /// The chest a raider should break next at this base, if any are left.
+    ///
+    /// The nearest one with something in it first, and then the nearest one
+    /// whatever it holds. Empty ones used to be skipped altogether, and that let
+    /// the player off every raid: a player's chests are theirs to fill, so they are
+    /// often empty, and a raider who broke the wall, found nothing in the chests
+    /// and walked out had cost the base a few blocks and nothing else. Breaking
+    /// the chest is the raid - the owner loses it, and has to reseal to get it
+    /// back.
+    ///
+    /// Sorted by id before the distance test, so two chests the same distance
+    /// away are never split by dictionary order.
+    private static func chestToBreak(at victim: TeamID,
+                                     for actor: Actor,
+                                     in world: World) -> Chest? {
+        let theirs = world.chests(notOwnedBy: actor.team)
+            .filter { $0.owner == victim }
+            .sorted { $0.id.raw < $1.id.raw }
+
+        func nearest(_ chests: [Chest]) -> Chest? {
+            var best: Chest?
+            var shortest = Double.greatestFiniteMagnitude
+            for chest in chests {
+                let distance = (chest.position - actor.position).length
+                guard distance < shortest else { continue }
+                shortest = distance
+                best = chest
+            }
+            return best
+        }
+
+        let stocked = theirs.filter { $0.contents.slots.contains { $0 != nil } }
+        return nearest(stocked) ?? nearest(theirs)
     }
 
     /// The nearest turret a base still has standing. Sorted, because this picks a
