@@ -425,6 +425,7 @@ final class GameScene: SKScene {
         // On the ground with the claim tint, under everything that stands on it.
         worldLayer.addChild(blueprint.node)
 
+        worldLayer.addChild(actorRenderer.groundNode)
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
         worldLayer.addChild(wallDamageRenderer.node)

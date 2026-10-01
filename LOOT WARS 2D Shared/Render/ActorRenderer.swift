@@ -21,6 +21,12 @@ final class ActorRenderer {
 
     let node = SKNode()
 
+    // Team rings live on the ground, separate from the figures, so walls and trees cover them.
+    let groundNode = SKNode()
+
+    // Above the claim tint and wall plan, below grass tufts, trees, crates and walls.
+    private static let ringZ: CGFloat = 1.5
+
     // Measured off the reference art: the overhead bar is exactly one tile wide.
     private static let barWidthInTiles: Double = 1.0
     private static let barHeightInTiles = BarArt.heightInTiles
@@ -33,22 +39,6 @@ final class ActorRenderer {
     /// grass down on the same beat - the foot planting and the grass moving are
     /// the same event seen twice, and two stride constants would drift apart.
     static let walkStride: Double = 1.05
-
-    /// How wide the pool of light under a powered-up figure is, in tiles.
-    ///
-    /// A shade wider than the person - they are nine tenths of a tile across - so
-    /// it reads as light they are standing IN rather than as a plate they are
-    /// standing on.
-    static let perkAuraInTiles: Double = 1.35
-
-    /// When a running perk starts saying it is nearly over, in seconds left.
-    ///
-    /// Not a number the simulation knows or should: the aura hurrying up is a thing
-    /// the screen does about a countdown it can read, exactly like the match clock
-    /// turning red. Long enough to change what you would do with the last of it -
-    /// break off, or spend it - and short enough that most of a perk is spent
-    /// simply enjoying it.
-    static let perkEndsWithin: Double = 1.6
 
     /// How fast a shot works its way out of the weapon, and how far it moves it.
     ///
@@ -114,8 +104,12 @@ final class ActorRenderer {
 
         let healthFill: SKShapeNode
         let blaster: SKSpriteNode
+
+        // The team ring under the feet; lives in groundNode and follows the root each frame.
+        let ring = SKNode()
         let goalLabel: SKLabelNode?
         var lastHealthFraction: Double = -1
+        var lastHealthBand = -1
         /// So the figure can be re-dressed the moment its helmet changes.
         var lastHelmet: HelmetTier?
         var lastBlaster: BlasterTier?
@@ -142,33 +136,6 @@ final class ActorRenderer {
         /// The muzzle flash, hung at the end of the barrel.
         let muzzle = SKSpriteNode(texture: GlowArt.pool)
 
-        /// The pool of light a powered-up figure stands in, and the ring around it.
-        ///
-        /// PARENTED TO THE ACTOR, which is the whole reason these exist. The trail
-        /// EffectsRenderer throws is drawn on the MAP and stays where it was thrown
-        /// - which is exactly right for a trail and is why a moving player leaves
-        /// one - but it means that standing still, or seen for the first time from
-        /// across the map, a powered-up person looked like an ordinary person with
-        /// some glitter near them. These travel with the figure, so being powered
-        /// up is something you ARE rather than something you have been leaving
-        /// behind you.
-        ///
-        /// Two nodes rather than one, because they say different things. The pool
-        /// is under the feet and reads as standing in light; the ring is a hard
-        /// edge around it and reads as a boundary switched on. A soft glow on its
-        /// own dissolves into pale grass at any distance, which is the same lesson
-        /// the rarity colours record - a colour that only exists as a haze is a
-        /// colour this map eats.
-        let perkPool = SKSpriteNode(texture: GlowArt.pool)
-        let perkRing: SKShapeNode
-
-        /// Which perk was running last frame, and whether it was in its last
-        /// moments. The pair is how the aura is switched on, recoloured, hurried up
-        /// and switched off without touching an action sixty times a second - see
-        /// the note on breathPhase for why that distinction matters here.
-        var lastPerk: Perk?
-        var perkEnding = false
-
         /// How much of a shot is still working through the weapon, 1 down to 0.
         ///
         /// A NUMBER that decays rather than an SKAction, because the weapon's
@@ -186,12 +153,10 @@ final class ActorRenderer {
         init(sprite: SKSpriteNode,
              healthFill: SKShapeNode,
              blaster: SKSpriteNode,
-             perkRing: SKShapeNode,
              goalLabel: SKLabelNode?) {
             self.sprite = sprite
             self.healthFill = healthFill
             self.blaster = blaster
-            self.perkRing = perkRing
             self.goalLabel = goalLabel
         }
     }
@@ -223,21 +188,9 @@ final class ActorRenderer {
             // passing straight through someone.
             nodes.root.alpha = actor.invulnerability > 0 ? 0.55 : 1.0
 
-            // The aura, which is a STATE and so is read off the world rather than
-            // announced - the same way a bot picking one up gets everything the
-            // player gets without a line of code saying so.
-            //
-            // Diffed on two things: which perk, and whether it is nearly out. Both
-            // switch a repeating action on, and a repeating action restarted every
-            // frame never plays a single cycle - the lesson this file already
-            // records for the walk and the breath. So it is only touched when one
-            // of those two answers actually changes.
-            let ending = actor.perk != nil && actor.perkRemaining <= ActorRenderer.perkEndsWithin
-            if actor.perk != nodes.lastPerk || ending != nodes.perkEnding {
-                setAura(actor.perk, ending: ending, on: nodes)
-                nodes.lastPerk = actor.perk
-                nodes.perkEnding = ending
-            }
+            nodes.ring.position = nodes.root.position
+            nodes.ring.isHidden = nodes.root.isHidden
+            nodes.ring.alpha = nodes.root.alpha
 
             // The walk. Distance covered since the last frame turns the cycle, so
             // the bob is tied to the ground rather than to the clock: stop and it
@@ -341,6 +294,7 @@ final class ActorRenderer {
 
         for (id, nodes) in Array(nodesByActor) where world.actors[id] == nil {
             nodes.root.removeFromParent()
+            nodes.ring.removeFromParent()
             nodesByActor[id] = nil
         }
     }
@@ -364,7 +318,7 @@ final class ActorRenderer {
         track.lineWidth = GridGeometry.length(ofTiles: ActorRenderer.barOutlineInTiles)
 
         let fill = SKShapeNode()
-        fill.fillColor = RenderPalette.colour(for: actor.team)
+        fill.fillColor = RenderPalette.healthColour(at: 1)
         fill.strokeColor = .black
         fill.lineWidth = track.lineWidth
         fill.zPosition = 1
@@ -401,35 +355,11 @@ final class ActorRenderer {
         blaster.anchorPoint = CGPoint(x: 0.30, y: 0.32)
         blaster.zPosition = 1
 
-        // The aura, built once and hidden. Made rather than made-and-thrown-away
-        // for the reason EnchantNode records: a thing built the moment it is needed
-        // and destroyed the moment it is not restarts its own animation constantly.
-        //
-        // An ellipse, because the ground is seen at an angle - the same squash the
-        // shadow and the placement ghost wear, so light lying on grass reads as
-        // lying on it rather than as a disc hanging in the air.
-        let auraWide = GridGeometry.length(ofTiles: ActorRenderer.perkAuraInTiles)
-        let auraTall = auraWide * 0.5
-
-        let perkRing = SKShapeNode(ellipseOf: CGSize(width: auraWide, height: auraTall))
-        perkRing.fillColor = .clear
-        perkRing.lineWidth = 3
-        perkRing.isHidden = true
-        perkRing.zPosition = -1
-
         let nodes = ActorNodes(sprite: sprite,
                                healthFill: fill,
                                blaster: blaster,
-                               perkRing: perkRing,
                                goalLabel: goalLabel)
 
-        nodes.perkPool.size = CGSize(width: auraWide * 1.45, height: auraTall * 1.45)
-        nodes.perkPool.colorBlendFactor = 1
-        nodes.perkPool.isHidden = true
-
-        // Behind the figure and its weapon, which both sit on the body at 0 and
-        // above. Light on the ground goes under the person standing in it.
-        nodes.perkPool.zPosition = -2
         // root -> body -> figure -> sprite, and each layer owns exactly one kind
         // of movement: the root is where the actor IS, the body is the walk, the
         // figure is whatever just happened to it, and the sprite is which way it is
@@ -445,21 +375,10 @@ final class ActorRenderer {
         nodes.muzzle.alpha = 0
         nodes.muzzle.zPosition = 2
 
-        // On the ROOT, and this is the one place in this file where that is the
-        // right answer rather than the lazy one.
-        //
-        // The root is simply where the actor IS. Every layer below it carries a
-        // movement: the body bobs, sways and breathes; the figure is flinched,
-        // healed and charged. All of that is correct for a FIGURE and wrong for
-        // light lying on the ground - a pool that rose with each step would be
-        // hovering, and one that took the body's sway would tilt, which is a thing
-        // the ground cannot do. Parented here it stays flat under the feet while
-        // the person moves about on top of it.
-        //
-        // It still inherits the two things it should: the root is hidden when its
-        // owner dies, and faded while they are spawn-protected.
-        nodes.root.addChild(nodes.perkPool)
-        nodes.root.addChild(perkRing)
+        nodes.ring.addChild(TeamRing.make(
+            team: actor.team, width: GridGeometry.length(ofTiles: TeamRing.widthInTiles)))
+        nodes.ring.zPosition = ActorRenderer.ringZ
+        groundNode.addChild(nodes.ring)
 
         nodes.figure.addChild(sprite)
         nodes.body.addChild(nodes.figure)
@@ -650,66 +569,6 @@ final class ActorRenderer {
     /// colour more than once - the item twinkles and the trail cycles, but the
     /// person themselves going through a rainbow is reserved for this single
     /// instant, and that is what makes the instant read as the big one.
-    /// Switches the standing aura on, recolours it, hurries it up, or takes it off.
-    ///
-    /// Four jobs in one function because they are one decision - what should the
-    /// light under this person be doing - and splitting them was how the old
-    /// version of this idea in EffectsRenderer ended up with a trail that could
-    /// outlive the perk that made it.
-    ///
-    /// The pulse is slow while there is time left and twice as fast in the last
-    /// second and a half, which is the only warning anybody gets that a perk is
-    /// about to go. It is worth having: the powers are big enough that walking into
-    /// a fight on the last half second of one is a real mistake, and nothing else
-    /// on the screen says so.
-    private func setAura(_ perk: Perk?, ending: Bool, on nodes: ActorNodes) {
-        nodes.perkPool.removeAllActions()
-        nodes.perkRing.removeAllActions()
-
-        guard let perk else {
-            // Gone, and it collapses rather than blinking out. A power-up ending is
-            // a thing that happens to you, and a light that simply stopped being
-            // drawn would be the screen switching off rather than the perk running
-            // out.
-            let finish = SKAction.sequence([
-                .group([.scaleX(to: 1.45, y: 1.45, duration: 0.12),
-                        .fadeOut(withDuration: 0.12)]),
-                .hide(),
-                .scale(to: 1, duration: 0)
-            ])
-
-            nodes.perkPool.run(finish)
-            nodes.perkRing.run(finish)
-            return
-        }
-
-        let colours = RenderPalette.colours(for: perk, at: 0)
-
-        nodes.perkPool.color = colours.bright
-        nodes.perkPool.isHidden = false
-        nodes.perkPool.alpha = 0.55
-        nodes.perkPool.setScale(1)
-
-        nodes.perkRing.strokeColor = colours.bright
-        nodes.perkRing.isHidden = false
-        nodes.perkRing.alpha = 0.8
-        nodes.perkRing.setScale(1)
-
-        // Out of phase with each other on purpose: the ring swells while the pool
-        // dims, so the pair breathes rather than throbbing as one blob.
-        let beat: TimeInterval = ending ? 0.22 : 0.5
-
-        nodes.perkPool.run(.repeatForever(.sequence([
-            .group([.fadeAlpha(to: 0.72, duration: beat), .scale(to: 1.1, duration: beat)]),
-            .group([.fadeAlpha(to: 0.38, duration: beat), .scale(to: 0.94, duration: beat)])
-        ])))
-
-        nodes.perkRing.run(.repeatForever(.sequence([
-            .group([.fadeAlpha(to: 0.35, duration: beat), .scale(to: 1.16, duration: beat)]),
-            .group([.fadeAlpha(to: 0.9, duration: beat), .scale(to: 1.0, duration: beat)])
-        ])))
-    }
-
     func charge(_ id: ActorID) {
         guard let nodes = nodesByActor[id] else { return }
 
@@ -744,6 +603,12 @@ final class ActorRenderer {
 
         nodes.healthFill.isHidden = clamped <= 0.001
         guard !nodes.healthFill.isHidden else { return }
+
+        let band = RenderPalette.healthBand(at: clamped)
+        if band != nodes.lastHealthBand {
+            nodes.lastHealthBand = band
+            nodes.healthFill.fillColor = RenderPalette.healthColour(at: clamped)
+        }
 
         let full = GridGeometry.length(ofTiles: ActorRenderer.barWidthInTiles)
         let height = GridGeometry.length(ofTiles: ActorRenderer.barHeightInTiles)

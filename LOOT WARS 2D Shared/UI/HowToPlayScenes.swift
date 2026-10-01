@@ -153,7 +153,7 @@ enum HowToPlayScenes {
         let enemy = HowToPlayKit.person("PlayerCommon", team: red, tile: t)
         enemy.position = CGPoint(x: 2.0 * t, y: -0.1 * t)
         stage.addChild(enemy)
-        let enemyBar = HowToPlayKit.healthBar(team: red, tile: t)
+        let enemyBar = HowToPlayKit.personBar(tile: t)
         enemyBar.node.position = CGPoint(x: 0, y: 2.0 * t)
         enemy.addChild(enemyBar.node)
 
@@ -173,7 +173,7 @@ enum HowToPlayScenes {
                 .run {
                     HowToPlayKit.burst(at: to, in: stage, colour: .white, tile: t, count: 3)
                     health -= 0.25
-                    HowToPlayKit.setBar(enemyBar.fill, full: enemyBar.full, share: health)
+                    HowToPlayKit.setHealth(enemyBar.fill, full: enemyBar.full, share: health)
                     enemy.run(.sequence([.moveBy(x: 0.08 * t, y: 0, duration: 0.04),
                                          .moveBy(x: -0.08 * t, y: 0, duration: 0.06)]))
                 },
@@ -184,7 +184,7 @@ enum HowToPlayScenes {
         HowToPlayKit.loop(stage, [
             (0.2, {
                 health = 1
-                HowToPlayKit.setBar(enemyBar.fill, full: enemyBar.full, share: 1)
+                HowToPlayKit.setHealth(enemyBar.fill, full: enemyBar.full, share: 1)
                 enemy.alpha = 1; enemy.setScale(1)
                 hero.position = CGPoint(x: -1.6 * t, y: -0.6 * t)
                 aimKnob?.position = .zero
@@ -344,7 +344,7 @@ enum HowToPlayScenes {
         let hero = HowToPlayKit.person("PlayerEpic", team: blue, tile: t)
         hero.position = CGPoint(x: 0, y: -0.6 * t)
         stage.addChild(hero)
-        let bar = HowToPlayKit.healthBar(team: blue, tile: t)
+        let bar = HowToPlayKit.personBar(tile: t)
         bar.node.position = CGPoint(x: 0, y: 2.0 * t)
         hero.addChild(bar.node)
 
@@ -383,12 +383,12 @@ enum HowToPlayScenes {
             motes()
             bar.fill.run(.customAction(withDuration: 0.6) { _, elapsed in
                 let now = start + (share - start) * elapsed / 0.6
-                HowToPlayKit.setBar(bar.fill, full: bar.full, share: now)
+                HowToPlayKit.setHealth(bar.fill, full: bar.full, share: now)
             })
         }
 
         HowToPlayKit.loop(stage, [
-            (0.9, { HowToPlayKit.setBar(bar.fill, full: bar.full, share: 0.25) }),
+            (0.9, { HowToPlayKit.setHealth(bar.fill, full: bar.full, share: 0.25) }),
             (1.1, { tap(0, healingTo: 0.55, from: 0.25) }),
             (1.6, { tap(1, healingTo: 1, from: 0.55) })
         ])

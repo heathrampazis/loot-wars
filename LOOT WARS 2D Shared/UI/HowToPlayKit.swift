@@ -59,18 +59,13 @@ enum HowToPlayKit {
 
     // MARK: - People
 
-    /// A figure, anchored at its feet, standing on a soft team-coloured pool the
-    /// way every person in a match does.
+    // A figure, anchored at its feet, standing on its team ring like every person in a match.
     static func person(_ asset: String = "Player", team: TeamID, tile t: CGFloat) -> SKNode {
         let root = SKNode()
 
-        let pool = SKSpriteNode(texture: GlowArt.pool)
-        pool.size = CGSize(width: 1.3 * t, height: 0.55 * t)
-        pool.color = RenderPalette.colour(for: team)
-        pool.colorBlendFactor = 1
-        pool.alpha = 0.85
-        pool.zPosition = -1
-        root.addChild(pool)
+        let ring = TeamRing.make(team: team, width: CGFloat(TeamRing.widthInTiles) * t)
+        ring.zPosition = -1
+        root.addChild(ring)
 
         let body = SKSpriteNode(texture: SKTexture(imageNamed: asset),
                                 size: CGSize(width: 0.9 * t, height: 1.72 * t))
@@ -108,7 +103,7 @@ enum HowToPlayKit {
                          .sequence([.scale(to: 1.15, duration: 0.08), .scale(to: 1, duration: 0.12)])]))
     }
 
-    /// The health bar over a person: one tile wide, in the team colour.
+    // A structure's health bar: one tile wide, in its owner's team colour.
     static func healthBar(team: TeamID, tile t: CGFloat) -> (node: SKNode, fill: SKShapeNode, full: CGFloat) {
         let full = t
         let (bar, fill) = BarArt.make(full: full, colour: RenderPalette.colour(for: team))
@@ -117,6 +112,18 @@ enum HowToPlayKit {
 
     static func setBar(_ fill: SKShapeNode, full: CGFloat, share: CGFloat) {
         fill.path = BarArt.path(full: full, filled: max(BarArt.height, full * max(0, min(1, share))))
+    }
+
+    // A person's health bar: one tile wide, green to red as it empties, like in a match.
+    static func personBar(tile t: CGFloat) -> (node: SKNode, fill: SKShapeNode, full: CGFloat) {
+        let full = t
+        let (bar, fill) = BarArt.make(full: full, colour: RenderPalette.healthColour(at: 1))
+        return (bar, fill, full)
+    }
+
+    static func setHealth(_ fill: SKShapeNode, full: CGFloat, share: CGFloat) {
+        setBar(fill, full: full, share: share)
+        fill.fillColor = RenderPalette.healthColour(at: Double(share))
     }
 
     // MARK: - Things on the ground

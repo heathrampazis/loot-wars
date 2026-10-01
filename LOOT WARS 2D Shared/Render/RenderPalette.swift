@@ -170,6 +170,22 @@ enum RenderPalette {
                                    blue: 0x27 / 255.0, alpha: 0.70)
     static let hudTrack  = SKColor(white: 0.0, alpha: 0.35)
     static let healthBar = rgb(0xFF, 0x51, 0x7B)
+
+    // Health bars over people: green above 60%, yellow above 30%, red below.
+    static func healthColour(at fraction: Double) -> SKColor {
+        switch healthBand(at: fraction) {
+        case 2: return rgb(0x3F, 0xD1, 0x6A)
+        case 1: return rgb(0xF5, 0xC5, 0x42)
+        default: return placementBlocked
+        }
+    }
+
+    // The band a fraction falls in, so a bar repaints only when the band changes.
+    static func healthBand(at fraction: Double) -> Int {
+        if fraction > 0.6 { return 2 }
+        if fraction > 0.3 { return 1 }
+        return 0
+    }
     /// Hotbar slots are plain black at 42% in the reference, not the HUD's olive -
     /// the ground shows through them far more.
     static let hotbarSlot = SKColor(white: 0.0, alpha: 0.42)
