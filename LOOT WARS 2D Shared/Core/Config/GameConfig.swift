@@ -363,10 +363,6 @@ enum GameConfig {
             // it is found - but the shop still makes an offer for one, because
             // nobody decides for the player which of their things are junk.
             //
-            // The ball's row is unreachable today: it is not obtainable, so it
-            // cannot be in a bag to be sold out of one. Left in place with the rest
-            // of what it owns - see Perk.isObtainable.
-            //
             // Kept deliberately low against what it does. At a fifth back that is
             // about four tokens, roughly a bandage, and it should stay there: the
             // day selling a perk is worth more than drinking one, the strongest
@@ -380,7 +376,8 @@ enum GameConfig {
             // back that is under three tokens, which is not a strategy.
             .perk(.strength): 14,
             .perk(.speed): 14,
-            .perk(.regeneration): 14
+            .perk(.regeneration): 14,
+            .perk(.resistance): 14
         ]
 
         /// What the shop pays for something you sell back, as a share of its price.
@@ -2116,16 +2113,20 @@ enum GameConfig {
         /// item rather than a reason to pick a bottle up.
         static let soloSpeedBoost: Double = 1.32
 
-        /// A quarter again becomes a third again, which over seven seconds is about
-        /// one extra hit landed in a close fight. That is the whole item.
-        static let soloDamageBoost: Double = 1.35
+        /// 1.45, up from 1.35: a third again was barely felt next to the disco
+        /// ball's quarter. Now it is close to half again - over seven seconds,
+        /// about one and a half extra hits landed in a close fight.
+        static let soloDamageBoost: Double = 1.45
 
-        /// 7% a beat rather than 5%, so about 49% of a bar across the perk against
-        /// the disco ball's 35%. Short of the 78% the old regeneration paid, and
-        /// deliberately: this no longer arrives alongside thicker skin, but it is
-        /// still a bar and a half of healing on a map where a medkit is the
-        /// expensive thing in the shop.
-        static let soloHealPortion: Double = 0.07
+        /// 9% a beat, up from 7%, so about 63% of a bar across the perk against
+        /// the disco ball's 35%. Still short of the 78% the old regeneration paid,
+        /// which arrived alongside thicker skin; this one does not.
+        static let soloHealPortion: Double = 0.09
+
+        /// The share of each hit that still lands while resistance runs - four
+        /// tenths shrugged off. Below the disco ball's 0.72, for the same reason
+        /// every single beats it at its one job.
+        static let soloDamageTaken: Double = 0.6
 
         /// How much harder your shots hit.
         ///
@@ -2388,18 +2389,18 @@ enum GameConfig {
         /// early one, and late is when the match is being decided and a crate needs
         /// to be able to change something.
         static func singlePerkWeight(at progress: Double) -> Int {
+            // Per single, and there are four now rather than three - so each was
+            // trimmed to keep the singles' total where it was (20 / 28 / 36
+            // against 21 / 27 / 36). Resistance is a new kind of power-up, not more
+            // power-ups.
             switch progress {
-            case ..<0.35: return 7
-            case ..<0.70: return 9
-            default:      return 12
+            case ..<0.35: return 5
+            case ..<0.70: return 7
+            default:      return 9
             }
         }
 
         /// The same, for the disco ball.
-        ///
-        /// PARKED. The ball is not obtainable at the moment - see Perk.obtainable -
-        /// so nothing reads this. Kept because it is the answer to "how often would
-        /// it turn up", which is the first question asked the day it comes back.
         ///
         /// Deliberately flat where the singles climb, and these numbers are chosen
         /// to hold its ABSOLUTE rate still - about 0.19 a match, exactly what it was
@@ -2409,12 +2410,16 @@ enum GameConfig {
         ///
         /// It is the one power-up that ends a fight by itself, and "rarer than it
         /// was" was never the ask. Everything the change handed out went to the
-        /// three that each do one thing.
+        /// singles that each do one thing.
+        ///
+        /// Up one in every band (from 4 / 4 / 5) when it came back, the smallest
+        /// step these weights take: about a fifth to a quarter likelier, so it
+        /// turns up a little more often without becoming the usual find.
         static func overdriveWeight(at progress: Double) -> Int {
             switch progress {
-            case ..<0.35: return 4
-            case ..<0.70: return 4
-            default:      return 5
+            case ..<0.35: return 5
+            case ..<0.70: return 5
+            default:      return 6
             }
         }
 

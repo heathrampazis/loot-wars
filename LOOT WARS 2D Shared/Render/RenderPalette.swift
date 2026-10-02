@@ -408,12 +408,19 @@ enum RenderPalette {
     /// Violet and magenta rather than violet twice, matching the other two. Magenta
     /// sits close to the health pink, which for a healing perk is the right
     /// accident to have.
+    /// Strength's second colour: the spectrum's red, darker.
+    static let strengthDeep = rgb(0xB8, 0x00, 0x18)
+
     static func colours(for perk: Perk, at step: Int) -> (bright: SKColor, deep: SKColor) {
         switch perk {
         case .overdrive:    return perkColours(at: step)
-        case .strength:     return (hue(at: 0), hue(at: 1))
+        // Red and a deeper red, rather than red and orange: the orange was what
+        // made it read as orange from across the map.
+        case .strength:     return (hue(at: 0), strengthDeep)
         case .speed:        return (hue(at: 4), hue(at: 5))
         case .regeneration: return (hue(at: 6), hue(at: 7))
+        // Gold and orange: a warm yellow, kept clear of strength's red.
+        case .resistance:   return (hue(at: 2), hue(at: 1))
         }
     }
 
