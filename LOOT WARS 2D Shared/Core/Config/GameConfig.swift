@@ -1215,6 +1215,20 @@ enum GameConfig {
         /// Having been shot this recently counts as still being in the fight.
         static let combatRecency: Double = 3.0
 
+        /// How close a visible enemy has to be for a bot to power up BEFORE the
+        /// fight rather than once it is already in it. Inside this the shooting is
+        /// about to start, and a perk drunk now is a perk working in the first
+        /// exchange, which is the one that decides most fights.
+        static let perkEnemyRange: Double = 9
+
+        /// Below this share of health a bot drinks regeneration whenever it has
+        /// one, fighting or not.
+        static let perkRegenBelow: Double = 0.65
+
+        /// Seconds a bot will carry a power-up without a good moment before using
+        /// it anyway.
+        static let perkPatience: Double = 25
+
         /// And even once the shooting stops, a beat before patching up. Winding a
         /// bandage on the same frame the last bullet lands is a tell that nobody is
         /// home.
@@ -2245,6 +2259,11 @@ enum GameConfig {
         /// bomb row and bodies drop none; once one is picked up or expires, they
         /// come back.
         static let maxLooseBombs = 2
+
+        /// How much likelier a crate is to hand out a just-unlocked item - see
+        /// Unlocks.featured. Twice, so it turns up a few times in the matches
+        /// after it unlocks without crowding out everything else.
+        static let featuredBoost: Double = 2.0
 
         /// How many stink bombs a crate hands out when it rolls one. Matches
         /// ItemType.maxStack for a stink bomb, so a crate fills one slot.

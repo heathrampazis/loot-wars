@@ -428,6 +428,12 @@ final class GameScene: SKScene {
         let generated = MapFactory.generate(seed: seed)
         world = World(generated: generated)
 
+        // What this match has in it: your level's unlocks, or everything in dev
+        // mode - see Progress. Before the first step, so nothing is ever rolled
+        // or handed out from a fuller set.
+        world.unlocks = Progress.matchUnlocks
+        world.duration = Progress.matchLength
+
         // Before anything draws an item, so a turret on the floor is in your
         // colour from the first frame - see ItemArt.viewer.
         ItemArt.viewer = world.localPlayer?.team
@@ -1462,7 +1468,15 @@ final class GameScene: SKScene {
     private func endMatch() {
         guard results.isHidden else { return }
 
-        results.show(with: world)
+        // XP for the match, worked out and saved BEFORE the results come up so
+        // the screen can play the bar filling and any unlock.
+        var award: Progress.Award?
+        if let team = world.localPlayer?.team,
+           let place = world.standings.firstIndex(where: { $0.team == team }) {
+            award = Progress.award(score: world.score(for: team), place: place)
+        }
+
+        results.show(with: world, award: award)
 
         // The first thing this game has ever remembered about how a match WENT.
         // A high-water mark and a count, so a bad match can never take anything

@@ -82,6 +82,11 @@ struct AIState {
     /// Spaces out treatments, so a hurt bot does not burn its whole bag at once.
     var healTimer: Double = 0
 
+    /// How long the bot has been carrying a power-up it has not used. Past
+    /// AI.perkPatience it uses it anyway - a power-up carried to the grave helps
+    /// nobody, and the player should see bots light up.
+    var perkHeldFor: Double = 0
+
     /// Counts down to the next urge to go home and add to the base.
     var buildUrgeTimer: Double = 0
 

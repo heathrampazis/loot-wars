@@ -200,6 +200,7 @@ enum ChestSystem {
     /// minutes would be a way round the one thing the grace period is for.
     private static func stockRows(in world: World) -> [(item: ItemType, weight: Int)] {
         let rows = GameConfig.Chest.stockTable(at: world.matchProgress)
+            .filter { world.unlocks.allows($0.item) }
         return world.bombsAllowed ? rows : rows.filter { $0.item != .bomb }
     }
 

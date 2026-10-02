@@ -59,7 +59,7 @@ final class SettingsSheetContent: MenuSheetContent {
     var onAbout: (() -> Void)?
 
     private enum Row: Int, CaseIterable {
-        case sound, leftHanded, tips, about
+        case sound, leftHanded, tips, devMode, about
     }
 
     private static let rowHeight: CGFloat = 56
@@ -67,6 +67,7 @@ final class SettingsSheetContent: MenuSheetContent {
     private var width: CGFloat = 0
     private var soundToggle: MenuToggleNode?
     private var handToggle: MenuToggleNode?
+    private var devToggle: MenuToggleNode?
     private var tipsButton: SKShapeNode?
     private var tipsLabel: SKLabelNode?
 
@@ -105,6 +106,12 @@ final class SettingsSheetContent: MenuSheetContent {
                 addLabels("Show tips again", detail: "Replay the hints from your first match", y: centreY)
                 addTipsButton(y: centreY)
 
+            case .devMode:
+                addLabels("Dev mode", detail: "Every feature unlocked in matches", y: centreY)
+                let toggle = MenuToggleNode(isOn: Prefs.devMode)
+                toggle.position = CGPoint(x: width / 2 - MenuToggleNode.trackSize.width / 2 - 4, y: centreY)
+                node.addChild(toggle)
+                devToggle = toggle
             case .about:
                 addLabels("About", detail: nil, y: centreY)
                 let chevron = Sheet.chevron()
@@ -142,6 +149,10 @@ final class SettingsSheetContent: MenuSheetContent {
             tipsButton?.run(.sequence([.scale(to: 0.9, duration: 0.05),
                                        .scale(to: 1, duration: 0.12)]))
 
+        case .devMode:
+            Prefs.devMode.toggle()
+            devToggle?.set(Prefs.devMode)
+            SoundPlayer.shared.play(.select)
         case .about:
             SoundPlayer.shared.play(.select)
             onAbout?()

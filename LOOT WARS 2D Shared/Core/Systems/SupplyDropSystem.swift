@@ -26,7 +26,7 @@ enum SupplyDropSystem {
 
         guard world.supplyDropsSent < GameConfig.SupplyDrop.maxDrops else { return }
 
-        let first = GameConfig.SupplyDrop.firstAt * GameConfig.Match.duration
+        let first = GameConfig.SupplyDrop.firstAt * world.duration
         let due = first + Double(world.supplyDropsSent) * GameConfig.SupplyDrop.interval
         guard world.elapsed >= due else { return }
 
@@ -38,8 +38,13 @@ enum SupplyDropSystem {
     }
 
     /// The one item inside. See GameConfig.SupplyDrop.loot.
-    static func roll(using rng: inout SeededRandom) -> Pickup {
-        let table = GameConfig.SupplyDrop.loot
+    ///
+    /// Cosmic gear only once it is unlocked; before that its share goes to the
+    /// Mythical rung below it.
+    static func roll(unlocks: Unlocks = .all, using rng: inout SeededRandom) -> Pickup {
+        let table = GameConfig.SupplyDrop.loot.compactMap { row -> (pickup: Pickup, weight: Int)? in
+            unlocks.clamp(row.pickup).map { (pickup: $0, weight: row.weight) }
+        }
         let total = table.reduce(0) { $0 + $1.weight }
         var pick = Int.random(in: 0..<total, using: &rng)
 

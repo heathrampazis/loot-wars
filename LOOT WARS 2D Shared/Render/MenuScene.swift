@@ -119,6 +119,14 @@ final class MenuScene: SKScene {
     /// How to Play, behind the Info button - see HowToPlayContent.
     private let howToPlay = HowToPlayContent()
 
+    /// Your level, top left, and the roadmap behind it.
+    private var levelBadge: LevelBadgeNode?
+    /// Whether the badge was drawn in dev mode, so turning it on or off in
+    /// Settings redraws it.
+    private var badgeDevMode = false
+    private let roadmap = RoadmapSheetContent()
+    private let featureDetail = FeatureDetailContent()
+
     /// Set once the scene has handed the game over, so a second tap on a button
     /// that is still animating cannot present a second match.
     private var starting = false
@@ -138,6 +146,18 @@ final class MenuScene: SKScene {
         aboutContent.onBack = { [weak self] in
             guard let self else { return }
             self.sheet.show(title: "SETTINGS", content: self.settingsContent)
+        }
+
+        // A roadmap card to its own page, and back.
+        roadmap.onSelect = { [weak self] feature, level in
+            guard let self else { return }
+            self.featureDetail.feature = feature
+            self.featureDetail.level = level
+            self.sheet.show(title: feature.title.uppercased(), content: self.featureDetail)
+        }
+        featureDetail.onBack = { [weak self] in
+            guard let self else { return }
+            self.sheet.show(title: "ROADMAP", content: self.roadmap)
         }
 
         // Before anything asks for a sound. See SoundPlayer.warm.
@@ -211,6 +231,8 @@ final class MenuScene: SKScene {
 
         if let insets = view?.safeAreaInsets, insets != laidOutInsets {
             buildRecord()
+        } else if Prefs.devMode != badgeDevMode {
+            buildLevelBadge()
         }
 
         let mapWide = GridGeometry.length(ofTiles: Double(GameConfig.Map.width))
@@ -391,9 +413,28 @@ final class MenuScene: SKScene {
     /// it changing and places the record again.
     private var laidOutInsets: UIEdgeInsets = .zero
 
+    /// Bottom left - the top of the screen belongs to the logo - and clear of the
+    /// notch the same way the record is.
+    private func buildLevelBadge() {
+        levelBadge?.removeFromParent()
+        badgeDevMode = Prefs.devMode
+
+        let margin: CGFloat = 18
+        let insets = view?.safeAreaInsets ?? .zero
+        let side = max(insets.left, insets.right)
+
+        let badge = LevelBadgeNode()
+        badge.position = CGPoint(x: side + margin,
+                                 y: insets.bottom + margin + LevelBadgeNode.size.height)
+        badge.zPosition = 10
+        addChild(badge)
+        levelBadge = badge
+    }
+
     private func buildRecord() {
         childNode(withName: "record")?.removeFromParent()
         laidOutInsets = view?.safeAreaInsets ?? .zero
+        buildLevelBadge()
         guard Prefs.matchesFinished > 0 else { return }
 
         let matches = Prefs.matchesFinished
@@ -482,6 +523,17 @@ final class MenuScene: SKScene {
             play.press { [weak view] in
                 view?.presentScene(GameScene.newGameScene(),
                                    transition: .fade(withDuration: 0.35))
+            }
+            return
+        }
+
+        if let badge = levelBadge,
+           badge.contains(localPoint: CGPoint(x: point.x - badge.position.x,
+                                              y: point.y - badge.position.y)) {
+            SoundPlayer.shared.play(.select)
+            badge.press { [weak self] in
+                guard let self else { return }
+                self.sheet.open(title: "ROADMAP", content: self.roadmap, on: self.size)
             }
             return
         }

@@ -34,6 +34,8 @@ enum Prefs {
         static let lessonsVersion = "lessonsVersion"
         static let soundOn = "soundOn"
         static let leftHanded = "leftHanded"
+        static let totalXP = "totalXP"
+        static let devMode = "devMode"
     }
 
     /// Bumped whenever a lesson CHANGES, which wipes every "you have seen this"
@@ -134,6 +136,22 @@ enum Prefs {
     }
 
     /// The "Show tips again" row in Settings.
+    // MARK: - Progression
+
+    /// Every point of XP ever earned. The level is worked out from this - see
+    /// Roadmap.level(forXP:) - so changing the curve never strands anybody.
+    static var totalXP: Int {
+        get { store.integer(forKey: Key.totalXP) }
+        set { store.set(max(0, newValue), forKey: Key.totalXP) }
+    }
+
+    /// Every feature unlocked in matches, whatever your level - for testing the
+    /// whole game together. Your real level and XP are untouched.
+    static var devMode: Bool {
+        get { store.bool(forKey: Key.devMode) }
+        set { store.set(newValue, forKey: Key.devMode) }
+    }
+
     static func forgetLessons() {
         taughtSelling = false
         taughtHolding = false

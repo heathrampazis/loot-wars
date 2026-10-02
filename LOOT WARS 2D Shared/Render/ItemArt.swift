@@ -95,7 +95,7 @@ enum ItemArt {
             // what Speed does.
             case .overdrive:    return "Power-Up"
             case .strength:     return "Strength"
-            case .speed:        return "Speed"
+            case .speed:        return "Swiftness"
             case .regeneration: return "Regeneration"
             case .resistance:   return "Resistance"
             }

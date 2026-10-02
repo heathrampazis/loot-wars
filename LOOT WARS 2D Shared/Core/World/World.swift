@@ -50,7 +50,12 @@ final class World {
     }
 
     /// Seconds left on the clock, floored at zero.
-    var timeRemaining: Double { max(0, GameConfig.Match.duration - elapsed) }
+    var timeRemaining: Double { max(0, duration - elapsed) }
+
+    /// How long this match runs, in seconds. The full length unless the screen
+    /// that made the world says otherwise - shorter while a player is early in
+    /// the roadmap, see Roadmap.matchLength. Set before the first step.
+    var duration: Double = GameConfig.Match.duration
 
     /// How far the match has run, nought to one.
     ///
@@ -59,7 +64,7 @@ final class World {
     /// change to the match length moves them together rather than leaving tuned
     /// constants behind in two files.
     var matchProgress: Double {
-        min(1, max(0, elapsed / GameConfig.Match.duration))
+        min(1, max(0, elapsed / duration))
     }
 
     /// Whether the whistle has gone.
@@ -374,6 +379,10 @@ final class World {
     }
 
     var localPlayer: Actor? { actors[localPlayerID] }
+
+    /// Which of the extras are in this match - see Unlocks. Everything unless the
+    /// screen that made the world says otherwise; set before the first step.
+    var unlocks: Unlocks = .all
 
     func claim(for team: TeamID) -> BaseClaim? { claims[team] }
 
@@ -1155,11 +1164,16 @@ final class World {
         // should be worth going out of your way for - handing every bot the good
         // one for nothing would make finding one yourself mean nothing.
         if ownedByABot, !hasArcade(team) {
-            let kind: ArcadeKind =
+            var kind: ArcadeKind =
                 Double.random(in: 0..<1, using: &rng) < GameConfig.Arcade.botMiniShare
                 ? .mini : .full
 
-            if let origin = nextArcadeOrigin(for: team, kind: kind, near: centre) {
+            // Only machines this match has. The cabinet unlocks after the mini,
+            // so a bot that drew it before then gets the mini instead.
+            if !unlocks.allows(.arcade(kind)) { kind = .mini }
+
+            if unlocks.allows(.arcade(kind)),
+               let origin = nextArcadeOrigin(for: team, kind: kind, near: centre) {
                 spawnArcade(at: origin, kind: kind, owner: team)
             }
         }
@@ -1175,7 +1189,7 @@ final class World {
         // Placed AFTER the machine rather than before, so that in a cramped base the
         // thing that earns gets the floor space and the thing that guards it takes
         // what is left.
-        if ownedByABot, !hasTurret(team),
+        if ownedByABot, !hasTurret(team), unlocks.allows(.turret),
            Double.random(in: 0..<1, using: &rng) < GameConfig.Turret.botShare,
            let origin = nextTurretOrigin(for: team, near: centre) {
             spawnTurret(at: origin, owner: team)
@@ -1499,6 +1513,12 @@ final class World {
                          at position: Vec2,
                          lifetime: Double? = nil,
                          from origin: Vec2? = nil) {
+        // The last line of defence for Unlocks: every drop on the map comes
+        // through here, so nothing locked can reach the grass even if a table
+        // somewhere forgets to ask. Cosmic steps down to Mythical; anything with
+        // no stand-in simply does not appear.
+        guard let pickup = unlocks.clamp(pickup) else { return }
+
         let id = GroundItemID(nextGroundItemID)
         nextGroundItemID += 1
         groundItems[id] = GroundItem(id: id,
