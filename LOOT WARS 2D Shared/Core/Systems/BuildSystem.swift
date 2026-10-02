@@ -45,6 +45,34 @@ enum BuildSystem {
         return !world.structureOccupies(point)
     }
 
+    /// Whether a wall here keeps this team's walls one tile thick.
+    ///
+    /// A base is a RING, and a ring is one block thick: a wall may run in a line,
+    /// turn a corner and meet itself, but never fill in a two-by-two square. That
+    /// one rule is all it takes - any wall two thick anywhere contains such a
+    /// square, and no single-thickness ring, corners included, ever does. So
+    /// doubling a wall up to make it bomb-proof is off the table: one bomb opens
+    /// any base, and building is about shape rather than stacking.
+    static func keepsWallThin(_ point: GridPoint, for team: TeamID, in world: World) -> Bool {
+        func ownWall(_ col: Int, _ row: Int) -> Bool {
+            world.map[GridPoint(col: col, row: row)].blockOwner == team
+        }
+
+        // The four two-by-two squares this tile is a corner of. If the other
+        // three tiles of any of them are already this team's wall, this one would
+        // fill it in.
+        for dCol in [-1, 1] {
+            for dRow in [-1, 1] {
+                if ownWall(point.col + dCol, point.row)
+                    && ownWall(point.col, point.row + dRow)
+                    && ownWall(point.col + dCol, point.row + dRow) {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
     static func canPlace(at point: GridPoint, by actor: Actor, in world: World) -> Bool {
         // Not for a few seconds after being bombed - see World.canBuild. The one
         // rule in this file that is about somebody ELSE: a raider needs the hole to
@@ -52,6 +80,9 @@ enum BuildSystem {
         guard world.canBuild(actor.team) else { return false }
 
         guard isBuildableTile(point, for: actor.team, in: world) else { return false }
+
+        // One wall thick - see keepsWallThin.
+        guard keepsWallThin(point, for: actor.team, in: world) else { return false }
 
         // You build your base from inside it. Measured from the feet, so it is
         // "standing on your own ground" rather than "leaning over it".

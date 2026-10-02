@@ -408,6 +408,7 @@ final class World {
     func nextBuildTile(for team: TeamID) -> GridPoint? {
         baseLayouts[team]?.tiles.first {
             BuildSystem.isBuildableTile($0, for: team, in: self)
+                && BuildSystem.keepsWallThin($0, for: team, in: self)
         }
     }
 

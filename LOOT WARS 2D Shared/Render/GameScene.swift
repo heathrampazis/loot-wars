@@ -1367,6 +1367,11 @@ final class GameScene: SKScene {
         guard !world.isOver else { return }
         guard let player = world.localPlayer else { return }
 
+        // Dead: no shopping until you are back. The shop shuts if it was open -
+        // nothing can be bought while respawning anyway - and its button goes
+        // until you are on your feet again.
+        if !player.isAlive, shopPanel.isOpen { shopPanel.close() }
+
         // Both sticks go away while you have your head in a chest.
         //
         // You therefore stand still to rummage, which is a real cost and the
@@ -1404,7 +1409,7 @@ final class GameScene: SKScene {
             return
         }
 
-        shopButton.isHidden = false
+        shopButton.isHidden = !player.isAlive
         hotbar.isHidden = false
         leaderboard.isHidden = false
 
