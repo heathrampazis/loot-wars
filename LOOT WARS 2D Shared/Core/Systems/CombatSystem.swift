@@ -25,10 +25,10 @@ enum CombatSystem {
     /// Health coming back, slowly, to somebody standing on their own ground.
     ///
     /// The third reason to have a base, after the chest and the machine, and the
-    /// one that costs nothing to understand: home is where you get better. It is
-    /// deliberately slow - a full bar takes most of half a minute - so it is a
-    /// reason to go home between fights rather than a way to win one, and a
-    /// bandage is still much faster than walking.
+    /// one that costs nothing to understand: home is where you get better. A full
+    /// bar in about fifteen seconds - quick enough to make playing safe a real
+    /// choice, slow enough that it is a reason to go home between fights rather
+    /// than a way to win one.
     ///
     /// Two conditions, and both matter. Inside your OWN claim, so it cannot be
     /// used by whoever is standing in your base robbing you. And only after a lull,

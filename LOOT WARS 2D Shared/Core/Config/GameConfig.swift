@@ -714,14 +714,15 @@ enum GameConfig {
         /// own base looked like being repeatedly zapped. Twelve deliberate pulses
         /// read as recovering; seven hundred tiny ones read as a fault.
         ///
-        /// The pace is unchanged and still slow: eight per cent of your bar every
-        /// two seconds is a full bar in twenty-five, so home is where you recover
-        /// BETWEEN fights rather than a way to win one, and a bandage is still six
-        /// times faster than walking back. The delay is what stops it ticking
-        /// during a fight on your doorstep, where a defender who heals mid-firefight
-        /// is a defender nobody can kill at home.
-        static let recoveryPortion: Double = 0.08
-        static let recoveryTick: Double = 2.0
+        /// Ten per cent of your bar every second and a half: a full bar in about
+        /// fifteen seconds, up from twenty-five. Quick enough that going home is a
+        /// real way to play safe - step inside, catch your breath, go again - and
+        /// still slower than a bandage, so it is a reason to go home between fights
+        /// rather than a way to win one. The delay is unchanged and is what stops
+        /// it ticking during a fight on your doorstep, where a defender who heals
+        /// mid-firefight is a defender nobody can kill at home.
+        static let recoveryPortion: Double = 0.10
+        static let recoveryTick: Double = 1.5
         static let recoveryDelay: Double = 4
 
         /// Seconds spent dead before respawning at your own claim.

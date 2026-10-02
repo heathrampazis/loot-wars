@@ -199,7 +199,8 @@ final class BlueprintRenderer {
 
         guard !walls.isEmpty else {
             return (world.baseLayouts[player.team]?.tiles ?? [])
-                .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+                .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world)
+                          && BuildSystem.keepsWallThin($0, for: player.team, in: world) }
         }
 
         var lowCol = walls.map(\.col).min() ?? 0
@@ -240,7 +241,8 @@ final class BlueprintRenderer {
             outline.append(GridPoint(col: highCol, row: row))
         }
 
-        return outline.filter { BuildSystem.isBuildableTile($0, for: player.team, in: world) }
+        return outline.filter { BuildSystem.isBuildableTile($0, for: player.team, in: world)
+                                && BuildSystem.keepsWallThin($0, for: player.team, in: world) }
     }
 
     /// A phase that belongs to the SQUARE rather than to the node drawing it, so a
