@@ -317,8 +317,10 @@ final class HotbarNode: SKNode {
         // Asked every frame rather than folded into the redraw below, because it
         // turns on when your health crosses a line - and nothing about your
         // inventory changes at that moment, so the redraw would not fire.
+        // The line where a tap on a heal USES it rather than picking it out - see
+        // GameScene.tapHotbar - so the ring means exactly "tap this now".
         let urgent = Double(player.health)
-            < Double(player.maxHealth) * GameConfig.Player.tapHealBelow
+            < Double(player.maxHealth) * GameConfig.Player.instantHealBelow
 
         for (index, stack) in player.inventory.slots.enumerated() {
             let spends = urgent && !selling && player.isAlive

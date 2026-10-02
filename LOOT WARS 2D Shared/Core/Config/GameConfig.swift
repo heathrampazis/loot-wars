@@ -838,6 +838,12 @@ enum GameConfig {
         /// button still spends it. Below, hesitating is the expensive thing.
         static let tapHealBelow: Double = 0.7
 
+        /// Below this a bandage or medkit tapped in the hotbar is used at once.
+        /// Above it the tap picks the heal out instead - ready on the button above
+        /// the corner, for when you want it. Half a bar is where hesitating starts
+        /// to get you killed.
+        static let instantHealBelow: Double = 0.5
+
         static let halfWidth: Double = 0.45
 
         /// Half the figure's height, in tiles.

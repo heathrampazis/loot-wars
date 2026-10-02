@@ -518,6 +518,11 @@ enum RenderPalette {
 
     // On-screen controls
     static let controlBackground = SKColor(white: 0.0, alpha: 0.18)
+
+    /// A control recommending itself - a heal you should take, a bomb lined up on
+    /// a wall. The bright Epic green, drawn as a rim round the control so it pops
+    /// off the see-through black of every other one.
+    static let recommend = rgb(0x2B, 0xDE, 0x6A)
     static let controlForeground = SKColor(white: 0.0, alpha: 0.30)
 
     private static func rgb(_ r: Int, _ g: Int, _ b: Int) -> SKColor {
