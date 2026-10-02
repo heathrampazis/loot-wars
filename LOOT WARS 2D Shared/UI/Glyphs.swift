@@ -28,6 +28,9 @@ enum Glyphs {
     static let info: SKTexture = makeInfo()
     static let gear: SKTexture = makeGear()
 
+    /// A plain house, for the way back to the title screen.
+    static let home: SKTexture = makeHome()
+
     /// The shop's bag, traced off the reference: a body that flares outwards
     /// towards the bottom, and a handle looping up out of the top edge.
     ///
@@ -162,6 +165,43 @@ enum Glyphs {
     /// outline, because the traced version is a page of trigonometry to get wrong
     /// and this is eight rectangles in a loop. At the size a button draws it the
     /// two are indistinguishable.
+    /// A roof and a body with a door cut out of it, in one white shape.
+    private static func makeHome() -> SKTexture {
+        let side: CGFloat = 128
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side),
+            format: format
+        ).image { _ in
+            SKColor.white.setFill()
+
+            // Roof. Images run top-down, so the peak is the smaller y.
+            let roof = UIBezierPath()
+            roof.move(to: CGPoint(x: side * 0.5, y: side * 0.14))
+            roof.addLine(to: CGPoint(x: side * 0.90, y: side * 0.50))
+            roof.addLine(to: CGPoint(x: side * 0.10, y: side * 0.50))
+            roof.close()
+            roof.fill()
+
+            // Body, with the door left out of it.
+            let body = UIBezierPath()
+            body.move(to: CGPoint(x: side * 0.22, y: side * 0.46))
+            body.addLine(to: CGPoint(x: side * 0.78, y: side * 0.46))
+            body.addLine(to: CGPoint(x: side * 0.78, y: side * 0.86))
+            body.addLine(to: CGPoint(x: side * 0.59, y: side * 0.86))
+            body.addLine(to: CGPoint(x: side * 0.59, y: side * 0.64))
+            body.addLine(to: CGPoint(x: side * 0.41, y: side * 0.64))
+            body.addLine(to: CGPoint(x: side * 0.41, y: side * 0.86))
+            body.addLine(to: CGPoint(x: side * 0.22, y: side * 0.86))
+            body.close()
+            body.fill()
+        }
+
+        return SKTexture(image: image)
+    }
+
     private static func makeGear() -> SKTexture {
         let side: CGFloat = 128
         let centre = CGPoint(x: side / 2, y: side / 2)
