@@ -40,6 +40,9 @@ final class GameScene: SKScene {
     private let supplyRenderer = SupplyDropRenderer()
     private let supplyCompass = SupplyCompassNode()
 
+    /// Says so when you take somebody out - see KillBannerNode.
+    private let killBanner = KillBannerNode()
+
     /// How many supply drops this screen has already called out, so each one is
     /// announced once, on the frame it lands.
     private var supplyDropsAnnounced = 0
@@ -461,6 +464,7 @@ final class GameScene: SKScene {
         cameraController.node.addChild(quickBuy)
         cameraController.node.addChild(hint)
         cameraController.node.addChild(supplyCompass)
+        cameraController.node.addChild(killBanner)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -691,6 +695,8 @@ final class GameScene: SKScene {
         // 161 points clear of the button and 37 clear of the leaderboard, and both
         // of those grow on every larger phone.
         matchPanel.position = CGPoint(x: 0, y: size.height / 2 - inset)
+        killBanner.restingY = matchPanel.position.y - MatchPanelNode.size.height
+            - 10 - KillBannerNode.height / 2
         results.layOut(for: size)
 
         // IN the corner, where the health panel used to be. Nothing to clamp
@@ -1258,6 +1264,15 @@ final class GameScene: SKScene {
                 effectsRenderer.mark(killAt: position,
                                      points: points,
                                      mine: killer == world.localPlayerID)
+
+                // Yours: the banner under the clock, and a sound, so a kill
+                // registers even when your eyes were on something else. The hint
+                // shares that strip of screen and gives way.
+                if killer == world.localPlayerID, victim != world.localPlayerID {
+                    hint.hide()
+                    killBanner.confirm()
+                    SoundPlayer.shared.play(.upgrade)
+                }
             }
         }
     }
@@ -1440,6 +1455,7 @@ final class GameScene: SKScene {
         throwButton.isHidden = true
         hotbar.isHidden = true
         respawnBanner.isHidden = true
+        killBanner.dismiss()
 
         #if os(iOS) || os(tvOS)
         moveTouch = nil
