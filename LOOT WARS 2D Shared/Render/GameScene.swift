@@ -1717,12 +1717,12 @@ extension GameScene {
                 // and asking about it first means an overlap can only ever resolve
                 // towards another match rather than out of the game.
                 if results.isPlayAgain(atLocalPoint: point) {
-                    restart()
+                    results.pressPlayAgain { [weak self] in self?.restart() }
                     return
                 }
 
                 if results.isMenu(atLocalPoint: point) {
-                    openMenu()
+                    results.pressMenu { [weak self] in self?.openMenu() }
                     return
                 }
             }
