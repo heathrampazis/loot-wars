@@ -46,7 +46,7 @@ final class HowToPlayContent: MenuSheetContent {
                  body: "Tap a bandage or medkit in your hotbar to heal. Medkits heal more.",
                  scene: .heal),
             Page(title: "Power-ups",
-                 body: "Tap a power-up for a few seconds of strength, speed or regeneration - or all of them at once.",
+                 body: "Tap a power-up for a few seconds of strength, speed, regeneration or resistance - or all of them at once.",
                  scene: .perks),
             Page(title: "Build your base",
                  body: "Tap the ground inside your base to place walls. Close the ring to seal it and earn chests.",

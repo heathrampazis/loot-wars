@@ -97,6 +97,7 @@ enum ItemArt {
             case .strength:     return "Strength"
             case .speed:        return "Speed"
             case .regeneration: return "Regeneration"
+            case .resistance:   return "Resistance"
             }
         case .helmet:  return "Helmet"
         case .blaster: return "Blaster"
@@ -117,6 +118,7 @@ enum ItemArt {
         case .item(.perk(.strength)):      return "StrengthPerk"
         case .item(.perk(.speed)):         return "SpeedPerk"
         case .item(.perk(.regeneration)):  return "RegenerationPerk"
+        case .item(.perk(.resistance)):    return "ResistancePerk"
         case .item(.helmet(let tier)):  return tier.name
         case .item(.blaster(let tier)): return tier.assetName
         // A golden token is the same pickup carrying a bigger number - Core has no

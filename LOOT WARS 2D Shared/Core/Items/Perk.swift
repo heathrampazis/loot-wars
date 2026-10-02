@@ -11,7 +11,7 @@
 //  particles coming off the person carrying it - belongs to the state and not to
 //  the press.
 //
-//  ONE THAT DOES EVERYTHING, AND THREE THAT EACH DO ONE THING.
+//  ONE THAT DOES EVERYTHING, AND FOUR THAT EACH DO ONE THING.
 //
 //  There were four singles - regeneration, speed, strength, resistance - and they
 //  were cut to one bottle that did all four, because four bottles meant telling
@@ -19,10 +19,10 @@
 //  of homework for a thing you find twice a match, and the usual outcome was
 //  drinking whichever one you had and finding out afterwards.
 //
-//  The singles are back, minus resistance, and the shape is deliberately not what
+//  The singles are back, all four of them, and the shape is deliberately not what
 //  it was. Before, the four were alternatives and you got whichever one the crate
 //  felt like. Now there is a clear best item - the disco ball, which does all of it
-//  - and three lesser ones that each do their own job BETTER than it does. So a
+//  - and four lesser ones that each do their own job BETTER than it does. So a
 //  single is never a disappointing disco ball; it is the right tool if the thing
 //  you need is that one thing, and the wrong one if you do not know yet.
 //
@@ -33,9 +33,8 @@
 //  an item nobody is pleased to find is the failure the four-perk version had. Less
 //  overall, better in its lane, is what makes it a choice.
 //
-//  Resistance stays merged in, so thicker skin is the thing you can only get from
-//  the disco ball. It keeps one power entirely to itself, which is worth more to it
-//  than another few points on the three it shares.
+//  Resistance came back as a single of its own, so the disco ball no longer keeps
+//  any power to itself - what it has instead is all of them at once.
 //
 //  Everything downstream was already written against "which perk is running" rather
 //  than "is a perk running", so this arrived as a set of switches to fill in rather
@@ -53,6 +52,8 @@ enum Perk: Hashable, CaseIterable {
     case speed
     /// Health back, and only that.
     case regeneration
+    /// Thicker skin, and only that.
+    case resistance
 
     /// The ones that can actually be FOUND, and the only list anything handing a
     /// power-up out should ever read.
@@ -67,13 +68,8 @@ enum Perk: Hashable, CaseIterable {
     /// Deterministic: allCases is declaration order and filter preserves it.
     static let obtainable: [Perk] = allCases.filter { $0.isObtainable }
 
-    /// Whether this one is in the game at the moment.
-    ///
-    /// The disco ball is NOT, and everything it does is still here - its powers,
-    /// its rung, its art, its ring that walks the whole colour wheel, its loot
-    /// curve, its sell price. Nothing about it has been deleted, because nothing
-    /// about it is wrong; it is simply not being handed out, and putting it back is
-    /// this one line.
+    /// Whether this one is in the game at the moment. All of them are: the disco
+    /// ball was switched off here for a while and is back.
     ///
     /// A flag rather than a weight of zero. Zero is a number in a table that
     /// somebody has to notice and interpret, and a weighted pick given a zero row
@@ -81,8 +77,7 @@ enum Perk: Hashable, CaseIterable {
     /// This says what is meant.
     var isObtainable: Bool {
         switch self {
-        case .overdrive: return false
-        case .strength, .speed, .regeneration: return true
+        case .overdrive, .strength, .speed, .regeneration, .resistance: return true
         }
     }
 
@@ -96,7 +91,7 @@ enum Perk: Hashable, CaseIterable {
     var rarity: Rarity {
         switch self {
         case .overdrive: return .mythical
-        case .strength, .speed, .regeneration: return .legendary
+        case .strength, .speed, .regeneration, .resistance: return .legendary
         }
     }
 
@@ -111,7 +106,7 @@ enum Perk: Hashable, CaseIterable {
         switch self {
         case .overdrive:  return GameConfig.Perks.speedBoost
         case .speed:      return GameConfig.Perks.soloSpeedBoost
-        case .strength, .regeneration: return 1
+        case .strength, .regeneration, .resistance: return 1
         }
     }
 
@@ -119,14 +114,15 @@ enum Perk: Hashable, CaseIterable {
         switch self {
         case .overdrive:  return GameConfig.Perks.damageBoost
         case .strength:   return GameConfig.Perks.soloDamageBoost
-        case .speed, .regeneration: return 1
+        case .speed, .regeneration, .resistance: return 1
         }
     }
 
-    /// Thicker skin, and the disco ball's alone.
+    /// Thicker skin: the share of every hit that still lands.
     var damageTakenShare: Double {
         switch self {
-        case .overdrive: return GameConfig.Perks.damageTaken
+        case .overdrive:  return GameConfig.Perks.damageTaken
+        case .resistance: return GameConfig.Perks.soloDamageTaken
         case .strength, .speed, .regeneration: return 1
         }
     }
@@ -137,7 +133,7 @@ enum Perk: Hashable, CaseIterable {
         switch self {
         case .overdrive:    return GameConfig.Perks.healPortion
         case .regeneration: return GameConfig.Perks.soloHealPortion
-        case .strength, .speed: return 0
+        case .strength, .speed, .resistance: return 0
         }
     }
 
@@ -152,19 +148,14 @@ enum Perk: Hashable, CaseIterable {
     /// reading 0.44 / 0.33 / 0.33 would ever guess it meant "unchanged".
     ///
     /// So each kind names its own curve in GameConfig and this picks one. The
-    /// relationship between them is still perfectly readable - the three singles
-    /// together are about nine times the disco ball late - it is just no longer
+    /// relationship between them is still perfectly readable - the four singles
+    /// together are about seven times the disco ball late - it is just no longer
     /// encoded in a number you have to divide to understand.
-    ///
-    /// The overdrive branch is unreached today: nothing asks this about a perk that
-    /// is not in Perk.obtainable. It is kept rather than deleted, because it is the
-    /// answer to "how often WOULD it turn up", and that question comes back the day
-    /// the ball does.
     func lootWeight(at progress: Double) -> Int {
         switch self {
         case .overdrive:
             return GameConfig.Loot.overdriveWeight(at: progress)
-        case .strength, .speed, .regeneration:
+        case .strength, .speed, .regeneration, .resistance:
             return GameConfig.Loot.singlePerkWeight(at: progress)
         }
     }

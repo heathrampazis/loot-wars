@@ -414,6 +414,9 @@ enum RenderPalette {
         case .strength:     return (hue(at: 0), hue(at: 1))
         case .speed:        return (hue(at: 4), hue(at: 5))
         case .regeneration: return (hue(at: 6), hue(at: 7))
+        // Gold and green, the two hues nobody else had. Gold leads, because the
+        // bright one is the tint and green is the one the lawn swallows.
+        case .resistance:   return (hue(at: 2), hue(at: 3))
         }
     }
 

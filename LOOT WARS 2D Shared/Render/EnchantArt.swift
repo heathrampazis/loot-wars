@@ -237,7 +237,7 @@ final class EnchantNode: SKNode {
         switch perk {
         case .overdrive:
             shimmer()
-        case .strength, .speed, .regeneration:
+        case .strength, .speed, .regeneration, .resistance:
             tint(RenderPalette.colours(for: perk, at: 0).bright)
         }
     }

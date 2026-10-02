@@ -235,9 +235,7 @@ enum LootTable {
         // early one.
         //
         // obtainable rather than allCases, and that is the ONE gate on which
-        // power-ups exist as far as the map is concerned - see Perk.obtainable. The
-        // disco ball is behind it at the moment, so this is three rows rather than
-        // four; everything the ball does is still written and still works.
+        // power-ups exist as far as the map is concerned - see Perk.obtainable.
         rows += Perk.obtainable.map { perk in
             (pickup: Pickup.item(.perk(perk)),
              weight: perk.lootWeight(at: progress))
