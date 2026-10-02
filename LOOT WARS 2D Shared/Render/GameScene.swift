@@ -49,6 +49,10 @@ final class GameScene: SKScene {
     /// Points home when home is off screen - see BaseCompassNode.
     private let baseCompass = BaseCompassNode()
 
+    /// Whether the base was being raided last frame, so the alarm sounds once
+    /// when a raid starts rather than every frame of it.
+    private var wasRaided = false
+
     /// How many supply drops this screen has already called out, so each one is
     /// announced once, on the frame it lands.
     private var supplyDropsAnnounced = 0
@@ -1540,13 +1544,23 @@ final class GameScene: SKScene {
     }
 
     /// The arrow home, on the edge of the screen while your base is out of view.
+    ///
+    /// Red and shaking while you are being raided: somebody standing in your
+    /// claim, or your wall freshly blown open.
     private func updateBaseCompass() {
         guard !world.isOver,
               let team = world.localPlayer?.team,
               let claim = world.claim(for: team) else {
             baseCompass.update(offset: nil, bounds: .zero)
+            baseCompass.setAlarm(false)
             return
         }
+
+        let raided = world.intruder(in: team) != nil
+            || world.buildLockRemaining(for: team) > 0
+        if raided, !wasRaided { SoundPlayer.shared.play(.notification) }
+        wasRaided = raided
+        baseCompass.setAlarm(raided)
 
         let zoom = max(GridGeometry.zoom(for: size), 0.0001)
         let eye = cameraController.node.position

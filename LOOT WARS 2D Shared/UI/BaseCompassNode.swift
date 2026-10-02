@@ -21,7 +21,18 @@ final class BaseCompassNode: SKNode {
     private static let radius: CGFloat = 19
 
     private let marker = SKNode()
+    /// Everything that is drawn, inside the marker, so the alarm can shake it
+    /// without disturbing where the marker sits on the edge.
+    private let body = SKNode()
     private let arrow: SKShapeNode
+    private let disc: SKShapeNode
+    private var alarmed = false
+
+    private static let calm = SKColor(white: 0, alpha: 0.55)
+    /// The alarm red: the same red as the rest of the interface's warnings (the
+    /// "blocked" pills and shakes), see-through like the calm marker so the map
+    /// still shows behind it.
+    private static let alarm = RenderPalette.placementBlocked.withAlphaComponent(0.72)
 
     override init() {
         let radius = BaseCompassNode.radius
@@ -32,27 +43,28 @@ final class BaseCompassNode: SKNode {
         path.addLine(to: CGPoint(x: radius + 1, y: -8))
         path.closeSubpath()
         arrow = SKShapeNode(path: path)
+        disc = SKShapeNode(circleOfRadius: radius)
 
         super.init()
         zPosition = 40
 
         // The same see-through black as the supply marker and the rest of the
         // interface.
-        arrow.fillColor = SKColor(white: 0, alpha: 0.55)
+        arrow.fillColor = BaseCompassNode.calm
         arrow.strokeColor = .clear
-        marker.addChild(arrow)
+        body.addChild(arrow)
 
-        let disc = SKShapeNode(circleOfRadius: radius)
-        disc.fillColor = SKColor(white: 0, alpha: 0.55)
+        disc.fillColor = BaseCompassNode.calm
         disc.strokeColor = .clear
-        marker.addChild(disc)
+        body.addChild(disc)
 
         let house = SKShapeNode(path: BaseCompassNode.housePath(width: radius * 1.1))
         house.fillColor = .white
         house.strokeColor = .clear
         house.zPosition = 1
-        marker.addChild(house)
+        body.addChild(house)
 
+        marker.addChild(body)
         marker.isHidden = true
         addChild(marker)
     }
@@ -90,6 +102,33 @@ final class BaseCompassNode: SKNode {
 
         marker.position = CGPoint(x: centre.x + dx * scale, y: centre.y + dy * scale)
         arrow.zRotation = atan2(dy, dx)
+    }
+
+    /// Your base is being raided: the marker turns red and shakes in short
+    /// bursts, so it is noticed from the corner of an eye in the middle of
+    /// something else. Calm again when the raid is over.
+    func setAlarm(_ on: Bool) {
+        guard on != alarmed else { return }
+        alarmed = on
+
+        arrow.fillColor = on ? BaseCompassNode.alarm : BaseCompassNode.calm
+        disc.fillColor = on ? BaseCompassNode.alarm : BaseCompassNode.calm
+
+        body.removeAction(forKey: "alarm")
+        body.position = .zero
+        body.setScale(1)
+        guard on else { return }
+
+        let jolt: CGFloat = 3.5
+        let shake = SKAction.sequence([
+            .group([.scale(to: 1.18, duration: 0.05), .moveBy(x: jolt, y: 0, duration: 0.05)]),
+            .moveBy(x: -jolt * 2, y: 0, duration: 0.06),
+            .moveBy(x: jolt * 2, y: 0, duration: 0.06),
+            .moveBy(x: -jolt * 2, y: 0, duration: 0.06),
+            .group([.scale(to: 1, duration: 0.1), .moveBy(x: jolt, y: 0, duration: 0.05)]),
+            .wait(forDuration: 0.7)
+        ])
+        body.run(.repeatForever(shake), withKey: "alarm")
     }
 
     /// A plain house: a roof and a body with a door cut out, centred.
