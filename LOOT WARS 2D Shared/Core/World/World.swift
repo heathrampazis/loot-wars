@@ -1275,6 +1275,13 @@ final class World {
         return elapsed >= until
     }
 
+    /// Seconds until this team may lay walls again, or zero if it may now. For
+    /// the screen to count down - see canBuild.
+    func buildLockRemaining(for team: TeamID) -> Double {
+        guard let until = repairAllowedAt[team] else { return 0 }
+        return max(0, until - elapsed)
+    }
+
     /// Whether this team's wall has a hole in it.
     ///
     /// The same question as "is there anything left to build", which is why an

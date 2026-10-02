@@ -43,6 +43,7 @@
 //
 
 import SpriteKit
+import QuartzCore
 
 final class HintNode: SKNode {
 
@@ -58,6 +59,25 @@ final class HintNode: SKNode {
 
     /// Up right now.
     var isShowing: Bool { showing != nil }
+
+    /// Held back while another notice has the spot - one at a time. A hint asked
+    /// for meanwhile waits, and is shown when the spot frees up if it is still
+    /// fresh; anything older than that is no longer news.
+    var isSuppressed = false {
+        didSet {
+            guard isSuppressed != oldValue else { return }
+            if isSuppressed {
+                hide()
+            } else if let waiting = pending, CACurrentMediaTime() - waiting.at < 3 {
+                pending = nil
+                show(waiting.text, seconds: waiting.seconds)
+            } else {
+                pending = nil
+            }
+        }
+    }
+
+    private var pending: (text: String, seconds: TimeInterval, at: CFTimeInterval)?
 
 
     override init() {
@@ -88,6 +108,10 @@ final class HintNode: SKNode {
     /// to read five words and no longer. A hint that outstays that is not being
     /// more helpful, it is being furniture.
     func show(_ text: String, seconds: TimeInterval = 1.5) {
+        guard !isSuppressed else {
+            pending = (text, seconds, CACurrentMediaTime())
+            return
+        }
         guard showing != text || isHidden else { return }
         showing = text
 

@@ -43,6 +43,12 @@ final class GameScene: SKScene {
     /// Says so when you take somebody out - see KillBannerNode.
     private let killBanner = KillBannerNode()
 
+    /// Counts down the quiet after a raid - see RebuildTimerNode.
+    private let rebuildTimer = RebuildTimerNode()
+
+    /// Points home when home is off screen - see BaseCompassNode.
+    private let baseCompass = BaseCompassNode()
+
     /// How many supply drops this screen has already called out, so each one is
     /// announced once, on the frame it lands.
     private var supplyDropsAnnounced = 0
@@ -480,6 +486,8 @@ final class GameScene: SKScene {
         cameraController.node.addChild(hint)
         cameraController.node.addChild(supplyCompass)
         cameraController.node.addChild(killBanner)
+        cameraController.node.addChild(rebuildTimer)
+        cameraController.node.addChild(baseCompass)
         cameraController.node.addChild(results)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
@@ -714,8 +722,13 @@ final class GameScene: SKScene {
         // 161 points clear of the button and 37 clear of the leaderboard, and both
         // of those grow on every larger phone.
         matchPanel.position = CGPoint(x: 0, y: size.height / 2 - inset)
-        killBanner.restingY = matchPanel.position.y - MatchPanelNode.size.height
+        // One spot for every notice, under the match panel - the kill banner, the
+        // hints and the rebuild countdown all use it, one at a time. See
+        // updateNotices for who gets it.
+        let noticeY = matchPanel.position.y - MatchPanelNode.size.height
             - 10 - KillBannerNode.height / 2
+        killBanner.restingY = noticeY
+        rebuildTimer.position = CGPoint(x: 0, y: noticeY)
         results.layOut(for: size)
 
         // IN the corner, where the health panel used to be. Nothing to clamp
@@ -772,7 +785,8 @@ final class GameScene: SKScene {
         // screen nothing else occupies mid-match. Measured off the HUD rather than
         // off the top edge, so it follows the panel if that ever changes height -
         // which it just did, when the ammo bar came out.
-        hint.position = CGPoint(x: 0, y: cornerBottom - 18)
+        hint.position = CGPoint(x: 0, y: matchPanel.position.y - MatchPanelNode.size.height
+                                     - 10 - KillBannerNode.height / 2)
 
     }
 
@@ -863,6 +877,8 @@ final class GameScene: SKScene {
 
         updateRightControl(with: world)
         updateQuickButton(with: world)
+        updateNotices(with: world)
+        updateBaseCompass()
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
         updateHint(with: world)
@@ -1476,6 +1492,8 @@ final class GameScene: SKScene {
         hotbar.isHidden = true
         respawnBanner.isHidden = true
         killBanner.dismiss()
+        rebuildTimer.dismiss()
+        baseCompass.update(offset: nil, bounds: .zero)
 
         #if os(iOS) || os(tvOS)
         moveTouch = nil
@@ -1485,6 +1503,44 @@ final class GameScene: SKScene {
         healTouch = nil
         pending = nil
         #endif
+    }
+
+    /// One notice at a time, in the one spot under the match panel.
+    ///
+    /// A kill is the most urgent news and takes the spot outright; a hint waits
+    /// for it. The rebuild countdown is a status rather than news, so it steps
+    /// aside for either and comes back once they have gone.
+    private func updateNotices(with world: World) {
+        if let player = world.localPlayer, !world.isOver {
+            rebuildTimer.update(remaining: world.buildLockRemaining(for: player.team))
+        }
+
+        let killShowing = !killBanner.isHidden
+        hint.isSuppressed = killShowing
+        rebuildTimer.setSuppressed(killShowing || hint.isShowing)
+    }
+
+    /// The arrow home, on the edge of the screen while your base is out of view.
+    private func updateBaseCompass() {
+        guard !world.isOver,
+              let team = world.localPlayer?.team,
+              let claim = world.claim(for: team) else {
+            baseCompass.update(offset: nil, bounds: .zero)
+            return
+        }
+
+        let zoom = max(GridGeometry.zoom(for: size), 0.0001)
+        let eye = cameraController.node.position
+        let home = GridGeometry.point(for: claim.centreTile.center)
+        let offset = CGPoint(x: (home.x - eye.x) / zoom, y: (home.y - eye.y) / zoom)
+
+        // The same frame the supply markers ride round.
+        let edge: CGFloat = 38
+        let bounds = CGRect(x: -size.width / 2 + safeLeft + edge,
+                            y: -size.height / 2 + edge,
+                            width: size.width - safeLeft - safeRight - edge * 2,
+                            height: size.height - edge * 2)
+        baseCompass.update(offset: offset, bounds: bounds)
     }
 
     /// What the button above the corner is offering.
@@ -2505,6 +2561,14 @@ extension GameScene {
             return true
         }
 
+        // Walls are off after a raid: point at the countdown, which says why and
+        // for how long. Even while dragging a run of wall, where no other refusal
+        // is explained - this one is the reason every tile is failing.
+        if !world.canBuild(player.team),
+           world.claim(for: player.team)?.contains(tile) == true {
+            rebuildTimer.nudge()
+        }
+
         guard explainRefusals else { return false }
 
         // Only inside your own ground. A red flash out on the open map would be the
@@ -2514,12 +2578,6 @@ extension GameScene {
         blueprint.refuse(at: tile)
         SoundPlayer.shared.play(.error)
 
-        // One refusal has a reason worth spelling out, because it is temporary and
-        // nothing else on screen mentions it: the quiet after a raid, which exists
-        // so a raider can still get back out through the hole they made.
-        if !world.canBuild(player.team) {
-            hint.show("WALLS ARE DOWN FOR A MOMENT")
-        }
 
         return false
     }
