@@ -23,7 +23,7 @@ import UIKit
 
 final class ResultsNode: SKNode {
 
-    private static let cardSize = CGSize(width: 360, height: 296)
+    private static let cardSize = CGSize(width: 360, height: 332)
     private static let rowHeight: CGFloat = 24
     private static let columnWidth: CGFloat = 152
     private static let columnGap: CGFloat = 16
@@ -36,6 +36,16 @@ final class ResultsNode: SKNode {
     private let headline = SKLabelNode()
     private let points = SKLabelNode()
     private let best = SKNode()
+
+    // Your level: the number, the bar filling with this match's XP, and how much.
+    private let levelLabel = SKLabelNode()
+    private let xpFill = SKShapeNode()
+    private let xpGained = SKLabelNode()
+    private static let xpBarWidth: CGFloat = 196
+
+    /// The card that says what a level-up unlocked, beside the results.
+    private let unlockCard = SKNode()
+    private var screen: CGSize = .zero
     private let again: MenuButtonNode
     private let menu: MenuButtonNode
 
@@ -75,7 +85,11 @@ final class ResultsNode: SKNode {
         addChild(card)
 
         buildHeader(in: size)
+        buildLevel(in: size)
         buildRows(in: size)
+
+        unlockCard.zPosition = 5
+        addChild(unlockCard)
         buildButtons(in: size)
     }
 
@@ -135,7 +149,7 @@ final class ResultsNode: SKNode {
         // table reads like the one you were watching all game.
         let width = ResultsNode.columnWidth
         let gap = ResultsNode.columnGap
-        let top = size.height / 2 - 104
+        let top = size.height / 2 - 138
         let perColumn = TeamID.count / 2
 
         for place in 0..<TeamID.count {
@@ -204,6 +218,49 @@ final class ResultsNode: SKNode {
         }
     }
 
+    /// LEVEL 7, a bar, +245 XP - one row between your score and the table.
+    private func buildLevel(in size: CGSize) {
+        let y = size.height / 2 - 108
+        let width = ResultsNode.xpBarWidth
+
+        levelLabel.horizontalAlignmentMode = .right
+        levelLabel.verticalAlignmentMode = .center
+        levelLabel.position = CGPoint(x: -width / 2 - 10, y: y)
+        levelLabel.zPosition = 2
+        card.addChild(levelLabel)
+
+        let track = SKShapeNode(path: CGPath(
+            roundedRect: CGRect(x: -width / 2, y: y - 6, width: width, height: 12),
+            cornerWidth: 6, cornerHeight: 6, transform: nil))
+        track.fillColor = SKColor(white: 0.86, alpha: 1)
+        track.strokeColor = .clear
+        track.zPosition = 2
+        card.addChild(track)
+
+        xpFill.fillColor = RenderPalette.menuPlay.face
+        xpFill.strokeColor = .clear
+        xpFill.position = CGPoint(x: -width / 2, y: y)
+        xpFill.zPosition = 3
+        card.addChild(xpFill)
+
+        xpGained.horizontalAlignmentMode = .left
+        xpGained.verticalAlignmentMode = .center
+        xpGained.position = CGPoint(x: width / 2 + 10, y: y)
+        xpGained.zPosition = 2
+        card.addChild(xpGained)
+    }
+
+    private func setXPBar(_ share: CGFloat) {
+        let width = ResultsNode.xpBarWidth * max(0, min(1, share))
+        xpFill.path = CGPath(roundedRect: CGRect(x: 0, y: -6, width: max(12, width), height: 12),
+                             cornerWidth: 6, cornerHeight: 6, transform: nil)
+        xpFill.isHidden = share <= 0
+    }
+
+    private func setLevel(_ level: Int) {
+        levelLabel.attributedText = ResultsNode.ink("LEVEL \(level)", size: 13, weight: .heavy)
+    }
+
     private func buildButtons(in size: CGSize) {
         // Play again the big one, home the small one beside it: almost everybody
         // who finishes a match wants another.
@@ -224,6 +281,7 @@ final class ResultsNode: SKNode {
 
     /// The veil covers the screen, and the card shrinks to fit a short one.
     func layOut(for screen: CGSize) {
+        self.screen = screen
         scrim.path = CGPath(rect: CGRect(x: -screen.width / 2, y: -screen.height / 2,
                                          width: screen.width, height: screen.height),
                             transform: nil)
@@ -255,7 +313,7 @@ final class ResultsNode: SKNode {
 
     // MARK: - Showing
 
-    func show(with world: World) {
+    func show(with world: World, award: Progress.Award? = nil) {
         guard isHidden else { return }
         isHidden = false
         pressed = false
@@ -360,6 +418,141 @@ final class ResultsNode: SKNode {
             button.alpha = 0
             button.run(.sequence([.wait(forDuration: 0.9), .fadeIn(withDuration: 0.2)]))
         }
+
+        playLevel(award)
+    }
+
+    // MARK: - Level
+
+    /// The bar fills with this match's XP, rolling over at each level-up with a
+    /// bump on the number, and any unlock is shown once it has finished.
+    private func playLevel(_ award: Progress.Award?) {
+        unlockCard.removeAllChildren()
+
+        guard let award else {
+            levelLabel.isHidden = true
+            xpGained.isHidden = true
+            setXPBar(0)
+            return
+        }
+
+        let start = Roadmap.level(forXP: award.xpBefore)
+        setLevel(start.level)
+        setXPBar(CGFloat(start.into) / CGFloat(start.needed))
+        xpGained.attributedText = ResultsNode.ink("+\(award.gained) XP", size: 13,
+                                                  weight: .bold, faint: true)
+
+        // One step per level crossed, then the remainder.
+        var steps: [SKAction] = [.wait(forDuration: 1.25)]
+        var xp = award.xpBefore
+        var left = award.gained
+
+        while left > 0 {
+            let here = Roadmap.level(forXP: xp)
+            let room = here.needed - here.into
+            let from = CGFloat(here.into) / CGFloat(here.needed)
+
+            if left >= room {
+                steps.append(fill(from: from, to: 1, duration: 0.35))
+                let next = here.level + 1
+                steps.append(.run { [weak self] in
+                    self?.setLevel(next)
+                    self?.setXPBar(0)
+                    self?.levelLabel.run(.sequence([.scale(to: 1.3, duration: 0.08),
+                                                    .scale(to: 1, duration: 0.14)]))
+                })
+                xp += room
+                left -= room
+            } else {
+                let to = CGFloat(here.into + left) / CGFloat(here.needed)
+                steps.append(fill(from: from, to: to, duration: 0.45))
+                xp += left
+                left = 0
+            }
+        }
+
+        if !award.unlocked.isEmpty {
+            steps.append(.run { [weak self] in self?.showUnlocks(award.unlocked) })
+        }
+
+        run(.sequence(steps), withKey: "level")
+    }
+
+    private func fill(from: CGFloat, to: CGFloat, duration: TimeInterval) -> SKAction {
+        .customAction(withDuration: duration) { [weak self] _, elapsed in
+            let t = min(1, elapsed / CGFloat(duration))
+            self?.setXPBar(from + (to - from) * t)
+        }
+    }
+
+    /// NEW UNLOCK, beside the results: each feature this match unlocked, with its
+    /// art and what it does. Pops in, and stays.
+    private func showUnlocks(_ features: [Feature]) {
+        unlockCard.removeAllChildren()
+
+        let width: CGFloat = 150
+        let rowHeight: CGFloat = 92
+        let height = 36 + rowHeight * CGFloat(features.count)
+
+        let plate = SKShapeNode(path: CGPath(
+            roundedRect: CGRect(x: -width / 2, y: -height / 2, width: width, height: height),
+            cornerWidth: 18, cornerHeight: 18, transform: nil))
+        plate.fillColor = SKColor(white: 0.99, alpha: 1)
+        plate.strokeColor = RenderPalette.menuPlay.face
+        plate.lineWidth = 3
+        unlockCard.addChild(plate)
+
+        let heading = SKLabelNode()
+        heading.attributedText = MenuButtonNode.text("NEW UNLOCK", size: 12, weight: .heavy,
+                                                     colour: RenderPalette.menuPlay.edge)
+        heading.verticalAlignmentMode = .center
+        heading.position = CGPoint(x: 0, y: height / 2 - 18)
+        heading.zPosition = 1
+        unlockCard.addChild(heading)
+
+        for (index, feature) in features.enumerated() {
+            let y = height / 2 - 36 - rowHeight * (CGFloat(index) + 0.5)
+
+            let texture = ItemArt.texture(for: feature.item)
+            let art = SKSpriteNode(texture: texture, size: ItemArt.size(of: texture, fittingInto: 44))
+            art.position = CGPoint(x: 0, y: y + 14)
+            art.zPosition = 1
+            unlockCard.addChild(art)
+
+            let name = SKLabelNode()
+            name.attributedText = ResultsNode.ink(feature.title, size: 13, weight: .heavy)
+            name.verticalAlignmentMode = .center
+            name.position = CGPoint(x: 0, y: y - 20)
+            name.zPosition = 1
+            unlockCard.addChild(name)
+
+            let blurb = SKLabelNode()
+            blurb.attributedText = ResultsNode.ink(feature.blurb, size: 11, weight: .semibold, faint: true)
+            blurb.verticalAlignmentMode = .center
+            blurb.position = CGPoint(x: 0, y: y - 36)
+            blurb.zPosition = 1
+            unlockCard.addChild(blurb)
+        }
+
+        // Beside the card where there is room, otherwise over its top corner.
+        let scale = card.xScale
+        let cardRight = card.position.x + ResultsNode.cardSize.width / 2 * scale
+        let roomRight = screen.width / 2 - cardRight
+        unlockCard.setScale(scale)
+        if roomRight >= (width + 24) * scale {
+            unlockCard.position = CGPoint(x: cardRight + 12 * scale + width / 2 * scale,
+                                          y: card.position.y)
+        } else {
+            unlockCard.position = CGPoint(x: cardRight - width / 2 * scale,
+                                          y: card.position.y + ResultsNode.cardSize.height / 2 * scale - height / 2 * scale)
+        }
+
+        let rest = unlockCard.xScale
+        unlockCard.setScale(0)
+        unlockCard.run(.sequence([.scale(to: rest * 1.15, duration: 0.16),
+                                  .scale(to: rest, duration: 0.12)]))
+        SoundPlayer.shared.play(.upgrade)
+        shower(from: unlockCard)
     }
 
     // MARK: - Pieces

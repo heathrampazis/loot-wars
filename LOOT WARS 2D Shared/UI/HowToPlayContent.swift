@@ -31,7 +31,7 @@ final class HowToPlayContent: MenuSheetContent {
         let (move, aim) = Prefs.leftHanded ? ("right", "left") : ("left", "right")
         return [
             Page(title: "Win the match",
-                 body: "Five minutes, eight teams. Everything you do scores points - finish top of the board to win.",
+                 body: "A few minutes, eight teams. Everything you do scores points - finish top of the board to win.",
                  scene: .win),
             Page(title: "Move and shoot",
                  body: "Use the \(move) stick to move. Drag the \(aim) stick to aim - you fire while you hold it.",
@@ -46,7 +46,7 @@ final class HowToPlayContent: MenuSheetContent {
                  body: "Tap a bandage or medkit in your hotbar to heal. Medkits heal more.",
                  scene: .heal),
             Page(title: "Power-ups",
-                 body: "Tap a power-up for a few seconds of strength, speed, regeneration or resistance - or all of them at once.",
+                 body: "Tap a power-up for a few seconds of strength, swiftness, regeneration or resistance - or all of them at once.",
                  scene: .perks),
             Page(title: "Build your base",
                  body: "Tap the ground inside your base to place walls. Close the ring to seal it and earn chests.",

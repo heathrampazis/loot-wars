@@ -186,14 +186,15 @@ enum LootTable {
     /// tracks the bands automatically as they move through the match - late, when
     /// the band already offers an Epic, a rare crate is where a Legendary comes
     /// from, and that is the only place one is ever found.
-    private static func upgraded(_ pickup: Pickup) -> Pickup {
+    private static func upgraded(_ pickup: Pickup, unlocks: Unlocks) -> Pickup {
         switch pickup {
         case .item(.helmet(let tier)):
+            // The rung above, if this match has it - Cosmic is a levelling unlock.
             let next = HelmetTier.allCases.first { $0 > tier } ?? tier
-            return .item(.helmet(next))
+            return .item(unlocks.allows(.helmet(next)) ? .helmet(next) : .helmet(tier))
         case .item(.blaster(let tier)):
             let next = BlasterTier.allCases.first { $0 > tier } ?? tier
-            return .item(.blaster(next))
+            return .item(unlocks.allows(.blaster(next)) ? .blaster(next) : .blaster(tier))
         default:
             // Not gear. A rare crate holding a bandage would be a let-down, so it
             // pays out a second one instead - see LootSystem, which asks for two
@@ -202,17 +203,22 @@ enum LootTable {
         }
     }
 
+    ///   - unlocks: what this match has - see Unlocks. A locked item's row is
+    ///     taken out and the rest of the table renormalised round it.
     static func roll(bombShare: Double,
                      at progress: Double,
                      rare: Bool = false,
+                     unlocks: Unlocks = .all,
                      using rng: inout SeededRandom) -> Pickup {
-        let rolled = plain(bombShare: bombShare, at: progress, rare: rare, using: &rng)
-        return rare ? upgraded(rolled) : rolled
+        let rolled = plain(bombShare: bombShare, at: progress, rare: rare,
+                           unlocks: unlocks, using: &rng)
+        return rare ? upgraded(rolled, unlocks: unlocks) : rolled
     }
 
     private static func plain(bombShare: Double,
                               at progress: Double,
                               rare: Bool,
+                              unlocks: Unlocks,
                               using rng: inout SeededRandom) -> Pickup {
         let table = table(at: progress)
         let share = min(1, max(0, bombShare))
@@ -236,9 +242,16 @@ enum LootTable {
         //
         // obtainable rather than allCases, and that is the ONE gate on which
         // power-ups exist as far as the map is concerned - see Perk.obtainable.
+        //
+        // The singles share ONE pool however many of them are unlocked, so a
+        // player who has only Strength sees it as often as a power-up of any kind
+        // will turn up later - early on, the power-up you have is the one you
+        // find. Locked ones are taken out further down.
+        let singles = max(1, unlocks.singlePerkCount)
         rows += Perk.obtainable.map { perk in
-            (pickup: Pickup.item(.perk(perk)),
-             weight: perk.lootWeight(at: progress))
+            let weight = perk.lootWeight(at: progress)
+            let pooled = perk == .overdrive ? weight : weight * 4 / singles
+            return (pickup: Pickup.item(.perk(perk)), weight: pooled)
         }
 
         // The mini machine, out of ANY crate.
@@ -308,7 +321,19 @@ enum LootTable {
                          weight: GameConfig.Loot.rareArcadeWeight))
         }
 
+        // Nothing this match has not unlocked - and the newest unlocks turned up,
+        // so something just unlocked actually turns up while it is new. See
+        // Unlocks.featured.
+        rows = rows.compactMap { row in
+            guard case .item(let type) = row.pickup else { return row }
+            guard unlocks.allows(type) else { return nil }
+            guard unlocks.isFeatured(type) else { return row }
+            return (pickup: row.pickup,
+                    weight: Int((Double(row.weight) * GameConfig.Loot.featuredBoost).rounded()))
+        }
+
         let total = rows.reduce(0) { $0 + $1.weight }
+        guard total > 0 else { return .item(.bandage) }
         var pick = Int.random(in: 0..<total, using: &rng)
 
         for entry in rows {

@@ -791,7 +791,7 @@ final class ShopPanelNode: SKNode {
         // The whole catalogue at once. What the gear half offers depends on what
         // you are wearing, so this comes from Core rather than straight out of the
         // config.
-        let items = ShopSystem.everythingOffered(to: player)
+        let items = ShopSystem.everythingOffered(to: player, unlocks: world.unlocks)
 
         // Redrawn when the purse, the offers, their prices or their sold-out state
         // change - and not otherwise, because a redraw resets card positions and

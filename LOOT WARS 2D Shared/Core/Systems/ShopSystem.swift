@@ -48,14 +48,15 @@ enum ShopSystem {
     }
 
     /// The gear tab's offers, without the caller needing to know which tab that is.
-    static func upgradeOffers(for actor: Actor) -> [GameConfig.Shop.Item] {
+    static func upgradeOffers(for actor: Actor,
+                              unlocks: Unlocks = .all) -> [GameConfig.Shop.Item] {
         // Every gear tab's offer, gathered - there are two of them now, one per
         // ladder, and the callers that want "what could this actor climb next"
         // want both. The bots buy the cheaper of them and the quick prompt offers
         // the same, so neither had to learn that the shop was reorganised.
         GameConfig.Shop.tabs.indices.flatMap { index -> [GameConfig.Shop.Item] in
             guard case .upgrades = GameConfig.Shop.tabs[index].stock else { return [] }
-            return offers(on: index, for: actor)
+            return offers(on: index, for: actor, unlocks: unlocks)
         }
     }
 
@@ -65,23 +66,30 @@ enum ShopSystem {
     /// step up from whatever you are wearing, so the cards change as you climb and
     /// nobody is shown four tiers they cannot reach yet. Empty once you are wearing
     /// the best there is.
-    static func offers(on tab: Int, for actor: Actor) -> [GameConfig.Shop.Item] {
+    ///
+    /// - Parameter unlocks: what this match has. The ladders stop at Mythical
+    ///   until Cosmic is unlocked, and nothing locked is put on a shelf.
+    static func offers(on tab: Int, for actor: Actor,
+                       unlocks: Unlocks = .all) -> [GameConfig.Shop.Item] {
         guard GameConfig.Shop.tabs.indices.contains(tab) else { return [] }
 
         switch GameConfig.Shop.tabs[tab].stock {
         case .shelf(let items):
-            return items
+            return items.filter { unlocks.allows($0.type) }
 
 
         case .upgrades:
             var offers: [GameConfig.Shop.Item] = []
 
-            if let next = nextTier(above: actor.helmet, in: HelmetTier.allCases),
+            let helmets = HelmetTier.allCases.filter { unlocks.allows(.helmet($0)) }
+            let blasters = BlasterTier.allCases.filter { unlocks.allows(.blaster($0)) }
+
+            if let next = nextTier(above: actor.helmet, in: helmets),
                let price = GameConfig.Shop.helmetPrices[next] {
                 offers.append(.init(type: .helmet(next), price: price))
             }
 
-            if let next = nextTier(above: actor.blaster, in: BlasterTier.allCases),
+            if let next = nextTier(above: actor.blaster, in: blasters),
                let price = GameConfig.Shop.blasterPrices[next] {
                 offers.append(.init(type: .blaster(next), price: price))
             }
@@ -100,8 +108,9 @@ enum ShopSystem {
     /// Shorter than the full catalogue when a ladder has run out: somebody wearing
     /// the best helmet in the game is offered three things, not three things and a
     /// blank.
-    static func everythingOffered(to actor: Actor) -> [GameConfig.Shop.Item] {
-        GameConfig.Shop.tabs.indices.flatMap { offers(on: $0, for: actor) }
+    static func everythingOffered(to actor: Actor,
+                                  unlocks: Unlocks = .all) -> [GameConfig.Shop.Item] {
+        GameConfig.Shop.tabs.indices.flatMap { offers(on: $0, for: actor, unlocks: unlocks) }
     }
 
     /// The next rung up, or nil at the top.
@@ -116,7 +125,8 @@ enum ShopSystem {
     /// Whether this actor could buy this right now. The purchase itself asks this,
     /// and so does the tap, so nothing is ever charged for something it cannot have.
     static func canBuy(_ type: ItemType, actor: Actor, in world: World) -> Bool {
-        guard actor.isAlive, let price = price(of: type) else { return false }
+        guard actor.isAlive, world.unlocks.allows(type),
+              let price = price(of: type) else { return false }
         guard actor.tokens >= price, actor.canAcquire(type) else { return false }
         return !isSoldOut(type, actor: actor, in: world)
     }
@@ -216,7 +226,7 @@ enum ShopSystem {
         // Otherwise the ladder, cheapest rung first. This is the purchase people
         // forget - healing is remembered because bleeding is loud, and a rung is
         // remembered only if something says so.
-        if let rung = upgradeOffers(for: actor)
+        if let rung = upgradeOffers(for: actor, unlocks: world.unlocks)
             .filter({ canBuy($0.type, actor: actor, in: world) })
             .min(by: { $0.price < $1.price }) {
             return rung

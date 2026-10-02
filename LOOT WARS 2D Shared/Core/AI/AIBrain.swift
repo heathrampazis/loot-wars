@@ -45,6 +45,9 @@ enum AIBrain {
         state.fightCooldown = max(0, state.fightCooldown - dt)
         state.decisionTimer -= dt
 
+        let carryingPerk = actor.inventory.slots.contains { $0?.type.perk != nil }
+        state.perkHeldFor = carryingPerk ? state.perkHeldFor + dt : 0
+
         // Being shot at cancels giving up. Walking away from somebody you cannot
         // reach is sensible; ignoring somebody who is hitting you is not.
         if actor.secondsSinceHit < GameConfig.AI.combatRecency {
@@ -161,7 +164,7 @@ enum AIBrain {
         // Before reaching for a bandage, because that is the order a player uses
         // them in: the perk is what you spend when the fight is still on, the
         // bandage is what you spend when it is over.
-        if let slot = perkToUse(state: state, actor: actor) {
+        if let slot = perkToUse(state: state, actor: actor, in: world) {
             commands.append(.useItem(slot: slot))
         }
 
@@ -2091,7 +2094,7 @@ enum AIBrain {
     /// it. worthBuying does the "has it actually run out" half, so both kinds of
     /// purchase are decided in the same place.
     private static func healingToBuy(actor: Actor, in world: World) -> ItemType? {
-        ShopSystem.everythingOffered(to: actor)
+        ShopSystem.everythingOffered(to: actor, unlocks: world.unlocks)
             .filter { offer in
                 switch offer.type {
                 case .bandage, .medkit: return true
@@ -2105,7 +2108,7 @@ enum AIBrain {
     }
 
     private static func upgradeToBuy(actor: Actor, in world: World) -> ItemType? {
-        ShopSystem.upgradeOffers(for: actor)
+        ShopSystem.upgradeOffers(for: actor, unlocks: world.unlocks)
             .filter { worthBuying($0.type, for: actor, in: world)
                       && ShopSystem.canBuy($0.type, actor: actor, in: world) }
             .min { $0.price < $1.price }?
@@ -2586,17 +2589,69 @@ enum AIBrain {
     ///
     /// No cooldown timer of its own. Holding two perks at once is already rare, and
     /// Actor.canUse refuses the second while the first runs.
-    private static func perkToUse(state: AIState, actor: Actor) -> Int? {
-        // In it, rather than merely scratched at some point in the past.
-        guard state.goal.isFight
-                || actor.secondsSinceHit < GameConfig.AI.combatRecency else { return nil }
-
-        for (index, slot) in actor.inventory.slots.enumerated() {
-            guard let stack = slot, stack.type.perk != nil,
-                  actor.canUse(slot: index) else { continue }
-
-            return index
+    ///
+    /// Fighting was the whole answer, and it was too narrow: a bot only drank once
+    /// it was already being shot, so most perks were either drunk too late to
+    /// matter or carried until the bot died. Each perk now has its own moments, the
+    /// ones a player would pick:
+    ///
+    ///   - any of them, in a fight or with an enemy close enough to start one
+    ///   - Strength, Resistance and the disco ball on the way into a raid, once
+    ///     the target base is close
+    ///   - Resistance when defending its own base or contesting a supply drop
+    ///   - Speed on a supply run, in retreat, or heading off on a raid
+    ///   - Regeneration whenever it is hurt enough to want healing
+    ///   - and anything carried longer than AI.perkPatience, whatever is going on
+    private static func perkToUse(state: AIState, actor: Actor, in world: World) -> Int? {
+        let held = actor.inventory.slots.enumerated().compactMap { index, slot -> (Int, Perk)? in
+            guard let perk = slot?.type.perk, actor.canUse(slot: index) else { return nil }
+            return (index, perk)
         }
+        guard !held.isEmpty else { return nil }
+
+        let fighting = state.goal.isFight
+            || actor.secondsSinceHit < GameConfig.AI.combatRecency
+        let enemyClose = nearestVisibleEnemy(to: actor, in: world).map {
+            ($0.position - actor.position).length <= GameConfig.AI.perkEnemyRange
+        } ?? false
+        let hurt = Double(actor.health)
+            < Double(actor.maxHealth) * GameConfig.AI.perkRegenBelow
+
+        // Close to the base it is raiding: inside its claim, or nearly.
+        let atRaid: Bool = {
+            guard state.goal.isRaiding, let victim = base(of: state.goal, in: world),
+                  let claim = world.claim(for: victim) else { return false }
+            return (claim.centreTile.center - actor.position).length
+                <= Double(claim.size) * 0.9
+        }()
+        let raidingFar = state.goal.isRaiding && !atRaid
+
+        let supplyRun = isSupplyRun(state.goal, in: world)
+        let retreating = state.goal.isRetreat
+        let defending: Bool = {
+            if case .defend = state.goal { return true }
+            return false
+        }()
+
+        func wanted(_ perk: Perk) -> Bool {
+            switch perk {
+            case .overdrive:
+                return fighting || enemyClose || atRaid || supplyRun
+            case .strength:
+                return fighting || enemyClose || atRaid
+            case .resistance:
+                return fighting || enemyClose || atRaid || defending || supplyRun
+            case .speed:
+                return fighting || supplyRun || retreating || raidingFar
+            case .regeneration:
+                return hurt || (fighting && actor.health < actor.maxHealth)
+            }
+        }
+
+        if let pick = held.first(where: { wanted($0.1) }) { return pick.0 }
+
+        // Carried too long without a moment for it: use it now.
+        if state.perkHeldFor >= GameConfig.AI.perkPatience { return held[0].0 }
 
         return nil
     }

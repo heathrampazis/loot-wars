@@ -43,7 +43,8 @@ enum LootSystem {
                 if box.supply {
                     world.award(GameConfig.SupplyDrop.score, to: actor.team)
                     world.awardTokens(GameConfig.SupplyDrop.tokens, to: id)
-                    world.spawnGroundItem(SupplyDropSystem.roll(using: &world.rng),
+                    world.spawnGroundItem(SupplyDropSystem.roll(unlocks: world.unlocks,
+                                                                using: &world.rng),
                                           at: box.position)
                     world.record(.supplyDropOpened(at: box.position))
                     break
@@ -63,6 +64,7 @@ enum LootSystem {
                 let pickup = LootTable.roll(bombShare: world.bombShare,
                                             at: world.matchProgress,
                                             rare: rare,
+                                            unlocks: world.unlocks,
                                             using: &world.rng)
                 world.spawnGroundItem(pickup, at: box.position)
 
