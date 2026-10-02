@@ -253,6 +253,9 @@ final class GameScene: SKScene {
     /// while holding one, and every touch of the stick became a committed throw
     /// with no way to change your mind - including touches you did not mean, since
     /// a cancelled gesture releases exactly like a deliberate one.
+    /// Heals with the best thing you carry - see HealButtonNode.
+    private let healButton = HealButtonNode()
+
     private let throwButton = ActionButtonNode(glyph: Glyphs.lootbox,
                                                radius: 40, grabRadius: 48)
 
@@ -289,6 +292,15 @@ final class GameScene: SKScene {
         return slot
     }
 
+    /// The slot holding a heal that has been picked out, if one is. The button
+    /// above the corner heals with it - see quickAction.
+    private var healingSlot: Int? {
+        guard let slot = selectedSlot,
+              world?.localPlayer?.inventory.stack(at: slot)?.type.isHealing == true
+        else { return nil }
+        return slot
+    }
+
     /// How far into a match the drop hint will still offer itself. The opening
     /// third, and no later.
     private static let hintWindow: Double = 0.35
@@ -310,6 +322,7 @@ final class GameScene: SKScene {
     private var moveTouch: UITouch?
     private var aimTouch: UITouch?
     private var throwTouch: UITouch?
+    private var healTouch: UITouch?
     private var openTouch: UITouch?
 
     /// The finger aiming something onto the map.
@@ -456,6 +469,8 @@ final class GameScene: SKScene {
         openButton.isHidden = true
         cameraController.node.addChild(throwButton)
         throwButton.isHidden = true
+        cameraController.node.addChild(healButton)
+        healButton.isHidden = true
 
         cameraController.node.addChild(leaderboard)
         cameraController.node.addChild(matchPanel)
@@ -655,9 +670,13 @@ final class GameScene: SKScene {
         // throw a bomb instead. So the centres must stay further apart than
         // 48 + 62 = 110, and moving right buys some of that distance back - which
         // is what lets it come down as far as it has.
+        //
+        // The heal button shares the spot. Only one of the two is ever up - see
+        // quickAction - so the thumb always goes to the same place.
         throwButton.position = CGPoint(
             x: aimStick.position.x + side * (JoystickNode.baseRadius - 40),
             y: aimStick.position.y + 115)
+        healButton.position = throwButton.position
 
         // Generously oversized rather than exactly the screen: the camera can be
         // mid-shake when this plays, and a rectangle cut to the glass would show a
@@ -843,7 +862,7 @@ final class GameScene: SKScene {
         hotbar.setSelected(shopPanel.isOpen ? nil : selectedSlot)
 
         updateRightControl(with: world)
-        updateThrowButton(with: world)
+        updateQuickButton(with: world)
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
         updateHint(with: world)
@@ -1453,6 +1472,7 @@ final class GameScene: SKScene {
         aimStick.end()
         openButton.isHidden = true
         throwButton.isHidden = true
+        healButton.isHidden = true
         hotbar.isHidden = true
         respawnBanner.isHidden = true
         killBanner.dismiss()
@@ -1462,39 +1482,143 @@ final class GameScene: SKScene {
         aimTouch = nil
         openTouch = nil
         throwTouch = nil
+        healTouch = nil
         pending = nil
         #endif
     }
 
-    /// Shows the throwable in hand, or nothing.
+    /// What the button above the corner is offering.
+    private enum QuickAction: Equatable {
+        case none
+        /// The best heal for the damage taken; green when you are hurt enough
+        /// that healing is the right call.
+        case heal(slot: Int, recommended: Bool)
+        /// A throw along your aim; green when that aim is on an enemy wall in
+        /// range.
+        case throwBomb(slot: Int, onTarget: Bool)
+    }
+
+    /// One button, one spot, and whichever job matters most right now - so there
+    /// is never a second thing to find mid-fight. In order:
     ///
-    /// Deliberately not folded into updateRightControl. That one guards against
-    /// swapping the corner under a thumb, and those guards do not apply here: this
-    /// button never swaps places with anything, so it can answer honestly every
-    /// frame.
+    ///   1. A bomb or a heal you picked out of the hotbar. You chose it; it
+    ///      stays. A heal goes green when you are hurt enough to need it.
+    ///   2. A heal, once you are below Player.tapHealBelow - green.
+    ///   3. A bomb in your bag, while your aim is on an enemy wall in range -
+    ///      green. Nothing to pick out: line up on a wall and the button is there.
+    ///   4. A heal, if you are hurt at all.
+    ///   5. Nothing: the button goes away.
+    private func quickAction(for player: Actor, in world: World) -> QuickAction {
+        guard player.isAlive else { return .none }
+
+        let onWall = GameScene.aimingAtEnemyWall(player, in: world)
+
+        if let slot = throwingSlot {
+            return .throwBomb(slot: slot, onTarget: onWall)
+        }
+
+        let heal = ConsumableSystem.bestHeal(for: player)
+        let urgent = Double(player.health)
+            < Double(player.maxHealth) * GameConfig.Player.tapHealBelow
+
+        if let slot = healingSlot {
+            return .heal(slot: slot, recommended: urgent && player.canUse(slot: slot))
+        }
+
+        if urgent, let slot = heal {
+            return .heal(slot: slot, recommended: true)
+        }
+
+        if onWall, let slot = BombSystem.loadedSlot(of: player),
+           BombSystem.canThrow(player, from: slot) {
+            return .throwBomb(slot: slot, onTarget: true)
+        }
+
+        if let slot = heal {
+            return .heal(slot: slot, recommended: false)
+        }
+
+        return .none
+    }
+
+    /// Whether a bomb thrown now, along the way you are pointing, would land on
+    /// somebody else's wall.
     ///
-    /// No cache on visibility, only on the glyph - which is the one thing here that
-    /// is costly to change. Re-applying isHidden every frame from what is wanted
-    /// right now is what makes it impossible for the node and a cache to disagree.
-    private func updateThrowButton(with world: World) {
-        guard !world.isOver,
-              chestPanel.openChest == nil,
-              !shopPanel.isOpen,
-              let slot = throwingSlot,
-              let stack = world.localPlayer?.inventory.stack(at: slot) else {
-            guard !throwButton.isHidden else { return }
+    /// Walks the throw's path the way BombSystem flies it: the first solid thing
+    /// it meets is what it hits, so a tree or your own wall in the way is a no.
+    /// Out to the throw's full range, from where the bomb leaves the hand.
+    private static func aimingAtEnemyWall(_ player: Actor, in world: World) -> Bool {
+        let heading = player.aim.normalized()
+        guard heading.length > 0 else { return false }
+
+        let start = player.position + heading * GameConfig.Bomb.launchOffset
+        let step = 0.2
+        var travelled = 0.0
+
+        while travelled <= GameConfig.Bomb.throwRange {
+            let point = start + heading * travelled
+            let tile = GridPoint(containing: point)
+
+            if let owner = world.map[tile].blockOwner {
+                return owner != player.team
+            }
+            if world.map.isOccupied(tile) || world.treeTiles.contains(tile) {
+                return false
+            }
+            travelled += step
+        }
+        return false
+    }
+
+    /// What the button is showing, held so a press does what it showed.
+    private var shownQuickAction: QuickAction = .none
+
+    /// Puts the right one of the two buttons up, or neither.
+    ///
+    /// Not swapped while a finger is on either - the thumb gets what it pressed.
+    private func updateQuickButton(with world: World) {
+        let wanted: QuickAction
+        if world.isOver || chestPanel.openChest != nil || shopPanel.isOpen {
+            wanted = .none
+        } else if healTouch != nil || throwTouch != nil {
+            wanted = shownQuickAction
+        } else if let player = world.localPlayer {
+            wanted = quickAction(for: player, in: world)
+        } else {
+            wanted = .none
+        }
+        shownQuickAction = wanted
+
+        switch wanted {
+        case .throwBomb(let slot, let onTarget):
+            if let stack = world.localPlayer?.inventory.stack(at: slot),
+               throwGlyph != stack.type {
+                throwGlyph = stack.type
+                throwButton.setGlyph(ItemArt.texture(for: stack.type))
+            }
+            throwButton.setHighlighted(onTarget)
+            throwButton.isHidden = false
+
+        case .heal(let slot, let recommended):
+            if let stack = world.localPlayer?.inventory.stack(at: slot) {
+                healButton.show(stack.type, recommended: recommended)
+            }
+            healButton.isHidden = false
+
+        case .none:
+            break
+        }
+
+        if case .throwBomb = wanted {} else if !throwButton.isHidden {
             throwButton.isHidden = true
             throwButton.end()
             throwGlyph = nil
-            return
         }
 
-        if throwGlyph != stack.type {
-            throwGlyph = stack.type
-            throwButton.setGlyph(ItemArt.texture(for: stack.type))
+        if case .heal = wanted {} else if !healButton.isHidden {
+            healButton.isHidden = true
+            healButton.end()
         }
-
-        throwButton.isHidden = false
     }
 
     // GONE WITH THE OLD VERSION OF THAT BUTTON: the two helpers that used to put a
@@ -1609,6 +1733,24 @@ extension GameScene {
             // button sits inside the stick's 120pt grab circle, so offering the
             // stick first would swallow every press aimed at it. Small precise
             // targets beat large forgiving ones; the stick loses nothing it needs.
+            // The heal button, ahead of the stick for the same reason.
+            if healTouch == nil, !healButton.isHidden,
+               healButton.begin(atLocalPoint: touch.location(in: healButton)) {
+                healTouch = touch
+
+                // On PRESS, like the throw: a heal that waits for the finger to
+                // lift is a heal a fraction late.
+                if case .heal(let slot, _) = shownQuickAction,
+                   let player = world.localPlayer, player.canUse(slot: slot) {
+                    queuedCommands.append(.useItem(slot: slot))
+                    hotbar.acknowledge(slot)
+                } else {
+                    healButton.refuse()
+                    SoundPlayer.shared.play(.error)
+                }
+                continue
+            }
+
             if throwTouch == nil, !throwButton.isHidden,
                throwButton.begin(atLocalPoint: touch.location(in: throwButton)) {
                 throwTouch = touch
@@ -1616,7 +1758,7 @@ extension GameScene {
                 // A one-shot action, so it fires on PRESS, along the aim you are
                 // holding. Next to a chest or crate the corner offers that instead
                 // of the stick, and the throw goes along your last aim.
-                if let slot = throwingSlot {
+                if case .throwBomb(let slot, _) = shownQuickAction {
                     queuedCommands.append(.useItem(slot: slot))
                     hotbar.acknowledge(slot)
                 }
@@ -1878,6 +2020,11 @@ extension GameScene {
             throwTouch = nil
         }
 
+        if let active = healTouch, touches.contains(active) {
+            healButton.end()
+            healTouch = nil
+        }
+
         if let active = openTouch, touches.contains(active) {
             openButton.end()
             openTouch = nil
@@ -1970,6 +2117,27 @@ extension GameScene {
         // no selecting any more, so a tap on a bandage at full health would throw
         // it away, and the one answer both the hotbar and the simulation give is
         // the right one again.
+        // A bandage or a medkit. Badly hurt, it goes at once - the tap you make
+        // when there is no time. Otherwise it is PICKED OUT: ready on the button
+        // above the corner, a thumb's move from the aim stick, for whenever you
+        // want it. Picking one out is allowed at full health too, which is the
+        // point of "ready".
+        if stack.type.isHealing {
+            let low = Double(player.health)
+                < Double(player.maxHealth) * GameConfig.Player.instantHealBelow
+
+            if low, player.canUse(slot: slot) {
+                queuedCommands.append(.useItem(slot: slot))
+                hotbar.acknowledge(slot)
+                selectedSlot = nil
+                return
+            }
+
+            SoundPlayer.shared.play(.tap)
+            selectedSlot = (selectedSlot == slot) ? nil : slot
+            return
+        }
+
         guard player.canUse(slot: slot) else {
             SoundPlayer.shared.play(.error)
             hotbar.refuse(slot: slot, saying: GameScene.refusal(for: stack.type))

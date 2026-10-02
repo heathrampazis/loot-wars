@@ -39,6 +39,7 @@ final class ActionButtonNode: SKNode {
 
     private(set) var isPressed = false
     private(set) var isEnabled = true
+    private(set) var isHighlighted = false
 
     init(glyph texture: SKTexture,
          radius: CGFloat = 62,
@@ -97,6 +98,33 @@ final class ActionButtonNode: SKNode {
     /// Drawn faint when the simulation would refuse the press, exactly as a hotbar
     /// slot greys out - so a button you can see but not use looks the part rather
     /// than looking broken.
+    /// Green: the button is recommending itself - a heal you should take, a bomb
+    /// lined up on a wall. A bright green rim round the usual see-through disc,
+    /// and the disc breathes gently while it stays green, so it reads as "press
+    /// me" rather than as a colour change.
+    func setHighlighted(_ on: Bool) {
+        guard on != isHighlighted else { return }
+        isHighlighted = on
+        base.strokeColor = on ? RenderPalette.recommend : .clear
+        base.lineWidth = on ? 4 : 0
+        glyph.alpha = on ? 1 : 0.85
+
+        // The breathing is on the disc alone: the whole button's scale belongs to
+        // the press, and the art staying still keeps it easy to read.
+        base.removeAction(forKey: "invite")
+        base.setScale(1)
+        guard on else { return }
+
+        base.run(.sequence([
+            .scale(to: 1.14, duration: 0.1),
+            .scale(to: 1, duration: 0.12),
+            .repeatForever(.sequence([
+                .scale(to: 1.07, duration: 0.55),
+                .scale(to: 1, duration: 0.55)
+            ]))
+        ]), withKey: "invite")
+    }
+
     func setEnabled(_ enabled: Bool) {
         guard enabled != isEnabled else { return }
         isEnabled = enabled
