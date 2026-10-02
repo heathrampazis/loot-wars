@@ -18,6 +18,10 @@ enum MovementSystem {
             let speed = GameConfig.Player.moveSpeed * actor.speedMultiplier
             let step = actor.moveInput.clampedToUnit() * (speed * dt)
 
+            // Where this tick started, which was a legal place to stand. Kept
+            // so a tick that cannot be resolved can simply not happen.
+            let start = actor.position
+
             // One axis at a time. Moving both at once and then resolving makes
             // actors snag on the seam between two tiles.
             actor.position.x += step.x
@@ -29,38 +33,102 @@ enum MovementSystem {
             // Trees are circles, so they are resolved after the grid, by pushing
             // straight back out along the surface normal. That is what gives you
             // the smooth slide around a clump instead of catching on a corner.
-            resolveTrees(&actor, in: world.trees)
+            //
+            // Twice, because clumps can sit side by side: pushing out of one can
+            // land you in the edge of the next, and a single pass left that for
+            // the next tick to fix with a jolt.
+            var pinned = false
+            for _ in 0..<2 where !pinned {
+                pinned = !resolveTrees(&actor, in: world)
+            }
+
+            // Squeezed between a tree and a wall, with no way out of the tree
+            // that is not into the wall: the step is not taken at all. Letting it
+            // through left the actor sunk into the tree a little further each
+            // tick, until some later push freed it all at once in a jump.
+            if pinned { actor.position = start }
+
             resolveStructures(&actor, in: world)
 
             world.actors[id] = actor
         }
     }
 
-    private static func resolveTrees(_ actor: inout Actor, in trees: [TreePatch]) {
-        for tree in trees {
+    /// Pushes the actor out of every clump it overlaps. False if one of them
+    /// could not be got out of without going into a wall.
+    private static func resolveTrees(_ actor: inout Actor, in world: World) -> Bool {
+        for tree in world.trees {
             // Nearest point on the actor's box to the centre of the clump.
             let closest = actor.hitbox.closestPoint(to: tree.centre)
 
-            var normal = closest - tree.centre
-            var distance = normal.length
+            let normal = closest - tree.centre
+            let distance = normal.length
 
             guard distance < tree.radius else { continue }
 
-            if distance < 0.0001 {
+            let push: Vec2
+            if distance > 0.0001 {
+                push = normal * ((tree.radius - distance) / distance)
+            } else {
                 // The clump's centre is inside the actor's box, so there is no
-                // surface normal to use. Push away from the centre instead; it
-                // untangles over the next tick or two.
-                normal = actor.position - tree.centre
-                distance = normal.length
-                if distance < 0.0001 {
-                    normal = Vec2(x: 0, y: 1)
-                    distance = 0.0001
-                }
+                // surface normal to use. This used to push away from the centre
+                // by a guess and leave the rest for later ticks, which is the
+                // jump backwards: the box is separated properly instead, along
+                // whichever axis gets it clear with the shorter move.
+                push = separation(of: actor, from: tree)
             }
 
-            let push = (tree.radius - distance) / distance
-            actor.position = actor.position + normal * push
+            guard nudge(&actor, by: push, out: tree, in: world.map) else { return false }
         }
+        return true
+    }
+
+    /// The shortest axis-aligned move that takes the actor's whole box clear of a
+    /// clump whose centre has ended up inside it.
+    private static func separation(of actor: Actor, from tree: TreePatch) -> Vec2 {
+        let away = actor.position - tree.centre
+        let clearX = GameConfig.Player.halfWidth + tree.radius - abs(away.x)
+        let clearY = GameConfig.Player.halfDepth + tree.radius - abs(away.y)
+
+        if clearX < clearY {
+            return Vec2(x: away.x < 0 ? -clearX : clearX, y: 0)
+        }
+        return Vec2(x: 0, y: away.y < 0 ? -clearY : clearY)
+    }
+
+    /// Moves the actor by a push, but never into a wall.
+    ///
+    /// A tree beside a wall used to push straight into it, and the wall's own
+    /// resolve - which assumed anything solid you overlap is something you just
+    /// walked into - then threw you out of its FAR side. At the edge of the map
+    /// the far side is more stone, so each tick threw you another tile out, which
+    /// is the flight off the map. So a push that would end in a wall is cut down:
+    /// the whole push if that is clear, otherwise just the part along the wall -
+    /// and only if it actually gets the actor out of the tree. Otherwise it
+    /// reports that the actor is pinned, and the tick's step is undone.
+    private static func nudge(_ actor: inout Actor,
+                              by push: Vec2,
+                              out tree: TreePatch,
+                              in map: TileMap) -> Bool {
+        let start = actor.position
+        let options = [start + push,
+                       Vec2(x: start.x + push.x, y: start.y),
+                       Vec2(x: start.x, y: start.y + push.y)]
+
+        for spot in options
+        where !overlapsWall(at: spot, for: actor.team, in: map) && isClear(of: tree, at: spot) {
+            actor.position = spot
+            return true
+        }
+        return false
+    }
+
+    /// Whether an actor standing here is out of this clump, to within a hair.
+    private static func isClear(of tree: TreePatch, at position: Vec2) -> Bool {
+        let box = Box(centre: position,
+                      size: Vec2(x: GameConfig.Player.halfWidth * 2,
+                                 y: GameConfig.Player.halfDepth * 2))
+        return (box.closestPoint(to: tree.centre) - tree.centre).length >= tree.radius - 0.001
     }
 
     /// Crates and arcade machines are both boxes, and both push out of the way the
@@ -157,6 +225,12 @@ enum MovementSystem {
 
     /// Pushes the actor back out of anything solid it just moved into.
     /// What counts as solid depends on the actor's team - your own walls do not.
+    ///
+    /// Only tiles that were AHEAD of the actor before this step count. The old
+    /// version took every solid tile it found overlapping and put the actor on
+    /// the far side of it in the direction of travel - correct for a wall you
+    /// walk into, and a teleport for one you were already touching from behind.
+    /// Anything left overlapping from before is now simply walked out of.
     private static func resolve(_ actor: inout Actor, in map: TileMap, along axis: Axis, delta: Double) {
         guard delta != 0 else { return }
 
@@ -168,6 +242,14 @@ enum MovementSystem {
         // A hair of margin so the actor rests just outside the tile rather than
         // exactly on its edge, where floating point would flip-flop.
         let margin = 0.0001
+
+        // How far a face may sit behind the leading edge and still count as
+        // ahead. Generous next to the margin above, so an actor resting against a
+        // wall still stops at it.
+        let tolerance = 0.001
+
+        // Where the actor was on this axis before the step.
+        let before = (axis == .horizontal ? actor.position.x : actor.position.y) - delta
 
         let minCol = Int(floor(actor.position.x - halfWidth))
         let maxCol = Int(floor(actor.position.x + halfWidth))
@@ -181,13 +263,25 @@ enum MovementSystem {
 
                 switch axis {
                 case .horizontal:
-                    actor.position.x = delta > 0
-                        ? Double(col) - halfWidth - margin
-                        : Double(col + 1) + halfWidth + margin
+                    if delta > 0 {
+                        let face = Double(col)
+                        guard face >= before + halfWidth - tolerance else { continue }
+                        actor.position.x = min(actor.position.x, face - halfWidth - margin)
+                    } else {
+                        let face = Double(col + 1)
+                        guard face <= before - halfWidth + tolerance else { continue }
+                        actor.position.x = max(actor.position.x, face + halfWidth + margin)
+                    }
                 case .vertical:
-                    actor.position.y = delta > 0
-                        ? Double(row) - halfDepth - margin
-                        : Double(row + 1) + halfDepth + margin
+                    if delta > 0 {
+                        let face = Double(row)
+                        guard face >= before + halfDepth - tolerance else { continue }
+                        actor.position.y = min(actor.position.y, face - halfDepth - margin)
+                    } else {
+                        let face = Double(row + 1)
+                        guard face <= before - halfDepth + tolerance else { continue }
+                        actor.position.y = max(actor.position.y, face + halfDepth + margin)
+                    }
                 }
             }
         }
