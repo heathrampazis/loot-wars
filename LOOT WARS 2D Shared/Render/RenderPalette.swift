@@ -267,6 +267,21 @@ enum RenderPalette {
         rarities[min(rarity.rawValue, rarities.count - 1)]
     }
 
+    /// The rarity colour as the interface's slot PLATES wear it - the tile behind
+    /// an item in the hotbar. Glows keep colour(of:): a dark glow read as a smudge.
+    ///
+    /// The same ladder except for the bottom rung. The pale steel that is right on
+    /// the grass - quiet, barely there - turned a common item's slot into a light
+    /// grey tile, which on a bar of see-through black read as the odd one out
+    /// rather than the least of them. In the interface Common is a dark slate
+    /// instead, so its slot reads as the same smoked black as the rest of the HUD
+    /// with an edge, and everything above it still lights up in its colour.
+    static func interfaceColour(of rarity: Rarity) -> SKColor {
+        rarity == .common ? commonInterface : colour(of: rarity)
+    }
+
+    private static let commonInterface = rgb(0x3A, 0x41, 0x4A)
+
     /// Stink gas. A sickly yellow-green rather than a clean one, because the map
     /// is already made of clean greens - a cloud in the same family as the grass
     /// would read as terrain, and this has to read as something you do not walk
