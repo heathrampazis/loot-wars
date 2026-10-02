@@ -433,13 +433,16 @@ final class ItemSlotNode: SKNode {
             return
         }
 
-        let colour = RenderPalette.colour(of: stack.type.rarity)
+        // The plate in the interface's dark slate for a common item, the glow in
+        // the rarity's own colour - a smoked tile with a soft light in it, rather
+        // than a light grey tile or a dark smudge. See RenderPalette.interfaceColour.
+        let plate = RenderPalette.interfaceColour(of: stack.type.rarity)
         rarityPlate.isHidden = false
-        rarityPlate.fillColor = colour.withAlphaComponent(0.5)
-        rarityPlate.strokeColor = colour
+        rarityPlate.fillColor = plate.withAlphaComponent(0.5)
+        rarityPlate.strokeColor = plate
 
         glow.isHidden = false
-        glow.color = colour
+        glow.color = RenderPalette.colour(of: stack.type.rarity)
         glow.alpha = 0.95
         breathe(for: stack.type.rarity)
 

@@ -56,8 +56,11 @@ enum GameConfig {
         /// the actual prize.
         static let rareLootboxOpened = 25
 
-        /// Per wall. Small on purpose: forty of them is a base, not a strategy.
-        static let wallPlaced = 2
+        /// Per wall: nothing (Oct 2026). Laying walls is how you protect your
+        /// points, not a way to earn them - it was a trickle anybody could farm by
+        /// building, so the score now only moves for doing something to somebody.
+        /// Finishing a base still pays (Base.sealed, Base.resealed).
+        static let wallPlaced = 0
 
         /// Blowing a hole in somebody else's. Their wall cost them two points to
         /// put up; taking it down costs you a bomb and puts you somewhere dangerous.
@@ -1042,7 +1045,12 @@ enum GameConfig {
         /// fights and the fights buy tokens - and a ladder started at a hundred
         /// seconds has the rest of the match to pay itself back. Started at a
         /// hundred and fifty it mostly does not.
-        static let buysAnythingAfter: Double = 0.33
+        ///
+        /// 0.15 now (Oct 2026, "the player wins every game"): bots were still in
+        /// starter kit for the first minute and a half of a match, which is where
+        /// the player's lead was being built. Gear compounds, so starting the ladder
+        /// earlier is most of what makes a bot a fight in the first half.
+        static let buysAnythingAfter: Double = 0.15
 
         /// How little healing a bot has to be carrying before it buys some.
         ///
@@ -1086,7 +1094,10 @@ enum GameConfig {
         ///
         /// Down again to 26, with the raid urge below. Bases now have turrets that
         /// hit back, so fewer raids land; the supply line has to keep up.
-        static let bombSupplyInterval: Double = 26
+        ///
+        /// 20 now, with the raid urge below: bots raiding more is how they score
+        /// more, and an urge with no bomb behind it buys nothing.
+        static let bombSupplyInterval: Double = 20
 
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
@@ -1178,7 +1189,11 @@ enum GameConfig {
         /// with. Doubling a bot's accuracy does not make a game harder, it makes it
         /// unfair - the player still has to be able to cross open ground - and the
         /// same is true in reverse, so this is a third off rather than a half.
-        static let aimSpread: Double = 1.3
+        ///
+        /// 1.05 now (Oct 2026): the player was winning every match with little
+        /// competition. That puts an aim-limited hit rate at about 43%, up from 35% -
+        /// sharper, still short of the 54% that made every exchange a loss.
+        static let aimSpread: Double = 1.05
 
         /// Chance, at each change of mind, that a bot reverses the way it is
         /// circling. Never reversing reads as a machine on rails; reversing every
@@ -1189,7 +1204,9 @@ enum GameConfig {
         /// Quicker off the mark, by about a fifth. Enough that walking round a
         /// corner into somebody is no longer a free first shot, not so quick that
         /// they stop feeling like people.
-        static let reactionDelay: ClosedRange<Double> = 0.2...0.4
+        ///
+        /// 0.15...0.3 now, about a quarter quicker again, with the aim above.
+        static let reactionDelay: ClosedRange<Double> = 0.15...0.3
 
         /// Below this share of its health, a bot breaks off and runs for home -
         /// but only while an enemy is actually near. Once it is safe it gets back
@@ -1338,13 +1355,18 @@ enum GameConfig {
         /// match - see leaderRush. The complaint was that the player was never
         /// raided at all, and a clock this slow meant most bots got four or five
         /// goes a match, most of which went on each other.
-        static let raidUrgeInterval: ClosedRange<Double> = 20...36
+        ///
+        /// 14...26 now. Raids are where points are, and a bot that raids twice as
+        /// often scores like it - which is what keeps the scoreboard a contest
+        /// rather than the player against seven bots on 400.
+        static let raidUrgeInterval: ClosedRange<Double> = 14...26
 
         /// How far a bot will travel for an enemy chest it could get at.
         ///
         /// Longer than raidRange, because this one is worth the walk: a chest with
         /// something in it is the only thing on the map that repays crossing it.
-        static let robRange: Double = 40
+        /// 48 now, so more bases are in reach of more bots.
+        static let robRange: Double = 48
 
         /// How long a bot keeps coming back to a base it has started on.
         ///
@@ -1409,7 +1431,9 @@ enum GameConfig {
         /// What a base has to be worth before a bot will cross the map to open it
         /// rather than get on with the match. Above a single item, so a lone
         /// bandage behind a wall is not a reason to go anywhere.
-        static let raidWorthOpening = 15
+        /// 10 now: the wall alone (breachWorth) clears it, so any sealed base is a
+        /// raid worth having.
+        static let raidWorthOpening = 10
 
         /// What one bomb through a standing wall is worth going for.
         ///
@@ -1447,7 +1471,9 @@ enum GameConfig {
         ///
         /// 0.38 now, from 0.45: the hunting starts a little earlier in a runaway,
         /// while it is still a contest rather than a formality.
-        static let huntsLeaderAt: Double = 0.38
+        ///
+        /// 0.32 now, with leaderChaseAt: the ganging up starts sooner.
+        static let huntsLeaderAt: Double = 0.32
 
         /// How long between one bot's hunts.
         ///
@@ -1587,7 +1613,27 @@ enum GameConfig {
         /// worth crossing the map for and the team one point behind them worth
         /// ignoring - a coin toss on a scoreboard that moves in fifties. At 0.35 it
         /// is a judgement instead, and one nobody in an ordinary match ever trips.
-        static let leaderChaseAt: Double = 0.35
+        ///
+        /// 0.3 now, so a player pulling clear meets it earlier in the match.
+        static let leaderChaseAt: Double = 0.3
+
+        // MARK: - Ganging up on the leader
+
+        /// The most bots that will gang up on a runaway at once - raiding their
+        /// base together, or piling into a fight with them.
+        ///
+        /// Three, not seven. One bot at a time was never a threat to a good player;
+        /// seven at once is a mob and no fun. Two or three turning up together is a
+        /// fight you have to win rather than one you can wait out.
+        static let gangSize = 3
+
+        /// How close a bot has to be to a fight with the runaway to join it. It
+        /// hears the shooting and comes to it.
+        static let pileOnRange: Double = 20
+
+        /// How close a bot has to be to the runaway's base to join a raid another
+        /// bot has started on it.
+        static let raidPartyRange: Double = 50
 
         /// How much of its aim wobble a bot being left behind gets back.
         ///

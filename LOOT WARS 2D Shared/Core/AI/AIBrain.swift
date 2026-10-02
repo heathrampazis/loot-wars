@@ -400,10 +400,17 @@ enum AIBrain {
         // does not re-ask for the rest of the match. A fresh hunt also starts with
         // no mark, so it walks at the quarry's base until it sees them - see
         // AIState.huntMark.
-        if case .hunt = wanted, !isHunt(state.goal) {
+        if case .hunt(let id) = wanted, !isHunt(state.goal) {
             state.huntUrgeTimer = Double.random(in: GameConfig.AI.huntUrgeInterval,
                                                 using: &world.rng)
             state.huntMark = nil
+
+            // Joining a fight already going on: it heard the shooting, so it heads
+            // for the shooting rather than for their base - see pileOn.
+            if let quarry = world.actors[id],
+               gang(on: quarry, except: actor.id, in: world).fighting > 0 {
+                state.huntMark = quarry.position
+            }
         }
 
         if wanted != state.goal {
@@ -603,6 +610,18 @@ enum AIBrain {
         // defender who needed line of sight would be told about it after the raid.
         if let intruder = world.intruder(in: actor.team) {
             return .defend(intruder)
+        }
+
+        // Ganging up on whoever is running away with the match: joining a fight
+        // another bot has started with them, or a raid on their base. What turns
+        // one bot at a time - which a good player never noticed - into two or
+        // three at once.
+        if let joined = pileOn(for: actor, in: world) {
+            return joined
+        }
+
+        if let joined = raidParty(for: actor, in: world) {
+            return joined
         }
 
         // A supply drop within reach. This high on purpose: it is the one thing
@@ -1041,6 +1060,103 @@ enum AIBrain {
         }
 
         return best
+    }
+
+    // MARK: - Ganging up
+
+    /// The one actor on a team, alive. Sorted, because this picks a target.
+    private static func leader(of team: TeamID, in world: World) -> Actor? {
+        world.actors.keys.sorted(by: { $0.raw < $1.raw })
+            .compactMap { world.actors[$0] }
+            .first { $0.team == team && $0.isAlive }
+    }
+
+    /// How many OTHER bots are already after this actor: shooting at them, or on
+    /// their way to.
+    private static func gang(on quarry: Actor,
+                             except me: ActorID,
+                             in world: World) -> (fighting: Int, coming: Int) {
+        var fighting = 0
+        var coming = 0
+
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) where id != me {
+            guard let other = world.actors[id], other.isAlive,
+                  let goal = other.ai?.goal else { continue }
+
+            switch goal {
+            case .fight(let target) where target == quarry.id,
+                 .defend(let target) where target == quarry.id:
+                fighting += 1
+            case .hunt(let target) where target == quarry.id:
+                coming += 1
+            default:
+                break
+            }
+        }
+
+        return (fighting, coming)
+    }
+
+    /// Whether this bot is in a state to go looking for trouble with somebody
+    /// else's: healthy, and carrying something to patch up with afterwards.
+    private static func fitToGangUp(_ actor: Actor) -> Bool {
+        Double(actor.health) / Double(actor.maxHealth) >= 0.5
+            && actor.inventory.totalHealing(of: actor.maxHealth)
+                >= GameConfig.AI.emergencyHealingStock
+    }
+
+    /// Joining a fight another bot has started with the runaway.
+    ///
+    /// Only within earshot, only while there is room in the gang, and only as a
+    /// hunt - it walks to the fight, and the moment it can see them reactToThreats
+    /// turns it into a fight of its own (shouldEngage always agrees to the leader).
+    private static func pileOn(for actor: Actor, in world: World) -> AIGoal? {
+        guard fitToGangUp(actor),
+              let runaway = world.runaway(against: actor.team),
+              let quarry = leader(of: runaway.team, in: world),
+              quarry.invulnerability <= 0,
+              (quarry.position - actor.position).length <= GameConfig.AI.pileOnRange
+        else { return nil }
+
+        let crowd = gang(on: quarry, except: actor.id, in: world)
+        guard crowd.fighting > 0,
+              crowd.fighting + crowd.coming < GameConfig.AI.gangSize else { return nil }
+
+        return .hunt(quarry.id)
+    }
+
+    /// Joining a raid another bot has started on the runaway's base.
+    ///
+    /// The raid that the player could always see off - one bot, one bomb, shoot it
+    /// on the doorstep - becomes two or three arriving together. A joiner with a
+    /// bomb opens a second hole; one without walks over (a hunt with no mark goes
+    /// to their base) and goes in through the first once it is open.
+    private static func raidParty(for actor: Actor, in world: World) -> AIGoal? {
+        guard fitToGangUp(actor),
+              let runaway = world.runaway(against: actor.team)?.team,
+              let claim = world.claim(for: runaway),
+              (claim.centreTile.center - actor.position).length
+                <= GameConfig.AI.raidPartyRange else { return nil }
+
+        var raiders = 0
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) where id != actor.id {
+            guard let other = world.actors[id], other.isAlive,
+                  other.ai?.raidingBase == runaway else { continue }
+            raiders += 1
+        }
+
+        guard raiders > 0, raiders < GameConfig.AI.gangSize else { return nil }
+
+        if world.baseIsBreached(runaway) {
+            return remaining(at: runaway, for: actor, in: world)
+        }
+
+        if actor.inventory.count(of: .bomb) > 0,
+           let wall = breachTile(into: runaway, for: actor, in: world) {
+            return .raid(wall)
+        }
+
+        return leader(of: runaway, in: world).map { .hunt($0.id) }
     }
 
     /// An enemy chest worth going for.

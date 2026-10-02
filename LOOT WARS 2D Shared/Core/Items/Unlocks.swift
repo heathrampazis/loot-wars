@@ -118,9 +118,9 @@ struct Unlocks: Equatable {
 /// The order things unlock in, one every five levels, and how much XP a level
 /// takes.
 ///
-/// Paced so the whole road takes a long while - the best part of fifty matches -
-/// with even the early levels taking a match or two each, and each level costing
-/// a little more than the last.
+/// Paced so the whole road takes a while - around forty matches - with the early
+/// levels taking a match or so each, and each level costing a little more than
+/// the last.
 enum Roadmap {
 
     static let milestones: [(level: Int, feature: Feature)] = [
@@ -142,10 +142,11 @@ enum Roadmap {
 
     /// XP to go from this level to the next.
     ///
-    /// Steep from the start: even the first few levels take a proper match or
-    /// two each, and the whole road takes the best part of fifty matches.
+    /// About a fifth quicker than it was (120 + 4 per level), all the way along:
+    /// the first few levels still take a proper match each, but the whole road is
+    /// around forty matches rather than the best part of fifty.
     static func xpToNext(from level: Int) -> Int {
-        120 + 4 * max(1, level)
+        96 + 3 * max(1, level)
     }
 
     /// Where a running XP total puts you: the level, and how far into it.
