@@ -68,6 +68,9 @@ enum RenderPalette {
                                    edge: rgb(0x3A, 0x8B, 0xD2))
     static let menuSettings = MenuTone(face: rgb(0xFF, 0x8B, 0x4F),
                                        edge: rgb(0xE0, 0x75, 0x49))
+    /// The profile banner, bottom left.
+    static let menuProfile = MenuTone(face: rgb(0x9B, 0x6B, 0xFF),
+                                      edge: rgb(0x7A, 0x4F, 0xD9))
 
     /// Near-black rather than black. A true black on a light ground vibrates at
     /// large sizes, which is exactly the size the wordmark is set at.

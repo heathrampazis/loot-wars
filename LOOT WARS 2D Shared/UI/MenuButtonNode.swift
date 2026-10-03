@@ -128,7 +128,7 @@ final class MenuButtonNode: SKNode {
     ///
     /// SKShapeNode strokes straddle the path, so the path is inset by half the
     /// edge - the outside of the edge then lands exactly on the laid-out size.
-    private static func slab(width: CGFloat,
+    static func slab(width: CGFloat,
                              height: CGFloat,
                              edge: CGFloat,
                              corner: CGFloat,
@@ -155,7 +155,7 @@ final class MenuButtonNode: SKNode {
     /// blurring live - it never changes, so there is nothing to recompute, and an
     /// effect node crops its blur to its children's bounds, which cuts the soft
     /// edge off exactly where it should be fading out.
-    private static func dropShadow(width: CGFloat, height: CGFloat, corner: CGFloat) -> SKNode {
+    static func dropShadow(width: CGFloat, height: CGFloat, corner: CGFloat) -> SKNode {
         let node = SKNode()
         node.zPosition = -1
 

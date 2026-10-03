@@ -47,6 +47,16 @@ final class FeatureDetailContent: MenuSheetContent {
         plate.position = CGPoint(x: -width / 2 + artSide / 2 + 4, y: -artSide / 2 - 6)
         node.addChild(plate)
 
+        // The rarity glow, as on the roadmap card and in the hotbar.
+        let glow = SKSpriteNode(texture: GlowArt.pool)
+        glow.size = CGSize(width: artSide * 0.95, height: artSide * 0.95)
+        glow.colorBlendFactor = 1
+        glow.color = unlocked ? RenderPalette.colour(of: feature.item.rarity)
+                              : SKColor(white: 0.6, alpha: 1)
+        glow.alpha = unlocked ? 0.9 : 0.35
+        glow.zPosition = 0.5
+        plate.addChild(glow)
+
         let texture = ItemArt.texture(for: feature.item)
         let art = SKSpriteNode(texture: texture, size: ItemArt.size(of: texture, fittingInto: artSide * 0.72))
         art.zPosition = 1
@@ -96,7 +106,7 @@ final class FeatureDetailContent: MenuSheetContent {
         backTop = contentBottom - 14
 
         let back = SKLabelNode()
-        back.attributedText = MenuButtonNode.text("‹  Back to roadmap", size: 14, weight: .bold,
+        back.attributedText = MenuButtonNode.text("‹  Back", size: 14, weight: .bold,
                                                   colour: RenderPalette.menuInfo.edge)
         back.verticalAlignmentMode = .center
         back.position = CGPoint(x: 0, y: backTop - FeatureDetailContent.backHeight / 2)

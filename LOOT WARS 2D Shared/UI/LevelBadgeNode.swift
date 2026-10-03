@@ -2,11 +2,10 @@
 //  LevelBadgeNode.swift
 //  Loot Wars
 //
-//  Your level on the title screen, top left: the number, a bar for how far into
-//  it you are, and the next thing coming. Tap it for the roadmap.
-//
-//  The same near-white card as the menu's sheets, so it reads as part of the
-//  menu rather than as something left over from a match.
+//  Your profile corner on the title screen, bottom left: a profile icon, your
+//  level and an XP bar. Built like the menu's buttons - a flat face edged in a
+//  darker shade, on a soft drop shadow - in its own purple. Tap it for the
+//  roadmap.
 //
 
 import SpriteKit
@@ -14,73 +13,84 @@ import UIKit
 
 final class LevelBadgeNode: SKNode {
 
-    static let size = CGSize(width: 176, height: 58)
+    static let size = CGSize(width: 156, height: 56)
+
+    private static let edge: CGFloat = 4
+    private static let corner: CGFloat = 13
+    private static let padding: CGFloat = 8
 
     override init() {
         super.init()
 
         let size = LevelBadgeNode.size
-        let plate = SKShapeNode(path: CGPath(
-            roundedRect: CGRect(x: 0, y: -size.height, width: size.width, height: size.height),
-            cornerWidth: 16, cornerHeight: 16, transform: nil))
-        plate.fillColor = SKColor(white: 0.99, alpha: 1)
-        plate.strokeColor = SKColor(white: 0.78, alpha: 1)
-        plate.lineWidth = 3
-        addChild(plate)
-
+        let tone = RenderPalette.menuProfile
         let progress = Roadmap.level(forXP: Prefs.totalXP)
 
+        // The button body, centred - the node's origin is its top-left corner.
+        let body = SKNode()
+        body.position = CGPoint(x: size.width / 2, y: -size.height / 2)
+        addChild(body)
+
+        body.addChild(MenuButtonNode.dropShadow(width: size.width, height: size.height,
+                                                corner: LevelBadgeNode.corner))
+        body.addChild(MenuButtonNode.slab(width: size.width, height: size.height,
+                                          edge: LevelBadgeNode.edge,
+                                          corner: LevelBadgeNode.corner,
+                                          tone: tone))
+
+        // The profile tile: the edge colour, set into the face.
+        let pad = LevelBadgeNode.padding
+        let square = size.height - pad * 2
+        let tile = SKShapeNode(path: CGPath(
+            roundedRect: CGRect(x: pad, y: -pad - square, width: square, height: square),
+            cornerWidth: 9, cornerHeight: 9, transform: nil))
+        tile.fillColor = tone.edge
+        tile.strokeColor = .clear
+        tile.zPosition = 1
+        addChild(tile)
+
+        let icon = SKSpriteNode(texture: Glyphs.profile,
+                                size: CGSize(width: square * 0.64, height: square * 0.64))
+        icon.position = CGPoint(x: pad + square / 2, y: -size.height / 2)
+        icon.zPosition = 2
+        addChild(icon)
+
+        // "LEVEL 12" over a white XP bar.
+        let left = pad + square + 10
+        let right = size.width - 14
+
         let title = SKLabelNode()
-        title.attributedText = MenuButtonNode.text("LEVEL \(progress.level)", size: 15,
-                                                   weight: .heavy, colour: RenderPalette.menuInk)
+        title.attributedText = MenuButtonNode.text("LEVEL \(progress.level)",
+                                                   size: 14, weight: .heavy, colour: .white)
         title.horizontalAlignmentMode = .left
         title.verticalAlignmentMode = .center
-        title.position = CGPoint(x: 14, y: -18)
-        title.zPosition = 1
+        title.position = CGPoint(x: left, y: -size.height / 2 + 8)
+        title.zPosition = 2
         addChild(title)
 
-        // What is next, or that the road is done.
-        let next = Roadmap.milestones.first { $0.level > progress.level }
-        let note = SKLabelNode()
-        note.attributedText = MenuButtonNode.text(
-            next.map { "Next: \($0.feature.title)" } ?? "All unlocked",
-            size: 11, weight: .semibold, colour: SKColor(white: 0, alpha: 0.5))
-        note.horizontalAlignmentMode = .left
-        note.verticalAlignmentMode = .center
-        note.position = CGPoint(x: 14, y: -size.height + 14)
-        note.zPosition = 1
-        addChild(note)
+        let barY = -size.height / 2 - 10
+        let barHeight: CGFloat = 8
+        let barWidth = right - left
 
-        let barWidth: CGFloat = 64
-        let barX = size.width - 14 - barWidth
         let track = SKShapeNode(path: CGPath(
-            roundedRect: CGRect(x: barX, y: -22, width: barWidth, height: 8),
-            cornerWidth: 4, cornerHeight: 4, transform: nil))
-        track.fillColor = SKColor(white: 0.88, alpha: 1)
+            roundedRect: CGRect(x: left, y: barY - barHeight / 2, width: barWidth, height: barHeight),
+            cornerWidth: barHeight / 2, cornerHeight: barHeight / 2, transform: nil))
+        track.fillColor = tone.edge
         track.strokeColor = .clear
-        track.zPosition = 1
+        track.zPosition = 2
         addChild(track)
 
         let share = CGFloat(progress.into) / CGFloat(max(1, progress.needed))
         if share > 0 {
             let fill = SKShapeNode(path: CGPath(
-                roundedRect: CGRect(x: barX, y: -22, width: max(8, barWidth * share), height: 8),
-                cornerWidth: 4, cornerHeight: 4, transform: nil))
-            fill.fillColor = RenderPalette.menuPlay.face
+                roundedRect: CGRect(x: left, y: barY - barHeight / 2,
+                                    width: max(barHeight, barWidth * min(1, share)),
+                                    height: barHeight),
+                cornerWidth: barHeight / 2, cornerHeight: barHeight / 2, transform: nil))
+            fill.fillColor = .white
             fill.strokeColor = .clear
-            fill.zPosition = 2
+            fill.zPosition = 3
             addChild(fill)
-        }
-
-        if Prefs.devMode {
-            let dev = SKLabelNode()
-            dev.attributedText = MenuButtonNode.text("DEV", size: 10, weight: .heavy,
-                                                     colour: RenderPalette.menuSettings.edge)
-            dev.horizontalAlignmentMode = .right
-            dev.verticalAlignmentMode = .center
-            dev.position = CGPoint(x: size.width - 14, y: -size.height + 14)
-            dev.zPosition = 1
-            addChild(dev)
         }
     }
 
@@ -96,7 +106,7 @@ final class LevelBadgeNode: SKNode {
     }
 
     func press(then done: @escaping () -> Void) {
-        run(.sequence([.scale(to: 0.94, duration: 0.05),
+        run(.sequence([.scale(to: 0.95, duration: 0.05),
                        .scale(to: 1, duration: 0.1),
                        .run(done)]))
     }

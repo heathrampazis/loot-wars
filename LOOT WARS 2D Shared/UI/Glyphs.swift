@@ -31,6 +31,9 @@ enum Glyphs {
     /// A plain house, for the way back to the title screen.
     static let home: SKTexture = makeHome()
 
+    /// A head and shoulders - the profile corner on the title screen.
+    static let profile: SKTexture = makeProfile()
+
     /// The shop's bag, traced off the reference: a body that flares outwards
     /// towards the bottom, and a handle looping up out of the top edge.
     ///
@@ -195,6 +198,35 @@ enum Glyphs {
             body.addLine(to: CGPoint(x: side * 0.41, y: side * 0.64))
             body.addLine(to: CGPoint(x: side * 0.41, y: side * 0.86))
             body.addLine(to: CGPoint(x: side * 0.22, y: side * 0.86))
+            body.close()
+            body.fill()
+        }
+
+        return SKTexture(image: image)
+    }
+
+    /// A round head over rounded shoulders, in one white shape.
+    private static func makeProfile() -> SKTexture {
+        let side: CGFloat = 128
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side),
+            format: format
+        ).image { _ in
+            SKColor.white.setFill()
+
+            // Head. Images run top-down.
+            UIBezierPath(ovalIn: CGRect(x: side * 0.33, y: side * 0.10,
+                                        width: side * 0.34, height: side * 0.34)).fill()
+
+            // Shoulders: a dome cut flat along the bottom.
+            let body = UIBezierPath()
+            body.move(to: CGPoint(x: side * 0.14, y: side * 0.88))
+            body.addCurve(to: CGPoint(x: side * 0.86, y: side * 0.88),
+                          controlPoint1: CGPoint(x: side * 0.14, y: side * 0.46),
+                          controlPoint2: CGPoint(x: side * 0.86, y: side * 0.46))
             body.close()
             body.fill()
         }

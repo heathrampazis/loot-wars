@@ -330,7 +330,7 @@ final class ResultsNode: SKNode {
         // MARK: Header
 
         if let place {
-            headline.attributedText = ResultsNode.ink(place == 0 ? "VICTORY!" : "\(ResultsNode.ordinal(place + 1)) PLACE",
+            headline.attributedText = ResultsNode.ink(place == 0 ? "YOU WON" : "\(ResultsNode.ordinal(place + 1)) PLACE",
                                                       size: 26, weight: .heavy)
             medalDisc.fillColor = ResultsNode.medalColour(for: place, team: you)
             medalDisc.strokeColor = ResultsNode.darker(medalDisc.fillColor)
@@ -576,33 +576,34 @@ final class ResultsNode: SKNode {
                           cornerWidth: 4, cornerHeight: 4, transform: nil)
     }
 
-    /// Gold stars out of the medal, for a win.
+    /// Tokens thrown up out of the medal, for a win - the game's own money,
+    /// the way an arcade pays out, rather than a generic burst of stars.
     private func shower(from origin: SKNode) {
         let centre = convert(CGPoint.zero, from: origin)
-        for index in 0..<16 {
-            let star = SKSpriteNode(texture: ImpactArt.star)
-            let side = CGFloat.random(in: 12...20)
-            star.size = CGSize(width: side, height: side)
-            star.color = RenderPalette.treasure
-            star.colorBlendFactor = 0.6
-            star.position = centre
-            star.zPosition = 10
-            star.setScale(0.4)
-            addChild(star)
+        let texture = ItemArt.texture(for: Pickup.token(1))
+        let count = 12
 
-            let angle = CGFloat(index) / 16 * .pi * 2 + CGFloat.random(in: -0.2...0.2)
-            let reach = CGFloat.random(in: 60...110)
-            let out = SKAction.moveBy(x: cos(angle) * reach, y: sin(angle) * reach * 0.7 + 20,
-                                      duration: 0.6)
-            out.timingMode = .easeOut
+        for index in 0..<count {
+            let coin = SKSpriteNode(texture: texture)
+            coin.size = ItemArt.size(of: texture, fittingInto: CGFloat.random(in: 16...22))
+            coin.position = centre
+            coin.zPosition = 10
+            addChild(coin)
 
-            star.run(.sequence([
-                .group([out,
-                        .rotate(byAngle: CGFloat.random(in: -3...3), duration: 0.6),
-                        .sequence([.scale(to: 1.1, duration: 0.15),
-                                   .wait(forDuration: 0.15),
-                                   .group([.scale(to: 0.3, duration: 0.3),
-                                           .fadeOut(withDuration: 0.3)])])]),
+            // Up and out, then down: a short arc either side of the medal.
+            let side = CGFloat(index) / CGFloat(count - 1) * 2 - 1
+            let across = side * CGFloat.random(in: 70...120)
+            let rise = CGFloat.random(in: 50...90)
+            let path = CGMutablePath()
+            path.move(to: centre)
+            path.addQuadCurve(to: CGPoint(x: centre.x + across, y: centre.y - 60),
+                              control: CGPoint(x: centre.x + across * 0.5, y: centre.y + rise * 2))
+
+            let duration = Double.random(in: 0.7...0.9)
+            coin.run(.sequence([
+                .group([.follow(path, asOffset: false, orientToPath: false, duration: duration),
+                        .sequence([.wait(forDuration: duration * 0.6),
+                                   .fadeOut(withDuration: duration * 0.4)])]),
                 .removeFromParent()
             ]))
         }

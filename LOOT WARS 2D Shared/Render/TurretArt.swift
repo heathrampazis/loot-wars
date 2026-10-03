@@ -198,26 +198,11 @@ enum TurretArt {
             skirt.fill()
             stroke(skirt, width: outline * u)
 
-            // Two vents on the front, which is most of what makes a box look like
-            // a machine rather than a crate.
-            SKColor(white: 0, alpha: 0.28).setFill()
-            for x in [0.62, 1.2] as [CGFloat] {
-                UIBezierPath(roundedRect: CGRect(x: x * u, y: y(0.36),
-                                                 width: 0.18 * u, height: 0.1 * u),
-                             cornerRadius: 0.04 * u).fill()
-            }
-
             let top = UIBezierPath(roundedRect: CGRect(x: left, y: y(1.62),
                                                        width: width, height: 1.14 * u),
                                    cornerRadius: corner)
             colour.setFill()
             top.fill()
-
-            // A catch of light along the top edge.
-            light(colour).withAlphaComponent(0.8).setFill()
-            UIBezierPath(roundedRect: CGRect(x: 0.36 * u, y: y(1.52),
-                                             width: 1.28 * u, height: 0.09 * u),
-                         cornerRadius: 0.045 * u).fill()
 
             stroke(top, width: outline * u)
 
@@ -244,11 +229,6 @@ enum TurretArt {
                                     cornerRadius: 0.1 * u)
             steel.setFill()
             tube.fill()
-
-            SKColor(white: 1, alpha: 0.35).setFill()
-            UIBezierPath(roundedRect: CGRect(x: 0.4 * u, y: mid - 0.1 * u,
-                                             width: 0.56 * u, height: 0.06 * u),
-                         cornerRadius: 0.03 * u).fill()
 
             stroke(tube, width: outline * u)
 
@@ -284,10 +264,6 @@ enum TurretArt {
 
             colour.setFill()
             circle(CGPoint(x: centre.x, y: centre.y - 0.035 * u), 0.26 * u).fill()
-
-            SKColor(white: 1, alpha: 0.55).setFill()
-            UIBezierPath(ovalIn: CGRect(x: centre.x - 0.2 * u, y: centre.y - 0.24 * u,
-                                        width: 0.18 * u, height: 0.1 * u)).fill()
 
             stroke(dome, width: outline * u)
         }
