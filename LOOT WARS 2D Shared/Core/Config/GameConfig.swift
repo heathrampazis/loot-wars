@@ -2102,9 +2102,11 @@ enum GameConfig {
         /// a bomb - which, once crates stopped handing them out, would have been
         /// where nearly all of yours came from.
         ///
-        /// 0.1 (Oct 2026): one bot in ten, so a kill is very occasionally a bomb
-        /// rather than a reliable supply.
-        static let bombDropChance = 0.1
+        /// 0.2 (Oct 2026), after a spell at 0.1 that was so rare it felt like
+        /// never: one carried bomb in five comes off the body - sometimes, not a
+        /// supply. Only bots actually carrying one can drop it, and the two-on-
+        /// the-ground cap (Loot.maxLooseBombs) still applies.
+        static let bombDropChance = 0.2
 
         /// The odds that a chest or a machine somebody was carrying survives them.
         ///
