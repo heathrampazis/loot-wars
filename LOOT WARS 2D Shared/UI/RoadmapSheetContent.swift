@@ -29,7 +29,7 @@ final class RoadmapSheetContent: MenuSheetContent {
     private var cardCentres: [(x: CGFloat, feature: Feature, level: Int)] = []
     private var cardRowY: CGFloat = 0
     private var dragDistance: CGFloat = 0
-    private static let cardSize = CGSize(width: 118, height: 150)
+    private static let cardSize = CGSize(width: 116, height: 146)
     private static let gap: CGFloat = 12
     private static let headerHeight: CGFloat = 46
 
@@ -42,8 +42,14 @@ final class RoadmapSheetContent: MenuSheetContent {
     private var stripMin: CGFloat = 0
     private var stripMax: CGFloat = 0
 
+    /// How fast the row was moving under the finger, in points a second, so a
+    /// flick carries on after the finger lifts.
+    private var velocity: CGFloat = 0
+    private var lastDragX: CGFloat = 0
+    private var lastDragTime: TimeInterval = 0
+
     func preferredCardWidth(for screen: CGSize) -> CGFloat? {
-        min(screen.width * 0.86, 680)
+        min(screen.width * 0.9, 720)
     }
 
     func layOut(width: CGFloat, maxHeight: CGFloat) -> CGFloat {
@@ -66,8 +72,19 @@ final class RoadmapSheetContent: MenuSheetContent {
         title.position = CGPoint(x: -width / 2 + 4, y: -14)
         node.addChild(title)
 
+        let xp = SKLabelNode()
+        xp.attributedText = MenuButtonNode.text("\(progress.into) / \(progress.needed) XP", size: 12,
+                                       weight: .semibold, colour: SKColor(white: 0, alpha: 0.5))
+        xp.horizontalAlignmentMode = .right
+        xp.verticalAlignmentMode = .center
+        xp.position = CGPoint(x: width / 2 - 4, y: -14)
+        node.addChild(xp)
+
+        // The bar runs between the title and the XP count, with a clear gap
+        // either side - it used to be a fixed width and ran into the numbers.
         let barLeft = title.position.x + title.frame.width + 14
-        let barWidth = max(60, width / 2 - 4 - barLeft - 70)
+        let barRight = xp.position.x - xp.frame.width - 12
+        let barWidth = max(40, barRight - barLeft)
         let track = SKShapeNode(path: CGPath(
             roundedRect: CGRect(x: barLeft, y: -20, width: barWidth, height: 12),
             cornerWidth: 6, cornerHeight: 6, transform: nil))
@@ -84,17 +101,9 @@ final class RoadmapSheetContent: MenuSheetContent {
         fill.isHidden = share <= 0
         node.addChild(fill)
 
-        let xp = SKLabelNode()
-        xp.attributedText = MenuButtonNode.text("\(progress.into) / \(progress.needed) XP", size: 12,
-                                       weight: .semibold, colour: SKColor(white: 0, alpha: 0.5))
-        xp.horizontalAlignmentMode = .right
-        xp.verticalAlignmentMode = .center
-        xp.position = CGPoint(x: width / 2 - 4, y: -14)
-        node.addChild(xp)
-
         if Prefs.devMode {
             let dev = SKLabelNode()
-            dev.attributedText = MenuButtonNode.text("DEV MODE - everything is on in matches", size: 11,
+            dev.attributedText = MenuButtonNode.text("Dev mode: everything unlocked", size: 11,
                                             weight: .bold, colour: RenderPalette.menuSettings.edge)
             dev.verticalAlignmentMode = .center
             dev.position = CGPoint(x: 0, y: -38)
@@ -112,6 +121,14 @@ final class RoadmapSheetContent: MenuSheetContent {
         window.position = CGPoint(x: 0, y: top - stripHeight / 2)
         crop.maskNode = window
         crop.addChild(strip)
+
+        // The cards never change while the sheet is up, so they are drawn once
+        // into a single texture and the row just slides that - a few dozen shape
+        // nodes and labels re-rendered every frame inside a crop node is what
+        // made the scroll stutter.
+        let flat = SKEffectNode()
+        flat.shouldRasterize = true
+        strip.addChild(flat)
         node.addChild(crop)
 
         let next = Roadmap.milestones.firstIndex { $0.level > level }
@@ -127,7 +144,7 @@ final class RoadmapSheetContent: MenuSheetContent {
             built.position = CGPoint(x: -width / 2 + card.width / 2
                                         + CGFloat(index) * (card.width + gap),
                                      y: top - stripHeight / 2)
-            strip.addChild(built)
+            flat.addChild(built)
             cardCentres.append((built.position.x, milestone.feature, milestone.level))
         }
 
@@ -168,8 +185,20 @@ final class RoadmapSheetContent: MenuSheetContent {
         root.addChild(tag)
 
         let texture = ItemArt.texture(for: feature.item)
-        let art = SKSpriteNode(texture: texture, size: ItemArt.size(of: texture, fittingInto: 54))
+        let art = SKSpriteNode(texture: texture, size: ItemArt.size(of: texture, fittingInto: 52))
         art.position = CGPoint(x: 0, y: 10)
+
+        // A pool of the item's rarity colour behind it, the way the hotbar shows
+        // one - faded and grey until it is yours.
+        let glow = SKSpriteNode(texture: GlowArt.pool)
+        glow.size = CGSize(width: 84, height: 84)
+        glow.position = art.position
+        glow.colorBlendFactor = 1
+        glow.color = unlocked ? RenderPalette.colour(of: feature.item.rarity)
+                              : SKColor(white: 0.6, alpha: 1)
+        glow.alpha = unlocked ? 0.9 : 0.35
+        glow.zPosition = 0.5
+        root.addChild(glow)
         art.zPosition = 1
         if !unlocked {
             // Seen but not yours yet: the shape, greyed.
@@ -184,7 +213,7 @@ final class RoadmapSheetContent: MenuSheetContent {
                                          colour: unlocked ? RenderPalette.menuInk
                                                           : SKColor(white: 0, alpha: 0.55))
         name.verticalAlignmentMode = .center
-        name.position = CGPoint(x: 0, y: -32)
+        name.position = CGPoint(x: 0, y: -31)
         name.zPosition = 1
         root.addChild(name)
 
@@ -192,16 +221,16 @@ final class RoadmapSheetContent: MenuSheetContent {
         if unlocked {
             status = feature.blurb
         } else if isNext {
-            status = levelsToGo == 1 ? "Next level!" : "\(levelsToGo) levels to go"
+            status = levelsToGo == 1 ? "Next level" : "\(levelsToGo) levels to go"
         } else {
             status = "Locked"
         }
         // A small circled "?" in the corner says the card opens.
-        let info = SKShapeNode(circleOfRadius: 9)
+        let info = SKShapeNode(circleOfRadius: 8)
         info.fillColor = .clear
         info.strokeColor = SKColor(white: 0, alpha: 0.35)
         info.lineWidth = 2
-        info.position = CGPoint(x: size.width / 2 - 15, y: size.height / 2 - 15)
+        info.position = CGPoint(x: size.width / 2 - 14, y: size.height / 2 - 14)
         info.zPosition = 1
         root.addChild(info)
 
@@ -221,10 +250,6 @@ final class RoadmapSheetContent: MenuSheetContent {
         line.zPosition = 1
         root.addChild(line)
 
-        if isNext {
-            root.run(.repeatForever(.sequence([.scale(to: 1.03, duration: 0.8),
-                                               .scale(to: 1, duration: 0.8)])))
-        }
         return root
     }
 
@@ -237,11 +262,24 @@ final class RoadmapSheetContent: MenuSheetContent {
         dragStart = point
         stripStart = strip.position.x
         dragDistance = 0
+        velocity = 0
+        lastDragX = point.x
+        lastDragTime = CACurrentMediaTime()
     }
 
     func dragMoved(to point: CGPoint) {
         guard let start = dragStart else { return }
         dragDistance = max(dragDistance, abs(point.x - start.x) + abs(point.y - start.y))
+
+        // Smoothed, so one jittery frame does not decide the flick.
+        let now = CACurrentMediaTime()
+        let elapsed = now - lastDragTime
+        if elapsed > 0.001 {
+            let instant = (point.x - lastDragX) / CGFloat(elapsed)
+            velocity = velocity * 0.15 + instant * 0.85
+        }
+        lastDragX = point.x
+        lastDragTime = now
         let target = stripStart + (point.x - start.x)
 
         // A little give past either end, so the edge is felt rather than hit.
@@ -260,9 +298,22 @@ final class RoadmapSheetContent: MenuSheetContent {
             return
         }
         dragStart = nil
-        let settle = SKAction.moveTo(x: clamp(strip.position.x), duration: 0.2)
-        settle.timingMode = .easeOut
-        strip.run(settle, withKey: "settle")
+
+        // A finger that stopped before lifting has no flick left in it.
+        if CACurrentMediaTime() - lastDragTime > 0.08 { velocity = 0 }
+
+        // Glide on with the speed it was let go at, easing to a stop. An ease-out
+        // starts at twice its average speed, so a glide of `carry` seconds covers
+        // the distance that keeps the row moving at exactly the finger's speed.
+        let carry: CGFloat = 0.35
+        let speed = max(-4000, min(4000, velocity))
+        let target = clamp(strip.position.x + speed * carry)
+        let distance = abs(target - strip.position.x)
+        let duration = TimeInterval(distance < 1 || abs(speed) < 50 ? 0.22 : carry * 2)
+
+        let glide = SKAction.moveTo(x: target, duration: duration)
+        glide.timingMode = .easeOut
+        strip.run(glide, withKey: "settle")
     }
 
     /// The card under a point in the content's space, if any.

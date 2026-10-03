@@ -224,10 +224,18 @@ final class MenuScene: SKScene {
         // Clamped, so coming back from the app switcher does not teleport the view
         // across the map in one frame.
         let dt = min(0.25, currentTime - lastFrame)
-        driftClock += dt
         lastFrame = currentTime
 
-        backdrop.update(dt: dt)
+        // The map behind the glass holds still while a sheet is up, and its blur
+        // is cached rather than redrawn: a full-screen blur every frame was
+        // costing the frames a scrolling sheet needs. It picks up where it left
+        // off when the sheet closes.
+        let frozen = sheet.isOpen
+        if blur.shouldRasterize != frozen { blur.shouldRasterize = frozen }
+        if !frozen {
+            driftClock += dt
+            backdrop.update(dt: dt)
+        }
 
         if let insets = view?.safeAreaInsets, insets != laidOutInsets {
             buildRecord()

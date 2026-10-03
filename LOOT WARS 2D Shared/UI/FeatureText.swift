@@ -40,32 +40,31 @@ extension Feature {
         }
     }
 
-    /// A few sentences on what it does and how to use it, for its page on the
-    /// roadmap.
+    /// One or two short lines on what it does, for its page on the roadmap.
     var detail: String {
         switch self {
         case .strength:
-            return "A power-up that makes every shot hit harder for a few seconds. Tap it in your hotbar just before a fight - it turns a close duel your way."
+            return "Your shots hit harder for a few seconds. Use it just before a fight."
         case .miniArcade:
-            return "A small machine you place inside your base. It pays out tokens every few seconds - pick them up and spend them in the shop. Seal your walls so nobody steals them."
+            return "A small machine for your base. It pays out tokens to spend in the shop."
         case .speed:
-            return "A power-up that makes you run faster for a few seconds. Use it to grab a supply drop first, chase somebody down, or get home before a raid."
+            return "Run faster for a few seconds. Good for reaching a supply drop first."
         case .stinkBombs:
-            return "A throwable that leaves a cloud of gas. Anyone standing in it takes damage over time - throw it into a doorway or onto a chest to clear the room."
+            return "Throw it to leave a cloud of gas. Anyone inside takes damage."
         case .regeneration:
-            return "A power-up that heals you a little every second for a few seconds. Pop it mid-fight and keep shooting while your health climbs."
+            return "Heal a little every second for a while. Works mid-fight."
         case .fullArcade:
-            return "The big machine. It earns far more than the mini arcade, but it is the first thing raiders come for - put it deep inside your walls."
+            return "The big machine. It pays out far more, so raiders will come for it."
         case .resistance:
-            return "A power-up that makes you take much less damage for a few seconds. Perfect for pushing into a base or holding a supply drop."
+            return "Take much less damage for a few seconds. Good for pushing into a base."
         case .turrets:
-            return "A defence you place in your base. It shoots any enemy who comes inside your claim. Raiders have to deal with it before they can touch your chests."
+            return "Place it in your base. It shoots any enemy who walks in."
         case .discoBall:
-            return "The best power-up in the game: strength, swiftness, regeneration and resistance, all at once. Rare - save it for the fight that matters."
+            return "Every power-up at once. It's rare, so save it for a big fight."
         case .cosmicHelmet:
-            return "The top helmet, above Mythical. The most health in the game. Found in late crates and supply drops, or bought in the shop."
+            return "The toughest helmet in the game. Find it late in a match or buy it in the shop."
         case .cosmicBlaster:
-            return "The top blaster, above Blaster 5. The most damage in the game. Found in late crates and supply drops, or bought in the shop."
+            return "The strongest blaster in the game. Find it late in a match or buy it in the shop."
         }
     }
 }
