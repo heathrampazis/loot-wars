@@ -187,6 +187,23 @@ enum LootTable {
     /// the band already offers an Epic, a rare crate is where a Legendary comes
     /// from, and that is the only place one is ever found.
     private static func upgraded(_ pickup: Pickup, unlocks: Unlocks) -> Pickup {
+        var result = oneRungUp(pickup, unlocks: unlocks)
+
+        // And never green or grey out of a purple crate (Oct 2026). One rung up
+        // from a Common helmet or a Blaster 2 is an Epic - green - which is what
+        // half the early gear rows landed on, and a purple crate that hands out the
+        // same colour as the medkits on the grass is a let-down. Climb until the
+        // gear is at least blue, or the ladder (or this match's unlocks) stops.
+        while case .item(let type) = result, type.isGear, type.rarity <= .epic {
+            let next = oneRungUp(result, unlocks: unlocks)
+            guard next != result else { break }
+            result = next
+        }
+
+        return result
+    }
+
+    private static func oneRungUp(_ pickup: Pickup, unlocks: Unlocks) -> Pickup {
         switch pickup {
         case .item(.helmet(let tier)):
             // The rung above, if this match has it - Cosmic is a levelling unlock.
@@ -205,13 +222,16 @@ enum LootTable {
 
     ///   - unlocks: what this match has - see Unlocks. A locked item's row is
     ///     taken out and the rest of the table renormalised round it.
+    ///   - perkBoost: how much likelier the power-up rows are than this band
+    ///     says - more than one for a bot opening it, see AI.cratePerkBoost.
     static func roll(bombShare: Double,
                      at progress: Double,
                      rare: Bool = false,
                      unlocks: Unlocks = .all,
+                     perkBoost: Double = 1,
                      using rng: inout SeededRandom) -> Pickup {
         let rolled = plain(bombShare: bombShare, at: progress, rare: rare,
-                           unlocks: unlocks, using: &rng)
+                           unlocks: unlocks, perkBoost: perkBoost, using: &rng)
         return rare ? upgraded(rolled, unlocks: unlocks) : rolled
     }
 
@@ -219,11 +239,20 @@ enum LootTable {
                               at progress: Double,
                               rare: Bool,
                               unlocks: Unlocks,
+                              perkBoost: Double,
                               using rng: inout SeededRandom) -> Pickup {
         let table = table(at: progress)
         let share = min(1, max(0, bombShare))
         var rows = table.compactMap { row -> (pickup: Pickup, weight: Int)? in
             guard row.pickup == .item(.bomb) else { return row }
+
+            // Bombs come out of the purple crates and nothing else (Oct 2026). One
+            // in every six or seven ordinary crates was still a bomb, which made
+            // them something you picked up on the way past rather than a find. The
+            // bands keep their bomb weights so a rare crate - which rolls the same
+            // band - still knows how likely one is at this point in the match.
+            guard rare else { return nil }
+
             let weight = Int((Double(row.weight) * share).rounded())
             return weight > 0 ? (pickup: row.pickup, weight: weight) : nil
         }
@@ -251,7 +280,8 @@ enum LootTable {
         rows += Perk.obtainable.map { perk in
             let weight = perk.lootWeight(at: progress)
             let pooled = perk == .overdrive ? weight : weight * 4 / singles
-            return (pickup: Pickup.item(.perk(perk)), weight: pooled)
+            let boosted = Int((Double(pooled) * perkBoost).rounded())
+            return (pickup: Pickup.item(.perk(perk)), weight: boosted)
         }
 
         // The mini machine, out of ANY crate.
@@ -299,11 +329,19 @@ enum LootTable {
         if rare {
             rows = rows.compactMap { row in
                 switch row.pickup {
-                case .item(.bandage):
+                // The medkit too (Oct 2026): it is green, and the whole of a
+                // purple crate is now blue and up - see upgraded().
+                case .item(.bandage), .item(.medkit):
                     return nil
-                case .item(.bomb):
+                // Power-ups and gear up, so a purple crate is mostly the good
+                // stuff and only now and then a bomb - see Loot.rarePerkBoost.
+                case .item(.perk):
                     return (pickup: row.pickup,
-                            weight: Int(Double(row.weight) * GameConfig.Loot.rareBombBoost))
+                            weight: Int(Double(row.weight) * GameConfig.Loot.rarePerkBoost))
+                case .item(let type) where type.isGear:
+                    return (pickup: row.pickup,
+                            weight: Int(Double(row.weight) * GameConfig.Loot.rareGearBoost))
+
                 default:
                     return row
                 }
@@ -330,6 +368,22 @@ enum LootTable {
             guard unlocks.isFeatured(type) else { return row }
             return (pickup: row.pickup,
                     weight: Int((Double(row.weight) * GameConfig.Loot.featuredBoost).rounded()))
+        }
+
+        // A purple crate's bomb is a fixed SHARE of the crate rather than a
+        // weight (Oct 2026). As a weight it swung with whatever else the match had
+        // unlocked: at level 1, with no power-ups or machines in the game, the
+        // same row was two crates in five; with everything unlocked, one in
+        // sixteen. A share keeps it level with the gear and power-ups at every
+        // level - see Loot.rareBombShare. The early-match ramp (World.bombShare)
+        // still scales it, and a full ground of loose bombs still removes it.
+        if rare, let index = rows.firstIndex(where: { $0.pickup == .item(.bomb) }) {
+            let others = rows.indices
+                .filter { $0 != index }
+                .reduce(0) { $0 + rows[$1].weight }
+            let wanted = GameConfig.Loot.rareBombShare
+            let weight = Double(others) * wanted / (1 - wanted) * share
+            rows[index].weight = max(1, Int(weight.rounded()))
         }
 
         let total = rows.reduce(0) { $0 + $1.weight }
