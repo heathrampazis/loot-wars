@@ -2215,7 +2215,15 @@ extension GameScene {
             let low = Double(player.health)
                 < Double(player.maxHealth) * GameConfig.Player.instantHealBelow
 
-            if low, player.canUse(slot: slot) {
+            // Tapping a heal that is ALREADY picked out uses it, exactly as the
+            // heal button would. It used to put it back, so the hotbar habit -
+            // tap the bandage when you are hurt - stopped working the moment one
+            // had been picked out, and the only way to heal was the other button.
+            // Both work now. At full health a second tap still puts it back, since
+            // there is nothing to heal.
+            let alreadyPicked = selectedSlot == slot
+
+            if low || alreadyPicked, player.canUse(slot: slot) {
                 queuedCommands.append(.useItem(slot: slot))
                 hotbar.acknowledge(slot)
                 selectedSlot = nil
