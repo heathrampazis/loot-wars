@@ -133,7 +133,8 @@ enum ShopSystem {
 
     /// Whether the SHOP itself refuses this, as opposed to you not affording it.
     ///
-    /// Nothing, currently, and this is the second reason it went. It was written
+    /// The bomb (Oct 2026), and nothing else. Before that it was nothing, and this
+    /// is the second reason it went. It was written
     /// for machines - one to a base, so the card greyed out once you had one - and
     /// that argument had already stopped applying when the shop stopped selling
     /// them; ShopSystem.price returns nil for a machine, so canBuy was refusing
@@ -145,7 +146,14 @@ enum ShopSystem {
     /// everyone. A shape with nothing in it is easier to find than a concept that
     /// has to be reintroduced.
     static func isSoldOut(_ type: ItemType, actor: Actor, in world: World) -> Bool {
-        false
+        switch type {
+        // One bomb at a time from the shop, and none before the grace period
+        // ends - the shelf is a way to get the next raid going, not to stockpile.
+        case .bomb:
+            return !world.bombsAllowed || actor.inventory.count(of: .bomb) > 0
+        default:
+            return false
+        }
     }
 
     /// What the shop pays for something out of your bag.

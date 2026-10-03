@@ -177,17 +177,12 @@ enum Roadmap {
 
     /// How long a match runs at this level, in seconds.
     ///
-    /// Shorter while there is less in the game: three minutes until Speed
-    /// (level 15), four until the full Arcade (level 30), then the full five
-    /// once most of the game is in. Everything that runs
-    /// on the match's progress - loot bands, the late-game respawn kit, supply
-    /// drops - stretches to fit.
+    /// Three minutes at every level now (Oct 2026) - it used to grow to five as
+    /// the game filled up. Kept as a function of level so it can vary again.
+    /// Everything that runs on the match's progress - loot bands, the late-game
+    /// respawn kit, supply drops - stretches to fit.
     static func matchLength(atLevel level: Int) -> Double {
-        switch level {
-        case ..<15: return 180
-        case ..<30: return 240
-        default:    return GameConfig.Match.duration
-        }
+        GameConfig.Match.duration
     }
 
     /// What a finished match is worth.

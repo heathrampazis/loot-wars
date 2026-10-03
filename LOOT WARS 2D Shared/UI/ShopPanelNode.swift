@@ -60,7 +60,7 @@ final class ShopPanelNode: SKNode {
     /// their width - 112 points is not enough to put a picture beside its words, so
     /// they go back to being portrait, picture over name over price - and that is
     /// the trade, taken deliberately.
-    private static let cardSize = CGSize(width: 118, height: 164)
+    private static let cardSize = CGSize(width: 106, height: 164)
     private static let cardGap: CGFloat = 10
     private static let padding: CGFloat = 14
     private static let headerHeight: CGFloat = 38

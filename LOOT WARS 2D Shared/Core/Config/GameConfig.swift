@@ -49,12 +49,17 @@ enum GameConfig {
         /// ground and their advantage - taking it off them there is worth more.
         static let killInTheirBase = 25
 
-        static let lootboxOpened = 10
+        /// Nothing (Oct 2026), from 10. Opening crates was where most of a
+        /// player's points came from, which scored looting rather than winning.
+        /// A crate pays in what is inside it, and in a token.
+        static let lootboxOpened = 0
 
         /// A rare crate, which is worth choosing over an ordinary one when both are
         /// in sight - but not worth a match spent hunting them. The gear inside is
         /// the actual prize.
-        static let rareLootboxOpened = 25
+        ///
+        /// Nothing as well (Oct 2026), from 25 - see lootboxOpened.
+        static let rareLootboxOpened = 0
 
         /// Per wall: nothing (Oct 2026). Laying walls is how you protect your
         /// points, not a way to earn them - it was a trickle anybody could farm by
@@ -124,7 +129,8 @@ enum GameConfig {
         /// Twelve seconds, which is slow enough to read as a drip rather than a
         /// counter spinning, and quick enough that the difference between holding
         /// and losing a base is visible inside one raid.
-        static let holdInterval: Double = 12
+        /// 3-minute matches (Oct 2026): 12 -> 7.
+        static let holdInterval: Double = 7
 
         /// Paid for a wall with no hole in it.
         static let holdStanding = 3
@@ -293,7 +299,16 @@ enum GameConfig {
                 // At eleven it pays 0.091 a token and three bars a slot.
                 Item(type: .medkit,  price: 11)
             ])),
-            Tab(name: "GEAR", stock: .upgrades)
+            Tab(name: "GEAR", stock: .upgrades),
+
+            // A bomb, back on the shelf (Oct 2026) - 18, between an Epic and a
+            // Legendary rung, so it is a decision rather than a top-up. One
+            // at a time: it is sold out while you are carrying one, and before
+            // the bomb grace ends (see ShopSystem.isSoldOut). Purple crates are
+            // still where most of them come from.
+            Tab(name: "RAID", stock: .shelf([
+                Item(type: .bomb, price: 18)
+            ]))
         ]
 
         /// The most cards the shop can ever show at once, which is what the panel
@@ -573,7 +588,12 @@ enum GameConfig {
 
     enum Match {
         /// How long a match runs, in seconds.
-        static let duration: Double = 300
+        /// 3-minute matches (Oct 2026): 300 -> 180. Every match is three minutes
+        /// now. The clocks that pace a match - crate respawns, arcade payouts,
+        /// supply drops, bomb grace, bot raid and hunt urges, chest restocks - were
+        /// scaled to about 0.6 to match (each marked "3-minute matches"), so a
+        /// match plays out the same, faster. Combat timings were left alone.
+        static let duration: Double = 180
 
         /// How long into a match before bombs start turning up, in seconds.
         ///
@@ -599,7 +619,8 @@ enum GameConfig {
         /// arrived. Thirty seconds lets them start turning up early, and
         /// bombRampEnd keeps that start a trickle rather than a flood - nobody
         /// has a wall worth blowing open yet anyway.
-        static let bombGrace: Double = 30
+        /// 3-minute matches (Oct 2026): 30 -> 18.
+        static let bombGrace: Double = 18
 
         /// When the bomb supply reaches full strength, in seconds.
         ///
@@ -607,7 +628,8 @@ enum GameConfig {
         /// of its weight to all of it, so the supply grows in rather than
         /// switching on. The bots' free top-up waits for this too, which keeps
         /// their raiding starting where it always has.
-        static let bombRampEnd: Double = 90
+        /// 3-minute matches (Oct 2026): 90 -> 54.
+        static let bombRampEnd: Double = 54
 
         /// How much of its weight the bomb row carries the moment bombs start.
         static let bombStartShare: Double = 0.35
@@ -771,7 +793,8 @@ enum GameConfig {
         /// have - it makes a kill unambiguously worth taking - but it is a
         /// consequence of this number and not a decision anybody made. The dial
         /// that turns it back into a race is Arcade.tokenLifetime, not this one.
-        static let respawnDelay: Double = 10.0
+        /// 3-minute matches (Oct 2026): 10.0 -> 7.0.
+        static let respawnDelay: Double = 7.0
 
         /// The kit you come back in, by how far the match has run.
         ///
@@ -1116,7 +1139,8 @@ enum GameConfig {
         ///
         /// 20 now, with the raid urge below: bots raiding more is how they score
         /// more, and an urge with no bomb behind it buys nothing.
-        static let bombSupplyInterval: Double = 20
+        /// 3-minute matches (Oct 2026): 20 -> 12.
+        static let bombSupplyInterval: Double = 12
 
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
@@ -1267,7 +1291,8 @@ enum GameConfig {
         ///
         /// 15 now, from 25: a power-up sat in a bot's pocket is one you never
         /// have to face.
-        static let perkPatience: Double = 15
+        /// 3-minute matches (Oct 2026): 15 -> 10.
+        static let perkPatience: Double = 10
 
         /// How much likelier a power-up is in a crate a BOT opens.
         ///
@@ -1392,7 +1417,8 @@ enum GameConfig {
         /// 14...26 now. Raids are where points are, and a bot that raids twice as
         /// often scores like it - which is what keeps the scoreboard a contest
         /// rather than the player against seven bots on 400.
-        static let raidUrgeInterval: ClosedRange<Double> = 14...26
+        /// 3-minute matches (Oct 2026): 14...26 -> 8...16.
+        static let raidUrgeInterval: ClosedRange<Double> = 8...16
 
         /// How far a bot will travel for an enemy chest it could get at.
         ///
@@ -1413,7 +1439,8 @@ enum GameConfig {
         ///
         /// It does not tick down during a fight - see AIBrain.think - so a raid
         /// interrupted by a long scrap is not quietly timed out by it.
-        static let raidHold: Double = 30
+        /// 3-minute matches (Oct 2026): 30 -> 18.
+        static let raidHold: Double = 18
 
         /// How far outside a base a bot will still consider itself mid-raid.
         ///
@@ -1457,7 +1484,8 @@ enum GameConfig {
         /// It applies to everybody. Bot bases get raided constantly and keep
         /// resetting theirs, so in practice the pressure accumulates on whoever is
         /// being left alone - which is the player, and which is the point.
-        static let raidPressurePerSecond: Double = 0.5
+        /// 3-minute matches (Oct 2026): 0.5 -> 0.8.
+        static let raidPressurePerSecond: Double = 0.8
         static let raidPressureCap: Double = 60
         static let raidDistanceCost: Double = 1.0
 
@@ -1515,7 +1543,8 @@ enum GameConfig {
         /// are out looking at any moment and the rest are playing the match. That is
         /// the difference between the leader being under pressure and the leader
         /// being griefed.
-        static let huntUrgeInterval: ClosedRange<Double> = 25...50
+        /// 3-minute matches (Oct 2026): 25...50 -> 15...30.
+        static let huntUrgeInterval: ClosedRange<Double> = 15...30
 
         /// How long a bot will keep looking before giving up and going back to its
         /// own match.
@@ -1523,7 +1552,8 @@ enum GameConfig {
         /// A hunt that has found nobody is a bot walking away from its base for
         /// nothing, and thirty seconds of that is a tenth of a match spent on an
         /// errand with no payoff. It gives up, takes a fresh urge, and gets on.
-        static let huntPatience: Double = 30
+        /// 3-minute matches (Oct 2026): 30 -> 18.
+        static let huntPatience: Double = 18
 
         /// How far off a bot can pick a hunt's trail up from.
         ///
@@ -1574,7 +1604,8 @@ enum GameConfig {
         /// that hangs off this. Somebody learning the game still never meets any of
         /// it. That is the requirement, and the reason this is a measure of what
         /// you are doing to the other seven teams rather than a difficulty setting.
-        static let leadScale: Double = 560
+        /// 3-minute matches (Oct 2026): 560 -> 480.
+        static let leadScale: Double = 480
 
         /// The scale behind World.behind, which is what a losing bot sharpens up
         /// against - aim, reaction and how soon it starts spending.
@@ -1590,7 +1621,8 @@ enum GameConfig {
         /// leader-pointing half only. The losing half already fires when it should:
         /// against one runaway on three times the field, all seven bots correctly
         /// read as fully behind and all seven sharpen up.
-        static let deficitScale: Double = 700
+        /// 3-minute matches (Oct 2026): 700 -> 600.
+        static let deficitScale: Double = 600
 
         /// What a full leader's base is worth on top of what is in it.
         ///
@@ -1867,7 +1899,8 @@ enum GameConfig {
         /// It is not free for the raider either: twelve seconds is also plenty of
         /// time for the owner to come home, and the owner is not prevented from
         /// defending - only from answering a raid with masonry.
-        static let raidGrace: Double = 12
+        /// 3-minute matches (Oct 2026): 12 -> 8.
+        static let raidGrace: Double = 8
 
         /// Walls laid per trip while patching a breach.
         ///
@@ -2272,13 +2305,15 @@ enum GameConfig {
         /// Seconds between drops after the first, and how many a match gets.
         /// Three over the back 45%: one every forty-five seconds or so, so there
         /// is nearly always one to go and fight over in the closing minutes.
-        static let interval: Double = 45
+        /// 3-minute matches (Oct 2026): 45 -> 27.
+        static let interval: Double = 27
         static let maxDrops = 3
 
         /// Seconds a drop is locked after it lands. Long enough for everybody who
         /// saw it come down to get there - which is the point: the countdown is
         /// what turns a crate into a fight.
-        static let unlockTime: Double = 20
+        /// 3-minute matches (Oct 2026): 20 -> 12.
+        static let unlockTime: Double = 12
 
         /// Where they may land: within this share of the map's half-width of the
         /// middle, which is the contested ground, and at least this many tiles
@@ -2473,12 +2508,25 @@ enum GameConfig {
         /// from 15%, 10% rising to 22%, at most four; about three in the
         /// opening map.
         static let rareFrom: Double = 0.15
-        static let rareChanceEarly: Double = 0.10
-        static let rareChanceLate: Double = 0.22
+        ///
+        /// 12% rising to 34% now (Oct 2026), from 10% to 22%: purple crates are
+        /// the only crates with bombs in them, and late in a match there were not
+        /// enough of them about for the raiding the end of a match is for.
+        static let rareChanceEarly: Double = 0.12
+        static let rareChanceLate: Double = 0.34
 
         /// The most rare crates standing on the map at once, so a lucky run of
         /// respawns cannot carpet the map with them.
         static let maxRareCrates = 4
+
+        /// The same cap in the last stretch of a match, where it rises so the
+        /// higher late chance above is not simply held back by it.
+        static let maxRareCratesLate = 6
+        static let rareCapRisesAt: Double = 0.6
+
+        static func rareCap(at progress: Double) -> Int {
+            progress >= rareCapRisesAt ? maxRareCratesLate : maxRareCrates
+        }
 
         /// How heavily ONE of the three plain power-ups sits in a crate's table,
         /// by how far the match has run.
@@ -2591,7 +2639,8 @@ enum GameConfig {
 
         /// Seconds before an opened crate comes back, in the same spot. Without
         /// this the map is stripped bare a minute into a match.
-        static let respawnDelay: Double = 45
+        /// 3-minute matches (Oct 2026): 45 -> 27.
+        static let respawnDelay: Double = 27
     }
 
     enum Chest {
@@ -2704,7 +2753,8 @@ enum GameConfig {
         /// keep happening is bases being worth a second visit, and both the old
         /// rules pushed the other way - one removed the chest, the other made the
         /// wait long enough that nobody would have come back for what was in it.
-        static let restockAfterRaid: Double = 8
+        /// 3-minute matches (Oct 2026): 8 -> 5.
+        static let restockAfterRaid: Double = 5
 
         /// Seconds between a raided bot chest putting one item back.
         ///
@@ -2721,7 +2771,8 @@ enum GameConfig {
         /// one. A robbed base is worth calling on again about half a minute later
         /// instead of ninety seconds later, which is the difference between a map
         /// with places to break into and a map of empty rooms.
-        static let restockInterval: Double = 14
+        /// 3-minute matches (Oct 2026): 14 -> 8.
+        static let restockInterval: Double = 8
 
         /// The most a chest will refill itself to. Still under what a fresh one
         /// holds, so the first raid on a base is always the best one.
@@ -2928,7 +2979,8 @@ enum GameConfig {
         /// twenty-four token ornament into the reason to own a base.
         /// REDUCED (token pass): 3.2 -> 3.9. Machines were the biggest single
         /// source of tokens and let a player buy the ladder far too early.
-        static let emitInterval: Double = 3.9
+        /// 3-minute matches (Oct 2026): 3.9 -> 2.4.
+        static let emitInterval: Double = 2.4
 
         /// What a shut wall is worth, as a multiplier on the interval.
         ///
@@ -3060,8 +3112,10 @@ enum GameConfig {
         /// jackpot, much past a quarter leaves one going at all times, and a thing
         /// that is always happening stops being an event and becomes the weather.
         /// At 29% it was starting to feel like the weather.
-        static let jackpotDuration: Double = 8
-        static let jackpotInterval: Double = 20
+        /// 3-minute matches (Oct 2026): 8 -> 5.
+        static let jackpotDuration: Double = 5
+        /// 3-minute matches (Oct 2026): 20 -> 12.
+        static let jackpotInterval: Double = 12
         static let jackpotChance = 0.12
 
         /// What a jackpot does to the two numbers that decide a machine's output.

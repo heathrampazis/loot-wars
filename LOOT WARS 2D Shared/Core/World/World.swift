@@ -527,7 +527,7 @@ final class World {
 
             var placed = crate
             let rareStanding = lootboxes.values.filter { $0.rare }.count
-            if rareStanding < GameConfig.Loot.maxRareCrates {
+            if rareStanding < GameConfig.Loot.rareCap(at: matchProgress) {
                 placed.rare = Double.random(in: 0..<1, using: &rng)
                     < GameConfig.Loot.rareChance(at: matchProgress)
             }
