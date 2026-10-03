@@ -1245,7 +1245,21 @@ enum GameConfig {
 
         /// Seconds a bot will carry a power-up without a good moment before using
         /// it anyway.
-        static let perkPatience: Double = 25
+        ///
+        /// 15 now, from 25: a power-up sat in a bot's pocket is one you never
+        /// have to face.
+        static let perkPatience: Double = 15
+
+        /// How much likelier a power-up is in a crate a BOT opens.
+        ///
+        /// A deliberate thumb on the scale, like the bomb top-up in
+        /// AISystem.resupply, and for the same reason: power-ups make fights
+        /// harder and more fun, and the player should meet them in bots' hands
+        /// more often than they find them in crates. Two and a half times takes a
+        /// bot's crate from about one in eleven being a power-up to about one in
+        /// five early, and one in seven to one in three late. The player's crates
+        /// are untouched.
+        static let cratePerkBoost: Double = 2.5
 
         /// And even once the shooting stops, a beat before patching up. Winding a
         /// bandage on the same frame the last bullet lands is a tell that nobody is
@@ -2082,6 +2096,16 @@ enum GameConfig {
         /// the crate rows that ration them - decoration.
         static let suppliesChance = 0.55
 
+        /// The odds a bomb comes off a body, on its own and well under the stink
+        /// bomb's. Bots are topped up with a bomb whenever their pockets are empty
+        /// (AISystem.resupply), so at the shared 0.55 every bot you killed was half
+        /// a bomb - which, once crates stopped handing them out, would have been
+        /// where nearly all of yours came from.
+        ///
+        /// 0.1 (Oct 2026): one bot in ten, so a kill is very occasionally a bomb
+        /// rather than a reliable supply.
+        static let bombDropChance = 0.1
+
         /// The odds that a chest or a machine somebody was carrying survives them.
         ///
         /// Lower again, and the lowest of the three on purpose: a machine in a bag
@@ -2288,16 +2312,25 @@ enum GameConfig {
 
     enum Loot {
         /// Lootboxes scattered across the map.
-        /// How much likelier a bomb is inside a rare crate, on top of the bandage
-        /// and chest rows having been removed from it entirely.
+        /// The share of purple crates that are a bomb - the ONLY crates that hold
+        /// one (see LootTable.plain). A share rather than a weight, so it is the
+        /// same at level 1 as at level 50 however much else the crate can hold.
         ///
-        /// A gentle nudge rather than the two and a half it started at, and the
-        /// difference is arithmetic: with the filler rows gone, everything left is
-        /// already far likelier than it was, and 2.5 on top made a rare crate 55%
-        /// bombs - a jackpot that mostly pays out ammunition. At 1.15 it comes out
-        /// around half gear, a third bombs and the rest medkits, which is a crate
-        /// with nothing in it you would throw away and gear as the usual answer.
-        static let rareBombBoost: Double = 1.15
+        /// One in five: somewhat common, level with the power-ups and a little
+        /// under the gear, so a purple crate is a bomb often enough to be the
+        /// place you look for one and rarely enough that it is not what the crate
+        /// is for.
+        ///
+        /// 0.25 now, one in four - a touch more after playtesting.
+        static let rareBombShare: Double = 0.25
+
+        /// How much likelier a power-up is in a purple crate than its band says.
+        /// Three times: about one purple crate in six is a power-up.
+        static let rarePerkBoost: Double = 3.0
+
+        /// And gear (which a purple crate then bumps a rung - see
+        /// LootTable.upgraded). One and a half: about a third of purple crates.
+        static let rareGearBoost: Double = 1.5
 
         /// The most bombs that may be lying on the ground at once.
         ///
@@ -2465,6 +2498,10 @@ enum GameConfig {
             // trimmed to keep the singles' total where it was (20 / 28 / 36
             // against 21 / 27 / 36). Resistance is a new kind of power-up, not more
             // power-ups.
+            //
+            // Tried at 7 / 10 / 12 (Oct 2026) and they were everywhere. Bots get
+            // their extra power-ups from AI.cratePerkBoost instead, so the
+            // player's crates stay as they were.
             switch progress {
             case ..<0.35: return 5
             case ..<0.70: return 7
@@ -2695,6 +2732,10 @@ enum GameConfig {
         /// into somebody's base and breaking their chest under fire was a couple of
         /// bandages. That is a crate, and a crate costs nothing.
         ///
+        /// Bombs 3 now (Oct 2026), from 22: crates only hand them out from purple
+        /// ones, and a chest that was a bomb nearly every raid undid that. A chest
+        /// also gives its bomb up last - see ChestSystem.crack.
+        ///
         /// 46 of 142 now (bombs trimmed from 26 to 22 so they stay a find), a
         /// third, against 42 for bandages. With three
         /// or four items in a fresh chest and the best three of them coming out,
@@ -2703,22 +2744,22 @@ enum GameConfig {
         /// healing and bombs, which is what lets you keep raiding.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 22), (.stink, 12),
+                (.bandage, 42), (.medkit, 20), (.bomb, 3), (.stink, 12),
                 (.helmet(.common), 15), (.helmet(.epic), 8),
                 (.blaster(.two),   15), (.blaster(.three), 8)
             ]),
             (0.35, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 22), (.stink, 12),
+                (.bandage, 42), (.medkit, 20), (.bomb, 3), (.stink, 12),
                 (.helmet(.common), 8), (.helmet(.epic), 15),
                 (.blaster(.two),   15), (.blaster(.three), 8)
             ]),
             (0.65, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 22), (.stink, 12),
+                (.bandage, 42), (.medkit, 20), (.bomb, 3), (.stink, 12),
                 (.helmet(.epic), 15), (.helmet(.legendary), 8),
                 (.blaster(.three), 15), (.blaster(.four), 8)
             ]),
             (0.85, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 22), (.stink, 12),
+                (.bandage, 42), (.medkit, 20), (.bomb, 3), (.stink, 12),
                 (.helmet(.legendary), 15), (.helmet(.mythical), 8),
                 (.blaster(.four), 15), (.blaster(.five), 8)
             ])

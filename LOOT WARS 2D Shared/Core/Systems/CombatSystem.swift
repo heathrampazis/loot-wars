@@ -263,8 +263,12 @@ enum CombatSystem {
             // A bomb also waits for room on the ground - see Loot.maxLooseBombs.
             // Late fights are where most deaths happen, and without the cap they
             // were where most bombs came from.
-            case .bomb, .stink:
-                guard stack.type != .bomb || world.roomForLooseBomb else { break }
+            case .bomb:
+                guard world.roomForLooseBomb else { break }
+                drop(.item(stack.type), chance: GameConfig.Drops.bombDropChance,
+                     at: actor.position, in: world)
+
+            case .stink:
                 drop(.item(stack.type), chance: GameConfig.Drops.suppliesChance,
                      at: actor.position, in: world)
 

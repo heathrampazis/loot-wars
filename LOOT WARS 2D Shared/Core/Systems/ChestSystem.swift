@@ -353,9 +353,17 @@ enum ChestSystem {
             stack.map { (slot: slot, stack: $0) }
         }
 
+        // Bombs LAST, whatever their rarity says (Oct 2026). A bomb is Mythical,
+        // so it used to be the first thing out of every chest that had one - and
+        // a raid that always pays for the next raid is a chain nobody has to
+        // earn. Now it comes out only when the chest has little else in it.
+        func rank(_ type: ItemType) -> Int {
+            type == .bomb ? -1 : type.rarity.rawValue
+        }
+
         let ranked = held.sorted { left, right in
-            let a = left.stack.type.rarity
-            let b = right.stack.type.rarity
+            let a = rank(left.stack.type)
+            let b = rank(right.stack.type)
             return a == b ? left.slot < right.slot : a > b
         }
 

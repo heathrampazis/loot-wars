@@ -61,10 +61,14 @@ enum LootSystem {
                 // raiding somebody, and raiding has to stay the best thing you can
                 // do with a minute. It is also the difference between a crate you
                 // cross the map for and a crate you camp.
+                // Bots find power-ups more often than you do - see
+                // AI.cratePerkBoost.
+                let byBot = world.actors[id]?.ai != nil
                 let pickup = LootTable.roll(bombShare: world.bombShare,
                                             at: world.matchProgress,
                                             rare: rare,
                                             unlocks: world.unlocks,
+                                            perkBoost: byBot ? GameConfig.AI.cratePerkBoost : 1,
                                             using: &world.rng)
                 world.spawnGroundItem(pickup, at: box.position)
 
