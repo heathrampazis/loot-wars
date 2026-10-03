@@ -45,6 +45,9 @@ final class HotbarNode: SKNode {
     /// same square replaces it rather than stacking on top of it.
     private var payouts: [Int: SKNode] = [:]
     private var heldSlot: Int?
+
+    /// The "SELL +3" tag over a slot that is being held - see beginHold.
+    private var holdTag: SKNode?
     private var lastInventory: Inventory?
 
     /// The refusal currently sitting over the bar. Only ever one: tapping two
@@ -89,16 +92,116 @@ final class HotbarNode: SKNode {
     }
 
     /// Starts the squeeze on a slot being held down, and stops it again.
-    func beginHold(_ index: Int, duration: TimeInterval) {
+    /// - Parameter price: what selling this would pay, or nil for something the
+    ///   shop will not take - which gets the squeeze but no tag.
+    func beginHold(_ index: Int, duration: TimeInterval, price: Int? = nil) {
         endHold()
         guard slots.indices.contains(index) else { return }
         heldSlot = index
         slots[index].beginHold(duration: duration)
+
+        if let price, price > 0 {
+            showHoldTag(over: index, price: price, duration: duration)
+        }
     }
 
     func endHold() {
         if let held = heldSlot { slots[held].endHold() }
         heldSlot = nil
+
+        holdTag?.removeAllActions()
+        holdTag?.run(.sequence([.fadeOut(withDuration: 0.08), .removeFromParent()]))
+        holdTag = nil
+    }
+
+    /// Says what a hold is doing WHILE it does it: "SELL +3", over the slot, with
+    /// green filling it from the left until the sale goes through.
+    ///
+    /// Selling was the one thing on the bar nobody was told about - people found
+    /// it by holding something by accident and watching it vanish. A held finger
+    /// now explains itself, so an accidental hold is the lesson rather than the
+    /// surprise, and letting go before the green reaches the end is the way out.
+    ///
+    /// Held back for a tenth of a second, so an ordinary tap - which is over
+    /// before then - never flashes it.
+    private func showHoldTag(over index: Int, price: Int, duration: TimeInterval) {
+        let tag = SKNode()
+        tag.position = CGPoint(x: HotbarNode.centreX(of: index),
+                               y: HotbarNode.slotSize / 2 + 22)
+        tag.zPosition = 25
+        tag.alpha = 0
+
+        let word = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        word.text = "SELL"
+        word.fontSize = 14
+        word.fontColor = .white
+        word.horizontalAlignmentMode = .left
+        word.verticalAlignmentMode = .center
+        word.zPosition = 2
+
+        let amount = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        amount.text = "+\(price)"
+        amount.fontSize = 14
+        amount.fontColor = .white
+        amount.horizontalAlignmentMode = .left
+        amount.verticalAlignmentMode = .center
+        amount.zPosition = 2
+
+        let texture = ItemArt.texture(for: Pickup.token(1))
+        let coin = SKSpriteNode(texture: texture)
+        coin.size = ItemArt.size(of: texture, fittingInto: 16)
+        coin.zPosition = 2
+
+        // Laid out from what it holds, so "+1" and "+14" both sit centred.
+        let gap: CGFloat = 6
+        let padding: CGFloat = 11
+        let content = word.frame.width + gap + amount.frame.width + 3 + coin.size.width
+        let width = content + padding * 2
+        let height: CGFloat = 28
+
+        var x = -content / 2
+        word.position = CGPoint(x: x, y: 0)
+        x += word.frame.width + gap
+        amount.position = CGPoint(x: x, y: 0)
+        x += amount.frame.width + 3
+        coin.position = CGPoint(x: x + coin.size.width / 2, y: 0)
+
+        let outline = CGPath(roundedRect: CGRect(x: -width / 2, y: -height / 2,
+                                                 width: width, height: height),
+                             cornerWidth: height / 2, cornerHeight: height / 2,
+                             transform: nil)
+
+        let back = SKShapeNode(path: outline)
+        back.fillColor = SKColor(white: 0, alpha: 0.6)
+        back.strokeColor = .clear
+        tag.addChild(back)
+
+        // The fill, cropped to the pill so its square end never shows.
+        let mask = SKShapeNode(path: outline)
+        mask.fillColor = .white
+        mask.strokeColor = .clear
+
+        let crop = SKCropNode()
+        crop.maskNode = mask
+        crop.zPosition = 1
+        tag.addChild(crop)
+
+        let fill = SKSpriteNode(color: RenderPalette.sellButton,
+                                size: CGSize(width: width, height: height))
+        fill.anchorPoint = CGPoint(x: 0, y: 0.5)
+        fill.position = CGPoint(x: -width / 2, y: 0)
+        fill.xScale = 0
+        crop.addChild(fill)
+
+        tag.addChild(word)
+        tag.addChild(amount)
+        tag.addChild(coin)
+        addChild(tag)
+        holdTag = tag
+
+        let delay: TimeInterval = 0.1
+        tag.run(.sequence([.wait(forDuration: delay), .fadeIn(withDuration: 0.08)]))
+        fill.run(.scaleX(to: 1, duration: duration))
     }
 
     /// Rings one slot, or none. Kept out of `update` because arming is scene state

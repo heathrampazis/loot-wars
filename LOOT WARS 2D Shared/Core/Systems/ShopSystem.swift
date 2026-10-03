@@ -164,7 +164,13 @@ enum ShopSystem {
         // A bomb is not on the shelf any more, so it has no price to take a share
         // of - but it is still a thing you can be carrying four of with a wall
         // nowhere in sight, which is exactly the situation this feature is for.
-        guard let price = price(of: type) ?? GameConfig.Shop.offShelf[type] else { return 0 }
+        // EVERYTHING sells (Oct 2026). Anything without a shelf price or an
+        // off-shelf one used to be worth nothing, and the shop would refuse it -
+        // stink bombs were, and a player holding one down saw nothing happen. A
+        // price by rarity catches anything either list misses, now and in future.
+        let price = price(of: type)
+            ?? GameConfig.Shop.offShelf[type]
+            ?? GameConfig.Shop.priceByRarity(type.rarity)
         return max(1, Int((Double(price) * GameConfig.Shop.sellShare).rounded(.down)))
     }
 

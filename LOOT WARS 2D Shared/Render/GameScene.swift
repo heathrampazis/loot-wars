@@ -327,6 +327,19 @@ final class GameScene: SKScene {
     /// shot at feels like the game has stopped listening.
     private static let holdDuration: TimeInterval = 0.4
 
+    /// The same, for selling off the hotbar - a little longer, because a hold
+    /// there now says "SELL +3" and fills up while it waits (HotbarNode.beginHold),
+    /// and four tenths was over before anybody could read it. Long enough to see
+    /// what is about to happen and let go; short enough not to feel like a menu.
+    private static let sellHoldDuration: TimeInterval = 0.65
+
+    private static func holdDuration(for target: PendingPress.Target) -> TimeInterval {
+        switch target {
+        case .map:    return holdDuration
+        case .hotbar: return sellHoldDuration
+        }
+    }
+
     #if os(iOS) || os(tvOS)
     /// Which finger owns which control.
     private var moveTouch: UITouch?
@@ -1250,7 +1263,15 @@ final class GameScene: SKScene {
 
             case .sold(let slot, let tokens, let seller):
                 guard seller == world.localPlayerID else { break }
-                hotbar.reward(slot: slot, tokens: tokens)
+                SoundPlayer.shared.play(.purchase)
+
+                // Sold from the shop's SELL tab, the bar is hidden behind the
+                // panel, so the panel answers instead.
+                if shopPanel.isOpen {
+                    shopPanel.confirmSale()
+                } else {
+                    hotbar.reward(slot: slot, tokens: tokens)
+                }
 
             case .purchase(let bought, let buyer):
                 guard buyer == world.localPlayerID else { break }
@@ -1998,7 +2019,11 @@ extension GameScene {
                                target: target)
 
         if case .hotbar(let slot) = target {
-            hotbar.beginHold(slot, duration: GameScene.holdDuration)
+            let price = world.localPlayer?.inventory.stack(at: slot).map {
+                ShopSystem.sellPrice(of: $0.type)
+            }
+            hotbar.beginHold(slot, duration: GameScene.sellHoldDuration,
+                             price: GameScene.holdSells ? price : nil)
         }
 
         if case .map = target { beginPrising(at: touch.location(in: worldLayer)) }
@@ -2051,7 +2076,7 @@ extension GameScene {
     private func resolveHold(at now: TimeInterval) {
         guard var press = pending,
               !press.fired,
-              now - press.beganAt >= GameScene.holdDuration else { return }
+              now - press.beganAt >= GameScene.holdDuration(for: press.target) else { return }
 
         press.fired = true
         pending = press
@@ -2320,6 +2345,33 @@ extension GameScene {
         if shopPanel.isBackButton(atLocalPoint: point) {
             shopPanel.close()
             SoundPlayer.shared.play(.exit)
+            return
+        }
+
+        // BUY or SELL.
+        if let mode = shopPanel.tab(atLocalPoint: point) {
+            if mode != shopPanel.mode {
+                shopPanel.setMode(mode)
+                SoundPlayer.shared.play(.tap)
+            }
+            return
+        }
+
+        // A card in the SELL tab: sell that slot. Checked here as well as by the
+        // simulation so a refusal can be said out loud, as a purchase's is.
+        if let slot = shopPanel.sellSlot(atLocalPoint: point) {
+            guard let player = world.localPlayer,
+                  let stack = player.inventory.stack(at: slot),
+                  ShopSystem.sellPrice(of: stack.type) > 0 else {
+                shopPanel.refuse()
+                SoundPlayer.shared.play(.error)
+                return
+            }
+
+            queuedCommands.append(.sellItem(slot: slot))
+
+            // Somebody who has sold something knows selling exists.
+            Prefs.taughtSelling = true
             return
         }
 
