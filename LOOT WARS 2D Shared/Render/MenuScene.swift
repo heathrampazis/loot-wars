@@ -115,6 +115,7 @@ final class MenuScene: SKScene {
     /// The settings page and the About page behind it - see SettingsSheetContent.
     private let settingsContent = SettingsSheetContent()
     private let aboutContent = AboutSheetContent()
+    private let legalContent = LegalSheetContent()
 
     /// How to Play, behind the Info button - see HowToPlayContent.
     private let howToPlay = HowToPlayContent()
@@ -146,6 +147,17 @@ final class MenuScene: SKScene {
         aboutContent.onBack = { [weak self] in
             guard let self else { return }
             self.sheet.show(title: "SETTINGS", content: self.settingsContent)
+        }
+
+        // About to the Privacy Policy or the Terms, and back.
+        aboutContent.onOpen = { [weak self] document in
+            guard let self else { return }
+            self.legalContent.document = document
+            self.sheet.show(title: document.title.uppercased(), content: self.legalContent)
+        }
+        legalContent.onBack = { [weak self] in
+            guard let self else { return }
+            self.sheet.show(title: "ABOUT", content: self.aboutContent)
         }
 
         // A roadmap card to its own page, and back.

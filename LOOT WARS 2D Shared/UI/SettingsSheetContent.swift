@@ -229,9 +229,15 @@ final class AboutSheetContent: MenuSheetContent {
     /// Called when Back is tapped.
     var onBack: (() -> Void)?
 
+    /// Called when Terms of Use or Privacy Policy is tapped.
+    var onOpen: ((LegalDocument) -> Void)?
+
     private static let rowHeight: CGFloat = 44
     private static let headHeight: CGFloat = 58
-    private static let items = ["Terms of Service", "Privacy Policy", "Credits"]
+    private static let items = ["Terms of Use", "Privacy Policy", "Credits"]
+
+    /// What each row opens, or nil for a row that is not ready yet.
+    private static let documents: [LegalDocument?] = [.terms, .privacy, nil]
 
     private var width: CGFloat = 0
 
@@ -255,7 +261,7 @@ final class AboutSheetContent: MenuSheetContent {
         node.addChild(version)
 
         var top = -AboutSheetContent.headHeight
-        for item in AboutSheetContent.items {
+        for (index, item) in AboutSheetContent.items.enumerated() {
             node.addChild(Sheet.separator(width: width, y: top))
             let centreY = top - AboutSheetContent.rowHeight / 2
 
@@ -267,13 +273,19 @@ final class AboutSheetContent: MenuSheetContent {
             label.position = CGPoint(x: -width / 2 + 6, y: centreY)
             node.addChild(label)
 
-            let soon = SKLabelNode()
-            soon.attributedText = Sheet.text("Coming soon", size: 12, weight: .regular,
-                                             colour: SKColor(white: 0, alpha: 0.4))
-            soon.horizontalAlignmentMode = .right
-            soon.verticalAlignmentMode = .center
-            soon.position = CGPoint(x: width / 2 - 6, y: centreY)
-            node.addChild(soon)
+            if AboutSheetContent.documents[index] != nil {
+                let chevron = Sheet.chevron()
+                chevron.position = CGPoint(x: width / 2 - 10, y: centreY)
+                node.addChild(chevron)
+            } else {
+                let soon = SKLabelNode()
+                soon.attributedText = Sheet.text("Coming soon", size: 12, weight: .regular,
+                                                 colour: SKColor(white: 0, alpha: 0.4))
+                soon.horizontalAlignmentMode = .right
+                soon.verticalAlignmentMode = .center
+                soon.position = CGPoint(x: width / 2 - 6, y: centreY)
+                node.addChild(soon)
+            }
 
             top -= AboutSheetContent.rowHeight
         }
@@ -292,8 +304,18 @@ final class AboutSheetContent: MenuSheetContent {
     }
 
     func tap(at point: CGPoint) {
-        // Only the Back row does anything yet; the document rows light up when
-        // there are documents to open.
+        guard abs(point.x) <= width / 2 else { return }
+
+        // A document row opens it; Credits is not ready yet.
+        let row = Int((-AboutSheetContent.headHeight - point.y) / AboutSheetContent.rowHeight)
+        if point.y <= -AboutSheetContent.headHeight,
+           AboutSheetContent.documents.indices.contains(row),
+           let document = AboutSheetContent.documents[row] {
+            SoundPlayer.shared.play(.select)
+            onOpen?(document)
+            return
+        }
+
         let backTop = -AboutSheetContent.headHeight
             - AboutSheetContent.rowHeight * CGFloat(AboutSheetContent.items.count)
         guard abs(point.x) <= width / 2,
