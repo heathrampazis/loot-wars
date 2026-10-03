@@ -355,6 +355,13 @@ enum GameConfig {
         /// match with no way out but the grass.
         static let offShelf: [ItemType: Int] = [
             .bomb: 11,
+            // A rung under the bomb, as it is everywhere else. It was missing from
+            // this list, so a stink bomb was the one thing the shop would not
+            // take - see ShopSystem.sellPrice, which no longer lets that happen.
+            .stink: 9,
+            // The starter blaster, in case one is ever in a bag rather than in a
+            // hand. Half a Blaster 2.
+            .blaster(.one): 6,
             .chest: 14,
             .arcade(.full): 24,
             .arcade(.mini): 14,
@@ -399,6 +406,18 @@ enum GameConfig {
         /// think better of it, sell it back, and every price in here would stop
         /// meaning anything.
         static let sellShare: Double = 0.20
+
+        /// What something is notionally worth when nothing else names a price -
+        /// the floor under ShopSystem.sellPrice, so no item is ever unsellable.
+        static func priceByRarity(_ rarity: Rarity) -> Int {
+            switch rarity {
+            case .common:    return 6
+            case .epic:      return 10
+            case .legendary: return 14
+            case .mythical:  return 20
+            case .cosmic:    return 30
+            }
+        }
 
         /// What it costs to step UP one rung. One ladder of prices, and BOTH gear
         /// ladders use it.

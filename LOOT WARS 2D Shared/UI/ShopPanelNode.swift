@@ -118,7 +118,37 @@ final class ShopPanelNode: SKNode {
         let flash: SKShapeNode
 
         var type: ItemType?
+
+        /// Which of your slots this card is selling, in the SELL tab.
+        var slot: Int?
     }
+
+    /// The two halves of the shop: what it sells you, and what it will buy off
+    /// you. One at a time, behind two tabs in the header - selling used to be the
+    /// hotbar sprouting prices UNDER the panel while it was open, which was two
+    /// interfaces with two rules on one screen. A tab is one interface that can
+    /// be pointed at either.
+    enum Mode { case buy, sell }
+
+    private(set) var mode: Mode = .buy
+
+    private struct Tab {
+        let mode: Mode
+        let node: SKNode
+        let plate: SKShapeNode
+        let label: SKLabelNode
+    }
+
+    private var tabs: [Tab] = []
+
+    /// The picture on a SELL card at the moment it was tapped. The sale lands a
+    /// frame later, by which time the card may already be showing the next thing
+    /// in your bag - so what flies into the purse is taken from here.
+    private var saleSnapshot: (texture: SKTexture, size: CGSize, at: CGPoint)?
+    private static let tabSize = CGSize(width: 82, height: 28)
+
+    /// Said in the SELL tab when there is nothing in your bag.
+    private let emptyNote = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
     private let panel = SKShapeNode()
     private let back = SKNode()
@@ -186,6 +216,7 @@ final class ShopPanelNode: SKNode {
         addChild(panel)
 
         buildHeader(inside: size)
+        buildTabs(inside: size)
 
         for index in 0..<ShopPanelNode.slots {
             cards.append(makeCard(at: index))
@@ -252,6 +283,66 @@ final class ShopPanelNode: SKNode {
     /// unpositioned node sits at the origin, which for this panel is dead centre
     /// among the cards. The symptom is not a missing button, it is the shop
     /// closing when you tap an item.
+    private func buildTabs(inside size: CGSize) {
+        let centreY = size.height / 2 - ShopPanelNode.headerHeight / 2 - 4
+        let box = ShopPanelNode.tabSize
+        let gap: CGFloat = 6
+
+        for (index, mode) in [Mode.buy, Mode.sell].enumerated() {
+            let node = SKNode()
+            node.position = CGPoint(x: (CGFloat(index) - 0.5) * (box.width + gap), y: centreY)
+            node.zPosition = 2
+
+            let plate = SKShapeNode(rect: CGRect(x: -box.width / 2, y: -box.height / 2,
+                                                 width: box.width, height: box.height),
+                                    cornerRadius: box.height / 2)
+            plate.strokeColor = .clear
+            node.addChild(plate)
+
+            let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            label.text = mode == .buy ? "BUY" : "SELL"
+            label.fontSize = 14
+            label.horizontalAlignmentMode = .center
+            label.verticalAlignmentMode = .center
+            label.zPosition = 1
+            node.addChild(label)
+
+            addChild(node)
+            tabs.append(Tab(mode: mode, node: node, plate: plate, label: label))
+        }
+
+        emptyNote.text = "NOTHING TO SELL"
+        emptyNote.fontSize = 18
+        emptyNote.fontColor = SKColor(white: 1, alpha: 0.55)
+        emptyNote.horizontalAlignmentMode = .center
+        emptyNote.verticalAlignmentMode = .center
+        emptyNote.position = CGPoint(x: 0, y: -ShopPanelNode.headerHeight / 2)
+        emptyNote.isHidden = true
+        addChild(emptyNote)
+
+        drawTabs()
+    }
+
+    /// The chosen tab lit white, the other a quiet outline-free label.
+    private func drawTabs() {
+        for tab in tabs {
+            let chosen = tab.mode == mode
+            tab.plate.fillColor = chosen ? SKColor(white: 1, alpha: 0.92) : SKColor(white: 1, alpha: 0.08)
+            tab.label.fontColor = chosen ? RenderPalette.hudPanel : SKColor(white: 1, alpha: 0.75)
+        }
+    }
+
+    /// Switches between buying and selling, and deals the cards again so the
+    /// change is seen rather than snapped.
+    func setMode(_ mode: Mode) {
+        guard mode != self.mode else { return }
+        self.mode = mode
+        lastDrawn = []
+        lastPressed = nil
+        drawTabs()
+        pendingDeal = 0
+    }
+
     private func buildCloseButton(inside size: CGSize) {
         let box = ShopPanelNode.backSize
 
@@ -480,6 +571,10 @@ final class ShopPanelNode: SKNode {
         lastDrawn = []
         lastPressed = nil
 
+        // Always opens on BUY, which is what nearly every visit is for.
+        mode = .buy
+        drawTabs()
+
         // Comes up rather than appearing. A panel this size arriving between two
         // frames reads as a glitch - the eye gets no chance to follow where it came
         // from, so it has to re-find everything on it. An eighth of a second of
@@ -548,8 +643,52 @@ final class ShopPanelNode: SKNode {
             && abs(point.y) <= size.height / 2
     }
 
+    /// Which tab a tap landed on, or nil. A generous margin, like the close
+    /// button's.
+    func tab(atLocalPoint point: CGPoint) -> Mode? {
+        let box = ShopPanelNode.tabSize
+        for tab in tabs {
+            if abs(point.x - tab.node.position.x) <= box.width / 2 + 3,
+               abs(point.y - tab.node.position.y) <= box.height / 2 + 8 {
+                return tab.mode
+            }
+        }
+        return nil
+    }
+
+    /// Which of your slots a tap in the SELL tab landed on, or nil.
+    func sellSlot(atLocalPoint point: CGPoint) -> Int? {
+        guard mode == .sell else { return nil }
+        guard let index = cardIndex(atLocalPoint: point) else {
+            lastPressed = nil
+            return nil
+        }
+        lastPressed = index
+
+        let card = cards[index]
+        saleSnapshot = card.icon.texture.map {
+            (texture: $0, size: card.icon.size,
+             at: CGPoint(x: card.holder.position.x + card.icon.position.x,
+                         y: card.holder.position.y + card.icon.position.y))
+        }
+        return card.slot
+    }
+
+    private func cardIndex(atLocalPoint point: CGPoint) -> Int? {
+        let card = ShopPanelNode.cardSize
+        for (index, entry) in cards.enumerated()
+        where entry.type != nil && !entry.holder.isHidden {
+            if abs(point.x - entry.holder.position.x) <= card.width / 2,
+               abs(point.y - entry.holder.position.y) <= card.height / 2 {
+                return index
+            }
+        }
+        return nil
+    }
+
     /// Which item a tap landed on, or nil.
     func item(atLocalPoint point: CGPoint) -> ItemType? {
+        guard mode == .buy else { return nil }
         let card = ShopPanelNode.cardSize
 
         for (index, entry) in cards.enumerated()
@@ -666,6 +805,27 @@ final class ShopPanelNode: SKNode {
     /// fresh each time and thrown away after: it exists for a third of a second and
     /// a node kept around for that would be a node to keep in sync with a card
     /// whose contents change every purchase.
+    /// A sale went through: the item flies into the purse and the card flashes
+    /// green, the same answer a purchase gets in the other direction.
+    func confirmSale() {
+        guard let index = lastPressed, cards.indices.contains(index) else { return }
+
+        let card = cards[index]
+        if let snapshot = saleSnapshot {
+            fly(snapshot.texture, size: snapshot.size, from: snapshot.at,
+                to: CGPoint(x: purse.position.x - 21, y: purse.position.y))
+        }
+        saleSnapshot = nil
+        shake(card, washedIn: RenderPalette.placementValid, strength: 0.6)
+
+        purse.removeAction(forKey: "paid")
+        purse.setScale(1)
+        purse.run(.sequence([.scale(to: 1.25, duration: 0.08),
+                             .scale(to: 1, duration: 0.14)]), withKey: "paid")
+
+        lastPressed = nil
+    }
+
     private func pulse(_ card: Card) {
         let size = ShopPanelNode.cardSize
 
@@ -716,12 +876,18 @@ final class ShopPanelNode: SKNode {
     private func deliver(_ card: Card, to destination: CGPoint) {
         guard let texture = card.icon.texture else { return }
 
+        fly(texture, size: card.icon.size,
+            from: CGPoint(x: card.holder.position.x + card.icon.position.x,
+                          y: card.holder.position.y + card.icon.position.y),
+            to: destination)
+    }
+
+    /// A copy of a picture, flown in an arc and shrunk to nothing.
+    private func fly(_ texture: SKTexture, size: CGSize, from start: CGPoint,
+                     to destination: CGPoint) {
         let parcel = SKSpriteNode(texture: texture)
-        parcel.size = card.icon.size
-        parcel.position = CGPoint(
-            x: card.holder.position.x + card.icon.position.x,
-            y: card.holder.position.y + card.icon.position.y
-        )
+        parcel.size = size
+        parcel.position = start
         parcel.zPosition = 50
         addChild(parcel)
 
@@ -788,6 +954,12 @@ final class ShopPanelNode: SKNode {
     func update(with world: World) {
         guard isOpen, let player = world.localPlayer else { return }
 
+        guard mode == .buy else {
+            drawSellTab(for: player)
+            return
+        }
+        emptyNote.isHidden = true
+
         // The whole catalogue at once. What the gear half offers depends on what
         // you are wearing, so this comes from Core rather than straight out of the
         // config.
@@ -826,6 +998,7 @@ final class ShopPanelNode: SKNode {
             card.holder.position = ShopPanelNode.home(of: index, outOf: items.count)
 
             card.type = item.type
+            card.slot = nil
             card.name.text = ItemArt.name(for: item.type)
             card.icon.texture = texture
             card.icon.size = ItemArt.size(of: texture, fittingInto: 48)
@@ -854,6 +1027,68 @@ final class ShopPanelNode: SKNode {
         }
 
         // Last, so every card is where it belongs before anything moves.
+        if let delay = pendingDeal {
+            pendingDeal = nil
+            dealCards(from: delay)
+        }
+    }
+
+    /// The SELL tab: one card per thing in your bag, with what the shop pays for
+    /// it. Tap one to sell it - see GameScene.handleShopTouch.
+    private func drawSellTab(for player: Actor) {
+        let offers = ShopSystem.sellOffers(for: player)
+
+        // Redrawn when the purse or the bag changes, and not otherwise - the same
+        // rule as the BUY tab, for the same reason. The leading marker keeps a
+        // sell fingerprint from ever matching a buy one.
+        var fingerprint: [Int] = [-1, player.tokens, offers.count]
+        for offer in offers {
+            fingerprint += [offer.slot, offer.stack.type.hashValue, offer.stack.count, offer.price]
+        }
+
+        guard fingerprint != lastDrawn else { return }
+
+        lastDrawn = fingerprint
+        purse.text = "\(player.tokens)"
+        emptyNote.isHidden = !offers.isEmpty
+
+        for (index, var card) in cards.enumerated() {
+            guard index < offers.count else {
+                card.holder.isHidden = true
+                card.type = nil
+                card.slot = nil
+                cards[index] = card
+                continue
+            }
+
+            let offer = offers[index]
+            let type = offer.stack.type
+            let texture = ItemArt.texture(for: .item(type))
+
+            card.holder.isHidden = false
+            card.holder.position = ShopPanelNode.home(of: index, outOf: offers.count)
+
+            card.type = type
+            card.slot = offer.slot
+            card.name.text = offer.stack.count > 1
+                ? "\(ItemArt.name(for: type)) x\(offer.stack.count)"
+                : ItemArt.name(for: type)
+            card.icon.texture = texture
+            card.icon.size = ItemArt.size(of: texture, fittingInto: 48)
+            card.glow.color = RenderPalette.colour(of: type.rarity)
+
+            // A plus, because this is money coming IN - the one thing that tells
+            // the two tabs apart at a glance.
+            card.price.text = "+\(offer.price)"
+
+            let sellable = offer.price > 0
+            card.holder.alpha = sellable ? 1.0 : 0.45
+            card.pill.fillColor = sellable ? RenderPalette.affordable : RenderPalette.unaffordable
+            card.bevel.fillColor = sellable ? RenderPalette.affordableDeep : RenderPalette.unaffordableDeep
+
+            cards[index] = card
+        }
+
         if let delay = pendingDeal {
             pendingDeal = nil
             dealCards(from: delay)
