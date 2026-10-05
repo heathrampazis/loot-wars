@@ -44,6 +44,10 @@ final class BlockRenderer {
     }
 
     private var walls: [GridPoint: Wall] = [:]
+
+    /// False until the map has been drawn once, so the walls a match starts with
+    /// are simply there and only walls built after that grow in.
+    private var drawnOnce = false
     private var textureCache: [TextureKey: SKTexture] = [:]
 
     private enum Side {
@@ -109,8 +113,18 @@ final class BlockRenderer {
 
                 node.addChild(sprite)
                 walls[point] = Wall(sprite: sprite, owner: owner, mask: shape)
+
+                // A new wall grows up out of the ground rather than appearing
+                // whole: small, a little past full size, then settled.
+                if drawnOnce {
+                    sprite.setScale(0.2)
+                    let grow = SKAction.scale(to: 1.1, duration: 0.16)
+                    grow.timingMode = .easeOut
+                    sprite.run(.sequence([grow, .scale(to: 1, duration: 0.1)]))
+                }
             }
         }
+        drawnOnce = true
 
         // And whatever is no longer there - blown up, or taken back down.
         for (point, wall) in walls where !seen.contains(point) {

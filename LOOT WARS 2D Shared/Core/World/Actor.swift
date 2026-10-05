@@ -122,6 +122,14 @@ struct Actor {
     var assisted = false
     /// Seconds before easy controls will use another heal.
     var assistHealWait: Double = 0
+    /// Seconds before easy controls will lay another wall, or buy another heal.
+    var assistBuildWait: Double = 0
+    var assistBuyWait: Double = 0
+    /// How long easy controls has seen you stood just over your base's outline,
+    /// and the tile the base is following you to once that has gone on long
+    /// enough - see AssistSystem.basePlan.
+    var assistOutsideTime: Double = 0
+    var assistFollowing: GridPoint?
 
     /// Seconds until this actor may fire again.
     var shootCooldown: Double = 0

@@ -6,7 +6,10 @@
 //  attention on moving and shooting.
 //
 //  - A crate opens the moment you are in reach of it.
-//  - A heal is used when your health drops low.
+//  - A heal is used when your health drops low - bought first if you have none.
+//  - Your base follows you: walls go up on its outline as you walk along it,
+//    the outline moves out to meet you if you linger just outside it, and walls
+//    left inside the new outline come down as you pass them.
 //  - A shot fired roughly at somebody is bent onto them (aim help).
 //  - A power-up you are carrying switches on when a fight starts.
 //
@@ -28,6 +31,8 @@ enum AssistSystem {
             guard var actor = world.actors[id], actor.assisted, actor.ai == nil else { continue }
 
             actor.assistHealWait = max(0, actor.assistHealWait - dt)
+            actor.assistBuildWait = max(0, actor.assistBuildWait - dt)
+            actor.assistBuyWait = max(0, actor.assistBuyWait - dt)
             defer { world.actors[id] = actor }
             guard actor.isAlive else { continue }
 
@@ -58,11 +63,30 @@ enum AssistSystem {
             // fills you up, or the biggest if none does. A short wait after each,
             // so two can not go in the same instant and the heal reads as a beat.
             let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
-            if actor.assistHealWait <= 0,
-               healthLeft < GameConfig.Assist.healBelow,
-               let slot = ConsumableSystem.bestHeal(for: actor) {
-                added.append(.useItem(slot: slot))
-                actor.assistHealWait = GameConfig.Assist.healGap
+            if actor.assistHealWait <= 0, healthLeft < GameConfig.Assist.healBelow {
+                if let slot = ConsumableSystem.bestHeal(for: actor) {
+                    added.append(.useItem(slot: slot))
+                    actor.assistHealWait = GameConfig.Assist.healGap
+                } else if actor.assistBuyWait <= 0, let heal = bestHealToBuy(for: actor, in: world) {
+                    // Nothing in the bag: buy one. It is used on a later tick by
+                    // the line above, once it is in the bag.
+                    added.append(.buyItem(heal))
+                    actor.assistBuyWait = GameConfig.Assist.buyGap
+                }
+            }
+
+            // Walls: the next piece of your base where you are walking, or an old
+            // wall the base has moved out past. The plan is worked out every tick
+            // so the time spent outside it is counted even between walls.
+            let plan = basePlan(for: &actor, in: world, dt: dt)
+            if actor.assistBuildWait <= 0, let plan,
+               let change = nextWallChange(for: actor, plan: plan, in: world) {
+                added.append(change)
+                // Quicker while you are walking the route, so the wall keeps up.
+                let walkingRoute = actor.moveInput.length > 0.2
+                    && plan.isAlongOutline(GridPoint(containing: actor.feet))
+                actor.assistBuildWait = walkingRoute ? GameConfig.Assist.buildGapAlongPath
+                                                     : GameConfig.Assist.buildGap
             }
 
             // Power-ups: switched on when a fight starts - you were just hit, or
@@ -141,5 +165,104 @@ enum AssistSystem {
             }
         }
         return nil
+    }
+
+    // MARK: - Building
+
+    /// Your base as easy controls sees it, or nil when there is nothing to build:
+    /// out of your claim, just bombed, or already closed.
+    ///
+    /// Before your first wall the square sits round wherever you are. After that
+    /// it stays put until you have stood just over its outline for followDelay
+    /// seconds, and only then moves out to meet you - so walking past it, or out
+    /// of your base, leaves it alone. Noted on the actor so the markers draw the
+    /// same plan.
+    private static func basePlan(for actor: inout Actor, in world: World,
+                                 dt: Double) -> World.BasePlan? {
+        let feet = GridPoint(containing: actor.feet)
+        let base = world.enclosure(of: actor.team)
+
+        guard world.canBuild(actor.team),
+              world.claim(for: actor.team)?.contains(feet) == true,
+              !base.isSealed else {
+            actor.assistOutsideTime = 0
+            actor.assistFollowing = nil
+            return nil
+        }
+
+        if base.ownWalls.isEmpty {
+            actor.assistOutsideTime = 0
+            actor.assistFollowing = feet
+        } else {
+            let still = world.basePlan(for: actor.team, walls: base.ownWalls, towardsMiddle: true)
+            if still?.isJustOutside(feet) == true {
+                actor.assistOutsideTime += dt
+            } else {
+                actor.assistOutsideTime = 0
+            }
+            actor.assistFollowing = actor.assistOutsideTime >= GameConfig.Assist.followDelay
+                ? feet : nil
+        }
+
+        return world.basePlan(for: actor.team, walls: base.ownWalls,
+                              towardsMiddle: true, following: actor.assistFollowing)
+    }
+
+    /// The next wall to put up or take down near your feet, or nil.
+    ///
+    /// Up first: the nearest gap in the plan's outline within a step or so,
+    /// never the tile you are standing on. Failing that, down: one of your own
+    /// walls within reach that the plan has moved out past, so the base reshapes
+    /// round you rather than leaving its old outline standing inside the new one.
+    private static func nextWallChange(for actor: Actor, plan: World.BasePlan,
+                                       in world: World) -> Command? {
+        let base = world.enclosure(of: actor.team)
+
+        if let tile = nearest(plan.gaps, to: actor, where: {
+            !actor.overlaps($0) && BuildSystem.canPlace(at: $0, by: actor, in: world)
+        }) {
+            return .placeBlock(tile)
+        }
+
+        if let tile = nearest(Array(base.ownWalls), to: actor, where: {
+            plan.isInterior($0) && BuildSystem.canRemove(at: $0, by: actor, in: world)
+        }) {
+            return .removeBlock(tile)
+        }
+        return nil
+    }
+
+    /// The tile within build reach nearest your feet that passes the test, or nil.
+    /// A tie goes to the lower tile so the same spot always gives the same answer.
+    private static func nearest(_ tiles: [GridPoint], to actor: Actor,
+                                where allowed: (GridPoint) -> Bool) -> GridPoint? {
+        var best: (tile: GridPoint, away: Double)?
+        for tile in tiles {
+            let centre = Vec2(x: Double(tile.col) + 0.5, y: Double(tile.row) + 0.5)
+            let away = (centre - actor.feet).length
+            guard away <= GameConfig.Assist.buildReach else { continue }
+            if let current = best {
+                if away > current.away { continue }
+                if away == current.away,
+                   (tile.row, tile.col) > (current.tile.row, current.tile.col) { continue }
+            }
+            guard allowed(tile) else { continue }
+            best = (tile, away)
+        }
+        return best?.tile
+    }
+
+    // MARK: - Buying heals
+
+    /// The biggest heal on the shelf you can afford, as the quick buy offers it.
+    private static func bestHealToBuy(for actor: Actor, in world: World) -> ItemType? {
+        GameConfig.Shop.tabs
+            .flatMap { tab -> [GameConfig.Shop.Item] in
+                if case .shelf(let items) = tab.stock { return items }
+                return []
+            }
+            .filter { $0.type.isHealing && ShopSystem.canBuy($0.type, actor: actor, in: world) }
+            .max { $0.price < $1.price }?
+            .type
     }
 }
