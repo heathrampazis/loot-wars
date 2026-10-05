@@ -384,6 +384,28 @@ final class World {
         self.actors = spawned
         self.localPlayerID = local
         self.rng = rng
+
+        // Names: the player's own until the screen sets it, and a different
+        // handle for every bot, drawn from the world's generator so a seed
+        // replays with the same names. Sorted, so the draw order is fixed.
+        var pool = PlayerNames.bots.shuffled(using: &self.rng)
+        for id in actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            if id == local {
+                actors[id]?.name = PlayerNames.defaultName
+            } else {
+                actors[id]?.name = pool.isEmpty ? "bot \(id.raw)" : pool.removeFirst()
+            }
+        }
+    }
+
+    /// Sets the player's own name - from Settings, before the first step.
+    func setLocalName(_ name: String) {
+        actors[localPlayerID]?.name = PlayerNames.clean(name)
+    }
+
+    /// Whoever plays for a team - one actor a team - by name.
+    func name(of team: TeamID) -> String {
+        actors.values.first { $0.team == team }?.name ?? ""
     }
 
     var localPlayer: Actor? { actors[localPlayerID] }

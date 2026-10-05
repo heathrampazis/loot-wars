@@ -110,7 +110,12 @@ final class MenuScene: SKScene {
     private var playButton: MenuButtonNode?
     private var infoButton: MenuButtonNode?
     private var settingsButton: MenuButtonNode?
-    private let sheet = MenuSheetNode()
+
+    /// Your nickname, above Play. The box is drawn in SpriteKit; the words in it
+    /// are a real system text field laid over it - see placeNameInput.
+    fileprivate var nameField: NameFieldNode?
+    fileprivate let nameInput = UITextField()
+    fileprivate let sheet = MenuSheetNode()
 
     /// The settings page and the About page behind it - see SettingsSheetContent.
     private let settingsContent = SettingsSheetContent()
@@ -130,7 +135,7 @@ final class MenuScene: SKScene {
 
     /// Set once the scene has handed the game over, so a second tap on a button
     /// that is still animating cannot present a second match.
-    private var starting = false
+    fileprivate var starting = false
 
     class func newMenuScene() -> MenuScene {
         let scene = MenuScene(size: CGSize(width: 1024, height: 768))
@@ -175,10 +180,17 @@ final class MenuScene: SKScene {
         // Before anything asks for a sound. See SoundPlayer.warm.
         SoundPlayer.shared.warm()
 
+        setUpNameInput(in: view)
+
         backgroundColor = RenderPalette.floorLight
         removeAllChildren()
         buildScenery()
         build()
+    }
+
+    override func willMove(from view: SKView) {
+        nameInput.resignFirstResponder()
+        nameInput.removeFromSuperview()
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -242,6 +254,8 @@ final class MenuScene: SKScene {
         // is cached rather than redrawn: a full-screen blur every frame was
         // costing the frames a scrolling sheet needs. It picks up where it left
         // off when the sheet closes.
+        fadeNameInput(dt: dt)
+
         let frozen = sheet.isOpen
         if blur.shouldRasterize != frozen { blur.shouldRasterize = frozen }
         if !frozen {
@@ -292,17 +306,26 @@ final class MenuScene: SKScene {
         // rather than the buttons running off the sides.
         let unit = min(size.height, size.width / 1.9)
 
-        // The name near the top, the wide play button dead centre, the two
-        // squares under it either side of the middle.
-        buildWordmark(centredOn: CGPoint(x: middle.x, y: middle.y + unit * 0.346),
+        // The name near the top, your nickname under it, the wide play button
+        // just below the middle, the two squares under it either side.
+        //
+        // The nickname box sits in the top third on purpose: the keyboard comes
+        // up over the bottom half in landscape, and the box has to stay in sight
+        // while you type into it.
+        buildWordmark(centredOn: CGPoint(x: middle.x, y: middle.y + unit * 0.37),
                       fontSize: unit * 0.2)
 
+        let playWidth = unit * 0.645
+        buildNameField(centredOn: CGPoint(x: middle.x, y: middle.y + unit * 0.19),
+                       width: playWidth,
+                       height: min(46, max(32, unit * 0.095)))
+
         let squareSide = unit * 0.184
-        buildButtons(centredOn: middle,
-                     playSize: CGSize(width: unit * 0.645, height: unit * 0.301),
+        buildButtons(centredOn: CGPoint(x: middle.x, y: middle.y - unit * 0.03),
+                     playSize: CGSize(width: playWidth, height: unit * 0.27),
                      squareSide: squareSide,
                      squareOffset: unit * 0.144,
-                     squareRowY: middle.y - unit * 0.316)
+                     squareRowY: middle.y - unit * 0.33)
 
         buildRecord()
 
@@ -376,6 +399,27 @@ final class MenuScene: SKScene {
                                        .moveBy(x: 0, y: -5, duration: 2.3)])
         float.timingMode = .easeInEaseOut
         wordmark.run(.repeatForever(float), withKey: "float")
+    }
+
+    private func buildNameField(centredOn centre: CGPoint, width: CGFloat, height: CGFloat) {
+        nameInput.resignFirstResponder()
+        nameField?.removeFromParent()
+
+        let field = NameFieldNode(width: width, height: height)
+        field.position = centre
+        field.zPosition = 10
+        field.alpha = 0
+        field.run(.fadeAlpha(to: 1, duration: 0.15))
+        addChild(field)
+        nameField = field
+        placeNameInput()
+    }
+
+    /// The saved name as the box shows it: nothing (so the placeholder) until
+    /// one has been chosen.
+    fileprivate static var shownName: String {
+        let name = Prefs.playerName
+        return name == PlayerNames.defaultName ? "" : name
     }
 
     private func buildButtons(centredOn playCentre: CGPoint,
@@ -524,6 +568,23 @@ final class MenuScene: SKScene {
 
         guard !starting else { return }
 
+        // The nickname box: a tap on it starts typing, a tap anywhere else stops
+        // it and saves - and still does whatever that tap was for, so tapping Play
+        // straight from the keyboard plays with the new name.
+        if let field = nameField,
+           field.contains(localPoint: CGPoint(x: point.x - field.position.x,
+                                              y: point.y - field.position.y)) {
+            // The text field takes taps on the words itself; this is the tile
+            // and the margins round it.
+            if !nameInput.isFirstResponder {
+                nameInput.becomeFirstResponder()
+            }
+            return
+        }
+        if nameInput.isFirstResponder {
+            nameInput.resignFirstResponder()
+        }
+
         if let play = playButton,
            play.contains(localPoint: CGPoint(x: point.x - play.position.x,
                                              y: point.y - play.position.y)) {
@@ -601,4 +662,87 @@ final class MenuScene: SKScene {
         sheet.dragEnded(localPoint: touch.location(in: sheet))
     }
     #endif
+}
+
+// MARK: - Typing your nickname
+
+extension MenuScene: UITextFieldDelegate {
+
+    /// The text field that holds your nickname, laid over the box. Set up once;
+    /// placed by placeNameInput whenever the box is built.
+    fileprivate func setUpNameInput(in view: SKView) {
+        nameInput.delegate = self
+        nameInput.borderStyle = .none
+        nameInput.backgroundColor = .clear
+        nameInput.textAlignment = .left
+        nameInput.autocapitalizationType = .none
+        nameInput.autocorrectionType = .no
+        nameInput.spellCheckingType = .no
+        nameInput.smartInsertDeleteType = .no
+        nameInput.textContentType = .nickname
+        nameInput.returnKeyType = .done
+        nameInput.clearButtonMode = .whileEditing
+        nameInput.textColor = RenderPalette.menuInk
+        nameInput.tintColor = RenderPalette.menuInfo.edge
+        nameInput.text = MenuScene.shownName
+        nameInput.alpha = 0
+        if nameInput.superview !== view { view.addSubview(nameInput) }
+    }
+
+    /// Lines the text field up with the box, in the view's own coordinates.
+    func placeNameInput() {
+        guard let view, let field = nameField else { return }
+        let rect = field.textRect
+        let topLeft = view.convert(CGPoint(x: field.position.x + rect.minX,
+                                           y: field.position.y + rect.maxY), from: self)
+        let bottomRight = view.convert(CGPoint(x: field.position.x + rect.maxX,
+                                               y: field.position.y + rect.minY), from: self)
+        nameInput.frame = CGRect(x: topLeft.x, y: topLeft.y,
+                                 width: bottomRight.x - topLeft.x,
+                                 height: bottomRight.y - topLeft.y)
+
+        let fontSize = (field.size.height * 0.4).rounded()
+        nameInput.font = UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        nameInput.attributedPlaceholder = NSAttributedString(
+            string: "Enter your nickname",
+            attributes: [.font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
+                         .foregroundColor: UIColor(white: 0, alpha: 0.38)])
+    }
+
+    /// Fades the text field with the box: out while a sheet is up or a match is
+    /// starting, since a system view always draws over the whole scene.
+    func fadeNameInput(dt: TimeInterval) {
+        let wanted: CGFloat = (sheet.isOpen || starting || nameField == nil) ? 0 : 1
+        let step = CGFloat(dt) * 8
+        let alpha = wanted > nameInput.alpha ? min(wanted, nameInput.alpha + step)
+                                             : max(wanted, nameInput.alpha - step)
+        if alpha != nameInput.alpha { nameInput.alpha = alpha }
+        let usable = alpha > 0.5
+        if nameInput.isUserInteractionEnabled != usable { nameInput.isUserInteractionEnabled = usable }
+    }
+
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        nameField?.isEditing = true
+    }
+
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        Prefs.playerName = textField.text ?? ""
+        textField.text = MenuScene.shownName
+        nameField?.isEditing = false
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return false
+    }
+
+    /// Only what a name may hold, and no longer than a name may be.
+    func textField(_ textField: UITextField,
+                   shouldChangeCharactersIn range: NSRange,
+                   replacementString string: String) -> Bool {
+        guard string.allSatisfy(PlayerNames.allows) else { return false }
+        let current = (textField.text ?? "") as NSString
+        let next = current.replacingCharacters(in: range, with: string)
+        return next.count <= PlayerNames.maxLength
+    }
 }

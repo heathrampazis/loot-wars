@@ -38,6 +38,17 @@ final class ActorRenderer {
     // Seconds an enemy's bar takes to fade out once it has lingered.
     private static let enemyBarFade: Double = 0.4
 
+    // The name tag over the bar: white on a see-through black pill, the same
+    // dark the hotbar slots use, so it reads on grass and sand alike without
+    // an outline round the letters.
+    private static let nameFontSize: CGFloat = 10
+    private static let nameHeight: CGFloat = 16
+    private static let namePadding: CGFloat = 6
+    private static let nameDot: CGFloat = 7
+    private static let nameGap: CGFloat = 3
+    // How quickly a tag settles at its new height when a bar comes or goes.
+    private static let nameSettleRate: Double = 14
+
     /// How far you walk per step, in tiles, and how high the figure rises on one.
     ///
     /// The stride is shared with EffectsRenderer, which puts a tuft of disturbed
@@ -158,6 +169,13 @@ final class ActorRenderer {
         // The whole overhead bar, track and fill, so it can be shown and hidden as one.
         let bar: SKNode
 
+        /// The name over the bar, redrawn only when the name itself changes.
+        let nameTag = SKNode()
+        var lastName: String?
+        /// Where the tag sits over a showing bar, and where it drops to without one.
+        var nameHighY: CGFloat = 0
+        var nameLowY: CGFloat = 0
+
         init(sprite: SKSpriteNode,
              healthFill: SKShapeNode,
              bar: SKNode,
@@ -209,6 +227,19 @@ final class ActorRenderer {
                 nodes.bar.alpha = 1
             } else if nodes.bar.alpha > 0 {
                 nodes.bar.alpha = max(0, nodes.bar.alpha - CGFloat(dt / ActorRenderer.enemyBarFade))
+            }
+
+            // Names always show, so you can tell who is who before anyone is hit.
+            // Over the bar while it shows, then down into its place once it has
+            // faded, so the name never floats over a gap.
+            let nameY = nodes.nameLowY + (nodes.nameHighY - nodes.nameLowY) * nodes.bar.alpha
+            let settle = CGFloat(1 - exp(-dt * ActorRenderer.nameSettleRate))
+            nodes.nameTag.position.y += (nameY - nodes.nameTag.position.y) * settle
+
+            if nodes.lastName != actor.name {
+                nodes.lastName = actor.name
+                ActorRenderer.dress(nodes.nameTag, with: actor.name, team: actor.team,
+                                    mine: id == world.localPlayerID)
             }
 
             // The walk. Distance covered since the last frame turns the cycle, so
@@ -318,6 +349,57 @@ final class ActorRenderer {
         }
     }
 
+    // MARK: - Name tags
+
+    /// The tag's typeface, kept as a UIFont too so the words can be centred on
+    /// their capitals rather than on the font's whole box - which leaves room
+    /// for descenders under every name and makes it sit high in its pill.
+    private static let nameFont = UIFont(name: "AvenirNext-Bold", size: nameFontSize)
+        ?? UIFont.boldSystemFont(ofSize: nameFontSize)
+
+    /// Fills a name tag: a team-coloured dot and the name in white, on a dark
+    /// pill sized to fit. The dot is the same one the leaderboard uses, so a
+    /// name over a head and a row on the board read as the same person.
+    private static func dress(_ tag: SKNode, with name: String, team: TeamID, mine: Bool) {
+        tag.removeAllChildren()
+        guard !name.isEmpty else { return }
+
+        let label = SKLabelNode(fontNamed: nameFont.fontName)
+        label.fontSize = nameFontSize
+        label.fontColor = SKColor(white: 1, alpha: mine ? 1 : 0.92)
+        label.horizontalAlignmentMode = .left
+        label.verticalAlignmentMode = .baseline
+        label.text = name
+        label.zPosition = 1
+
+        let dot = nameDot
+        let gap: CGFloat = 4
+        let textWidth = ceil(label.frame.width)
+        let width = (namePadding + dot + gap + textWidth + namePadding + 0.5).rounded()
+        let left = -width / 2
+
+        let pill = SKShapeNode(rect: CGRect(x: left, y: -nameHeight / 2,
+                                            width: width, height: nameHeight),
+                               cornerRadius: nameHeight / 2)
+        pill.fillColor = SKColor(white: 0, alpha: mine ? 0.6 : 0.5)
+        pill.strokeColor = .clear
+        tag.addChild(pill)
+
+        let swatch = SKShapeNode(circleOfRadius: dot / 2)
+        swatch.fillColor = RenderPalette.vibrantColour(for: team)
+        swatch.strokeColor = .black
+        swatch.lineWidth = 1
+        swatch.position = CGPoint(x: left + namePadding + dot / 2, y: 0)
+        swatch.zPosition = 1
+        tag.addChild(swatch)
+
+        // Baseline half a cap height below the middle, so the capitals sit dead
+        // centre whatever the name is.
+        label.position = CGPoint(x: left + namePadding + dot + gap,
+                                 y: -(nameFont.capHeight / 2).rounded())
+        tag.addChild(label)
+    }
+
     // MARK: - Building
 
     private func makeNodes(for actor: Actor) -> ActorNodes {
@@ -360,7 +442,8 @@ final class ActorRenderer {
             label.alpha = 0.8
             label.verticalAlignmentMode = .bottom
             label.position = CGPoint(x: 0, y: bar.position.y
-                                     + GridGeometry.length(ofTiles: ActorRenderer.barHeightInTiles))
+                                     + GridGeometry.length(ofTiles: ActorRenderer.barHeightInTiles)
+                                     + ActorRenderer.nameGap + ActorRenderer.nameHeight)
             goalLabel = label
         }
 
@@ -407,6 +490,14 @@ final class ActorRenderer {
         nodes.root.addChild(nodes.body)
         nodes.root.addChild(bar)
         if let goalLabel { nodes.root.addChild(goalLabel) }
+
+        let barHalf = GridGeometry.length(ofTiles: ActorRenderer.barHeightInTiles / 2)
+        nodes.nameHighY = bar.position.y + barHalf + ActorRenderer.nameGap + ActorRenderer.nameHeight / 2
+        nodes.nameLowY = bar.position.y - barHalf + ActorRenderer.nameHeight / 2
+        // Starts over the bar, which starts showing; it follows the bar down from there.
+        nodes.nameTag.position = CGPoint(x: 0, y: nodes.nameHighY)
+        nodes.nameTag.zPosition = 2
+        nodes.root.addChild(nodes.nameTag)
 
         // Everybody breathes at the same rate and nobody breathes together. Eight
         // figures rising and falling in step is a chorus line, and it is the single

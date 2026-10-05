@@ -451,6 +451,7 @@ final class GameScene: SKScene {
         world.unlocks = Progress.matchUnlocks
         world.duration = Progress.matchLength
         world.difficulty = Prefs.difficulty
+        world.setLocalName(Prefs.playerName)
 
         // Before anything draws an item, so a turret on the floor is in your
         // colour from the first frame - see ItemArt.viewer.
