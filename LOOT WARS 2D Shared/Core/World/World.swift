@@ -177,6 +177,15 @@ final class World {
     /// What each team has scored. The leaderboard reads this and nothing else.
     private(set) var scores: [TeamID: Int] = [:]
 
+    /// What each player did this match - see MatchStats. Only ever written to
+    /// during a match; the results screen is the one thing that reads it.
+    private(set) var stats: [ActorID: MatchStats] = [:]
+
+    /// Adds to a player's match stats.
+    func tally(_ id: ActorID, _ change: (inout MatchStats) -> Void) {
+        change(&stats[id, default: MatchStats()])
+    }
+
     func score(for team: TeamID) -> Int { scores[team] ?? 0 }
 
     /// The leading score, or zero before anyone has any. What a bot measures a
@@ -284,6 +293,7 @@ final class World {
         guard count > 0, var actor = actors[id] else { return }
         actor.tokens += count
         actors[id] = actor
+        tally(id) { $0.tokensEarned += count }
     }
 
     func award(_ points: Int, to team: TeamID) {

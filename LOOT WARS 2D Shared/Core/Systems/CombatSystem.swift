@@ -82,6 +82,11 @@ enum CombatSystem {
         let taken = max(1, Int((Double(max(1, amount))
                                 * actor.damageTakenShare).rounded()))
 
+        if let attacker, let source = world.actors[attacker], source.team != actor.team {
+            let dealt = min(taken, actor.health)
+            world.tally(attacker) { $0.damageDealt += dealt }
+        }
+
         actor.health -= taken
         actor.secondsSinceHit = 0
 
@@ -131,7 +136,11 @@ enum CombatSystem {
 
             earned.points = points
             world.award(points, to: killer.team)
+
+            world.tally(attacker) { $0.kills += 1 }
         }
+
+        world.tally(actor.id) { $0.deaths += 1 }
 
         world.record(.kill(victim: actor.id, by: attacker, at: actor.position,
                            points: earned.points, tokens: earned.tokens))
