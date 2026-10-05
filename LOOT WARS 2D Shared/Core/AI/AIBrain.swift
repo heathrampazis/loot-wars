@@ -1126,7 +1126,7 @@ enum AIBrain {
 
         let crowd = gang(on: quarry, except: actor.id, in: world)
         guard crowd.fighting > 0,
-              crowd.fighting + crowd.coming < GameConfig.AI.gangSize else { return nil }
+              crowd.fighting + crowd.coming < world.difficulty.gangSize else { return nil }
 
         return .hunt(quarry.id)
     }
@@ -1151,7 +1151,7 @@ enum AIBrain {
             raiders += 1
         }
 
-        guard raiders > 0, raiders < GameConfig.AI.gangSize else { return nil }
+        guard raiders > 0, raiders < world.difficulty.gangSize else { return nil }
 
         if world.baseIsBreached(runaway) {
             return remaining(at: runaway, for: actor, in: world)

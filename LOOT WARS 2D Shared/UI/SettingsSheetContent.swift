@@ -154,7 +154,7 @@ final class SettingsSheetContent: MenuSheetContent {
             SoundPlayer.shared.play(.select)
 
         case .difficulty:
-            Prefs.difficulty = Prefs.difficulty == .hard ? .easy : .hard
+            Prefs.difficulty = Prefs.difficulty.next
             SoundPlayer.shared.play(.select)
             paintDifficultyButton()
             difficultyButton?.run(.sequence([.scale(to: 0.9, duration: 0.05),
@@ -202,10 +202,10 @@ final class SettingsSheetContent: MenuSheetContent {
         node.addChild(small)
     }
 
-    /// Easy or Hard, on a pill the same size as the tips button. Tapping the row
-    /// switches it; the next match is played on whichever it shows.
+    /// Easy, Medium, Hard or Hardcore, on a pill. Tapping the row steps to the
+    /// next one round; the next match is played on whichever it shows.
     private func addDifficultyButton(y: CGFloat) {
-        let size = CGSize(width: 76, height: 30)
+        let size = CGSize(width: 92, height: 30)
         let button = SKShapeNode(rect: CGRect(x: -size.width / 2, y: -size.height / 2,
                                               width: size.width, height: size.height),
                                  cornerRadius: size.height / 2)
@@ -226,7 +226,13 @@ final class SettingsSheetContent: MenuSheetContent {
 
     private func paintDifficultyButton() {
         let difficulty = Prefs.difficulty
-        let tone = difficulty == .easy ? RenderPalette.menuPlay : RenderPalette.menuSettings
+        let tone: RenderPalette.MenuTone
+        switch difficulty {
+        case .easy:     tone = RenderPalette.menuPlay
+        case .medium:   tone = RenderPalette.menuCaution
+        case .hard:     tone = RenderPalette.menuSettings
+        case .hardcore: tone = RenderPalette.menuDanger
+        }
         difficultyButton?.fillColor = tone.face
         difficultyButton?.strokeColor = tone.edge
         difficultyLabel?.attributedText = Sheet.text(difficulty.title, size: 13, weight: .bold,
