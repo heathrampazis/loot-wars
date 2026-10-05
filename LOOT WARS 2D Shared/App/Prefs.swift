@@ -158,10 +158,19 @@ enum Prefs {
 
     /// Every feature unlocked in matches, whatever your level - for testing the
     /// whole game together. Your real level and XP are untouched.
+    ///
+    /// No longer switchable in the app: the Settings row was removed for
+    /// release. To test with it, set `devModeForced` to true below and build.
+    /// The saved value is ignored, so a phone that had it switched on during
+    /// testing goes back to normal play.
     static var devMode: Bool {
-        get { store.bool(forKey: Key.devMode) }
+        get { devModeForced }
         set { store.set(newValue, forKey: Key.devMode) }
     }
+
+    /// Flip to true to play every match with everything unlocked. Must be false
+    /// in anything shipped.
+    static let devModeForced = false
 
     static func forgetLessons() {
         taughtSelling = false
