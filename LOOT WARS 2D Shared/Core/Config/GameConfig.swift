@@ -954,6 +954,28 @@ enum GameConfig {
         static let perkHitWithin: Double = 1.0
         /// Health back is only switched on below this share of full health.
         static let regenBelow: Double = 0.75
+
+        /// Building for you: a recommended wall tile this close to your feet, in
+        /// tiles, goes up as you walk past it...
+        static let buildReach: Double = 1.6
+        /// ...one at a time, this many seconds apart, so the wall is seen going up
+        /// rather than appearing all at once.
+        static let buildGap: Double = 0.45
+        /// The gap while you are walking along the outline itself, so the wall
+        /// keeps pace with you down the route.
+        static let buildGapAlongPath: Double = 0.22
+        /// The smallest side of the square easy controls build, in tiles. Eight
+        /// in a nine-tile claim: a roomy base with a tile to spare round it,
+        /// rather than the tightest square that counts.
+        static let baseSide = 8
+        /// Seconds you have to stay just outside your base's outline before it
+        /// moves out to meet you. Long enough that walking past, or out of the
+        /// base, leaves it where it is.
+        static let followDelay: Double = 1.2
+
+        /// Hurt with no heal in the bag, the best one you can afford is bought for
+        /// you, then used. No more often than this, in seconds.
+        static let buyGap: Double = 1.0
     }
 
     enum AI {

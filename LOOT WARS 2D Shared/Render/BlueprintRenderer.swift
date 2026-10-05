@@ -103,13 +103,6 @@ final class BlueprintRenderer {
     /// without drawing the wall for you.
     private static let maximum = 4
 
-    /// The shortest side a recommended base can have.
-    ///
-    /// Six, because the smallest legal base encloses sixteen tiles - a four-by-four
-    /// room - and the outline round a four-by-four is six by six. Anything smaller
-    /// would be recommending a shape that does not count when it is finished.
-    private static let smallestSide = 6
-
     private var pool: [SKSpriteNode] = []
     private var builtFor: TeamID?
 
@@ -153,7 +146,11 @@ final class BlueprintRenderer {
         // Sorted by distance only to decide what to drop when there are more than
         // the pool holds; the SET is chosen by the radius, which is what stops the
         // run reshuffling itself under your feet as you move.
-        let near = recommendation(for: player, walls: base.ownWalls, in: world)
+        // With easy controls on, the plan follows you - the same plan AssistSystem
+        // builds from, so the markers show where the walls will actually go.
+        let near = world.recommendedWalls(for: player.team, walls: base.ownWalls,
+                                          towardsMiddle: player.assisted,
+                                          following: player.assisted ? player.assistFollowing : nil)
             .map { (tile: $0, away: distance(from: player.feet, to: $0)) }
             .filter { $0.away <= BlueprintRenderer.reach }
             .sorted { $0.away < $1.away }
@@ -184,65 +181,6 @@ final class BlueprintRenderer {
             ghost.alpha = breathe * CGFloat(0.35 + 0.65 * closeness)
             ghost.setScale(0.9 + 0.1 * CGFloat(beat * 0.5 + 0.5))
         }
-    }
-
-    /// The gaps in the square this player looks like they are building.
-    ///
-    /// With nothing laid there is no evidence, so the generated plan stands in -
-    /// which is also what makes a first base feel like the game had a plan for it.
-    /// From the first wall onwards the recommendation is drawn round the walls
-    /// themselves, so it follows whoever is not following the plan.
-    private func recommendation(for player: Actor,
-                                walls: Set<GridPoint>,
-                                in world: World) -> [GridPoint] {
-        guard let claim = world.claim(for: player.team) else { return [] }
-
-        guard !walls.isEmpty else {
-            return (world.baseLayouts[player.team]?.tiles ?? [])
-                .filter { BuildSystem.isBuildableTile($0, for: player.team, in: world)
-                          && BuildSystem.keepsWallThin($0, for: player.team, in: world) }
-        }
-
-        var lowCol = walls.map(\.col).min() ?? 0
-        var highCol = walls.map(\.col).max() ?? 0
-        var lowRow = walls.map(\.row).min() ?? 0
-        var highRow = walls.map(\.row).max() ?? 0
-
-        // Grown to the smallest legal base, symmetrically, then pushed back inside
-        // the claim if that took it over the edge. Growing first and clamping after
-        // is what keeps a base started in a corner square rather than squashed
-        // against the boundary.
-        let limitLow = claim.origin
-        let limitHigh = GridPoint(col: claim.origin.col + claim.size - 1,
-                                  row: claim.origin.row + claim.size - 1)
-
-        func stretch(_ low: inout Int, _ high: inout Int, min lowest: Int, max highest: Int) {
-            while high - low + 1 < BlueprintRenderer.smallestSide {
-                if high < highest { high += 1 }
-                else if low > lowest { low -= 1 }
-                else { break }
-            }
-            low = max(lowest, low)
-            high = min(highest, high)
-        }
-
-        stretch(&lowCol, &highCol, min: limitLow.col, max: limitHigh.col)
-        stretch(&lowRow, &highRow, min: limitLow.row, max: limitHigh.row)
-
-        // The outline of that box, and only the parts of it still missing.
-        var outline: [GridPoint] = []
-
-        for col in lowCol...highCol {
-            outline.append(GridPoint(col: col, row: lowRow))
-            outline.append(GridPoint(col: col, row: highRow))
-        }
-        for row in (lowRow + 1)..<highRow {
-            outline.append(GridPoint(col: lowCol, row: row))
-            outline.append(GridPoint(col: highCol, row: row))
-        }
-
-        return outline.filter { BuildSystem.isBuildableTile($0, for: player.team, in: world)
-                                && BuildSystem.keepsWallThin($0, for: player.team, in: world) }
     }
 
     /// A phase that belongs to the SQUARE rather than to the node drawing it, so a
