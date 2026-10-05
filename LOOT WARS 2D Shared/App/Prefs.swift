@@ -36,6 +36,7 @@ enum Prefs {
         static let leftHanded = "leftHanded"
         static let totalXP = "totalXP"
         static let devMode = "devMode"
+        static let difficulty = "difficulty"
     }
 
     /// Bumped whenever a lesson CHANGES, which wipes every "you have seen this"
@@ -133,6 +134,16 @@ enum Prefs {
     static var leftHanded: Bool {
         get { store.bool(forKey: Key.leftHanded) }
         set { store.set(newValue, forKey: Key.leftHanded) }
+    }
+
+    /// How hard the bots play - see Difficulty. Hard, the game as tuned, until
+    /// somebody picks Easy in Settings.
+    static var difficulty: Difficulty {
+        get {
+            guard store.object(forKey: Key.difficulty) != nil else { return .hard }
+            return Difficulty(rawValue: store.integer(forKey: Key.difficulty)) ?? .hard
+        }
+        set { store.set(newValue.rawValue, forKey: Key.difficulty) }
     }
 
     /// The "Show tips again" row in Settings.
