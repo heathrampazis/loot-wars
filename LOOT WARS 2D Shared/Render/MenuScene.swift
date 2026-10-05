@@ -704,7 +704,7 @@ extension MenuScene: UITextFieldDelegate {
         let fontSize = (field.size.height * 0.4).rounded()
         nameInput.font = UIFont.systemFont(ofSize: fontSize, weight: .bold)
         nameInput.attributedPlaceholder = NSAttributedString(
-            string: "Enter your nickname",
+            string: "Enter your name",
             attributes: [.font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
                          .foregroundColor: UIColor(white: 0, alpha: 0.38)])
     }

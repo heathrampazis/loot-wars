@@ -34,6 +34,7 @@ enum Prefs {
         static let lessonsVersion = "lessonsVersion"
         static let soundOn = "soundOn"
         static let leftHanded = "leftHanded"
+        static let easyControls = "easyControls"
         static let totalXP = "totalXP"
         static let devMode = "devMode"
         static let difficulty = "difficulty"
@@ -135,6 +136,15 @@ enum Prefs {
     static var leftHanded: Bool {
         get { store.bool(forKey: Key.leftHanded) }
         set { store.set(newValue, forKey: Key.leftHanded) }
+    }
+
+    /// Easy controls: crates open as you reach them, heals are used for you when
+    /// your health drops low, shots bend onto nearby enemies and power-ups switch
+    /// on when a fight starts. Off until switched on. Read by GameScene at
+    /// the start of a match - see AssistSystem.
+    static var easyControls: Bool {
+        get { store.bool(forKey: Key.easyControls) }
+        set { store.set(newValue, forKey: Key.easyControls) }
     }
 
     /// The name over your head and on the leaderboard, typed on the title screen. Always

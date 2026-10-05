@@ -117,6 +117,12 @@ struct Actor {
     /// today, a remote player later.
     var ai: AIState?
 
+    /// Easy controls: crates open and heals are used for you - see AssistSystem.
+    /// Off for everyone unless the player switched it on in Settings.
+    var assisted = false
+    /// Seconds before easy controls will use another heal.
+    var assistHealWait: Double = 0
+
     /// Seconds until this actor may fire again.
     var shootCooldown: Double = 0
 
