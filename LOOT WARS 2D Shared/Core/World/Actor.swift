@@ -10,6 +10,10 @@ struct Actor {
     let id: ActorID
     let team: TeamID
 
+    /// What this actor is called - over its head and on the leaderboard. See
+    /// PlayerNames.
+    var name: String = ""
+
     /// Centre of the actor's hitbox, in tile space.
     var position: Vec2
 

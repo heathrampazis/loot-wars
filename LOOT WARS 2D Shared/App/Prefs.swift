@@ -37,6 +37,7 @@ enum Prefs {
         static let totalXP = "totalXP"
         static let devMode = "devMode"
         static let difficulty = "difficulty"
+        static let playerName = "playerName"
     }
 
     /// Bumped whenever a lesson CHANGES, which wipes every "you have seen this"
@@ -134,6 +135,13 @@ enum Prefs {
     static var leftHanded: Bool {
         get { store.bool(forKey: Key.leftHanded) }
         set { store.set(newValue, forKey: Key.leftHanded) }
+    }
+
+    /// The name over your head and on the leaderboard, typed on the title screen. Always
+    /// cleaned - see PlayerNames.clean - and "You" until one is chosen.
+    static var playerName: String {
+        get { PlayerNames.clean(store.string(forKey: Key.playerName) ?? "") }
+        set { store.set(PlayerNames.clean(newValue), forKey: Key.playerName) }
     }
 
     /// How hard the bots play - see Difficulty. Hard, the game as tuned, until
