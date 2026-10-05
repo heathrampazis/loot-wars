@@ -57,6 +57,7 @@ enum AISystem {
 
         if state.bombSupplyTimer <= 0 {
             state.bombSupplyTimer = GameConfig.AI.bombSupplyInterval
+                * world.difficulty.bombSupplyScale
 
             if actor.inventory.count(of: .bomb) == 0 {
                 _ = actor.inventory.add(.bomb)

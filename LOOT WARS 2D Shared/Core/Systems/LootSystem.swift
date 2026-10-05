@@ -68,7 +68,7 @@ enum LootSystem {
                                             at: world.matchProgress,
                                             rare: rare,
                                             unlocks: world.unlocks,
-                                            perkBoost: byBot ? GameConfig.AI.cratePerkBoost : 1,
+                                            perkBoost: byBot ? world.difficulty.botPerkBoost : 1,
                                             using: &world.rng)
                 world.spawnGroundItem(pickup, at: box.position)
 

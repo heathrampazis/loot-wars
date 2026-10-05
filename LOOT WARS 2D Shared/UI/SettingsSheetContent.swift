@@ -5,7 +5,8 @@
 //  What goes inside the menu's sheet: the settings, and the About page behind
 //  them.
 //
-//  Four rows and no more - sound, left-handed controls, the tips again, and About.
+//  A short list - sound, left-handed controls, difficulty, the tips again, dev
+//  mode, and About.
 //  A short page of things people actually change on a phone reads as finished; a
 //  long one reads as a checklist. Each row is its own tap target, the whole width
 //  of the card, because a switch thirty points tall is a small thing to aim at
@@ -59,12 +60,18 @@ final class SettingsSheetContent: MenuSheetContent {
     var onAbout: (() -> Void)?
 
     private enum Row: Int, CaseIterable {
-        case sound, leftHanded, tips, devMode, about
+        case sound, leftHanded, difficulty, tips, devMode, about
     }
 
     private static let rowHeight: CGFloat = 56
 
+    /// The row height actually used: the full 56 where there is room, a little
+    /// less on a short screen so every row still fits.
+    private var rowHeight: CGFloat = SettingsSheetContent.rowHeight
+
     private var width: CGFloat = 0
+    private var difficultyButton: SKShapeNode?
+    private var difficultyLabel: SKLabelNode?
     private var soundToggle: MenuToggleNode?
     private var handToggle: MenuToggleNode?
     private var devToggle: MenuToggleNode?
@@ -78,13 +85,15 @@ final class SettingsSheetContent: MenuSheetContent {
     func layOut(width: CGFloat, maxHeight: CGFloat) -> CGFloat {
         self.width = width
         node.removeAllChildren()
+        rowHeight = max(44, min(SettingsSheetContent.rowHeight,
+                                (maxHeight / CGFloat(Row.allCases.count)).rounded(.down)))
 
         for row in Row.allCases {
-            let centreY = -SettingsSheetContent.rowHeight * (CGFloat(row.rawValue) + 0.5)
+            let centreY = -rowHeight * (CGFloat(row.rawValue) + 0.5)
 
             if row.rawValue > 0 {
                 node.addChild(Sheet.separator(width: width,
-                                              y: -SettingsSheetContent.rowHeight * CGFloat(row.rawValue)))
+                                              y: -rowHeight * CGFloat(row.rawValue)))
             }
 
             switch row {
@@ -101,6 +110,10 @@ final class SettingsSheetContent: MenuSheetContent {
                 toggle.position = CGPoint(x: width / 2 - MenuToggleNode.trackSize.width / 2 - 4, y: centreY)
                 node.addChild(toggle)
                 handToggle = toggle
+
+            case .difficulty:
+                addLabels("Difficulty", detail: "How hard the other players are", y: centreY)
+                addDifficultyButton(y: centreY)
 
             case .tips:
                 addLabels("Show tips again", detail: "Replay the hints from your first match", y: centreY)
@@ -120,12 +133,12 @@ final class SettingsSheetContent: MenuSheetContent {
             }
         }
 
-        return SettingsSheetContent.rowHeight * CGFloat(Row.allCases.count)
+        return rowHeight * CGFloat(Row.allCases.count)
     }
 
     func tap(at point: CGPoint) {
         guard abs(point.x) <= width / 2, point.y <= 0,
-              let row = Row(rawValue: Int(-point.y / SettingsSheetContent.rowHeight)) else { return }
+              let row = Row(rawValue: Int(-point.y / rowHeight)) else { return }
 
         switch row {
         case .sound:
@@ -139,6 +152,13 @@ final class SettingsSheetContent: MenuSheetContent {
             Prefs.leftHanded.toggle()
             handToggle?.set(Prefs.leftHanded)
             SoundPlayer.shared.play(.select)
+
+        case .difficulty:
+            Prefs.difficulty = Prefs.difficulty == .hard ? .easy : .hard
+            SoundPlayer.shared.play(.select)
+            paintDifficultyButton()
+            difficultyButton?.run(.sequence([.scale(to: 0.9, duration: 0.05),
+                                             .scale(to: 1, duration: 0.12)]))
 
         case .tips:
             guard !tipsReset else { return }
@@ -180,6 +200,37 @@ final class SettingsSheetContent: MenuSheetContent {
         small.verticalAlignmentMode = .center
         small.position = CGPoint(x: left, y: y - 10)
         node.addChild(small)
+    }
+
+    /// Easy or Hard, on a pill the same size as the tips button. Tapping the row
+    /// switches it; the next match is played on whichever it shows.
+    private func addDifficultyButton(y: CGFloat) {
+        let size = CGSize(width: 76, height: 30)
+        let button = SKShapeNode(rect: CGRect(x: -size.width / 2, y: -size.height / 2,
+                                              width: size.width, height: size.height),
+                                 cornerRadius: size.height / 2)
+        button.lineWidth = 2.5
+        button.position = CGPoint(x: width / 2 - size.width / 2 - 4, y: y)
+        node.addChild(button)
+
+        let label = SKLabelNode()
+        label.verticalAlignmentMode = .center
+        label.horizontalAlignmentMode = .center
+        label.zPosition = 1
+        button.addChild(label)
+
+        difficultyButton = button
+        difficultyLabel = label
+        paintDifficultyButton()
+    }
+
+    private func paintDifficultyButton() {
+        let difficulty = Prefs.difficulty
+        let tone = difficulty == .easy ? RenderPalette.menuPlay : RenderPalette.menuSettings
+        difficultyButton?.fillColor = tone.face
+        difficultyButton?.strokeColor = tone.edge
+        difficultyLabel?.attributedText = Sheet.text(difficulty.title, size: 13, weight: .bold,
+                                                     colour: .white)
     }
 
     private func addTipsButton(y: CGFloat) {

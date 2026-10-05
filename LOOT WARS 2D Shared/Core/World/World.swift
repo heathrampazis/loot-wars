@@ -57,6 +57,11 @@ final class World {
     /// the roadmap, see Roadmap.matchLength. Set before the first step.
     var duration: Double = GameConfig.Match.duration
 
+    /// How hard the bots play this match - see Difficulty. Hard, the game as
+    /// tuned, unless the screen that made the world says otherwise. Set before
+    /// the first step.
+    var difficulty: Difficulty = .hard
+
     /// How far the match has run, nought to one.
     ///
     /// The one place the phrase "late in the match" is defined. Chest loot and the
@@ -246,6 +251,9 @@ final class World {
     /// Asked from a bot's point of view: "is somebody running away with this, and
     /// is it not me". Teams in id order, so a tie resolves the same way every run.
     func runaway(against team: TeamID) -> (team: TeamID, lead: Double)? {
+        // Nobody is singled out for being ahead on Easy - see Difficulty.
+        guard difficulty.pressesTheLeader else { return nil }
+
         var best: (team: TeamID, lead: Double)?
 
         for other in TeamID.all where other != team {
@@ -660,7 +668,7 @@ final class World {
         var turret = Turret(id: TurretID(nextTurretID), origin: origin, owner: owner)
 
         // A bot's turret is the stronger kind - see GameConfig.Turret.botHealth.
-        if isBotTeam(owner) {
+        if isBotTeam(owner), difficulty.fortifiesBotTurrets {
             turret.fortified = true
             turret.health = turret.maxHealth
         }
@@ -805,7 +813,9 @@ final class World {
 
         // And winning. Whoever is out in front is worth breaking into whoever they
         // are - see World.lead, which says the same of all eight teams.
-        worth += lead(of: team) * GameConfig.AI.leaderWorth
+        if difficulty.pressesTheLeader {
+            worth += lead(of: team) * GameConfig.AI.leaderWorth
+        }
 
         // People are raided as readily as bots, whatever they have banked.
         if !isBotTeam(team) { worth += GameConfig.AI.playerBaseWorth }

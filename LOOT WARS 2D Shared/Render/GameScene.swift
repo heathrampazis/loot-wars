@@ -450,6 +450,7 @@ final class GameScene: SKScene {
         // or handed out from a fuller set.
         world.unlocks = Progress.matchUnlocks
         world.duration = Progress.matchLength
+        world.difficulty = Prefs.difficulty
 
         // Before anything draws an item, so a turret on the floor is in your
         // colour from the first frame - see ItemArt.viewer.

@@ -30,7 +30,9 @@ enum AIBrain {
         state.buildUrgeTimer = max(0, state.buildUrgeTimer - dt)
         // Faster while somebody else is running away with the match - see
         // GameConfig.AI.leaderRush. Both the urges that point at the leader.
-        let rush = 1 + (world.runaway(against: actor.team)?.lead ?? 0) * GameConfig.AI.leaderRush
+        let rush = world.difficulty.pressesTheLeader
+            ? 1 + (world.runaway(against: actor.team)?.lead ?? 0) * GameConfig.AI.leaderRush
+            : 1
         state.raidUrgeTimer = max(0, state.raidUrgeTimer - dt * rush)
         state.huntUrgeTimer = max(0, state.huntUrgeTimer - dt * rush)
         state.stashCooldown = max(0, state.stashCooldown - dt)
@@ -319,6 +321,7 @@ enum AIBrain {
             if state.goalAge > GameConfig.AI.huntPatience {
                 state.huntUrgeTimer = Double.random(in: GameConfig.AI.huntUrgeInterval,
                                                     using: &world.rng)
+                    * world.difficulty.urgeScale
                 state.huntMark = nil
             }
         case .wander, .fight, .retreat, .raid:
@@ -381,6 +384,7 @@ enum AIBrain {
         if wanted.isRaiding, !state.goal.isRaiding {
             state.raidUrgeTimer = Double.random(in: GameConfig.AI.raidUrgeInterval,
                                                 using: &world.rng)
+                * world.difficulty.urgeScale
         }
 
         // And it remembers WHOSE, which is the thing none of the raiding goals
@@ -403,6 +407,7 @@ enum AIBrain {
         if case .hunt(let id) = wanted, !isHunt(state.goal) {
             state.huntUrgeTimer = Double.random(in: GameConfig.AI.huntUrgeInterval,
                                                 using: &world.rng)
+                * world.difficulty.urgeScale
             state.huntMark = nil
 
             // Joining a fight already going on: it heard the shooting, so it heads
@@ -1041,6 +1046,7 @@ enum AIBrain {
     /// Sorted by id, because two teams on the same lead would otherwise resolve out
     /// of dictionary order and two runs of one seed would diverge.
     private static func worthHunting(for actor: Actor, in world: World) -> Actor? {
+        guard world.difficulty.pressesTheLeader else { return nil }
         guard actor.inventory.totalHealing(of: actor.maxHealth)
                 >= GameConfig.AI.emergencyHealingStock else { return nil }
 
@@ -1111,7 +1117,7 @@ enum AIBrain {
     /// hunt - it walks to the fight, and the moment it can see them reactToThreats
     /// turns it into a fight of its own (shouldEngage always agrees to the leader).
     private static func pileOn(for actor: Actor, in world: World) -> AIGoal? {
-        guard fitToGangUp(actor),
+        guard world.difficulty.pressesTheLeader, fitToGangUp(actor),
               let runaway = world.runaway(against: actor.team),
               let quarry = leader(of: runaway.team, in: world),
               quarry.invulnerability <= 0,
@@ -1132,7 +1138,7 @@ enum AIBrain {
     /// bomb opens a second hole; one without walks over (a hunt with no mark goes
     /// to their base) and goes in through the first once it is open.
     private static func raidParty(for actor: Actor, in world: World) -> AIGoal? {
-        guard fitToGangUp(actor),
+        guard world.difficulty.pressesTheLeader, fitToGangUp(actor),
               let runaway = world.runaway(against: actor.team)?.team,
               let claim = world.claim(for: runaway),
               (claim.centreTile.center - actor.position).length
@@ -1599,7 +1605,8 @@ enum AIBrain {
         // "level with the best score" made the leader worth chasing and the team
         // one point behind them worth ignoring, which on a scoreboard that moves in
         // fifties is a coin toss rather than a judgement.
-        if world.lead(of: enemy.team) >= GameConfig.AI.leaderChaseAt { return true }
+        if world.difficulty.pressesTheLeader,
+           world.lead(of: enemy.team) >= GameConfig.AI.leaderChaseAt { return true }
 
         // Otherwise the target has to be worth the ground between them, and the
         // further away they are the more they have to be worth. Somebody a step
@@ -1630,6 +1637,7 @@ enum AIBrain {
                                          to target: Actor,
                                          in world: World) -> Double {
         let distance = (target.position - actor.position).length
+        guard world.difficulty.pressesTheLeader else { return distance }
         return distance * (1 - GameConfig.AI.leaderPull * world.lead(of: target.team))
     }
 
@@ -2249,7 +2257,7 @@ enum AIBrain {
     /// is good value, but whether the bot has any.
     private static func worthBuying(_ type: ItemType, for actor: Actor, in world: World) -> Bool {
         let impatient = world.behind(actor.team) >= GameConfig.AI.pressureBuysAt
-        let waited = world.matchProgress >= GameConfig.AI.buysAnythingAfter
+        let waited = world.matchProgress >= world.difficulty.buysAnythingAfter
 
         switch type {
         case .helmet(let tier):
@@ -2990,7 +2998,7 @@ enum AIBrain {
         // Deliberately a small share of the spread rather than a march towards
         // perfect: a bot that cannot miss is the least enjoyable opponent there is,
         // and the point of this is to be competitive rather than to be a wall.
-        let spread = GameConfig.AI.aimSpread
+        let spread = GameConfig.AI.aimSpread * world.difficulty.aimSpreadScale
             * (1 - world.behind(actor.team) * GameConfig.AI.pressureAim)
 
         let wobble = atan(spread / max(towards.length, 0.5))
@@ -3254,6 +3262,7 @@ enum AIBrain {
 
         return Double.random(in: range.lowerBound...max(range.lowerBound, upper),
                              using: &world.rng)
+            * world.difficulty.reactionScale
     }
 
     /// Rotates one heading towards another by at most `limit` radians.
