@@ -105,6 +105,7 @@ enum WeaponSystem {
         // Firing pushes the refill back out to the full delay.
         actor.rechargeTimer = GameConfig.Blaster.rechargeDelay
         world.actors[id] = actor
+        world.tally(id) { $0.shotsFired += 1 }
 
         world.spawnProjectile(
             owner: id,

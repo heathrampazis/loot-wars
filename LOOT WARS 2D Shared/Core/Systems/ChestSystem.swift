@@ -392,6 +392,7 @@ enum ChestSystem {
         // could not be a target; bases are now judged on more than their contents,
         // so bare ones will genuinely get visited.
         if !spill.isEmpty {
+            world.tally(id) { $0.chestsRaided += 1 }
             world.award(GameConfig.Score.chestRaided, to: actor.team)
             world.awardTokens(GameConfig.Tokens.perChestRaided, to: id)
         }

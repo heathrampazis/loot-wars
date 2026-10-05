@@ -54,6 +54,9 @@ enum ProjectileSystem {
             if world.structureBlocks(projectile.position) { continue }
 
             if let hit = actorHit(by: projectile, in: world, order: targets) {
+                if !projectile.fromTurret {
+                    world.tally(projectile.owner) { $0.shotsHit += 1 }
+                }
                 CombatSystem.damage(hit, amount: projectile.damage,
                                     from: projectile.owner, in: world)
                 continue
