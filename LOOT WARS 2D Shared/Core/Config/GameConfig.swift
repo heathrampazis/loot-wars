@@ -935,6 +935,27 @@ enum GameConfig {
         static let spacing: Double = 0.75
     }
 
+    /// Easy controls - see AssistSystem.
+    enum Assist {
+        /// A heal is used for you once your health is below this share of full.
+        /// Half: low enough that a scratch does not burn a bandage, high enough
+        /// that the heal lands while you are still in the fight.
+        static let healBelow: Double = 0.5
+        /// Seconds between two heals used for you.
+        static let healGap: Double = 0.6
+
+        /// Aim help: a shot within this angle of an enemy, in radians, is turned
+        /// onto them. About 25 degrees either side - generous, since it is for
+        /// people who find the aim stick hard.
+        static let aimCone: Double = 0.44
+
+        /// A power-up is switched on for you if you were hit this recently, in
+        /// seconds, or are shooting at somebody.
+        static let perkHitWithin: Double = 1.0
+        /// Health back is only switched on below this share of full health.
+        static let regenBelow: Double = 0.75
+    }
+
     enum AI {
         /// Master switch. Off gives you the quiet map back for testing anything else.
         static let enabled = true

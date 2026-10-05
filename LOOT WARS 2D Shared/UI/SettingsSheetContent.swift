@@ -5,8 +5,8 @@
 //  What goes inside the menu's sheet: the settings, and the About page behind
 //  them.
 //
-//  A short list - sound, left-handed controls, difficulty, the tips again, and
-//  About. (Dev mode no longer has a row - see Prefs.devMode.)
+//  A short list - sound, left-handed controls, easy controls, difficulty, the
+//  tips again, and About. (Dev mode no longer has a row - see Prefs.devMode.)
 //  A short page of things people actually change on a phone reads as finished; a
 //  long one reads as a checklist. Each row is its own tap target, the whole width
 //  of the card, because a switch thirty points tall is a small thing to aim at
@@ -60,7 +60,7 @@ final class SettingsSheetContent: MenuSheetContent {
     var onAbout: (() -> Void)?
 
     private enum Row: Int, CaseIterable {
-        case sound, leftHanded, difficulty, tips, about
+        case sound, leftHanded, easyControls, difficulty, tips, about
     }
 
     private static let rowHeight: CGFloat = 56
@@ -74,6 +74,7 @@ final class SettingsSheetContent: MenuSheetContent {
     private var difficultyLabel: SKLabelNode?
     private var soundToggle: MenuToggleNode?
     private var handToggle: MenuToggleNode?
+    private var easyToggle: MenuToggleNode?
     private var tipsButton: SKShapeNode?
     private var tipsLabel: SKLabelNode?
 
@@ -110,6 +111,13 @@ final class SettingsSheetContent: MenuSheetContent {
                 node.addChild(toggle)
                 handToggle = toggle
 
+            case .easyControls:
+                addLabels("Easy controls", detail: "Aim assist and help with the basics", y: centreY)
+                let toggle = MenuToggleNode(isOn: Prefs.easyControls)
+                toggle.position = CGPoint(x: width / 2 - MenuToggleNode.trackSize.width / 2 - 4, y: centreY)
+                node.addChild(toggle)
+                easyToggle = toggle
+
             case .difficulty:
                 addLabels("Difficulty", detail: "How hard the other players are", y: centreY)
                 addDifficultyButton(y: centreY)
@@ -144,6 +152,11 @@ final class SettingsSheetContent: MenuSheetContent {
         case .leftHanded:
             Prefs.leftHanded.toggle()
             handToggle?.set(Prefs.leftHanded)
+            SoundPlayer.shared.play(.select)
+
+        case .easyControls:
+            Prefs.easyControls.toggle()
+            easyToggle?.set(Prefs.easyControls)
             SoundPlayer.shared.play(.select)
 
         case .difficulty:

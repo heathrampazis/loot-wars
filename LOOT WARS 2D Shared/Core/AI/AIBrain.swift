@@ -3053,7 +3053,10 @@ enum AIBrain {
     /// one tile, cleared from any angle.
     private static let turretFaceInset: Double = 1.1
 
-    private static func hasLineOfSight(from start: Vec2, to end: Vec2, in world: World) -> Bool {
+    /// Whether a shot from one point would reach the other. Also used by easy
+    /// controls' aim help - see AssistSystem - so it never locks on to somebody
+    /// behind a wall.
+    static func hasLineOfSight(from start: Vec2, to end: Vec2, in world: World) -> Bool {
         let delta = end - start
         let distance = delta.length
         guard distance > 0.01 else { return true }

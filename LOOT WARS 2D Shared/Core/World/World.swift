@@ -398,6 +398,12 @@ final class World {
         }
     }
 
+    /// Switches easy controls on or off for the player - from Settings, before
+    /// the first step. See AssistSystem.
+    func setLocalAssist(_ on: Bool) {
+        actors[localPlayerID]?.assisted = on
+    }
+
     /// Sets the player's own name - from Settings, before the first step.
     func setLocalName(_ name: String) {
         actors[localPlayerID]?.name = PlayerNames.clean(name)
@@ -1711,6 +1717,7 @@ final class World {
         // rest. From here down, nothing can tell which is which.
         var everyone = commands
         AISystem.contribute(to: &everyone, in: self, dt: dt)
+        AssistSystem.contribute(to: &everyone, in: self, dt: dt)
 
         applyMovementInput(everyone)
         BuildSystem.update(self, commands: everyone)
