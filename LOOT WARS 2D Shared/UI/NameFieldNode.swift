@@ -20,8 +20,8 @@ final class NameFieldNode: SKNode {
     let size: CGSize
 
     private static let edge: CGFloat = 3
-    private static let face = SKColor(white: 1, alpha: 0.55)
-    private static let idleEdge = SKColor(white: 1, alpha: 0.85)
+    private static let face = SKColor(white: 1, alpha: 0.7)
+    private static let idleEdge = SKColor(white: 0, alpha: 0.3)
 
     private let slab: SKShapeNode
     private let pencil: SKShapeNode
