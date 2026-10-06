@@ -25,6 +25,10 @@ extension World {
     struct BasePlan {
         let lowCol: Int, highCol: Int, lowRow: Int, highRow: Int
         let gaps: [GridPoint]
+        /// Outline tiles that are free but cannot take a wall yet, because a wall
+        /// just inside them would make the ring two thick - usually a corner with
+        /// an old wall still standing diagonally inside it.
+        var blocked: [GridPoint] = []
         /// False for the generated template, which has no box of its own.
         let hasBox: Bool
 
@@ -142,9 +146,10 @@ extension World {
             outline.append(GridPoint(col: highCol, row: row))
         }
 
-        let gaps = outline.filter { BuildSystem.isBuildableTile($0, for: team, in: self)
-                                    && BuildSystem.keepsWallThin($0, for: team, in: self) }
+        let free = outline.filter { BuildSystem.isBuildableTile($0, for: team, in: self) }
+        let gaps = free.filter { BuildSystem.keepsWallThin($0, for: team, in: self) }
+        let blocked = free.filter { !BuildSystem.keepsWallThin($0, for: team, in: self) }
         return BasePlan(lowCol: lowCol, highCol: highCol, lowRow: lowRow, highRow: highRow,
-                        gaps: gaps, hasBox: true)
+                        gaps: gaps, blocked: blocked, hasBox: true)
     }
 }

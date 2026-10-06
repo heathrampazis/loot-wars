@@ -963,6 +963,9 @@ enum GameConfig {
         /// Building for you: a recommended wall tile this close to your feet, in
         /// tiles, goes up as you walk past it...
         static let buildReach: Double = 1.6
+        /// Further, for a gap your walls already reach on two sides - a corner,
+        /// or one tile left in a run - so cutting a corner does not leave it open.
+        static let closeReach: Double = 2.6
         /// ...one at a time, this many seconds apart, so the wall is seen going up
         /// rather than appearing all at once.
         static let buildGap: Double = 0.45
