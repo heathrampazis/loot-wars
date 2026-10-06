@@ -139,10 +139,10 @@ enum Prefs {
         set { store.set(newValue, forKey: Key.leftHanded) }
     }
 
-    /// Easy controls: crates open as you reach them, heals are used for you when
-    /// your health drops low, shots bend onto nearby enemies and power-ups switch
-    /// on when a fight starts. Off until switched on. Read by GameScene at
-    /// the start of a match - see AssistSystem.
+    /// Assisted controls: aim assist, heals used (and bought) for you when your
+    /// health drops low, and power-ups switched on when a fight starts. Off until
+    /// switched on. Opening crates and building your base happen for everyone
+    /// either way. Read by GameScene at the start of a match - see AssistSystem.
     static var easyControls: Bool {
         get { store.bool(forKey: Key.easyControls) }
         set { store.set(newValue, forKey: Key.easyControls) }

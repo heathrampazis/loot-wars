@@ -5,7 +5,7 @@
 //  What goes inside the menu's sheet: the settings, and the About page behind
 //  them.
 //
-//  A short list - sound, left-handed controls, easy controls, difficulty, tips
+//  A short list - sound, left-handed controls, assisted controls, difficulty, tips
 //  on or off, and About. (Dev mode no longer has a row - see Prefs.devMode.)
 //  A short page of things people actually change on a phone reads as finished; a
 //  long one reads as a checklist. Each row is its own tap target, the whole width
@@ -108,7 +108,7 @@ final class SettingsSheetContent: MenuSheetContent {
                 handToggle = toggle
 
             case .easyControls:
-                addLabels("Easy controls", detail: "Aim assist and help with the basics", y: centreY)
+                addLabels("Assisted controls", detail: "Aim assist and auto healing", y: centreY)
                 let toggle = MenuToggleNode(isOn: Prefs.easyControls)
                 toggle.position = CGPoint(x: width / 2 - MenuToggleNode.trackSize.width / 2 - 4, y: centreY)
                 node.addChild(toggle)

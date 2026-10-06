@@ -408,10 +408,12 @@ final class World {
         }
     }
 
-    /// Switches easy controls on or off for the player - from Settings, before
+    /// Switches assisted controls on or off for the player - from Settings, before
     /// the first step. See AssistSystem.
     func setLocalAssist(_ on: Bool) {
         actors[localPlayerID]?.assisted = on
+        // The chores are not part of the setting - every player gets them.
+        actors[localPlayerID]?.autoChores = true
     }
 
     /// Sets the player's own name - from Settings, before the first step.

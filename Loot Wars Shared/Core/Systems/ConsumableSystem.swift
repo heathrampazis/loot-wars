@@ -35,7 +35,7 @@ enum ConsumableSystem {
     /// should not cost a medkit, and when nothing in the bag is enough you want the
     /// most it can give.
     ///
-    /// Easy controls use this to pick the heal for you - see AssistSystem. With
+    /// Assisted controls use this to pick the heal for you - see AssistSystem. With
     /// them off, a tap on a slot is the heal and the player does their own
     /// choosing. AIBrain.healToUse makes the same decision on the bots' side.
     ///

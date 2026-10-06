@@ -6,7 +6,7 @@
 //
 //  Lives in the world rather than in the renderer that draws it, because two
 //  things need the same answer - the dark markers that show you where to build,
-//  and easy controls, which build there for you as you walk past (see
+//  and auto building, which builds there for you as you walk past (see
 //  AssistSystem). One answer means the walls go up exactly where the markers
 //  said they would.
 //
@@ -72,7 +72,7 @@ extension World {
     /// From the first wall onwards the recommendation is drawn round the walls
     /// themselves, so it follows whoever is not following the plan.
     ///
-    /// Easy controls (see AssistSystem) draw it round the player as well as the
+    /// Auto building (see AssistSystem) draws it round the player as well as the
     /// walls - FOLLOWING - so the base goes where they walk rather than where the
     /// template put it, and grow it TOWARDS THE MIDDLE of the claim, so the player
     /// ends up on its edge rather than in a corner of it. When to follow is the
@@ -93,15 +93,15 @@ extension World {
         // that took it over the edge. Growing first and clamping after is what
         // keeps a base started in a corner square rather than squashed against the
         // boundary.
-        // Easy controls build a roomier square than the smallest legal one - see
+        // Auto building makes a roomier square than the smallest legal one - see
         // GameConfig.Assist.baseSide.
         let smallest = towardsMiddle ? max(World.smallestBaseSide, GameConfig.Assist.baseSide)
                                      : World.smallestBaseSide
 
         func stretch(_ low: inout Int, _ high: inout Int, min lowest: Int, max highest: Int,
-                     middle: Int) {
+                     middle: Int, to side: Int) {
             let upFirst = !towardsMiddle || (low + high) / 2 <= middle
-            while high - low + 1 < smallest {
+            while high - low + 1 < side {
                 if upFirst {
                     if high < highest { high += 1 } else if low > lowest { low -= 1 } else { break }
                 } else {
@@ -117,8 +117,22 @@ extension World {
             var highCol = points.map(\.col).max() ?? 0
             var lowRow = points.map(\.row).min() ?? 0
             var highRow = points.map(\.row).max() ?? 0
-            stretch(&lowCol, &highCol, min: limitLow.col, max: limitHigh.col, middle: centre.col)
-            stretch(&lowRow, &highRow, min: limitLow.row, max: limitHigh.row, middle: centre.row)
+            stretch(&lowCol, &highCol, min: limitLow.col, max: limitHigh.col,
+                    middle: centre.col, to: smallest)
+            stretch(&lowRow, &highRow, min: limitLow.row, max: limitHigh.row,
+                    middle: centre.row, to: smallest)
+
+            // Auto building always makes a true square: whichever side came out
+            // shorter - from stepping out on one side, or a stray wall - is grown
+            // to match the longer, towards the middle of the claim. A base that is
+            // nine one way and eight the other looks like a mistake.
+            if towardsMiddle {
+                let side = max(highCol - lowCol, highRow - lowRow) + 1
+                stretch(&lowCol, &highCol, min: limitLow.col, max: limitHigh.col,
+                        middle: centre.col, to: side)
+                stretch(&lowRow, &highRow, min: limitLow.row, max: limitHigh.row,
+                        middle: centre.row, to: side)
+            }
             return (lowCol, highCol, lowRow, highRow)
         }
 
