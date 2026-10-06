@@ -226,7 +226,7 @@ enum MapFactory {
             let local = density[biomes.biome(at: candidate.centre)] ?? 1
             guard keep < local / densest else { continue }
 
-            guard isClear(candidate, of: planted, and: claims, biomes: biomes) else { continue }
+            guard isClear(candidate, of: planted, and: claims, biomes: biomes, in: map) else { continue }
             planted.append(candidate)
         }
 
@@ -239,28 +239,56 @@ enum MapFactory {
 
     /// A clump needs clear space around it: away from other clumps so they read as
     /// separate, and away from every claim so nobody is ever penned into their base.
+    ///
+    /// And every gap it leaves has to be one a player FITS through. A player is
+    /// under a tile wide but nearly two tall, so a gap is measured against the
+    /// player's size across it: two clumps side by side need a player's width
+    /// between them to walk up through, two stacked need a player's height to
+    /// walk across. The same goes for the gap beside a base and along the stone
+    /// edge of the map, so no clump ever closes off a corner.
     private static func isClear(_ candidate: TreePatch,
                                 of planted: [TreePatch],
                                 and claims: [TeamID: BaseClaim],
-                                biomes: BiomeMap) -> Bool {
+                                biomes: BiomeMap,
+                                in map: TileMap) -> Bool {
+        let width = GameConfig.Player.halfWidth * 2 + GameConfig.Trees.passageMargin
+        let height = GameConfig.Player.halfDepth * 2 + GameConfig.Trees.passageMargin
+
         let ownGap = treeGap(in: biomes.biome(at: candidate.centre))
         for other in planted {
             let delta = candidate.centre - other.centre
-            // The wider of the two biomes' gaps, so a forest edge stays walkable from both sides.
-            let gap = max(ownGap, treeGap(in: biomes.biome(at: other.centre)))
-            let minimum = candidate.radius + other.radius + gap
-            if delta.length < minimum { return false }
+            let distance = delta.length
+            guard distance > 0.0001 else { return false }
+
+            // How much of a player lies along the line between the two: their
+            // width if the clumps are side by side, their height if stacked.
+            let across = abs(delta.x) / distance * width + abs(delta.y) / distance * height
+
+            // The wider of the two biomes' gaps, so a forest edge stays walkable
+            // from both sides - and never less than a player.
+            let gap = max(ownGap, treeGap(in: biomes.biome(at: other.centre)), across)
+            if distance < candidate.radius + other.radius + gap { return false }
         }
 
         for claim in claims.values {
-            // The claim, grown by a tile of breathing room.
+            // The claim, grown by a player's width at the sides and a player's
+            // height above and below, so there is always a way round a base.
             let closest = candidate.closestPoint(
-                inBox: Vec2(x: Double(claim.origin.col) - 1, y: Double(claim.origin.row) - 1),
-                to: Vec2(x: Double(claim.origin.col + claim.size) + 1,
-                         y: Double(claim.origin.row + claim.size) + 1)
+                inBox: Vec2(x: Double(claim.origin.col) - width,
+                            y: Double(claim.origin.row) - height),
+                to: Vec2(x: Double(claim.origin.col + claim.size) + width,
+                         y: Double(claim.origin.row + claim.size) + height)
             )
             if (closest - candidate.centre).length < candidate.radius { return false }
         }
+
+        // Off the stone border by enough to walk between the two.
+        let centre = candidate.centre
+        let radius = candidate.radius
+        guard centre.x - radius >= 1 + width,
+              centre.x + radius <= Double(map.width - 1) - width,
+              centre.y - radius >= 1 + height,
+              centre.y + radius <= Double(map.height - 1) - height else { return false }
 
         return true
     }

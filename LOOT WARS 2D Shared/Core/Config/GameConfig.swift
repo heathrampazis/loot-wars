@@ -933,6 +933,11 @@ enum GameConfig {
 
         /// Clear space kept between two clumps, in tiles.
         static let spacing: Double = 0.75
+
+        /// Room to spare, in tiles, on top of a player's own size wherever a
+        /// clump has to leave a way through - between two clumps, beside a base
+        /// and along the edge of the map. See MapFactory.isClear.
+        static let passageMargin: Double = 0.2
     }
 
     /// Easy controls - see AssistSystem.
