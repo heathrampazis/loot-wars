@@ -44,7 +44,8 @@ final class JoystickNode: SKNode {
         super.init()
 
         base.fillColor = RenderPalette.controlBackground
-        base.strokeColor = .clear
+        base.strokeColor = RenderPalette.glassRim
+        base.lineWidth = RenderPalette.glassRimWidth
         knob.fillColor = RenderPalette.controlForeground
         knob.strokeColor = .clear
 

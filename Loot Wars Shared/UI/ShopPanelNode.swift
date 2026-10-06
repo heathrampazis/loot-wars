@@ -207,11 +207,14 @@ final class ShopPanelNode: SKNode {
 
         panel.fillColor = RenderPalette.hudPanel
 
-        // A hairline of light along the edge. Small, and it does more than it
-        // sounds: the panel and the map behind it are both mid-toned, and without
-        // an edge the corners dissolve into whatever happens to be under them.
-        panel.strokeColor = SKColor(white: 1, alpha: 0.16)
-        panel.lineWidth = 1.5
+        // A thin edge, the same as every in-match control. Small, and it does more
+        // than it sounds: the panel and the map behind it are both mid-toned, and
+        // without an edge the corners dissolve into whatever is under them.
+        panel.strokeColor = RenderPalette.glassRim
+        panel.lineWidth = RenderPalette.glassRimWidth
+
+        // Frosted map behind it - see GlassNode.
+        if let path = panel.path { panel.addChild(GlassNode(path: path)) }
 
         addChild(panel)
 

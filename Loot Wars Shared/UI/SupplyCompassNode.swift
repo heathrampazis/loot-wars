@@ -52,7 +52,11 @@ final class SupplyCompassNode: SKNode {
 
     override init() {
         super.init()
-        zPosition = 40
+        // Over the buttons, hotbar and sticks (1000), which it runs along the
+        // edge past and used to vanish behind. Under every panel - the timer and
+        // leaderboard (1045), the quick buy and hints (1050), the shop and chest
+        // (1100) - which are there to be read and should win.
+        zPosition = 1040
     }
 
     required init?(coder aDecoder: NSCoder) {

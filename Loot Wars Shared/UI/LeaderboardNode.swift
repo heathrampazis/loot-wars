@@ -100,10 +100,12 @@ final class LeaderboardNode: SKNode {
         let lineWidth = LeaderboardNode.width - LeaderboardNode.padding * 2 - 8
         divider = SKShapeNode(rect: CGRect(x: -lineWidth / 2, y: -0.5, width: lineWidth, height: 1))
         super.init()
-        zPosition = 1000
+        // Over the edge markers (1040), which slide past it - see BaseCompassNode.
+        zPosition = 1045
 
         panel.fillColor = RenderPalette.hudPanel
-        panel.strokeColor = .clear
+        panel.strokeColor = RenderPalette.glassRim
+        panel.lineWidth = RenderPalette.glassRimWidth
         addChild(panel)
 
         divider.fillColor = SKColor(white: 1, alpha: 0.2)
@@ -137,6 +139,9 @@ final class LeaderboardNode: SKNode {
             roundedRect: CGRect(x: -LeaderboardNode.width, y: -height,
                                 width: LeaderboardNode.width, height: height),
             cornerWidth: 12, cornerHeight: 12, transform: nil)
+        // The glass is cut to the panel's shape, so it is cut again when that changes.
+        panel.removeAllChildren()
+        if let path = panel.path { panel.addChild(GlassNode(path: path)) }
         divider.isHidden = !wanted
         rows[LeaderboardNode.shown].holder.isHidden = !wanted
     }

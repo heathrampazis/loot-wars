@@ -120,6 +120,33 @@ final class MenuButtonNode: SKNode {
         face.addChild(mark)
     }
 
+    /// A wide one with a word on it, for a choice that has to be read - the
+    /// pause menu's Resume and Quit match.
+    init(label: String, width: CGFloat, height: CGFloat, tone: RenderPalette.MenuTone) {
+        self.weight = .primary
+        self.box = CGSize(width: width, height: height)
+        self.sink = max(3, height * 0.04)
+        self.shadow = MenuButtonNode.dropShadow(width: width, height: height,
+                                                corner: height * MenuButtonNode.primaryCorner)
+        super.init()
+
+        addChild(shadow)
+        addChild(face)
+
+        face.addChild(MenuButtonNode.slab(width: width, height: height,
+                                          edge: max(3, height * MenuButtonNode.primaryEdge),
+                                          corner: height * MenuButtonNode.primaryCorner,
+                                          tone: tone))
+
+        let word = SKLabelNode()
+        word.attributedText = MenuButtonNode.text(label, size: (height * 0.36).rounded(),
+                                                  weight: .heavy, colour: .white)
+        word.verticalAlignmentMode = .center
+        word.horizontalAlignmentMode = .center
+        word.zPosition = 1
+        face.addChild(word)
+    }
+
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }

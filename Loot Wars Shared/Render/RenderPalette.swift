@@ -227,6 +227,12 @@ enum RenderPalette {
     /// Hotbar slots are plain black at 42% in the reference, not the HUD's olive -
     /// the ground shows through them far more.
     static let hotbarSlot = SKColor(white: 0.0, alpha: 0.42)
+
+    /// The rim round every in-match control - the sticks, buttons, hotbar and
+    /// panels all ask for this one colour. None for now: they read cleaner
+    /// without. Give it a colour here and every control gets the edge back.
+    static let glassRim = SKColor.clear
+    static let glassRimWidth: CGFloat = 1.5
     /// The stack-count badge reuses the health pink.
     static let countBadge = rgb(0xFF, 0x51, 0x7B)
     static let ammoBar   = rgb(0x3E, 0xA1, 0x80)
