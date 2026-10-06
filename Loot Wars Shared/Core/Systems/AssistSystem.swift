@@ -2,24 +2,23 @@
 //  AssistSystem.swift
 //  Loot Wars
 //
-//  Easy controls: the fiddly parts done for you, so a new player can spend their
-//  attention on moving and shooting.
+//  Help for the player, through the same commands a player sends - an open, a
+//  use, a shot, a wall - so every rule about whether that is allowed is still
+//  checked in the one place it lives.
 //
+//  For every player (Actor.autoChores):
 //  - A crate opens the moment you are in reach of it.
-//  - A heal is used when your health drops low - bought first if you have none.
 //  - Your base follows you: walls go up on its outline as you walk along it,
 //    the outline moves out to meet you if you linger just outside it, and walls
 //    left inside the new outline come down as you pass them.
-//  - A shot fired roughly at somebody is bent onto them (aim help).
+//
+//  With Assisted controls on (Actor.assisted):
+//  - A shot fired roughly at somebody is bent onto them (aim assist).
+//  - A heal is used when your health drops low - bought first if you have none.
 //  - A power-up you are carrying switches on when a fight starts.
 //
-//  It works through the same commands a player sends - an open, a use, a shot -
-//  so every rule about whether that is allowed is still checked in the one place
-//  it lives. Apart from bending a shot it only ever adds; anything the player
-//  does themselves still works.
-//
-//  Per actor rather than per match (see Actor.assisted), so in a match with real
-//  people one player can have it on without it touching anyone else.
+//  Per actor rather than per match, so in a match with real people each
+//  player's setting only touches them.
 //
 
 import Foundation
@@ -28,7 +27,8 @@ enum AssistSystem {
 
     static func contribute(to commands: inout [ActorID: [Command]], in world: World, dt: Double) {
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
-            guard var actor = world.actors[id], actor.assisted, actor.ai == nil else { continue }
+            guard var actor = world.actors[id], actor.ai == nil,
+                  actor.assisted || actor.autoChores else { continue }
 
             actor.assistHealWait = max(0, actor.assistHealWait - dt)
             actor.assistBuildWait = max(0, actor.assistBuildWait - dt)
@@ -42,7 +42,7 @@ enum AssistSystem {
             // where it was pointed. Noted, so a power-up can tell a fight has
             // started from the player's side too, not only from being hit.
             var lockedOn = false
-            if let list = commands[id] {
+            if actor.assisted, let list = commands[id] {
                 commands[id] = list.map { command in
                     guard case .shoot(let direction) = command,
                           let aimed = assistedAim(direction, for: actor, in: world) else {
@@ -55,7 +55,7 @@ enum AssistSystem {
 
             // Crates: in reach is enough. LootSystem picks the box and opens one
             // per tick, exactly as if the button had been pressed.
-            if world.reachableLootbox(for: actor) != nil {
+            if actor.autoChores, world.reachableLootbox(for: actor) != nil {
                 added.append(.openLootbox)
             }
 
@@ -63,7 +63,7 @@ enum AssistSystem {
             // fills you up, or the biggest if none does. A short wait after each,
             // so two can not go in the same instant and the heal reads as a beat.
             let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
-            if actor.assistHealWait <= 0, healthLeft < GameConfig.Assist.healBelow {
+            if actor.assisted, actor.assistHealWait <= 0, healthLeft < GameConfig.Assist.healBelow {
                 if let slot = ConsumableSystem.bestHeal(for: actor) {
                     added.append(.useItem(slot: slot))
                     actor.assistHealWait = GameConfig.Assist.healGap
@@ -78,7 +78,7 @@ enum AssistSystem {
             // Walls: the next piece of your base where you are walking, or an old
             // wall the base has moved out past. The plan is worked out every tick
             // so the time spent outside it is counted even between walls.
-            let plan = basePlan(for: &actor, in: world, dt: dt)
+            let plan = actor.autoChores ? basePlan(for: &actor, in: world, dt: dt) : nil
             if actor.assistBuildWait <= 0, let plan,
                let change = nextWallChange(for: actor, plan: plan, in: world) {
                 added.append(change)
@@ -92,7 +92,7 @@ enum AssistSystem {
             // Power-ups: switched on when a fight starts - you were just hit, or
             // you are shooting at somebody - and only when none is running.
             let inFight = lockedOn || actor.secondsSinceHit < GameConfig.Assist.perkHitWithin
-            if inFight, actor.perk == nil, let slot = bestPerk(for: actor) {
+            if actor.assisted, inFight, actor.perk == nil, let slot = bestPerk(for: actor) {
                 added.append(.useItem(slot: slot))
             }
 
@@ -169,7 +169,7 @@ enum AssistSystem {
 
     // MARK: - Building
 
-    /// Your base as easy controls sees it, or nil when there is nothing to build:
+    /// Your base as auto building sees it, or nil when there is nothing to build:
     /// out of your claim, just bombed, or already closed.
     ///
     /// Before your first wall the square sits round wherever you are. After that

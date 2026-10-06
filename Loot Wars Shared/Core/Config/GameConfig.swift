@@ -940,7 +940,7 @@ enum GameConfig {
         static let passageMargin: Double = 0.2
     }
 
-    /// Easy controls - see AssistSystem.
+    /// Player help: auto building and Assisted controls - see AssistSystem.
     enum Assist {
         /// A heal is used for you once your health is below this share of full.
         /// Half: low enough that a scratch does not burn a bandage, high enough
@@ -972,7 +972,7 @@ enum GameConfig {
         /// The gap while you are walking along the outline itself, so the wall
         /// keeps pace with you down the route.
         static let buildGapAlongPath: Double = 0.22
-        /// The smallest side of the square easy controls build, in tiles. Eight
+        /// The smallest side of the square auto building makes, in tiles. Eight
         /// in a nine-tile claim: a roomy base with a tile to spare round it,
         /// rather than the tightest square that counts.
         static let baseSide = 8

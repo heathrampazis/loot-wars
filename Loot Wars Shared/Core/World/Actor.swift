@@ -117,15 +117,21 @@ struct Actor {
     /// today, a remote player later.
     var ai: AIState?
 
-    /// Easy controls: crates open and heals are used for you - see AssistSystem.
+    /// Assisted controls: aim assist, heals and power-ups - see AssistSystem.
     /// Off for everyone unless the player switched it on in Settings.
     var assisted = false
-    /// Seconds before easy controls will use another heal.
+
+    /// The player's chores done for them - crates open as you reach them and
+    /// your base builds as you walk it. On for the player in every match,
+    /// whatever the assist setting; off for bots, which do their own, and for
+    /// the How to Play puppets. See AssistSystem.
+    var autoChores = false
+    /// Seconds before assisted controls will use another heal.
     var assistHealWait: Double = 0
-    /// Seconds before easy controls will lay another wall, or buy another heal.
+    /// Seconds before auto building will lay another wall, or buy another heal.
     var assistBuildWait: Double = 0
     var assistBuyWait: Double = 0
-    /// How long easy controls has seen you stood just over your base's outline,
+    /// How long auto building has seen you stood just over your base's outline,
     /// and the tile the base is following you to once that has gone on long
     /// enough - see AssistSystem.basePlan.
     var assistOutsideTime: Double = 0

@@ -1009,7 +1009,7 @@ final class GameScene: SKScene {
         wasHome = home
 
         if arrivedHome, !hasBuilt, blueprint.hasSlots, world.canBuild(player.team) {
-            hint.show("TAP BASE TILES TO PLACE WALLS", seconds: 2.2)
+            hint.show("WALK THE MARKED TILES TO BUILD WALLS", seconds: 2.2)
             return
         }
 

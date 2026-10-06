@@ -146,11 +146,11 @@ final class BlueprintRenderer {
         // Sorted by distance only to decide what to drop when there are more than
         // the pool holds; the SET is chosen by the radius, which is what stops the
         // run reshuffling itself under your feet as you move.
-        // With easy controls on, the plan follows you - the same plan AssistSystem
+        // The plan follows you, as auto building does - the same plan AssistSystem
         // builds from, so the markers show where the walls will actually go.
         let near = world.recommendedWalls(for: player.team, walls: base.ownWalls,
-                                          towardsMiddle: player.assisted,
-                                          following: player.assisted ? player.assistFollowing : nil)
+                                          towardsMiddle: player.autoChores,
+                                          following: player.autoChores ? player.assistFollowing : nil)
             .map { (tile: $0, away: distance(from: player.feet, to: $0)) }
             .filter { $0.away <= BlueprintRenderer.reach }
             .sorted { $0.away < $1.away }
