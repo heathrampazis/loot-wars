@@ -138,7 +138,8 @@ final class GameScene: SKScene {
                                               // The reference draws it at 0.6,
                                               // which left more air round it than
                                               // the button wanted.
-                                              glyphSize: 58)
+                                              glyphSize: 58,
+                                              glass: true)
     private let shopPanel = ShopPanelNode()
 
     /// One offer, unprompted, for a few seconds - see QuickBuyNode.
@@ -205,6 +206,16 @@ final class GameScene: SKScene {
     /// When the shop button next waves at somebody who has not been in.
     private var nextNudge: TimeInterval = 0
     private let results = ResultsNode()
+
+    /// The pause button by the timer, the menu it opens, and whether the match
+    /// is stopped. Paused, the world does not step, its animations hold, and
+    /// only the menu answers a tap.
+    private let pauseButton = PauseButtonNode()
+
+    /// The blurred map behind every control - see GlassBackdrop and GlassNode.
+    private let glass = GlassBackdrop()
+    private let pauseMenu = PauseMenuNode()
+    private var matchPaused = false
     private let hotbar = HotbarNode()
     private let chestPanel = ChestPanelNode()
     private let respawnBanner = RespawnBanner()
@@ -518,6 +529,8 @@ final class GameScene: SKScene {
         cameraController.node.addChild(rebuildTimer)
         cameraController.node.addChild(baseCompass)
         cameraController.node.addChild(results)
+        cameraController.node.addChild(pauseButton)
+        cameraController.node.addChild(pauseMenu)
         cameraController.node.addChild(hotbar)
         cameraController.node.addChild(chestPanel)
         cameraController.node.addChild(respawnBanner)
@@ -532,6 +545,55 @@ final class GameScene: SKScene {
         layOutUI()
 
         syncRenderers()
+
+        #if os(iOS)
+        // A call, a notification pulled down, the app switcher: the match stops
+        // and waits rather than carrying on without you.
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive),
+                                               name: UIApplication.willResignActiveNotification,
+                                               object: nil)
+        #endif
+    }
+
+    override func willMove(from view: SKView) {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    #if os(iOS)
+    @objc private func appWillResignActive() {
+        pauseMatch()
+    }
+    #endif
+
+    // MARK: - Pausing
+
+    /// Stops the match and shows the pause menu. Not once it is over.
+    private func pauseMatch() {
+        guard world != nil, !matchPaused, !world.isOver, results.isHidden else { return }
+        matchPaused = true
+
+        // Let go of everything held, so nothing is still firing or walking when
+        // the match comes back.
+        #if os(iOS) || os(tvOS)
+        let held = [moveTouch, aimTouch, throwTouch, healTouch, openTouch].compactMap { $0 }
+        releaseControls(matching: Set(held))
+        #endif
+
+        worldLayer.isPaused = true
+        let place = world.localPlayer.flatMap { player in
+            world.standings.firstIndex { $0.team == player.team }
+        }
+        pauseMenu.show(timeLeft: world.timeRemaining, place: place)
+    }
+
+    private func resumeMatch() {
+        guard matchPaused else { return }
+        matchPaused = false
+        worldLayer.isPaused = false
+        pauseMenu.hide()
+        // The clock starts again from now, not from when it stopped.
+        lastUpdateTime = 0
+        accumulator = 0
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -759,6 +821,12 @@ final class GameScene: SKScene {
         killBanner.restingY = noticeY
         rebuildTimer.position = CGPoint(x: 0, y: noticeY)
         results.layOut(for: size)
+        pauseMenu.layOut(for: size)
+
+        // Just left of the timer, its top edge level with the timer's.
+        pauseButton.position = CGPoint(
+            x: matchPanel.position.x - MatchPanelNode.size.width / 2 - 10 - PauseButtonNode.side / 2,
+            y: matchPanel.position.y - PauseButtonNode.side / 2)
 
         // IN the corner, where the health panel used to be. Nothing to clamp
         // against: it is square, it starts at the corner, and the nearest thing to
@@ -824,6 +892,14 @@ final class GameScene: SKScene {
     override func update(_ currentTime: TimeInterval) {
         guard world != nil else { return }
 
+        // Paused: nothing moves, and the clock is held so that resuming does not
+        // try to catch up on the time spent in the menu.
+        if matchPaused {
+            lastUpdateTime = currentTime
+            accumulator = 0
+            return
+        }
+
         if lastUpdateTime == 0 { lastUpdateTime = currentTime }
         frameDelta = min(0.25, currentTime - lastUpdateTime)
         accumulator += currentTime - lastUpdateTime
@@ -855,6 +931,18 @@ final class GameScene: SKScene {
         #endif
 
         syncRenderers()
+        refreshGlass()
+    }
+
+    /// Re-blurs the map behind the controls and hands each one its patch. After
+    /// the renderers, so the glass shows this frame's map rather than the last.
+    private func refreshGlass() {
+        guard GlassBackdrop.enabled, let view else { return }
+        let camera = cameraController.node
+        glass.refresh(view: view, world: worldLayer, centre: camera.position,
+                      zoom: camera.xScale, screen: size)
+        guard let texture = glass.texture else { return }
+        GlassNode.fillAll(from: texture, under: camera, screen: size)
     }
 
     /// How long the last frame took, for the renderers that decay a value rather
@@ -1790,7 +1878,40 @@ extension GameScene {
             return
         }
 
+        // Paused, only the pause menu answers.
+        if matchPaused {
+            for touch in touches {
+                let point = touch.location(in: pauseMenu)
+                if pauseMenu.isResume(atLocalPoint: point) {
+                    SoundPlayer.shared.play(.select)
+                    pauseMenu.pressResume { [weak self] in self?.resumeMatch() }
+                    return
+                }
+                if pauseMenu.isQuit(atLocalPoint: point) {
+                    SoundPlayer.shared.play(.exit)
+                    pauseMenu.pressQuit { [weak self] in self?.openMenu() }
+                    return
+                }
+                // Anywhere off the card carries on, like Resume.
+                if pauseMenu.isOffCard(atLocalPoint: point) {
+                    SoundPlayer.shared.play(.select)
+                    pauseMenu.dismiss { resumeMatch() }
+                    return
+                }
+            }
+            return
+        }
+
         for touch in touches {
+            // The pause button first: it is small, it sits up by the timer away
+            // from everything else, and a tap on it should never also do something.
+            if pauseButton.contains(localPoint: touch.location(in: pauseButton)) {
+                pauseButton.press()
+                SoundPlayer.shared.play(.select)
+                pauseMatch()
+                return
+            }
+
             // BEFORE the move stick, which otherwise swallows it: the prompt sits
             // under the health panel, and on a small phone the stick's grab circle
             // reaches that far up the left-hand side. Same trade the item button

@@ -55,7 +55,8 @@ final class MatchPanelNode: SKNode {
 
     override init() {
         super.init()
-        zPosition = 1000
+        // Over the edge markers (1040), which slide past it - see BaseCompassNode.
+        zPosition = 1045
 
         let size = MatchPanelNode.size
 
@@ -65,7 +66,10 @@ final class MatchPanelNode: SKNode {
             cornerWidth: 12, cornerHeight: 12, transform: nil))
 
         panel.fillColor = RenderPalette.hudPanel
-        panel.strokeColor = .clear
+        panel.strokeColor = RenderPalette.glassRim
+        panel.lineWidth = RenderPalette.glassRimWidth
+        // Frosted map behind it - see GlassNode.
+        if let path = panel.path { panel.addChild(GlassNode(path: path)) }
         addChild(panel)
 
         // The origin is the panel's TOP, so everything inside it hangs downward and

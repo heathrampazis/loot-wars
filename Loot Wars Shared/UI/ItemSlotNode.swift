@@ -84,7 +84,9 @@ final class ItemSlotNode: SKNode {
     private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
     /// Local origin is the centre of the slot.
-    init(side: CGFloat) {
+    /// - Parameter glass: frosted map behind the slot - see GlassNode. Off by
+    ///   default; the hotbar is plain see-through.
+    init(side: CGFloat, glass: Bool = false) {
         self.side = side
         enchant = EnchantArt.overlay(box: side * 0.85)
 
@@ -109,7 +111,9 @@ final class ItemSlotNode: SKNode {
         super.init()
 
         panel.fillColor = RenderPalette.hotbarSlot
-        panel.strokeColor = .clear
+        panel.strokeColor = RenderPalette.glassRim
+        panel.lineWidth = RenderPalette.glassRimWidth
+        if glass, let path = panel.path { panel.addChild(GlassNode(path: path)) }
         addChild(panel)
 
         // Over everything, including the count badge and the urgent ring: a refusal

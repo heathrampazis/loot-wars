@@ -302,10 +302,9 @@ enum GameConfig {
             Tab(name: "GEAR", stock: .upgrades),
 
             // A bomb, back on the shelf (Oct 2026) - 18, between an Epic and a
-            // Legendary rung, so it is a decision rather than a top-up. One
-            // at a time: it is sold out while you are carrying one, and before
-            // the bomb grace ends (see ShopSystem.isSoldOut). Purple crates are
-            // still where most of them come from.
+            // Legendary rung, so it is a decision rather than a top-up. Never
+            // sold out, and the quick offer pushes it (see ShopSystem.quickOffer);
+            // one bought before the bomb grace ends waits until it can be thrown.
             Tab(name: "RAID", stock: .shelf([
                 Item(type: .bomb, price: 18)
             ]))

@@ -145,15 +145,14 @@ enum ShopSystem {
     /// on a future shelf will want it - a per-match limit, a thing sold out for
     /// everyone. A shape with nothing in it is easier to find than a concept that
     /// has to be reintroduced.
+    ///
+    /// Nothing, again (Oct 2026). The bomb was the last thing it refused - one at
+    /// a time, and none before the opening grace - and a greyed-out bomb read as
+    /// "not for you" when raiding is the thing the shop should be selling hardest.
+    /// A bomb bought early still cannot be thrown until the grace ends; that rule
+    /// lives in BombSystem, where it belongs.
     static func isSoldOut(_ type: ItemType, actor: Actor, in world: World) -> Bool {
-        switch type {
-        // One bomb at a time from the shop, and none before the grace period
-        // ends - the shelf is a way to get the next raid going, not to stockpile.
-        case .bomb:
-            return !world.bombsAllowed || actor.inventory.count(of: .bomb) > 0
-        default:
-            return false
-        }
+        false
     }
 
     /// What the shop pays for something out of your bag.
@@ -237,6 +236,15 @@ enum ShopSystem {
             return best
         }
 
+        // Then a bomb, if you have none on you. Raiding is the best thing you
+        // can do with a minute and the quick offer is the shop's loudest voice,
+        // so it says "bomb" before it says "rung". Not before bombs can be
+        // thrown, when it would only be a thing to carry.
+        let bomb = shelf.first { $0.type == .bomb }
+        if world.bombsAllowed, let bomb, actor.inventory.count(of: .bomb) == 0 {
+            return bomb
+        }
+
         // Otherwise the ladder, cheapest rung first. This is the purchase people
         // forget - healing is remembered because bleeding is loud, and a rung is
         // remembered only if something says so.
@@ -246,7 +254,12 @@ enum ShopSystem {
             return rung
         }
 
-        // And failing both, anything at all off the shelf, cheapest first.
+        // A second bomb before the odds and ends.
+        if world.bombsAllowed, let bomb {
+            return bomb
+        }
+
+        // And failing all of those, anything at all off the shelf, cheapest first.
         //
         // This last line is most of why the prompt is ever on screen. A rung costs
         // between 9 and 40 and a bandage costs 6, so for most of a match the honest

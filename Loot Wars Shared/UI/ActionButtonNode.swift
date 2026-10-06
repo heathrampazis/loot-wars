@@ -46,7 +46,8 @@ final class ActionButtonNode: SKNode {
          grabRadius: CGFloat = 105,
          shape: Shape = .circle,
          fill: SKColor = RenderPalette.controlBackground,
-         glyphSize: CGFloat? = nil) {
+         glyphSize: CGFloat? = nil,
+         glass: Bool = false) {
         self.grabRadius = grabRadius
         // Defaults to half the button, which is right for art that already has its
         // own margin. The drawn glyphs do not, so they say how big they want to be.
@@ -66,7 +67,10 @@ final class ActionButtonNode: SKNode {
         super.init()
 
         base.fillColor = fill
-        base.strokeColor = .clear
+        base.strokeColor = RenderPalette.glassRim
+        base.lineWidth = RenderPalette.glassRimWidth
+        // Frosted map behind it - see GlassNode. Only where asked: the shop button.
+        if glass, let path = base.path { base.addChild(GlassNode(path: path)) }
 
         glyph.alpha = 0.85
 
@@ -105,8 +109,8 @@ final class ActionButtonNode: SKNode {
     func setHighlighted(_ on: Bool) {
         guard on != isHighlighted else { return }
         isHighlighted = on
-        base.strokeColor = on ? RenderPalette.recommend : .clear
-        base.lineWidth = on ? 4 : 0
+        base.strokeColor = on ? RenderPalette.recommend : RenderPalette.glassRim
+        base.lineWidth = on ? 4 : RenderPalette.glassRimWidth
         glyph.alpha = on ? 1 : 0.85
 
         // The breathing is on the disc alone: the whole button's scale belongs to

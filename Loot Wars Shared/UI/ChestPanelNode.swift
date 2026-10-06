@@ -92,7 +92,7 @@ final class ChestPanelNode: SKNode {
         panel.lineWidth = 1
 
         for index in 0..<Inventory.slotCount {
-            let slot = ItemSlotNode(side: ChestPanelNode.slotSize)
+            let slot = ItemSlotNode(side: ChestPanelNode.slotSize, glass: false)
             slot.position = CGPoint(x: ChestPanelNode.centreX(of: index), y: 0)
             addChild(slot)
             slots.append(slot)
