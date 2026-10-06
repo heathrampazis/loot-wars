@@ -22,7 +22,8 @@ enum Glyphs {
 
     static let clock: SKTexture = makeClock()
 
-    /// The menu's two secondary buttons. Drawn here with the rest rather than
+    /// The menu's two secondary buttons: How to Play's question mark and the
+    /// Settings gear. Drawn here with the rest rather than
     /// exported, for the reason this file exists: a symbol made of arcs and
     /// rectangles is a dozen lines and never needs a retina export.
     static let info: SKTexture = makeInfo()
@@ -127,13 +128,13 @@ enum Glyphs {
         return SKTexture(image: image)
     }
 
-    /// A lowercase i in a ring.
+    /// A question mark, for How to Play.
     ///
-    /// Built out of a dot and a bar rather than set as TEXT, which is the whole
-    /// reason it is in here. A letter drawn by a font is a different weight, a
+    /// Built out of a hook and a dot rather than set as TEXT, which is the whole
+    /// reason it is in here. A character drawn by a font is a different weight, a
     /// different width and a different optical centre in every font the device
-    /// might fall back to, and this has to sit inside a circle next to a gear and
-    /// look like its sibling.
+    /// might fall back to, and this has to sit next to a gear and look like its
+    /// sibling.
     private static func makeInfo() -> SKTexture {
         let side: CGFloat = 128
         let format = UIGraphicsImageRendererFormat.default()
@@ -143,20 +144,29 @@ enum Glyphs {
             size: CGSize(width: side, height: side),
             format: format
         ).image { _ in
+            SKColor.white.setStroke()
             SKColor.white.setFill()
 
-            let width = side * 0.13
-            let x = (side - width) / 2
+            let stroke = side * 0.13
+            let centre = CGPoint(x: side * 0.5, y: side * 0.37)
+            let radius = side * 0.15
 
-            // The dot, then the stem. The gap between them is a shade wider than
-            // the dot is tall, which is what keeps an i reading as an i at the size
-            // a button glyph is actually seen at.
-            UIBezierPath(ovalIn: CGRect(x: x, y: side * 0.20,
-                                        width: width, height: width)).fill()
+            // The hook: round over the top from the left, down the right, then
+            // in to a short stem in the middle.
+            let hook = UIBezierPath()
+            hook.addArc(withCenter: centre, radius: radius,
+                        startAngle: .pi, endAngle: .pi * 0.35, clockwise: true)
+            hook.addQuadCurve(to: CGPoint(x: side * 0.5, y: side * 0.60),
+                              controlPoint: CGPoint(x: side * 0.5, y: side * 0.52))
+            hook.addLine(to: CGPoint(x: side * 0.5, y: side * 0.64))
+            hook.lineWidth = stroke
+            hook.lineCapStyle = .round
+            hook.lineJoinStyle = .round
+            hook.stroke()
 
-            UIBezierPath(roundedRect: CGRect(x: x, y: side * 0.40,
-                                             width: width, height: side * 0.40),
-                         cornerRadius: width / 2).fill()
+            // The dot, the same size as the stroke, a clear gap below the stem.
+            UIBezierPath(ovalIn: CGRect(x: (side - stroke) / 2, y: side * 0.73,
+                                        width: stroke, height: stroke)).fill()
         }
 
         return SKTexture(image: image)

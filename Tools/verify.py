@@ -21,7 +21,7 @@
 #
 import re, sys, subprocess, pathlib, collections, argparse
 
-root = pathlib.Path("LOOT WARS 2D Shared")
+root = pathlib.Path("Loot Wars Shared")
 bad = 0
 
 parser = argparse.ArgumentParser()
