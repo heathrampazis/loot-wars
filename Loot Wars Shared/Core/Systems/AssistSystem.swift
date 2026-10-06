@@ -211,20 +211,50 @@ enum AssistSystem {
     /// The next wall to put up or take down near your feet, or nil.
     ///
     /// Up first: the nearest gap in the plan's outline within a step or so,
-    /// never the tile you are standing on. Failing that, down: one of your own
-    /// walls within reach that the plan has moved out past, so the base reshapes
-    /// round you rather than leaving its old outline standing inside the new one.
+    /// including the tile you are standing on, then a corner or last gap from a
+    /// little further. Failing that, down: an old wall stopping a corner going
+    /// in, then any wall the plan has moved out past, so the base reshapes round
+    /// you rather than leaving its old outline standing inside the new one.
     private static func nextWallChange(for actor: Actor, plan: World.BasePlan,
                                        in world: World) -> Command? {
         let base = world.enclosure(of: actor.team)
+        let reach = GameConfig.Assist.buildReach
 
-        if let tile = nearest(plan.gaps, to: actor, where: {
-            !actor.overlaps($0) && BuildSystem.canPlace(at: $0, by: actor, in: world)
+        // The tile you are standing on counts. You walk through your own walls,
+        // so a wall going up under you traps nobody - and ruling it out was why
+        // corners got missed: you are ON the corner as you turn it, and by the
+        // time you have stepped off it is behind you and out of reach.
+        if let tile = nearest(plan.gaps, to: actor, within: reach, where: {
+            BuildSystem.canPlace(at: $0, by: actor, in: world)
         }) {
             return .placeBlock(tile)
         }
 
-        if let tile = nearest(Array(base.ownWalls), to: actor, where: {
+        // A gap your walls already reach on two sides - a corner, or one tile
+        // left in a run - is filled from further away, so a corner cut short
+        // still gets closed.
+        if let tile = nearest(plan.gaps, to: actor, within: GameConfig.Assist.closeReach, where: {
+            ownNeighbours(of: $0, in: base.ownWalls) >= 2
+                && BuildSystem.canPlace(at: $0, by: actor, in: world)
+        }) {
+            return .placeBlock(tile)
+        }
+
+        // A corner that cannot take a wall because an old one stands diagonally
+        // inside it: that old wall comes down first, so the corner can go in.
+        let unblocking = Set(plan.blocked.flatMap { tile in
+            [(-1, -1), (-1, 1), (1, -1), (1, 1)].map {
+                GridPoint(col: tile.col + $0.0, row: tile.row + $0.1)
+            }
+        })
+        if let tile = nearest(Array(base.ownWalls), to: actor, within: GameConfig.Assist.closeReach, where: {
+            unblocking.contains($0) && plan.isInterior($0)
+                && BuildSystem.canRemove(at: $0, by: actor, in: world)
+        }) {
+            return .removeBlock(tile)
+        }
+
+        if let tile = nearest(Array(base.ownWalls), to: actor, within: reach, where: {
             plan.isInterior($0) && BuildSystem.canRemove(at: $0, by: actor, in: world)
         }) {
             return .removeBlock(tile)
@@ -232,15 +262,22 @@ enum AssistSystem {
         return nil
     }
 
+    /// How many of a tile's four sides touch one of these walls.
+    private static func ownNeighbours(of tile: GridPoint, in walls: Set<GridPoint>) -> Int {
+        [(0, 1), (0, -1), (1, 0), (-1, 0)].filter {
+            walls.contains(GridPoint(col: tile.col + $0.0, row: tile.row + $0.1))
+        }.count
+    }
+
     /// The tile within build reach nearest your feet that passes the test, or nil.
     /// A tie goes to the lower tile so the same spot always gives the same answer.
-    private static func nearest(_ tiles: [GridPoint], to actor: Actor,
+    private static func nearest(_ tiles: [GridPoint], to actor: Actor, within reach: Double,
                                 where allowed: (GridPoint) -> Bool) -> GridPoint? {
         var best: (tile: GridPoint, away: Double)?
         for tile in tiles {
             let centre = Vec2(x: Double(tile.col) + 0.5, y: Double(tile.row) + 0.5)
             let away = (centre - actor.feet).length
-            guard away <= GameConfig.Assist.buildReach else { continue }
+            guard away <= reach else { continue }
             if let current = best {
                 if away > current.away { continue }
                 if away == current.away,
