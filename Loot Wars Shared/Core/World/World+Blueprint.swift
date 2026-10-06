@@ -99,9 +99,9 @@ extension World {
                                      : World.smallestBaseSide
 
         func stretch(_ low: inout Int, _ high: inout Int, min lowest: Int, max highest: Int,
-                     middle: Int) {
+                     middle: Int, to side: Int) {
             let upFirst = !towardsMiddle || (low + high) / 2 <= middle
-            while high - low + 1 < smallest {
+            while high - low + 1 < side {
                 if upFirst {
                     if high < highest { high += 1 } else if low > lowest { low -= 1 } else { break }
                 } else {
@@ -117,8 +117,22 @@ extension World {
             var highCol = points.map(\.col).max() ?? 0
             var lowRow = points.map(\.row).min() ?? 0
             var highRow = points.map(\.row).max() ?? 0
-            stretch(&lowCol, &highCol, min: limitLow.col, max: limitHigh.col, middle: centre.col)
-            stretch(&lowRow, &highRow, min: limitLow.row, max: limitHigh.row, middle: centre.row)
+            stretch(&lowCol, &highCol, min: limitLow.col, max: limitHigh.col,
+                    middle: centre.col, to: smallest)
+            stretch(&lowRow, &highRow, min: limitLow.row, max: limitHigh.row,
+                    middle: centre.row, to: smallest)
+
+            // Auto building always makes a true square: whichever side came out
+            // shorter - from stepping out on one side, or a stray wall - is grown
+            // to match the longer, towards the middle of the claim. A base that is
+            // nine one way and eight the other looks like a mistake.
+            if towardsMiddle {
+                let side = max(highCol - lowCol, highRow - lowRow) + 1
+                stretch(&lowCol, &highCol, min: limitLow.col, max: limitHigh.col,
+                        middle: centre.col, to: side)
+                stretch(&lowRow, &highRow, min: limitLow.row, max: limitHigh.row,
+                        middle: centre.row, to: side)
+            }
             return (lowCol, highCol, lowRow, highRow)
         }
 
