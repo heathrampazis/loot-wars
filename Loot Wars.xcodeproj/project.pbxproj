@@ -7,31 +7,31 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		7277C91030415F7D00590F11 /* LOOT WARS 2D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LOOT WARS 2D.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7277C91030415F7D00590F11 /* Loot Wars.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Loot Wars.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		7277C94A30415F7D00590F11 /* Exceptions for "LOOT WARS 2D iOS" folder in "LOOT WARS 2D iOS" target */ = {
+		7277C94A30415F7D00590F11 /* Exceptions for "Loot Wars iOS" folder in "Loot Wars" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 7277C90F30415F7D00590F11 /* LOOT WARS 2D iOS */;
+			target = 7277C90F30415F7D00590F11 /* Loot Wars */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		7277C90730415F7B00590F11 /* LOOT WARS 2D Shared */ = {
+		7277C90730415F7B00590F11 /* Loot Wars Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "LOOT WARS 2D Shared";
+			path = "Loot Wars Shared";
 			sourceTree = "<group>";
 		};
-		7277C91230415F7D00590F11 /* LOOT WARS 2D iOS */ = {
+		7277C91230415F7D00590F11 /* Loot Wars iOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				7277C94A30415F7D00590F11 /* Exceptions for "LOOT WARS 2D iOS" folder in "LOOT WARS 2D iOS" target */,
+				7277C94A30415F7D00590F11 /* Exceptions for "Loot Wars iOS" folder in "Loot Wars" target */,
 			);
-			path = "LOOT WARS 2D iOS";
+			path = "Loot Wars iOS";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -50,8 +50,8 @@
 		7277C90230415F7B00590F11 = {
 			isa = PBXGroup;
 			children = (
-				7277C90730415F7B00590F11 /* LOOT WARS 2D Shared */,
-				7277C91230415F7D00590F11 /* LOOT WARS 2D iOS */,
+				7277C90730415F7B00590F11 /* Loot Wars Shared */,
+				7277C91230415F7D00590F11 /* Loot Wars iOS */,
 				7277C91130415F7D00590F11 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -59,7 +59,7 @@
 		7277C91130415F7D00590F11 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				7277C91030415F7D00590F11 /* LOOT WARS 2D.app */,
+				7277C91030415F7D00590F11 /* Loot Wars.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -67,9 +67,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		7277C90F30415F7D00590F11 /* LOOT WARS 2D iOS */ = {
+		7277C90F30415F7D00590F11 /* Loot Wars */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 7277C94730415F7D00590F11 /* Build configuration list for PBXNativeTarget "LOOT WARS 2D iOS" */;
+			buildConfigurationList = 7277C94730415F7D00590F11 /* Build configuration list for PBXNativeTarget "Loot Wars" */;
 			buildPhases = (
 				7277C90C30415F7D00590F11 /* Sources */,
 				7277C90D30415F7D00590F11 /* Frameworks */,
@@ -80,14 +80,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				7277C90730415F7B00590F11 /* LOOT WARS 2D Shared */,
-				7277C91230415F7D00590F11 /* LOOT WARS 2D iOS */,
+				7277C90730415F7B00590F11 /* Loot Wars Shared */,
+				7277C91230415F7D00590F11 /* Loot Wars iOS */,
 			);
-			name = "LOOT WARS 2D iOS";
+			name = "Loot Wars";
 			packageProductDependencies = (
 			);
-			productName = "LOOT WARS 2D iOS";
-			productReference = 7277C91030415F7D00590F11 /* LOOT WARS 2D.app */;
+			productName = "Loot Wars";
+			productReference = 7277C91030415F7D00590F11 /* Loot Wars.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -105,7 +105,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 7277C90630415F7B00590F11 /* Build configuration list for PBXProject "LOOT WARS 2D" */;
+			buildConfigurationList = 7277C90630415F7B00590F11 /* Build configuration list for PBXProject "Loot Wars" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -119,7 +119,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				7277C90F30415F7D00590F11 /* LOOT WARS 2D iOS */,
+				7277C90F30415F7D00590F11 /* Loot Wars */,
 			);
 		};
 /* End PBXProject section */
@@ -154,9 +154,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JYYF7659TK;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "LOOT WARS 2D iOS/Info.plist";
+				INFOPLIST_FILE = "Loot Wars iOS/Info.plist";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_CFBundleDisplayName = "Loot Wars";
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -166,8 +167,8 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "xdmisty.LOOT-WARS-2D";
-				PRODUCT_NAME = "LOOT WARS 2D";
+				PRODUCT_BUNDLE_IDENTIFIER = xdmisty.LootWars;
+				PRODUCT_NAME = "Loot Wars";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -188,9 +189,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JYYF7659TK;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "LOOT WARS 2D iOS/Info.plist";
+				INFOPLIST_FILE = "Loot Wars iOS/Info.plist";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_CFBundleDisplayName = "Loot Wars";
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -200,8 +202,8 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "xdmisty.LOOT-WARS-2D";
-				PRODUCT_NAME = "LOOT WARS 2D";
+				PRODUCT_BUNDLE_IDENTIFIER = xdmisty.LootWars;
+				PRODUCT_NAME = "Loot Wars";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -331,7 +333,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		7277C90630415F7B00590F11 /* Build configuration list for PBXProject "LOOT WARS 2D" */ = {
+		7277C90630415F7B00590F11 /* Build configuration list for PBXProject "Loot Wars" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7277C95430415F7D00590F11 /* Debug */,
@@ -340,7 +342,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		7277C94730415F7D00590F11 /* Build configuration list for PBXNativeTarget "LOOT WARS 2D iOS" */ = {
+		7277C94730415F7D00590F11 /* Build configuration list for PBXNativeTarget "Loot Wars" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7277C94830415F7D00590F11 /* Debug */,

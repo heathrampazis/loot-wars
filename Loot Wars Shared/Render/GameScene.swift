@@ -147,6 +147,9 @@ final class GameScene: SKScene {
     /// Teaches the one gesture nothing on screen suggests: hold a slot to drop it.
     private let hint = HintNode()
 
+    /// Whether tips are on for this match - read once, from Settings.
+    private let tipsOn = Prefs.tipsOn
+
     /// The hold hint's whole budget for a match.
     ///
     /// One showing, spent only on the moment that earns it: walking over something
@@ -958,6 +961,7 @@ final class GameScene: SKScene {
     /// never having been told, and this is the one thing on screen with no claim
     /// on that attention.
     private func updateHint(with world: World) {
+        guard tipsOn else { return }
         guard let player = world.localPlayer, player.isAlive, !world.isOver else {
             wasBlocked = false
             wasAtEnemyChest = false
@@ -1259,7 +1263,7 @@ final class GameScene: SKScene {
                 effectsRenderer.earned(at: position, points: points)
 
                 // And once, ever, the sentence that explains what the number is.
-                if !Prefs.taughtHolding {
+                if tipsOn, !Prefs.taughtHolding {
                     Prefs.taughtHolding = true
                     hint.show("YOUR BASE EARNS WHILE IT HOLDS", seconds: 2.0)
                 }

@@ -1,6 +1,6 @@
 //
 //  SceneDelegate.swift
-//  LOOT WARS 2D iOS
+//  Loot Wars
 //
 //  Created by Heath Rampazis on 28/8/2026.
 //

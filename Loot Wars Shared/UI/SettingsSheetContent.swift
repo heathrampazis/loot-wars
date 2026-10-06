@@ -5,8 +5,8 @@
 //  What goes inside the menu's sheet: the settings, and the About page behind
 //  them.
 //
-//  A short list - sound, left-handed controls, easy controls, difficulty, the
-//  tips again, and About. (Dev mode no longer has a row - see Prefs.devMode.)
+//  A short list - sound, left-handed controls, easy controls, difficulty, tips
+//  on or off, and About. (Dev mode no longer has a row - see Prefs.devMode.)
 //  A short page of things people actually change on a phone reads as finished; a
 //  long one reads as a checklist. Each row is its own tap target, the whole width
 //  of the card, because a switch thirty points tall is a small thing to aim at
@@ -75,12 +75,8 @@ final class SettingsSheetContent: MenuSheetContent {
     private var soundToggle: MenuToggleNode?
     private var handToggle: MenuToggleNode?
     private var easyToggle: MenuToggleNode?
-    private var tipsButton: SKShapeNode?
-    private var tipsLabel: SKLabelNode?
+    private var tipsToggle: MenuToggleNode?
 
-    /// Whether the tips have been reset since the sheet was opened, so the button
-    /// can say it worked and not offer to do it twice.
-    private var tipsReset = false
 
     func layOut(width: CGFloat, maxHeight: CGFloat) -> CGFloat {
         self.width = width
@@ -123,8 +119,11 @@ final class SettingsSheetContent: MenuSheetContent {
                 addDifficultyButton(y: centreY)
 
             case .tips:
-                addLabels("Show tips again", detail: "Replay the hints from your first match", y: centreY)
-                addTipsButton(y: centreY)
+                addLabels("Tips", detail: "Hints while you play", y: centreY)
+                let toggle = MenuToggleNode(isOn: Prefs.tipsOn)
+                toggle.position = CGPoint(x: width / 2 - MenuToggleNode.trackSize.width / 2 - 4, y: centreY)
+                node.addChild(toggle)
+                tipsToggle = toggle
 
             case .about:
                 addLabels("About", detail: nil, y: centreY)
@@ -167,13 +166,9 @@ final class SettingsSheetContent: MenuSheetContent {
                                              .scale(to: 1, duration: 0.12)]))
 
         case .tips:
-            guard !tipsReset else { return }
-            tipsReset = true
-            Prefs.forgetLessons()
+            Prefs.tipsOn.toggle()
+            tipsToggle?.set(Prefs.tipsOn)
             SoundPlayer.shared.play(.select)
-            paintTipsButton()
-            tipsButton?.run(.sequence([.scale(to: 0.9, duration: 0.05),
-                                       .scale(to: 1, duration: 0.12)]))
 
         case .about:
             SoundPlayer.shared.play(.select)
@@ -240,47 +235,11 @@ final class SettingsSheetContent: MenuSheetContent {
         difficultyLabel?.attributedText = Sheet.text(difficulty.title, size: 13, weight: .bold,
                                                      colour: .white)
     }
-
-    private func addTipsButton(y: CGFloat) {
-        let size = CGSize(width: 76, height: 30)
-        let button = SKShapeNode(rect: CGRect(x: -size.width / 2, y: -size.height / 2,
-                                              width: size.width, height: size.height),
-                                 cornerRadius: size.height / 2)
-        button.lineWidth = 2.5
-        button.position = CGPoint(x: width / 2 - size.width / 2 - 4, y: y)
-        node.addChild(button)
-
-        let label = SKLabelNode()
-        label.verticalAlignmentMode = .center
-        label.horizontalAlignmentMode = .center
-        label.zPosition = 1
-        button.addChild(label)
-
-        tipsButton = button
-        tipsLabel = label
-        paintTipsButton()
-    }
-
-    private func paintTipsButton() {
-        if tipsReset {
-            tipsButton?.fillColor = SKColor(white: 0.84, alpha: 1)
-            tipsButton?.strokeColor = SKColor(white: 0.72, alpha: 1)
-            tipsLabel?.attributedText = Sheet.text("Done", size: 13, weight: .bold,
-                                                   colour: SKColor(white: 0, alpha: 0.5))
-        } else {
-            tipsButton?.fillColor = RenderPalette.menuInfo.face
-            tipsButton?.strokeColor = RenderPalette.menuInfo.edge
-            tipsLabel?.attributedText = Sheet.text("Reset", size: 13, weight: .bold,
-                                                   colour: .white)
-        }
-    }
 }
 
 // MARK: - About
 
-/// Who made it, which version this is, and - later - the terms, privacy policy
-/// and credits. The rows are placeholders now so the page exists and the links
-/// have somewhere to go when the documents are written.
+/// The game's name and version, and the Terms of Use and Privacy Policy.
 final class AboutSheetContent: MenuSheetContent {
 
     let node = SKNode()
@@ -293,10 +252,10 @@ final class AboutSheetContent: MenuSheetContent {
 
     private static let rowHeight: CGFloat = 44
     private static let headHeight: CGFloat = 58
-    private static let items = ["Terms of Use", "Privacy Policy", "Credits"]
+    private static let items = ["Terms of Use", "Privacy Policy"]
 
-    /// What each row opens, or nil for a row that is not ready yet.
-    private static let documents: [LegalDocument?] = [.terms, .privacy, nil]
+    /// What each row opens.
+    private static let documents: [LegalDocument] = [.terms, .privacy]
 
     private var width: CGFloat = 0
 
@@ -320,7 +279,7 @@ final class AboutSheetContent: MenuSheetContent {
         node.addChild(version)
 
         var top = -AboutSheetContent.headHeight
-        for (index, item) in AboutSheetContent.items.enumerated() {
+        for item in AboutSheetContent.items {
             node.addChild(Sheet.separator(width: width, y: top))
             let centreY = top - AboutSheetContent.rowHeight / 2
 
@@ -332,19 +291,9 @@ final class AboutSheetContent: MenuSheetContent {
             label.position = CGPoint(x: -width / 2 + 6, y: centreY)
             node.addChild(label)
 
-            if AboutSheetContent.documents[index] != nil {
-                let chevron = Sheet.chevron()
-                chevron.position = CGPoint(x: width / 2 - 10, y: centreY)
-                node.addChild(chevron)
-            } else {
-                let soon = SKLabelNode()
-                soon.attributedText = Sheet.text("Coming soon", size: 12, weight: .regular,
-                                                 colour: SKColor(white: 0, alpha: 0.4))
-                soon.horizontalAlignmentMode = .right
-                soon.verticalAlignmentMode = .center
-                soon.position = CGPoint(x: width / 2 - 6, y: centreY)
-                node.addChild(soon)
-            }
+            let chevron = Sheet.chevron()
+            chevron.position = CGPoint(x: width / 2 - 10, y: centreY)
+            node.addChild(chevron)
 
             top -= AboutSheetContent.rowHeight
         }
@@ -365,13 +314,12 @@ final class AboutSheetContent: MenuSheetContent {
     func tap(at point: CGPoint) {
         guard abs(point.x) <= width / 2 else { return }
 
-        // A document row opens it; Credits is not ready yet.
+        // A document row opens it.
         let row = Int((-AboutSheetContent.headHeight - point.y) / AboutSheetContent.rowHeight)
         if point.y <= -AboutSheetContent.headHeight,
-           AboutSheetContent.documents.indices.contains(row),
-           let document = AboutSheetContent.documents[row] {
+           AboutSheetContent.documents.indices.contains(row) {
             SoundPlayer.shared.play(.select)
-            onOpen?(document)
+            onOpen?(AboutSheetContent.documents[row])
             return
         }
 

@@ -179,6 +179,7 @@ final class MenuSheetNode: SKNode {
 
         if let content {
             content.node.zPosition = 2
+            content.node.isHidden = false
             card.addChild(content.node)
         }
     }
@@ -186,6 +187,7 @@ final class MenuSheetNode: SKNode {
     private func present() {
         isOpen = true
         isHidden = false
+        content?.node.isHidden = false
         removeAllActions()
 
         // The card comes up from slightly below and the scrim just fades. Moving
@@ -203,6 +205,13 @@ final class MenuSheetNode: SKNode {
         isOpen = false
 
         removeAllActions()
+
+        // The content goes at once rather than fading with the card. Some of it -
+        // the How to Play pages, behind a crop node - does not take its alpha
+        // from the card, so it stayed fully drawn through the fade and hung on
+        // screen for a moment after the sheet had gone.
+        content?.node.isHidden = true
+
         run(.sequence([.fadeOut(withDuration: 0.14), .hide()]))
         card.run(.moveTo(y: -14, duration: 0.14))
     }

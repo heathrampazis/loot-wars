@@ -33,6 +33,7 @@ enum Prefs {
         static let taughtHolding  = "taughtHolding"
         static let lessonsVersion = "lessonsVersion"
         static let soundOn = "soundOn"
+        static let tipsOn = "tipsOn"
         static let leftHanded = "leftHanded"
         static let easyControls = "easyControls"
         static let totalXP = "totalXP"
@@ -164,7 +165,17 @@ enum Prefs {
         set { store.set(newValue.rawValue, forKey: Key.difficulty) }
     }
 
-    /// The "Show tips again" row in Settings.
+    /// Tips on or off - the hints that teach building, raiding, selling and
+    /// what your base earns. On until switched off. Switching them back on
+    /// forgets which ones you have learned, so they all come round again.
+    static var tipsOn: Bool {
+        get { store.object(forKey: Key.tipsOn) as? Bool ?? true }
+        set {
+            store.set(newValue, forKey: Key.tipsOn)
+            if newValue { forgetLessons() }
+        }
+    }
+
     // MARK: - Progression
 
     /// Every point of XP ever earned. The level is worked out from this - see
