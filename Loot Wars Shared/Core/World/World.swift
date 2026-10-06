@@ -1032,6 +1032,34 @@ final class World {
     /// walls. Searching the claim put chests on that ground - protected by nothing,
     /// free to anyone who strolled past, and no reason to raid anybody.
     func nextChestTile(for team: TeamID, near position: Vec2) -> GridPoint? {
+        let candidates = chestCandidates(for: team)
+            .map { (spot: $0, distance: ($0.center - position).length) }
+        return nearestOpen(candidates, for: team) { [$0] }
+    }
+
+    /// Somewhere random in this team's base for a chest, or nil.
+    ///
+    /// For the chests a base is given when it seals (see furnish), which used to
+    /// go nearest the middle - so every base kept its loot in the same spot and
+    /// a raider always knew where to go. Now any free tile inside the walls,
+    /// drawn from the world's generator so a seed replays the same, and not
+    /// right beside another chest while there is room elsewhere. The same rules
+    /// as anywhere else: never on the spawn pad, never boxing anything in.
+    func randomChestTile(for team: TeamID) -> GridPoint? {
+        let tiles = chestCandidates(for: team).shuffled(using: &rng)
+        let others = chests.values.filter { $0.owner == team }.map(\.tile)
+
+        func crowded(_ tile: GridPoint) -> Bool {
+            others.contains { abs($0.col - tile.col) <= 1 && abs($0.row - tile.row) <= 1 }
+        }
+
+        let spaced = tiles.filter { !crowded($0) }
+        let rest = tiles.filter { crowded($0) }
+        return (spaced + rest).first { keepsBaseOpen(placing: [$0], for: team) }
+    }
+
+    /// Every tile a chest could go on in this team's base, in a fixed order.
+    private func chestCandidates(for team: TeamID) -> [GridPoint] {
         // Inside the walls if there are any, anywhere on your own ground if not.
         //
         // The fallback is not a nicety. Chests and machines can be set down in an
@@ -1042,7 +1070,7 @@ final class World {
         let room = enclosure(of: team).room
         let ground = room.isEmpty ? claimTiles(of: team) : room
 
-        var candidates: [(spot: GridPoint, distance: Double)] = []
+        var candidates: [GridPoint] = []
 
         // Sorted, because Set iteration order is not stable and two runs of the
         // same seed have to put the chest in the same place.
@@ -1069,10 +1097,10 @@ final class World {
                 $0.isAlive && $0.hitbox.intersects(Box(tile: tile))
             }) else { continue }
 
-            candidates.append((tile, (tile.center - position).length))
+            candidates.append(tile)
         }
 
-        return nearestOpen(candidates, for: team) { [$0] }
+        return candidates
     }
 
     /// The nearest of these spots that would not box anybody in - see
@@ -1161,6 +1189,8 @@ final class World {
 
         let wanted = min(GameConfig.Base.chestsOnSeal(forRoomOf: room.count),
                          GameConfig.Base.maxChests)
+        // Where the machine and turret below are put down near - chests no longer
+        // are, see randomChestTile.
         let centre = claims[team]?.centreTile.center ?? .zero
         let ownedByABot = actors.values.contains { $0.team == team && $0.ai != nil }
         var placed = 0
@@ -1171,10 +1201,9 @@ final class World {
 
         for _ in standing..<max(standing, wanted) {
             // Re-asked each time rather than gathered up front: a chest occupies
-            // the tile it lands on, so the next call answers with the next nearest
-            // free one and they end up clustered round the middle rather than
-            // stacked.
-            guard let tile = nextChestTile(for: team, near: centre) else { break }
+            // the tile it lands on, so the next one goes somewhere else - and
+            // somewhere random, rather than all of them round the middle.
+            guard let tile = randomChestTile(for: team) else { break }
 
             let id = spawnChest(at: tile, owner: team)
             if ownedByABot { ChestSystem.stock(id, in: self) }
