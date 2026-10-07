@@ -35,6 +35,23 @@ final class NameFieldNode: SKNode {
         }
     }
 
+    /// A name turned down: the edge flashes red and the box gives a short shake.
+    func refuse() {
+        removeAction(forKey: "refuse")
+        slab.strokeColor = RenderPalette.menuDanger.face
+        run(.sequence([
+            .moveBy(x: -6, y: 0, duration: 0.04),
+            .moveBy(x: 12, y: 0, duration: 0.07),
+            .moveBy(x: -10, y: 0, duration: 0.06),
+            .moveBy(x: 4, y: 0, duration: 0.05),
+            .wait(forDuration: 1.2),
+            .run { [weak self] in
+                guard let self, !self.isEditing else { return }
+                self.slab.strokeColor = NameFieldNode.idleEdge
+            }
+        ]), withKey: "refuse")
+    }
+
     /// Where the text field goes, in this node's own space: from the left
     /// margin to just short of the right edge. The pencil sits in the gap on the
     /// right and is hidden while typing, when the clear button needs the room.

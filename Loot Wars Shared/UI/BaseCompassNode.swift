@@ -82,7 +82,8 @@ final class BaseCompassNode: SKNode {
     ///     points. Nil hides the marker.
     ///   - bounds: the part of the screen the marker may sit in, in the same space.
     ///     A base inside it is on screen and needs no marker.
-    func update(offset: CGPoint?, bounds: CGRect) {
+    ///   - keepOut: controls and panels it must not sit on - see EdgeMarker.
+    func update(offset: CGPoint?, bounds: CGRect, avoiding keepOut: [CGRect] = []) {
         guard let point = offset, !bounds.contains(point) else {
             marker.isHidden = true
             return
@@ -104,7 +105,9 @@ final class BaseCompassNode: SKNode {
         let scale = min(dx == 0 ? .greatestFiniteMagnitude : bounds.width / 2 / abs(dx),
                         dy == 0 ? .greatestFiniteMagnitude : bounds.height / 2 / abs(dy))
 
-        marker.position = CGPoint(x: centre.x + dx * scale, y: centre.y + dy * scale)
+        marker.position = EdgeMarker.clear(
+            CGPoint(x: centre.x + dx * scale, y: centre.y + dy * scale),
+            of: keepOut, radius: BaseCompassNode.radius + 8, within: bounds)
         arrow.zRotation = atan2(dy, dx)
     }
 

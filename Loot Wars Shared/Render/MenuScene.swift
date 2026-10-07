@@ -723,12 +723,42 @@ extension MenuScene: UITextFieldDelegate {
 
     func textFieldDidBeginEditing(_ textField: UITextField) {
         nameField?.isEditing = true
+        removeAction(forKey: "nameHint")
+        showNameHint("Enter your name", warning: false)
     }
 
     func textFieldDidEndEditing(_ textField: UITextField) {
-        Prefs.playerName = textField.text ?? ""
-        textField.text = MenuScene.shownName
+        let typed = textField.text ?? ""
         nameField?.isEditing = false
+
+        // A rude name is not saved: the old one stays, the box shakes, and the
+        // hint says why for a moment - see PlayerNames.isOffensive.
+        if PlayerNames.isOffensive(typed) {
+            textField.text = ""
+            nameField?.refuse()
+            SoundPlayer.shared.play(.error)
+            showNameHint("Pick a different name", warning: true)
+            run(.sequence([.wait(forDuration: 2.2), .run { [weak self] in
+                guard let self else { return }
+                self.nameInput.text = MenuScene.shownName
+                self.showNameHint("Enter your name", warning: false)
+            }]), withKey: "nameHint")
+            return
+        }
+
+        Prefs.playerName = typed
+        textField.text = MenuScene.shownName
+    }
+
+    /// The grey words in the empty box: the usual prompt, or a short warning in
+    /// red when a name has been turned down.
+    private func showNameHint(_ text: String, warning: Bool) {
+        let size = nameInput.font?.pointSize ?? 16
+        nameInput.attributedPlaceholder = NSAttributedString(
+            string: text,
+            attributes: [.font: UIFont.systemFont(ofSize: size, weight: .semibold),
+                         .foregroundColor: warning ? RenderPalette.menuDanger.face
+                                                   : UIColor(white: 0, alpha: 0.38)])
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {

@@ -578,6 +578,16 @@ final class GameScene: SKScene {
     }
     #endif
 
+    /// Where the controls and panels are on screen right now, for the edge
+    /// markers to keep off - see EdgeMarker. Only what is showing.
+    private func hudFrames() -> [CGRect] {
+        let parts: [SKNode] = [hotbar, moveStick, aimStick, healButton, throwButton,
+                               openButton, shopButton, quickBuy, leaderboard,
+                               matchPanel, pauseButton]
+        return parts.filter { !$0.isHidden && $0.alpha > 0.01 }
+            .map { $0.calculateAccumulatedFrame() }
+    }
+
     // MARK: - Pausing
 
     /// Stops the match and shows the pause menu. Not once it is over.
@@ -672,7 +682,7 @@ final class GameScene: SKScene {
                             y: -size.height / 2 + edge,
                             width: size.width - safeLeft - safeRight - edge * 2,
                             height: size.height - edge * 2)
-        supplyCompass.update(targets: targets, bounds: bounds)
+        supplyCompass.update(targets: targets, bounds: bounds, avoiding: hudFrames())
     }
 
     private var safeLeft: CGFloat {
@@ -1672,7 +1682,7 @@ final class GameScene: SKScene {
                             y: -size.height / 2 + edge,
                             width: size.width - safeLeft - safeRight - edge * 2,
                             height: size.height - edge * 2)
-        baseCompass.update(offset: offset, bounds: bounds)
+        baseCompass.update(offset: offset, bounds: bounds, avoiding: hudFrames())
     }
 
     /// What the button above the corner is offering.

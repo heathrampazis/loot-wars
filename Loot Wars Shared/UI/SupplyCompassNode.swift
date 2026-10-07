@@ -66,7 +66,9 @@ final class SupplyCompassNode: SKNode {
     /// - Parameter bounds: the part of the screen the markers may sit in, in the
     ///   same space as the offsets. A drop inside it is on screen and needs no
     ///   marker.
-    func update(targets: [Target], bounds: CGRect) {
+    /// - Parameter keepOut: controls and panels they must not sit on - see
+    ///   EdgeMarker.
+    func update(targets: [Target], bounds: CGRect, avoiding keepOut: [CGRect] = []) {
         let wanted = Set(targets.map(\.id))
         for (id, marker) in markers where !wanted.contains(id) {
             marker.root.removeFromParent()
@@ -94,7 +96,9 @@ final class SupplyCompassNode: SKNode {
             let scale = min(dx == 0 ? .greatestFiniteMagnitude : halfW / abs(dx),
                             dy == 0 ? .greatestFiniteMagnitude : halfH / abs(dy))
 
-            marker.root.position = CGPoint(x: centre.x + dx * scale, y: centre.y + dy * scale)
+            marker.root.position = EdgeMarker.clear(
+                CGPoint(x: centre.x + dx * scale, y: centre.y + dy * scale),
+                of: keepOut, radius: SupplyCompassNode.radius + 8, within: bounds)
             marker.arrow.zRotation = atan2(dy, dx)
 
             setOpen(on: marker, open: target.secondsLeft == nil)
