@@ -83,11 +83,16 @@ final class GameScene: SKScene {
     /// Every fight collapsed into two actors marching into each other.
     private let moveStick = JoystickNode()
     ///
-    /// The bottom-right corner holds two controls that swap places: the aim stick
-    /// while there is shooting to be done, and a plain Open button while there is a
-    /// crate in reach. Only one is ever on screen.
+    /// The aim stick, always in the bottom-right corner, and the button for your
+    /// own chest, which appears in the heal button's spot above it when you are at
+    /// your chest. It used to replace the aim stick, which took your shooting away
+    /// whenever you walked past a crate or your chest.
     private let aimStick = JoystickNode(glyph: Glyphs.crosshair)
-    private let openButton = ActionButtonNode(glyph: Glyphs.lootbox)
+    private let openButton = ActionButtonNode(glyph: Glyphs.chest,
+                                              radius: HealButtonNode.radius,
+                                              grabRadius: HealButtonNode.grabRadius,
+                                              fill: RenderPalette.stickBackground,
+                                              glass: true, shadow: true)
 
     /// What that corner is currently for.
     private enum CornerAction: Equatable {
@@ -139,7 +144,7 @@ final class GameScene: SKScene {
                                               // which left more air round it than
                                               // the button wanted.
                                               glyphSize: 58,
-                                              glass: true)
+                                              glass: true, shadow: true)
     private let shopPanel = ShopPanelNode()
 
     /// One offer, unprompted, for a few seconds - see QuickBuyNode.
@@ -281,7 +286,9 @@ final class GameScene: SKScene {
     private let healButton = HealButtonNode()
 
     private let throwButton = ActionButtonNode(glyph: Glyphs.lootbox,
-                                               radius: 40, grabRadius: 48)
+                                               radius: 40, grabRadius: 48,
+                                               fill: RenderPalette.stickBackground,
+                                               glass: true, shadow: true)
 
     /// What the throw button is currently showing, so its glyph is only rebuilt
     /// when the item in hand changes rather than every frame.
@@ -361,6 +368,12 @@ final class GameScene: SKScene {
     private var throwTouch: UITouch?
     private var healTouch: UITouch?
     private var openTouch: UITouch?
+
+    /// A finger on the shop's cards: a tap (acted on when it lifts) or a swipe
+    /// between BUY and SELL, which only becomes clear once it moves.
+    private var shopTouch: UITouch?
+    private var shopTouchStart: CGPoint = .zero
+    private var shopSwiping = false
 
     /// The finger aiming something onto the map.
     ///
@@ -754,10 +767,8 @@ final class GameScene: SKScene {
 
         moveStick.position = CGPoint(x: -side * (size.width / 2 - margin),
                                      y: -size.height / 2 + margin)
-        // Same corner: they take it in turns rather than sharing it.
         aimStick.position = CGPoint(x: side * (size.width / 2 - margin),
                                     y: -size.height / 2 + margin)
-        openButton.position = aimStick.position
 
         // Right edges flush with the stick below it, and tucked down close.
         //
@@ -776,6 +787,9 @@ final class GameScene: SKScene {
             x: aimStick.position.x + side * (JoystickNode.baseRadius - 40),
             y: aimStick.position.y + 115)
         healButton.position = throwButton.position
+        // Your chest's button takes the same spot too - the aim stick stays the
+        // aim stick, always.
+        openButton.position = throwButton.position
 
         // Generously oversized rather than exactly the screen: the camera can be
         // mid-shake when this plays, and a rectangle cut to the glass would show a
@@ -1476,12 +1490,8 @@ final class GameScene: SKScene {
                                                             by: player, in: world))
     }
 
-    /// Swaps the bottom-right corner between the aim stick and the Open button.
-    ///
-    /// The swap waits for a lull: never while a thumb is on the stick, and never
-    /// while a shot is still cooling down. Pulling the aim stick out from under
-    /// somebody mid-fight because they happened to walk past a crate would be
-    /// indefensible, and walking past crates during a fight is exactly what happens.
+    /// The right-hand controls: the aim stick, always, and your chest's button in
+    /// the heal button's spot while you are at your own chest.
     private func updateRightControl(with world: World) {
         // The match is finished; nothing gets its controls back.
         guard !world.isOver else { return }
@@ -1536,54 +1546,27 @@ final class GameScene: SKScene {
 
         moveStick.isHidden = false
 
-        #if os(iOS) || os(tvOS)
-        guard aimTouch == nil, openTouch == nil, throwTouch == nil else { return }
-        #endif
-        guard player.shootCooldown <= 0 else { return }
+        // The aim stick is always the aim stick. Your own chest, when you are at
+        // it, gets a button in the heal button's spot instead - see
+        // updateQuickButton, which stands aside for it. Crates need no button:
+        // they open as you reach them (see AssistSystem).
+        aimStick.isHidden = false
 
-        // Asks the world the same questions the systems will, so the button can
-        // never offer to open something the simulation would then refuse. Your own
-        // chest wins over a crate: it is inside your base, and it is yours.
-        //
-        // A bomb in hand no longer has a say here. It used to hold the corner on
-        // the stick, back when the stick was the only way to throw one; now the
-        // bomb has its own button above the corner, so picking one out must not
-        // stop you opening the chest or crate you are standing at.
+        #if os(iOS) || os(tvOS)
+        // Not swapped under a thumb that is pressing it.
+        guard openTouch == nil else { return }
+        #endif
+
+        // Only YOURS. Standing next to somebody else's leaves it to the blaster:
+        // shooting it is what opens it.
         let wanted: CornerAction
         if let chest = world.reachableChest(for: player), chest.owner == player.team {
-            // Only YOURS. Standing next to somebody else's leaves the corner on the
-            // aim stick, which is the correct offer: shooting it is what opens it.
             wanted = .chest(chest.id)
-        } else if world.reachableLootbox(for: player) != nil {
-            wanted = .lootbox
         } else {
             wanted = .aim
         }
-
-        // The glyph is the only thing here that is costly to change and the only
-        // thing that must never change under a thumb, so the glyph is the only
-        // thing the cache guards. Visibility is re-applied every frame from what is
-        // wanted right now - which is what makes it impossible for the nodes and
-        // the cache to disagree again, rather than merely fixing the one case where
-        // they did.
-        if wanted != cornerAction {
-            cornerAction = wanted
-
-            switch wanted {
-            case .lootbox: openButton.setGlyph(Glyphs.lootbox)
-            case .chest:   openButton.setGlyph(Glyphs.chest)
-            case .aim:     break
-            }
-        }
-
-        let offersButton = wanted != .aim
-        let alreadyOffering = !openButton.isHidden
-
-        aimStick.isHidden = offersButton
-        openButton.isHidden = !offersButton
-
-        // Do not leave the stick holding a direction it can no longer give up.
-        if offersButton, !alreadyOffering { aimStick.end() }
+        cornerAction = wanted
+        openButton.isHidden = wanted == .aim
     }
 
     /// Puts the controls away and brings the table up.
@@ -1785,6 +1768,9 @@ final class GameScene: SKScene {
         let wanted: QuickAction
         if world.isOver || chestPanel.openChest != nil || shopPanel.isOpen {
             wanted = .none
+        } else if !openButton.isHidden, healTouch == nil, throwTouch == nil {
+            // At your chest: its button has this spot.
+            wanted = .none
         } else if healTouch != nil || throwTouch != nil {
             wanted = shownQuickAction
         } else if let player = world.localPlayer {
@@ -1953,9 +1939,21 @@ extension GameScene {
                 continue
             }
 
-            // Same for the shop.
+            // Same for the shop. A finger on the cards waits to see whether it is
+            // a tap or a swipe to the other page; the way out, the tabs and the
+            // background answer straight away, as before.
             if shopPanel.isOpen {
-                handleShopTouch(touch)
+                let point = touch.location(in: shopPanel)
+                if shopTouch == nil,
+                   shopPanel.contains(localPoint: point),
+                   !shopPanel.isBackButton(atLocalPoint: point),
+                   shopPanel.tab(atLocalPoint: point) == nil {
+                    shopTouch = touch
+                    shopTouchStart = point
+                    shopSwiping = false
+                } else {
+                    handleShopTouch(touch)
+                }
                 continue
             }
 
@@ -2003,12 +2001,8 @@ extension GameScene {
                 continue
             }
 
-            if aimTouch == nil, !aimStick.isHidden,
-               aimStick.begin(atLocalPoint: touch.location(in: aimStick)) {
-                aimTouch = touch
-                continue
-            }
-
+            // Your chest's button sits where the heal button does, inside the aim
+            // stick's grab circle, so it is offered the touch first, like the heal.
             if openTouch == nil, !openButton.isHidden,
                openButton.begin(atLocalPoint: touch.location(in: openButton)) {
                 openTouch = touch
@@ -2027,6 +2021,13 @@ extension GameScene {
                 }
                 continue
             }
+
+            if aimTouch == nil, !aimStick.isHidden,
+               aimStick.begin(atLocalPoint: touch.location(in: aimStick)) {
+                aimTouch = touch
+                continue
+            }
+
 
             // Note the hotbar no longer acts on PRESS. It cannot: a hold means drop
             // it, and acting on press would use the item first and then drop it.
@@ -2059,6 +2060,15 @@ extension GameScene {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // Sideways across the shop's cards: the page follows the finger.
+        if let active = shopTouch, touches.contains(active), shopPanel.isOpen {
+            let now = active.location(in: shopPanel)
+            let dx = now.x - shopTouchStart.x
+            let dy = now.y - shopTouchStart.y
+            if !shopSwiping, abs(dx) > 14, abs(dx) > abs(dy) { shopSwiping = true }
+            if shopSwiping { shopPanel.drag(by: dx) }
+        }
+
         // A hidden stick is not being driven, whatever the finger is doing.
         if let active = moveTouch, touches.contains(active), !moveStick.isHidden {
             moveStick.update(toLocalPoint: active.location(in: moveStick))
@@ -2094,6 +2104,19 @@ extension GameScene {
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseControls(matching: touches)
 
+        // The shop finger lifting: a swipe turns the page or springs back, and
+        // anything else was a tap, acted on now.
+        if let active = shopTouch, touches.contains(active) {
+            shopTouch = nil
+            if shopSwiping {
+                shopSwiping = false
+                let dx = active.location(in: shopPanel).x - shopTouchStart.x
+                if shopPanel.endDrag(by: dx) != nil { SoundPlayer.shared.play(.tap) }
+            } else if shopPanel.isOpen {
+                handleShopTouch(active)
+            }
+        }
+
         if let active = placingTouch, touches.contains(active) {
             placingTouch = nil
             commitPlacement()
@@ -2117,6 +2140,13 @@ extension GameScene {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         releaseControls(matching: touches)
+
+        // A cancelled shop finger buys nothing; a half swipe springs back.
+        if let active = shopTouch, touches.contains(active) {
+            shopTouch = nil
+            if shopSwiping { shopPanel.endDrag(by: 0) }
+            shopSwiping = false
+        }
 
         // A cancelled placing finger leaves the outline where it was and places
         // nothing. The item is still picked out, so it can be aimed again - a call

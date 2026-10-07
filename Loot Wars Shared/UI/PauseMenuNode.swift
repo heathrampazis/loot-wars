@@ -4,8 +4,8 @@
 //
 //  The pause button by the match timer, and the card it opens.
 //
-//  The button is the in-match kind: see-through dark, like the hotbar slots,
-//  with the same thin rim so it reads as something to press. The card is
+//  The button wears the timer's colours, frosted, with a soft shadow, and
+//  sits beside it as part of the same strip. The card is
 //  the title screen's kind - the same near-white card and chunky buttons as the
 //  results - because pausing is the moment the match stops and a menu starts.
 //
@@ -27,14 +27,24 @@ final class PauseButtonNode: SKNode {
 
     override init() {
         super.init()
+        // Level with the timer beside it, so it is never drawn under the map - a
+        // tree or a wall passing behind it used to cover it.
+        zPosition = 1045
         let side = PauseButtonNode.side
 
         let plate = SKShapeNode(rect: CGRect(x: -side / 2, y: -side / 2, width: side, height: side),
                                 cornerRadius: 10)
-        plate.fillColor = RenderPalette.hotbarSlot
+        // The timer's own plate, so the two read as one strip.
+        plate.fillColor = RenderPalette.hudPanel
         plate.strokeColor = RenderPalette.glassRim
         plate.lineWidth = RenderPalette.glassRimWidth
+        if let path = plate.path { plate.addChild(GlassNode(path: path)) }
         addChild(plate)
+
+        let under = MenuButtonNode.dropShadow(width: side, height: side, corner: 10)
+        under.zPosition = -2
+        under.alpha = 0.7
+        addChild(under)
 
         for x in [-4.5, 4.5] as [CGFloat] {
             let bar = SKShapeNode(rect: CGRect(x: x - 2.5, y: -7.5, width: 5, height: 15),

@@ -47,7 +47,8 @@ final class ActionButtonNode: SKNode {
          shape: Shape = .circle,
          fill: SKColor = RenderPalette.controlBackground,
          glyphSize: CGFloat? = nil,
-         glass: Bool = false) {
+         glass: Bool = false,
+         shadow: Bool = false) {
         self.grabRadius = grabRadius
         // Defaults to half the button, which is right for art that already has its
         // own margin. The drawn glyphs do not, so they say how big they want to be.
@@ -69,8 +70,20 @@ final class ActionButtonNode: SKNode {
         base.fillColor = fill
         base.strokeColor = RenderPalette.glassRim
         base.lineWidth = RenderPalette.glassRimWidth
-        // Frosted map behind it - see GlassNode. Only where asked: the shop button.
+        // Frosted map behind it - see GlassNode. Only where asked.
         if glass, let path = base.path { base.addChild(GlassNode(path: path)) }
+
+        // A soft shadow under it, the menu buttons' own, lighter here so it lifts
+        // the button off the map without drawing a dark ring round it. A sibling
+        // of the base rather than a child, so it stays put while the base breathes.
+        if shadow {
+            let under = MenuButtonNode.dropShadow(
+                width: radius * 2, height: radius * 2,
+                corner: shape == .circle ? radius : radius * 2 * 0.16)
+            under.zPosition = -2
+            under.alpha = 0.7
+            addChild(under)
+        }
 
         glyph.alpha = 0.85
 

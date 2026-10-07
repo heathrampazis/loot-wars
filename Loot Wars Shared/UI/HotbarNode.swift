@@ -171,6 +171,13 @@ final class HotbarNode: SKNode {
                              cornerWidth: height / 2, cornerHeight: height / 2,
                              transform: nil)
 
+        // A soft shadow under it, so it sits up off the map like a button.
+        let shadow = MenuButtonNode.dropShadow(width: width, height: height,
+                                               corner: height / 2)
+        shadow.zPosition = -1
+        shadow.alpha = 0.7
+        tag.addChild(shadow)
+
         let back = SKShapeNode(path: outline)
         back.fillColor = SKColor(white: 0, alpha: 0.6)
         back.strokeColor = .clear
@@ -192,6 +199,16 @@ final class HotbarNode: SKNode {
         fill.position = CGPoint(x: -width / 2, y: 0)
         fill.xScale = 0
         crop.addChild(fill)
+
+        // A border in the sell green's darker shade, over the fill, the way the
+        // menu's buttons are edged: it shows the whole pill from the start, so the
+        // fill reads as filling something rather than as a bar on its own.
+        let edge = SKShapeNode(path: outline)
+        edge.fillColor = .clear
+        edge.strokeColor = RenderPalette.sellButtonEdge
+        edge.lineWidth = 2.5
+        edge.zPosition = 1.5
+        tag.addChild(edge)
 
         tag.addChild(word)
         tag.addChild(amount)
