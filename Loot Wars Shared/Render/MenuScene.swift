@@ -770,7 +770,7 @@ extension MenuScene: UITextFieldDelegate {
     func textField(_ textField: UITextField,
                    shouldChangeCharactersIn range: NSRange,
                    replacementString string: String) -> Bool {
-        guard string.allSatisfy(PlayerNames.allows) else { return false }
+        guard string.allSatisfy({ PlayerNames.allows($0) }) else { return false }
         let current = (textField.text ?? "") as NSString
         let next = current.replacingCharacters(in: range, with: string)
         return next.count <= PlayerNames.maxLength

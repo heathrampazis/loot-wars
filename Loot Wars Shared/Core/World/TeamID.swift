@@ -10,7 +10,7 @@
 struct TeamID: Hashable {
     let raw: Int
 
-    init(_ raw: Int) {
+    nonisolated init(_ raw: Int) {
         self.raw = raw
     }
 

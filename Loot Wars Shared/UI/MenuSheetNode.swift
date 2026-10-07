@@ -173,8 +173,16 @@ final class MenuSheetNode: SKNode {
 
         heading.attributedText = MenuSheetNode.text(title, size: 22, weight: .bold,
                                                     colour: RenderPalette.menuInk)
-        body.attributedText = MenuSheetNode.text(message ?? "", size: 14, weight: .regular,
-                                                 colour: SKColor(white: 0, alpha: 0.45))
+        // No text at all rather than an empty one: an SKLabelNode given an
+        // attributed string with no characters crashes on newer iOS
+        // ("NSMutableRLEArray ... Out of bounds"). Pages with their own content
+        // have no message, so this is every Settings and How to Play sheet.
+        if let message, !message.isEmpty {
+            body.attributedText = MenuSheetNode.text(message, size: 14, weight: .regular,
+                                                     colour: SKColor(white: 0, alpha: 0.45))
+        } else {
+            body.attributedText = nil
+        }
         body.isHidden = message == nil
 
         if let content {

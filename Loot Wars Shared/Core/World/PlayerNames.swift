@@ -43,7 +43,7 @@ enum PlayerNames {
     /// numbers and a little punctuation only, and no longer than maxLength.
     /// Capitals are left exactly as typed. Nothing left means the default.
     static func clean(_ raw: String) -> String {
-        let allowed = raw.filter(allows)
+        let allowed = raw.filter { allows($0) }
         let words = allowed.split(separator: " ", omittingEmptySubsequences: true)
         let joined = words.joined(separator: " ")
         let trimmed = String(joined.prefix(maxLength)).trimmingCharactersInSpace()

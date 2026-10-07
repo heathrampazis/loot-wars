@@ -30,7 +30,7 @@ final class HowToPlayStage {
 
     /// Sets a scene up and says what happens when. Handed the stage rather than
     /// capturing it, so nothing the stage keeps holds the stage.
-    typealias Setup = (HowToPlayStage) -> Void
+    typealias Setup = @MainActor (HowToPlayStage) -> Void
 
     /// Something that happens at a moment in the scene.
     private struct Cue {
