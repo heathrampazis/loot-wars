@@ -70,6 +70,17 @@ final class GameScene: SKScene {
     private let blueprint = BlueprintRenderer()
     private let cameraController = CameraController()
 
+    /// Every control and panel, hung off the camera and scaled up on a big screen
+    /// so it covers the same share of it as on a phone - see InterfaceScale.
+    /// Everything under it is laid out in uiSize rather than size.
+    private let hud = SKNode()
+
+    /// How much bigger the interface is drawn here. One on a phone.
+    private var uiScale: CGFloat { InterfaceScale.factor(for: size) }
+
+    /// The screen in the interface's own points.
+    private var uiSize: CGSize { InterfaceScale.size(for: size) }
+
     /// The map revision the block layer was last drawn from, so it is only rebuilt
     /// when a tile actually changed.
     private var drawnMapRevision = -1
@@ -522,31 +533,32 @@ final class GameScene: SKScene {
         // The UI rides on the camera, so it stays put on screen while the map moves.
         camera = cameraController.node
         addChild(cameraController.node)
-        cameraController.node.addChild(moveStick)
-        cameraController.node.addChild(aimStick)
-        cameraController.node.addChild(openButton)
+        cameraController.node.addChild(hud)
+        hud.addChild(moveStick)
+        hud.addChild(aimStick)
+        hud.addChild(openButton)
         openButton.isHidden = true
-        cameraController.node.addChild(throwButton)
+        hud.addChild(throwButton)
         throwButton.isHidden = true
-        cameraController.node.addChild(healButton)
+        hud.addChild(healButton)
         healButton.isHidden = true
 
-        cameraController.node.addChild(leaderboard)
-        cameraController.node.addChild(matchPanel)
-        cameraController.node.addChild(shopButton)
-        cameraController.node.addChild(shopPanel)
-        cameraController.node.addChild(quickBuy)
-        cameraController.node.addChild(hint)
-        cameraController.node.addChild(supplyCompass)
-        cameraController.node.addChild(killBanner)
-        cameraController.node.addChild(rebuildTimer)
-        cameraController.node.addChild(baseCompass)
-        cameraController.node.addChild(results)
-        cameraController.node.addChild(pauseButton)
-        cameraController.node.addChild(pauseMenu)
-        cameraController.node.addChild(hotbar)
-        cameraController.node.addChild(chestPanel)
-        cameraController.node.addChild(respawnBanner)
+        hud.addChild(leaderboard)
+        hud.addChild(matchPanel)
+        hud.addChild(shopButton)
+        hud.addChild(shopPanel)
+        hud.addChild(quickBuy)
+        hud.addChild(hint)
+        hud.addChild(supplyCompass)
+        hud.addChild(killBanner)
+        hud.addChild(rebuildTimer)
+        hud.addChild(baseCompass)
+        hud.addChild(results)
+        hud.addChild(pauseButton)
+        hud.addChild(pauseMenu)
+        hud.addChild(hotbar)
+        hud.addChild(chestPanel)
+        hud.addChild(respawnBanner)
 
         // Over the map and UNDER every control, so a flash never washes out the
         // stick you are holding or the bar you are reading. It is drawn on the
@@ -664,7 +676,8 @@ final class GameScene: SKScene {
         // Where each drop is relative to the middle of the screen, in the screen
         // points the interface is laid out in: the camera's scale undone, since
         // the interface hangs off the camera and is not zoomed with the map.
-        let zoom = max(GridGeometry.zoom(for: size), 0.0001)
+        let zoom = max(GridGeometry.zoom(for: self.size) * uiScale, 0.0001)
+        let size = uiSize
         let eye = cameraController.node.position
 
         let targets = world.supplyDrops.map { drop -> SupplyCompassNode.Target in
@@ -687,7 +700,7 @@ final class GameScene: SKScene {
 
     private var safeLeft: CGFloat {
         #if os(iOS) || os(tvOS)
-        return view?.safeAreaInsets.left ?? 0
+        return (view?.safeAreaInsets.left ?? 0) / uiScale
         #else
         return 0
         #endif
@@ -695,7 +708,7 @@ final class GameScene: SKScene {
 
     private var safeRight: CGFloat {
         #if os(iOS) || os(tvOS)
-        return view?.safeAreaInsets.right ?? 0
+        return (view?.safeAreaInsets.right ?? 0) / uiScale
         #else
         return 0
         #endif
@@ -752,8 +765,9 @@ final class GameScene: SKScene {
         // parented to the camera and a camera's own children are drawn at their
         // natural point size whatever it is scaled to. So the map zooms and the
         // buttons do not, which is the whole reason the HUD hangs off the camera.
-        let zoom = GridGeometry.zoom(for: size)
+        let zoom = GridGeometry.zoom(for: self.size)
         cameraController.node.setScale(zoom)
+        hud.setScale(uiScale)
 
         // Tell the simulation how much of the map this screen is actually showing,
         // so bots will not open fire from somewhere the player cannot look. Done
@@ -765,9 +779,13 @@ final class GameScene: SKScene {
         // the screen is points wide.
         if world != nil {
             world.visibleHalfExtent = Vec2(
-                x: Double(size.width / 2 * zoom / GridGeometry.tileSize),
-                y: Double(size.height / 2 * zoom / GridGeometry.tileSize))
+                x: Double(self.size.width / 2 * zoom / GridGeometry.tileSize),
+                y: Double(self.size.height / 2 * zoom / GridGeometry.tileSize))
         }
+
+        // From here on, the screen as the interface sees it: the same as size on
+        // a phone, and size with the scale taken out on a tablet.
+        let size = uiSize
 
         let margin: CGFloat = 110
 
@@ -804,7 +822,7 @@ final class GameScene: SKScene {
         // Generously oversized rather than exactly the screen: the camera can be
         // mid-shake when this plays, and a rectangle cut to the glass would show a
         // hard edge sliding in from one side.
-        perkFlash.size = CGSize(width: size.width * 1.3, height: size.height * 1.3)
+        perkFlash.size = CGSize(width: self.size.width * 1.3, height: self.size.height * 1.3)
 
         // The top-left corner itself, plus whatever the hardware is eating off the
         // left edge. Everything in that corner is measured from this one point, so
@@ -1673,7 +1691,8 @@ final class GameScene: SKScene {
         wasRaided = raided
         baseCompass.setAlarm(raided)
 
-        let zoom = max(GridGeometry.zoom(for: size), 0.0001)
+        let zoom = max(GridGeometry.zoom(for: self.size) * uiScale, 0.0001)
+        let size = uiSize
         let eye = cameraController.node.position
         let home = GridGeometry.point(for: claim.centreTile.center)
         let offset = CGPoint(x: (home.x - eye.x) / zoom, y: (home.y - eye.y) / zoom)

@@ -201,6 +201,13 @@ final class MenuScene: SKScene {
         build()
     }
 
+    /// How much bigger the corner pieces and the sheet are drawn here. One on a
+    /// phone - see InterfaceScale. The main buttons scale off the screen already.
+    private var uiScale: CGFloat { InterfaceScale.factor(for: size) }
+
+    /// The screen in the interface's own points.
+    private var uiSize: CGSize { InterfaceScale.size(for: size) }
+
     // MARK: - Behind the glass
 
     /// The map, its bases and their people, built once per visit.
@@ -318,7 +325,7 @@ final class MenuScene: SKScene {
         let playWidth = unit * 0.645
         buildNameField(centredOn: CGPoint(x: middle.x, y: middle.y + unit * 0.19),
                        width: playWidth,
-                       height: min(46, max(32, unit * 0.095)))
+                       height: min(46 * uiScale, max(32, unit * 0.095)))
 
         let squareSide = unit * 0.184
         buildButtons(centredOn: CGPoint(x: middle.x, y: middle.y - unit * 0.03),
@@ -331,7 +338,8 @@ final class MenuScene: SKScene {
 
         if sheet.parent == nil { addChild(sheet) }
         sheet.position = middle
-        sheet.layOut(for: size)
+        sheet.setScale(uiScale)
+        sheet.layOut(for: uiSize)
     }
 
     /// The name, as a logo: rounded heavy letters, white with a thick black
@@ -483,13 +491,14 @@ final class MenuScene: SKScene {
         levelBadge?.removeFromParent()
         badgeDevMode = Prefs.devMode
 
-        let margin: CGFloat = 18
+        let margin: CGFloat = 18 * uiScale
         let insets = view?.safeAreaInsets ?? .zero
         let side = max(insets.left, insets.right)
 
         let badge = LevelBadgeNode()
+        badge.setScale(uiScale)
         badge.position = CGPoint(x: side + margin,
-                                 y: insets.bottom + margin + LevelBadgeNode.size.height)
+                                 y: insets.bottom + margin + LevelBadgeNode.size.height * uiScale)
         badge.zPosition = 10
         addChild(badge)
         levelBadge = badge
@@ -507,7 +516,7 @@ final class MenuScene: SKScene {
         // Clear of the notch whichever way the phone is turned: the larger of
         // the two side insets, since the notch can be on either side in
         // landscape and the record should not jump across when it flips.
-        let margin: CGFloat = 18
+        let margin: CGFloat = 18 * uiScale
         let insets = view?.safeAreaInsets ?? .zero
         let side = max(insets.left, insets.right)
         let right = size.width - side - margin
@@ -516,6 +525,7 @@ final class MenuScene: SKScene {
         let record = SKNode()
         record.name = "record"
         record.position = CGPoint(x: right, y: top)
+        record.setScale(uiScale)
         record.zPosition = 10
 
         let best = SKLabelNode()
@@ -609,12 +619,11 @@ final class MenuScene: SKScene {
         }
 
         if let badge = levelBadge,
-           badge.contains(localPoint: CGPoint(x: point.x - badge.position.x,
-                                              y: point.y - badge.position.y)) {
+           badge.contains(localPoint: touch.location(in: badge)) {
             SoundPlayer.shared.play(.select)
             badge.press { [weak self] in
                 guard let self else { return }
-                self.sheet.open(title: "ROADMAP", content: self.roadmap, on: self.size)
+                self.sheet.open(title: "ROADMAP", content: self.roadmap, on: self.uiSize)
             }
             return
         }
@@ -627,7 +636,7 @@ final class MenuScene: SKScene {
                 guard let self else { return }
                 self.sheet.open(title: "HOW TO PLAY",
                                 content: self.howToPlay,
-                                on: self.size)
+                                on: self.uiSize)
             }
             return
         }
@@ -640,7 +649,7 @@ final class MenuScene: SKScene {
                 guard let self else { return }
                 self.sheet.open(title: "SETTINGS",
                                 content: self.settingsContent,
-                                on: self.size)
+                                on: self.uiSize)
             }
         }
     }
