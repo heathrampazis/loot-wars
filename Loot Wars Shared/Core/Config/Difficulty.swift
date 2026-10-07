@@ -47,6 +47,20 @@ enum Difficulty: Int, CaseIterable {
     /// How much wider a bot's aim wobble is. Roughly the share of aim-limited
     /// shots that land: Easy 23%, Medium 31%, Hard 43%, Hardcore 53% - see
     /// GameConfig.AI.aimSpread.
+    /// XP for a match is multiplied by this - see Progress.award. Harder pays
+    /// better: not enough to make Easy a chore, enough to see on the results.
+    var xpMultiplier: Double {
+        switch self {
+        case .easy:     return 1.0
+        case .medium:   return 1.1
+        case .hard:     return 1.2
+        case .hardcore: return 1.3
+        }
+    }
+
+    /// And a little more again for playing without Assisted controls.
+    static let unassistedXPBonus: Double = 1.1
+
     var aimSpreadScale: Double {
         switch self {
         case .easy:     return 1.85

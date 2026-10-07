@@ -1591,7 +1591,9 @@ final class GameScene: SKScene {
         var award: Progress.Award?
         if let team = world.localPlayer?.team,
            let place = world.standings.firstIndex(where: { $0.team == team }) {
-            award = Progress.award(score: world.score(for: team), place: place)
+            award = Progress.award(score: world.score(for: team), place: place,
+                                   difficulty: world.difficulty,
+                                   assisted: world.localPlayer?.assisted ?? false)
         }
 
         results.show(with: world, award: award)

@@ -41,6 +41,9 @@ final class ResultsNode: SKNode {
     private let levelLabel = SKLabelNode()
     private let xpFill = SKShapeNode()
     private let xpGained = SKLabelNode()
+    /// "×1.43 BONUS" under the XP, when the difficulty or playing without
+    /// assists paid extra - see Progress.award.
+    private let xpBonus = SKLabelNode()
     private static let xpBarWidth: CGFloat = 196
 
     /// Your match in six numbers, two rows of three.
@@ -156,6 +159,11 @@ final class ResultsNode: SKNode {
         xpGained.verticalAlignmentMode = .center
         xpGained.position = CGPoint(x: width / 2 + 10, y: 0)
         levelRow.addChild(xpGained)
+
+        xpBonus.horizontalAlignmentMode = .left
+        xpBonus.verticalAlignmentMode = .center
+        xpBonus.position = CGPoint(x: width / 2 + 10, y: -13)
+        levelRow.addChild(xpBonus)
     }
 
     private func setXPBar(_ share: CGFloat) {
@@ -410,6 +418,7 @@ final class ResultsNode: SKNode {
         guard let award else {
             levelLabel.isHidden = true
             xpGained.isHidden = true
+            xpBonus.isHidden = true
             setXPBar(0)
             return
         }
@@ -419,6 +428,16 @@ final class ResultsNode: SKNode {
         setXPBar(CGFloat(start.into) / CGFloat(start.needed))
         xpGained.attributedText = ResultsNode.ink("+\(award.gained) XP", size: 13,
                                                   weight: .bold, faint: true)
+
+        // The extra for a harder game, in the green the game uses for good news.
+        xpBonus.isHidden = award.multiplier < 1.001
+        let bonus = (award.multiplier * 100).rounded() / 100
+        var number = String(format: "%.2f", bonus)
+        while number.hasSuffix("0") { number.removeLast() }
+        if number.hasSuffix(".") { number.removeLast() }
+        xpBonus.attributedText = MenuButtonNode.text("\u{00D7}\(number) BONUS", size: 10,
+                                                     weight: .heavy,
+                                                     colour: RenderPalette.menuPlay.edge)
 
         // One step per level crossed, then the remainder.
         var steps: [SKAction] = [.wait(forDuration: 1.25)]
