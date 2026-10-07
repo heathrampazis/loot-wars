@@ -19,6 +19,9 @@ enum Progress {
     struct Award {
         let xpBefore: Int
         let gained: Int
+        /// What the match's XP was multiplied by, for the difficulty and for
+        /// playing without assistance. 1 for none.
+        let multiplier: Double
         /// Features that unlocked during this match's level-ups, in roadmap order.
         let unlocked: [Feature]
 
@@ -41,10 +44,20 @@ enum Progress {
 
     /// Adds a finished match to your XP and says what changed.
     ///
-    /// - Parameter place: 0 for first.
-    static func award(score: Int, place: Int) -> Award {
+    /// Harder difficulties pay more, and playing without Assisted controls pays
+    /// a little more on top - Hardcore with no assists is about half as much
+    /// again as Easy. See Difficulty.xpMultiplier.
+    ///
+    /// - Parameters:
+    ///   - place: 0 for first.
+    ///   - difficulty: what the match was played on.
+    ///   - assisted: whether Assisted controls were on.
+    static func award(score: Int, place: Int,
+                      difficulty: Difficulty = .hard, assisted: Bool = false) -> Award {
         let before = Prefs.totalXP
-        let gained = Roadmap.matchXP(score: score, place: place)
+        let multiplier = difficulty.xpMultiplier
+            * (assisted ? 1 : Difficulty.unassistedXPBonus)
+        let gained = Int((Double(Roadmap.matchXP(score: score, place: place)) * multiplier).rounded())
 
         let oldLevel = Roadmap.level(forXP: before).level
         let newLevel = Roadmap.level(forXP: before + gained).level
@@ -53,6 +66,6 @@ enum Progress {
             .map { $0.feature }
 
         Prefs.totalXP = before + gained
-        return Award(xpBefore: before, gained: gained, unlocked: unlocked)
+        return Award(xpBefore: before, gained: gained, multiplier: multiplier, unlocked: unlocked)
     }
 }
