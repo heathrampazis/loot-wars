@@ -1088,6 +1088,7 @@ final class ShopPanelNode: SKNode {
             card.icon.texture = texture
             card.icon.size = ItemArt.size(of: texture, fittingInto: 48)
             card.glow.color = RenderPalette.colour(of: item.type.rarity)
+            card.glow.alpha = 0.7 * RenderPalette.glowStrength(of: item.type.rarity)
             card.price.text = "\(item.price)"
 
             let soldOut = ShopSystem.isSoldOut(item.type, actor: player, in: world)
@@ -1161,6 +1162,7 @@ final class ShopPanelNode: SKNode {
             card.icon.texture = texture
             card.icon.size = ItemArt.size(of: texture, fittingInto: 48)
             card.glow.color = RenderPalette.colour(of: type.rarity)
+            card.glow.alpha = 0.7 * RenderPalette.glowStrength(of: type.rarity)
 
             // A plus, because this is money coming IN - the one thing that tells
             // the two tabs apart at a glance.

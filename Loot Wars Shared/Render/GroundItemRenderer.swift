@@ -127,6 +127,8 @@ final class GroundItemRenderer {
 
         if case .item(let type) = item.pickup {
             let colour = RenderPalette.colour(of: type.rarity)
+            // Common is drawn at half strength so it does not compete for the eye.
+            let strength = RenderPalette.glowStrength(of: type.rarity)
             // Offset per item, so twenty items on the floor do not pulse in unison.
             let phase = Double(item.id.raw % 7) * 0.14
 
@@ -136,7 +138,7 @@ final class GroundItemRenderer {
             glow.position = CGPoint(x: 0, y: -box * 0.3)
             glow.color = colour
             glow.colorBlendFactor = 1
-            glow.alpha = 1
+            glow.alpha = strength
             glow.zPosition = -0.3
             root.addChild(glow)
 
@@ -146,7 +148,7 @@ final class GroundItemRenderer {
             core.position = glow.position
             core.color = colour
             core.colorBlendFactor = 1
-            core.alpha = 1
+            core.alpha = strength
             core.zPosition = -0.25
             root.addChild(core)
 
@@ -156,7 +158,7 @@ final class GroundItemRenderer {
             ring.fillColor = .clear
             ring.strokeColor = colour
             ring.lineWidth = 2.5
-            ring.alpha = 0.9
+            ring.alpha = 0.9 * strength
             ring.zPosition = -0.2
             root.addChild(ring)
 
@@ -168,7 +170,7 @@ final class GroundItemRenderer {
             beam.position = glow.position
             beam.color = colour
             beam.colorBlendFactor = 1
-            beam.alpha = 0.95
+            beam.alpha = 0.95 * strength
             beam.zPosition = -0.1
             root.addChild(beam)
 
@@ -176,8 +178,8 @@ final class GroundItemRenderer {
                 .sequence([
                     .wait(forDuration: phase),
                     .repeatForever(.sequence([
-                        .group([.fadeAlpha(to: low, duration: 0.9), .scale(to: scale, duration: 0.9)]),
-                        .group([.fadeAlpha(to: high, duration: 0.9), .scale(to: 1.0, duration: 0.9)])
+                        .group([.fadeAlpha(to: low * strength, duration: 0.9), .scale(to: scale, duration: 0.9)]),
+                        .group([.fadeAlpha(to: high * strength, duration: 0.9), .scale(to: 1.0, duration: 0.9)])
                     ]))
                 ])
             }

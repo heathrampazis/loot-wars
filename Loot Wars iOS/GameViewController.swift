@@ -22,8 +22,15 @@ class GameViewController: UIViewController {
         skView.presentScene(MenuScene.newMenuScene())
         
         skView.ignoresSiblingOrder = true
-        skView.showsFPS = true
-        skView.showsNodeCount = false
+
+        // The performance readout in the corner: frame rate, how many nodes are
+        // in the scene, and how many draw calls each frame takes. Draw calls are
+        // the number that matters most - see the notes on performance. Turn this
+        // off before release.
+        let showStats = true
+        skView.showsFPS = showStats
+        skView.showsNodeCount = showStats
+        skView.showsDrawCount = showStats
     }
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
