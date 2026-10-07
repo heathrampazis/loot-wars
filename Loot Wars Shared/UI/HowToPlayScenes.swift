@@ -37,25 +37,25 @@ enum HowToPlayScenes {
     static func make(_ kind: Kind, in size: CGSize) -> SKNode {
         switch kind {
         case .win:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: win)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: { win($0) })
         case .moveAndShoot:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: moveAndShoot)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: { moveAndShoot($0) })
         case .crates:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: crates)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: { crates($0) })
         case .gear:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: gear)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: { gear($0) })
         case .heal:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 19.5), setup: heal)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 19.5), setup: { heal($0) })
         case .perks:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 19.5), setup: perks)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 19.5), setup: { perks($0) })
         case .build:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: build)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: { build($0) })
         case .earn:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: earn)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: { earn($0) })
         case .raid:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 25.5, y: 20.5), setup: raid)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 25.5, y: 20.5), setup: { raid($0) })
         case .supply:
-            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: supply)
+            return HowToPlayStage.make(in: size, centre: Vec2(x: 24.5, y: 20.5), setup: { supply($0) })
         }
     }
 

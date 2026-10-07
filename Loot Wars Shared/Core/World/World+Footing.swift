@@ -131,9 +131,16 @@ extension World {
     /// Whether an actor of this team could be in this tile, as far as the grid
     /// can tell. Conservative on purpose: a chest is a little under a tile, but a
     /// tile with a chest in it counts as full.
+    func isPassable(_ tile: GridPoint, for team: TeamID) -> Bool {
+        isPassable(tile, for: team, besides: [])
+    }
+
+    /// The same, treating the tiles in blocked as already full. A separate
+    /// overload rather than a default argument: a default is worked out outside
+    /// the main actor, where building a Set of GridPoint is not allowed.
     func isPassable(_ tile: GridPoint,
                     for team: TeamID,
-                    besides blocked: Set<GridPoint> = []) -> Bool {
+                    besides blocked: Set<GridPoint>) -> Bool {
         guard map.contains(tile), !blocked.contains(tile) else { return false }
         guard !map.blocksMovement(at: tile, for: team) else { return false }
         guard !treeTiles.contains(tile) else { return false }

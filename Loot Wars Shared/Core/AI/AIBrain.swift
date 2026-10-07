@@ -857,7 +857,7 @@ enum AIBrain {
         // one was false. The two cannot both want the bot at once.
         if actor.inventory.totalHealing(of: actor.maxHealth) < GameConfig.AI.emergencyHealingStock,
            state.lootCooldown <= 0 {
-            if let item = nearestItem(to: actor, in: world, include: isHealing) {
+            if let item = nearestItem(to: actor, in: world, include: { isHealing($0) }) {
                 return .collect(item.id)
             }
             if let crate = nearestCrate(to: actor, in: world) { return .loot(crate.id) }
