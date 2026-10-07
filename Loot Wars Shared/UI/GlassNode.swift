@@ -24,8 +24,11 @@ final class GlassNode: SKCropNode {
     private let pane = SKSpriteNode()
     private let area: CGRect
 
-    /// - Parameter path: the control's shape, in the space this node is added to.
-    init(path: CGPath) {
+    /// - Parameters:
+    ///   - path: the control's shape, in the space this node is added to.
+    ///   - strength: how much of the blur shows, 0 to 1. Below 1 the sharp map
+    ///     shows through it too, for a lighter frost.
+    init(path: CGPath, strength: CGFloat = 1) {
         area = path.boundingBoxOfPath
         super.init()
 
@@ -41,6 +44,7 @@ final class GlassNode: SKCropNode {
 
         // Under whatever it is added to, which is the plate it sits behind.
         zPosition = -1
+        alpha = strength
         GlassNode.all.add(self)
     }
 

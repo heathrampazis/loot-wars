@@ -43,9 +43,10 @@ final class JoystickNode: SKNode {
     init(glyph: SKTexture? = nil) {
         super.init()
 
-        base.fillColor = RenderPalette.controlBackground
-        base.strokeColor = RenderPalette.glassRim
-        base.lineWidth = RenderPalette.glassRimWidth
+        // A shade darker than the buttons' see-through, so the stick's area
+        // reads clearly over bright ground.
+        base.fillColor = RenderPalette.stickBackground
+        base.strokeColor = .clear
         knob.fillColor = RenderPalette.controlForeground
         knob.strokeColor = .clear
 

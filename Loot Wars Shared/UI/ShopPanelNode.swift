@@ -152,6 +152,15 @@ final class ShopPanelNode: SKNode {
 
     private let panel = SKShapeNode()
     private let back = SKNode()
+
+    /// The cards, on a layer that slides sideways between BUY and SELL - see
+    /// drag(by:) - cut to the panel so they slide out of sight at its edges.
+    private let crop = SKCropNode()
+    private let deck = SKNode()
+
+    /// How far a swipe has to travel to turn the page, in points. Short of it,
+    /// the cards spring back.
+    private static let swipeToTurn: CGFloat = 70
     private let purse = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
     private var cards: [Card] = []
@@ -217,6 +226,14 @@ final class ShopPanelNode: SKNode {
         if let path = panel.path { panel.addChild(GlassNode(path: path)) }
 
         addChild(panel)
+
+        let window = SKShapeNode(path: panel.path ?? CGPath(rect: .zero, transform: nil))
+        window.fillColor = .white
+        window.strokeColor = .clear
+        crop.maskNode = window
+        crop.zPosition = 1
+        crop.addChild(deck)
+        addChild(crop)
 
         buildHeader(inside: size)
         buildTabs(inside: size)
@@ -321,7 +338,7 @@ final class ShopPanelNode: SKNode {
         emptyNote.verticalAlignmentMode = .center
         emptyNote.position = CGPoint(x: 0, y: -ShopPanelNode.headerHeight / 2)
         emptyNote.isHidden = true
-        addChild(emptyNote)
+        deck.addChild(emptyNote)
 
         drawTabs()
     }
@@ -335,15 +352,78 @@ final class ShopPanelNode: SKNode {
         }
     }
 
-    /// Switches between buying and selling, and deals the cards again so the
-    /// change is seen rather than snapped.
-    func setMode(_ mode: Mode) {
-        guard mode != self.mode else { return }
-        self.mode = mode
-        lastDrawn = []
-        lastPressed = nil
-        drawTabs()
-        pendingDeal = 0
+    /// Switches between buying and selling by sliding the page across: BUY
+    /// sits to the left of SELL, so going to SELL slides the cards off to the
+    /// left and the new ones in from the right, and back the other way.
+    ///
+    /// - Parameter from: where the cards already are, if a swipe has dragged
+    ///   them part of the way.
+    func setMode(_ mode: Mode, from offset: CGFloat = 0) {
+        guard mode != self.mode else {
+            settleDeck()
+            return
+        }
+        let width = ShopPanelNode.panelSize.width
+        let leaving: CGFloat = mode == .sell ? -width : width
+
+        deck.removeAction(forKey: "slide")
+        deck.position.x = offset
+
+        let out = SKAction.moveTo(x: leaving, duration: 0.14)
+        out.timingMode = .easeIn
+        let inbound = SKAction.moveTo(x: 0, duration: 0.2)
+        inbound.timingMode = .easeOut
+
+        deck.run(.sequence([
+            out,
+            .run { [weak self] in
+                guard let self else { return }
+                self.mode = mode
+                self.lastDrawn = []
+                self.lastPressed = nil
+                self.drawTabs()
+                self.deck.position.x = -leaving
+            },
+            // A frame for the redraw, so the old cards never slide back in.
+            .wait(forDuration: 0.02),
+            inbound
+        ]), withKey: "slide")
+    }
+
+    // MARK: - Swiping
+
+    /// Follows a sideways swipe across the cards. Towards the other page it moves
+    /// with the finger; the other way there is nothing to go to, so it gives a
+    /// little and no more.
+    func drag(by dx: CGFloat) {
+        deck.removeAction(forKey: "slide")
+        let towardsOther = mode == .buy ? dx < 0 : dx > 0
+        deck.position.x = towardsOther ? dx : dx * 0.25
+    }
+
+    /// The finger has come off after a swipe: turns the page if it went far
+    /// enough towards the other one, springs back if not.
+    ///
+    /// - Returns: the page it turned to, or nil.
+    @discardableResult
+    func endDrag(by dx: CGFloat) -> Mode? {
+        let other: Mode = mode == .buy ? .sell : .buy
+        let towardsOther = mode == .buy ? dx < 0 : dx > 0
+        guard towardsOther, abs(dx) >= ShopPanelNode.swipeToTurn else {
+            settleDeck()
+            return nil
+        }
+        setMode(other, from: deck.position.x)
+        return other
+    }
+
+    /// Springs the cards back to where they belong.
+    private func settleDeck() {
+        guard deck.position.x != 0 else { return }
+        deck.removeAction(forKey: "slide")
+        let home = SKAction.moveTo(x: 0, duration: 0.18)
+        home.timingMode = .easeOut
+        deck.run(home, withKey: "slide")
     }
 
     private func buildCloseButton(inside size: CGSize) {
@@ -419,7 +499,7 @@ final class ShopPanelNode: SKNode {
         let holder = SKNode()
 
         holder.position = ShopPanelNode.home(of: index, outOf: ShopPanelNode.slots)
-        addChild(holder)
+        deck.addChild(holder)
 
         let outline = CGPath(
             roundedRect: CGRect(
@@ -577,6 +657,8 @@ final class ShopPanelNode: SKNode {
         // Always opens on BUY, which is what nearly every visit is for.
         mode = .buy
         drawTabs()
+        deck.removeAction(forKey: "slide")
+        deck.position = .zero
 
         // Comes up rather than appearing. A panel this size arriving between two
         // frames reads as a glitch - the eye gets no chance to follow where it came

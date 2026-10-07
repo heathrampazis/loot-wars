@@ -473,6 +473,8 @@ enum RenderPalette {
     /// outlines alike - so "you can do this" looks the same everywhere it is said,
     /// which is the only way a colour ever comes to mean anything.
     static let sellButton = rgb(0x3F, 0xB9, 0x50)
+    /// Its darker shade, for an edge - the hold-to-sell tag's border.
+    static let sellButtonEdge = rgb(0x2C, 0x8E, 0x3B)
 
     /// The plate under an offer the game is making you.
     ///
@@ -548,6 +550,10 @@ enum RenderPalette {
 
     // On-screen controls
     static let controlBackground = SKColor(white: 0.0, alpha: 0.18)
+
+    /// The sticks' base, and the heal, throw and chest buttons': a little darker
+    /// than controlBackground.
+    static let stickBackground = SKColor(white: 0.0, alpha: 0.28)
 
     /// A control recommending itself - a heal you should take, a bomb lined up on
     /// a wall. The bright Epic green, drawn as a rim round the control so it pops

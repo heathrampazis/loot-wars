@@ -27,7 +27,9 @@ final class HealButtonNode: SKNode {
 
     private let button = ActionButtonNode(glyph: SKTexture(imageNamed: "Bandage"),
                                           radius: HealButtonNode.radius,
-                                          grabRadius: HealButtonNode.grabRadius)
+                                          grabRadius: HealButtonNode.grabRadius,
+                                          fill: RenderPalette.stickBackground,
+                                          glass: true, shadow: true)
     private var shownType: ItemType?
 
     override init() {
