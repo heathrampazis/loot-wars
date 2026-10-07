@@ -447,7 +447,7 @@ final class ItemSlotNode: SKNode {
 
         glow.isHidden = false
         glow.color = RenderPalette.colour(of: stack.type.rarity)
-        glow.alpha = 0.95
+        glow.alpha = 0.95 * RenderPalette.glowStrength(of: stack.type.rarity)
         breathe(for: stack.type.rarity)
 
         let texture = ItemArt.texture(for: stack.type)

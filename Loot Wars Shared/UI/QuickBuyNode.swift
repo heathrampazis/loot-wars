@@ -342,6 +342,7 @@ final class QuickBuyNode: SKNode {
     /// arrival has to change them before one.
     private func dress(_ item: GameConfig.Shop.Item) {
         glow.color = RenderPalette.colour(of: item.type.rarity)
+        glow.alpha = 0.7 * RenderPalette.glowStrength(of: item.type.rarity)
 
         let texture = ItemArt.texture(for: item.type)
         icon.texture = texture

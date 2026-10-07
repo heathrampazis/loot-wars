@@ -255,10 +255,12 @@ enum RenderPalette {
     // off their conventional values because a green that reads on a black inventory
     // screen is invisible on grass.
     private static let rarities: [SKColor] = [
-        // Pale steel, and deliberately the quietest thing on the map. It barely
-        // separates from the grass, which is the correct amount of attention for a
-        // rung that means "you will find another one in a minute".
-        rgb(0xA3, 0xAD, 0xB8),   // common
+        // A dull stone grey, and deliberately the quietest thing on the map. Not
+        // the pale steel it was, which was bright and blue enough to look sharp on
+        // the grass. It barely separates from the floor, which is the correct
+        // amount of attention for a rung that means "you will find another one in
+        // a minute". glowStrength(of:) turns its light down further.
+        rgb(0x8E, 0x92, 0x94),   // common
 
         // An emerald rather than the lime the artwork wears. A lime pool sat within
         // a hair of the floor tile on every measure and vanished under the item it
@@ -280,6 +282,13 @@ enum RenderPalette {
 
     static func colour(of rarity: Rarity) -> SKColor {
         rarities[min(rarity.rawValue, rarities.count - 1)]
+    }
+
+    /// How strongly a rarity's glow is drawn, as a multiplier on its usual alpha.
+    /// Common is turned down so a grey pool reads as a faint shadow of colour
+    /// rather than a light; everything above it shines at full strength.
+    static func glowStrength(of rarity: Rarity) -> CGFloat {
+        rarity == .common ? 0.5 : 1
     }
 
     /// The rarity colour as the interface's slot PLATES wear it - the tile behind
