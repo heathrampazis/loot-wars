@@ -29,6 +29,9 @@ final class GameScene: SKScene {
     // MARK: - Rendering
 
     private let worldLayer = SKNode()
+
+    /// The dark over a night match, or nil by day - see NightOverlay.
+    private var night: NightOverlay?
     private let tileRenderer = TileMapRenderer()
     private let claimRenderer = ClaimRenderer()
     private let treeRenderer = TreeRenderer()
@@ -509,6 +512,12 @@ final class GameScene: SKScene {
         turretRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(claimRenderer.node)
+
+        if world.isNight {
+            let overlay = NightOverlay()
+            worldLayer.addChild(overlay.node)
+            night = overlay
+        }
 
         // On the ground with the claim tint, under everything that stands on it.
         worldLayer.addChild(blueprint.node)
@@ -991,6 +1000,16 @@ final class GameScene: SKScene {
         #endif
 
         syncRenderers()
+        // Before the glass, so the blurred copy of the map behind the panels is
+        // the night one.
+        // The torch goes with you; while you are down it waits where the camera is.
+        if let night {
+            if let me = world.localPlayer, me.isAlive {
+                night.follow(GridGeometry.point(for: me.position))
+            } else {
+                night.follow(cameraController.node.position)
+            }
+        }
         refreshGlass()
     }
 

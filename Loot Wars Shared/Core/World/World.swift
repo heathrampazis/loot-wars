@@ -323,8 +323,20 @@ final class World {
     /// simply one of eight. Nothing else in the code assumes it is special.
     let localPlayerID: ActorID
 
+    /// Whether this match is played at night. Changes nothing in the game, only
+    /// how it is drawn; kept here so every player in a match sees the same sky.
+    let isNight: Bool
+
+    /// Night or day, from the map's seed on a generator of its own, so it never
+    /// shifts any other draw and a seed always comes up the same.
+    static func isNight(seed: UInt64) -> Bool {
+        var rng = SeededRandom(seed: seed ^ 0x4E16_47B0_0D5E_A5ED)
+        return Double.random(in: 0..<1, using: &rng) < GameConfig.Night.chance
+    }
+
     init(generated: GeneratedMap) {
         self.map = generated.map
+        self.isNight = World.isNight(seed: generated.seed)
         self.claims = generated.claims
         self.trees = generated.trees
         self.baseLayouts = generated.baseLayouts
