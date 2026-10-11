@@ -131,6 +131,10 @@ enum WorldEvent {
     /// actor is wearing would compare it against ITSELF.
     case pickedUp(ItemType, by: ActorID, worn: Bool)
 
+    /// Somebody picked tokens up off the ground, and how many. Its own event
+    /// because tokens never go in the bag, so pickedUp never hears about them.
+    case tokensPickedUp(Int, by: ActorID)
+
     /// Somebody was killed, and what it was worth to whoever did it.
     ///
     /// Carries the position because by the time this is read the victim has been

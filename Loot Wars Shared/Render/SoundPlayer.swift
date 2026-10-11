@@ -38,7 +38,10 @@ final class SoundPlayer {
     private let engine = AVAudioEngine()
 
     /// Decoded once, at launch, and then never again.
-    private var buffers: [Sound: AVAudioPCMBuffer] = [:]
+    private var buffers: [Sound: [AVAudioPCMBuffer]] = [:]
+
+    /// The take each sound played last, so the same one never plays twice running.
+    private var lastTake: [Sound: Int] = [:]
     private var nodes: [Sound: [AVAudioPlayerNode]] = [:]
 
     private var next: [Sound: Int] = [:]
@@ -85,8 +88,30 @@ final class SoundPlayer {
     /// part and it would otherwise land on whichever frame first fired a gun -
     /// which is to say, on the first interesting thing that happens in a match.
     private func load(_ sound: Sound, into mixer: AVAudioMixerNode) {
-        let file = sound.file
+        var takes: [AVAudioPCMBuffer] = []
+        for file in sound.files {
+            if let buffer = read(file) { takes.append(buffer) }
+        }
+        guard let first = takes.first else { return }
 
+        buffers[sound] = takes
+
+        // Connected at the FILE's own format rather than at one house format. The
+        // mixer converts, which is its job, and the alternative is resampling
+        // thirteen files by hand to agree with each other.
+        var pool: [AVAudioPlayerNode] = []
+        for _ in 0..<sound.voices {
+            let node = AVAudioPlayerNode()
+            engine.attach(node)
+            engine.connect(node, to: mixer, format: first.format)
+            pool.append(node)
+        }
+
+        nodes[sound] = pool
+    }
+
+    /// One file, decoded whole into memory.
+    private func read(_ file: (name: String, kind: String)) -> AVAudioPCMBuffer? {
         // Both spellings, because where these land in the bundle depends on how the
         // folder was added to the project: a group flattens them to the root, a
         // folder reference keeps the Sounds/ directory. Asking for both costs one
@@ -98,12 +123,12 @@ final class SoundPlayer {
 
         guard let url else {
             print("Loot Wars: missing sound \(file.name).\(file.kind)")
-            return
+            return nil
         }
 
         guard let audio = try? AVAudioFile(forReading: url) else {
             print("Loot Wars: unreadable sound \(file.name).\(file.kind)")
-            return
+            return nil
         }
 
         let frames = AVAudioFrameCount(audio.length)
@@ -111,28 +136,15 @@ final class SoundPlayer {
               let buffer = AVAudioPCMBuffer(pcmFormat: audio.processingFormat,
                                             frameCapacity: frames) else {
             print("Loot Wars: undecodable sound \(file.name).\(file.kind)")
-            return
+            return nil
         }
 
         do { try audio.read(into: buffer) } catch {
             print("Loot Wars: unreadable sound \(file.name).\(file.kind) - \(error)")
-            return
+            return nil
         }
 
-        buffers[sound] = buffer
-
-        // Connected at the FILE's own format rather than at one house format. The
-        // mixer converts, which is its job, and the alternative is resampling
-        // thirteen files by hand to agree with each other.
-        var pool: [AVAudioPlayerNode] = []
-        for _ in 0..<sound.voices {
-            let node = AVAudioPlayerNode()
-            engine.attach(node)
-            engine.connect(node, to: mixer, format: buffer.format)
-            pool.append(node)
-        }
-
-        nodes[sound] = pool
+        return buffer
     }
 
     /// Starts the engine, and every node in it, if they are not already going.
@@ -180,7 +192,11 @@ final class SoundPlayer {
     /// eight teams shooting at each other across a fifty-six tile map would
     /// otherwise be a continuous rumble that tells you nothing, where a shot you
     /// can only just hear, off to the left, is a fight you could walk to.
-    func play(_ sound: Sound, at position: Vec2, heardFrom listener: Vec2) {
+    ///
+    /// loudness scales it on top of the sound's own gain - see the footsteps,
+    /// where other people's are turned up so you hear them coming.
+    func play(_ sound: Sound, at position: Vec2, heardFrom listener: Vec2,
+              loudness: Float = 1) {
         guard let earshot = sound.earshot else {
             play(sound)
             return
@@ -195,7 +211,8 @@ final class SoundPlayer {
         // level with one at your feet; squaring pulls the far half down where it
         // belongs and leaves the near half alone.
         let near = 1 - distance / earshot
-        let volume = Float(near * near) * sound.gain
+        let fade = sound.fadesEvenly ? near : near * near
+        let volume = Float(fade) * sound.gain * loudness
 
         let sideways = away.x / SoundPlayer.fullyOneSide
         let pan = max(-1, min(1, Float(sideways))) * SoundPlayer.widest
@@ -217,7 +234,7 @@ final class SoundPlayer {
         // through, so nothing can slip past it.
         guard Prefs.soundOn else { return }
 
-        guard let buffer = buffers[sound],
+        guard let takes = buffers[sound], !takes.isEmpty,
               let pool = nodes[sound], !pool.isEmpty else { return }
 
         // One moment can announce the same thing several times over - a kill
@@ -234,6 +251,16 @@ final class SoundPlayer {
 
         let index = (next[sound] ?? 0) % pool.count
         next[sound] = index + 1
+
+        // A different take from last time, when there is more than one. Random
+        // is fine here: this is sound, not the simulation.
+        var take = 0
+        if takes.count > 1 {
+            take = Int.random(in: 0..<takes.count - 1)
+            if let last = lastTake[sound], take >= last { take += 1 }
+        }
+        lastTake[sound] = take
+        let buffer = takes[take]
 
         let node = pool[index]
         node.volume = max(0, min(1, volume))

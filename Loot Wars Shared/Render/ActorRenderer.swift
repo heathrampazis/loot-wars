@@ -193,7 +193,31 @@ final class ActorRenderer {
     private var textureCache: [HelmetTier: SKTexture] = [:]
     private var blasterCache: [BlasterTier: SKTexture] = [:]
 
-    func sync(with world: World, dt: TimeInterval) {
+    /// What the ground is under each foot, for the footsteps. Set by the match;
+    /// left nil in the How to Play pictures, which walk in silence.
+    var biomes: BiomeMap?
+
+    /// One step, in the sound of whatever it landed on. Grass covers the plains
+    /// and the forest; the desert borrows the snow, which is the nearest thing
+    /// to sand.
+    private func footfall(of actor: Actor, mine: Bool, heardFrom ears: Vec2) {
+        guard let biomes else { return }
+        let sound: Sound
+        switch biomes.biome(at: actor.feet) {
+        case .plains, .forest: sound = .stepGrass
+        case .snow, .desert:   sound = .stepSnow
+        }
+        // Somebody else's steps louder than your own. Yours are there to make
+        // the walk feel solid and can stay in the background; theirs are a
+        // warning, and a warning you cannot hear is no use.
+        SoundPlayer.shared.play(sound, at: actor.feet, heardFrom: ears,
+                                loudness: mine ? 1 : ActorRenderer.otherStepsLoudness)
+    }
+
+    /// How much louder another player's footsteps are than your own.
+    static let otherStepsLoudness: Float = 2.5
+
+    func sync(with world: World, dt: TimeInterval, heardFrom ears: Vec2? = nil) {
         for (id, actor) in world.actors {
             let nodes = nodesByActor[id] ?? makeNodes(for: actor)
 
@@ -254,7 +278,16 @@ final class ActorRenderer {
             // conclusion for the grass. At full speed a frame covers about six
             // hundredths of a tile, so anything past a stride is a respawn.
             if moved < ActorRenderer.walkStride {
+                let before = nodes.walkPhase
                 nodes.walkPhase += moved * .pi / ActorRenderer.walkStride
+
+                // A foot lands each time the hop touches the ground, which is
+                // every half turn of the cycle. The sound goes on that beat, so
+                // what you hear and what you see are the same step.
+                if (nodes.walkPhase / .pi).rounded(.down) > (before / .pi).rounded(.down),
+                   let ears {
+                    footfall(of: actor, mine: id == world.localPlayerID, heardFrom: ears)
+                }
             }
 
             let hop = abs(sin(nodes.walkPhase))

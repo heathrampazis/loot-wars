@@ -48,6 +48,10 @@ final class BlockRenderer {
     /// False until the map has been drawn once, so the walls a match starts with
     /// are simply there and only walls built after that grow in.
     private var drawnOnce = false
+
+    /// Told about every wall that goes up after the first draw, anybody's, so
+    /// the match can play the sound of it. Left unset in How to Play.
+    var onWallBuilt: ((GridPoint) -> Void)?
     private var textureCache: [TextureKey: SKTexture] = [:]
 
     private enum Side {
@@ -121,6 +125,7 @@ final class BlockRenderer {
                     let grow = SKAction.scale(to: 1.1, duration: 0.16)
                     grow.timingMode = .easeOut
                     sprite.run(.sequence([grow, .scale(to: 1, duration: 0.1)]))
+                    onWallBuilt?(point)
                 }
             }
         }
