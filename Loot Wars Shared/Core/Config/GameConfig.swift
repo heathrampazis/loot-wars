@@ -3479,4 +3479,13 @@ enum GameConfig {
         /// Seconds per bullet once recharging has started.
         static let rechargeInterval: Double = 0.35
     }
+
+    // MARK: - Night
+
+    /// Some matches are played at night. The same game in every way; only how
+    /// it is drawn changes - see NightOverlay.
+    enum Night {
+        /// The share of matches that fall at night.
+        static let chance: Double = 0.2
+    }
 }
