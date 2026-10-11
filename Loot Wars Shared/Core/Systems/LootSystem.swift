@@ -206,6 +206,7 @@ enum LootSystem {
             actor.tokens += value
             world.tally(actor.id) { $0.tokensEarned += value }
             world.award(GameConfig.Score.tokenCollected * value, to: actor.team)
+            world.record(.tokensPickedUp(value, by: actor.id))
             return true
         }
     }

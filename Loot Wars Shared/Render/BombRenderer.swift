@@ -41,6 +41,10 @@ final class BombRenderer {
         return texture
     }
 
+    /// Told where a bomb was thrown, so the match can play its fuse. Only the
+    /// blast kind: a stink bomb has no fuse to fizz.
+    var onFuseLit: ((Vec2) -> Void)?
+
     func sync(with world: World) {
         for bomb in world.bombs {
             let sprite = nodesByBomb[bomb.id] ?? makeNode(for: bomb)
@@ -236,6 +240,7 @@ final class BombRenderer {
         // and stays on the rope's end.
         if bomb.kind == .blast {
             sprite.addChild(BombRenderer.fuseSpark(size: side, at: BombRenderer.fuseTip(of: sprite)))
+            onFuseLit?(bomb.position)
         }
 
         node.addChild(sprite)

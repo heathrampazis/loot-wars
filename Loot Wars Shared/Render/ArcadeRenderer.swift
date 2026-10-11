@@ -86,6 +86,9 @@ final class ArcadeRenderer {
         self.mapHeight = mapHeight
     }
 
+    /// Told where a machine broke, so the match can play the sound of it.
+    var onBreak: ((Vec2) -> Void)?
+
     func sync(with world: World) {
         for (id, machine) in world.arcades where nodesByArcade[id] == nil {
             make(machine)
@@ -149,6 +152,7 @@ final class ArcadeRenderer {
                 ]))
             }
 
+            onBreak?(GridGeometry.position(for: sprite.position))
             breakApart(sprite)
         }
     }

@@ -504,6 +504,7 @@ final class GameScene: SKScene {
         claimRenderer.build(claims: generated.claims)
         treeRenderer.build(patches: generated.trees, biomes: generated.biomes)
         effectsRenderer.biomes = generated.biomes
+        actorRenderer.biomes = generated.biomes
         arcadeRenderer.build(mapHeight: generated.map.height)
         turretRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)
@@ -515,14 +516,31 @@ final class GameScene: SKScene {
         worldLayer.addChild(actorRenderer.groundNode)
         worldLayer.addChild(treeRenderer.node)
         worldLayer.addChild(blockRenderer.node)
+        // Every wall that goes up, heard from where it went up.
+        blockRenderer.onWallBuilt = { [weak self] tile in
+            guard let self else { return }
+            SoundPlayer.shared.play(.block, at: tile.center, heardFrom: self.ears)
+        }
         worldLayer.addChild(wallDamageRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
+        arcadeRenderer.onBreak = { [weak self] position in
+            guard let self else { return }
+            SoundPlayer.shared.play(.arcadeBreak, at: position, heardFrom: self.ears)
+        }
         worldLayer.addChild(turretRenderer.node)
         worldLayer.addChild(lootboxRenderer.node)
+        lootboxRenderer.onOpened = { [weak self] position in
+            guard let self else { return }
+            SoundPlayer.shared.play(.lootbox, at: position, heardFrom: self.ears)
+        }
         worldLayer.addChild(supplyRenderer.node)
         worldLayer.addChild(chestRenderer.node)
         worldLayer.addChild(groundItemRenderer.node)
         worldLayer.addChild(bombRenderer.node)
+        bombRenderer.onFuseLit = { [weak self] position in
+            guard let self else { return }
+            SoundPlayer.shared.play(.fuse, at: position, heardFrom: self.ears)
+        }
         worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
         worldLayer.addChild(gasRenderer.node)
@@ -1011,7 +1029,7 @@ final class GameScene: SKScene {
         groundItemRenderer.sync(with: world)
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world, heardFrom: ears)
-        actorRenderer.sync(with: world, dt: frameDelta)
+        actorRenderer.sync(with: world, dt: frameDelta, heardFrom: ears)
         matchPanel.update(with: world)
         repositionForSafeAreaIfNeeded()
         leaderboard.update(with: world)
@@ -1312,6 +1330,7 @@ final class GameScene: SKScene {
                 // The cloud itself is drawn from the world every frame; this is the
                 // burst that says it arrived, which state alone cannot show.
                 effectsRenderer.burst(at: position)
+                SoundPlayer.shared.play(.stinkGas, at: position, heardFrom: ears)
 
             case .chestCracked(let position, let items):
                 // The same burst a crate gets, scaled by what came out of it.
@@ -1456,6 +1475,11 @@ final class GameScene: SKScene {
                 // a different noise - see WorldEvent.pickedUp for why the world has
                 // to say so rather than this working it out, which it cannot.
                 SoundPlayer.shared.play(worn ? .upgrade : .collect)
+
+            case .tokensPickedUp(_, let who):
+                // Yours only, like any other pickup.
+                guard who == world.localPlayerID else { break }
+                SoundPlayer.shared.play(.token)
 
             case .kill(let victim, let killer, let position, let points, _):
                 // Remembered so the camera can go and watch them - see aimCamera.
@@ -1882,12 +1906,16 @@ extension GameScene {
                 // Play again first: it is the bigger target and the common answer,
                 // and asking about it first means an overlap can only ever resolve
                 // towards another match rather than out of the game.
+                // The same sounds as the menu's Play button and the pause menu's
+                // Quit, so going again and leaving sound the way they do there.
                 if results.isPlayAgain(atLocalPoint: point) {
+                    SoundPlayer.shared.play(.play)
                     results.pressPlayAgain { [weak self] in self?.restart() }
                     return
                 }
 
                 if results.isMenu(atLocalPoint: point) {
+                    SoundPlayer.shared.play(.exit)
                     results.pressMenu { [weak self] in self?.openMenu() }
                     return
                 }

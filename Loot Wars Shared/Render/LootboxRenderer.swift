@@ -52,6 +52,10 @@ final class LootboxRenderer {
         return texture
     }
 
+    /// Told where a crate was opened, so the match can play the sound of it.
+    /// Opening is the only thing that takes a crate off the map.
+    var onOpened: ((Vec2) -> Void)?
+
     func sync(with world: World) {
         // Supply drops are drawn by SupplyDropRenderer.
         for (id, box) in world.lootboxes where nodesByBox[id] == nil && !box.supply {
@@ -62,6 +66,7 @@ final class LootboxRenderer {
 
         for (id, sprite) in Array(nodesByBox) where world.lootboxes[id] == nil {
             nodesByBox[id] = nil
+            onOpened?(GridGeometry.position(for: sprite.position))
             sprite.removeFromParent()
         }
 
