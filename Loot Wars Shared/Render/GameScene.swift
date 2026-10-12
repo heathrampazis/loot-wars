@@ -3050,8 +3050,12 @@ extension GameScene {
     /// what is drawn under the finger is the same rectangle the placement will use.
     private func aimPlacement(at pointInWorld: CGPoint) {
         guard let type = placingType else { return }
-        ghostOrigin = PlacementSystem.origin(
-            of: type, tappedAt: GridGeometry.position(for: pointInWorld))
+        let point = GridGeometry.position(for: pointInWorld)
+        if let player = world.localPlayer {
+            ghostOrigin = PlacementSystem.aimed(type, tappedAt: point, by: player, in: world)
+        } else {
+            ghostOrigin = PlacementSystem.origin(of: type, tappedAt: point)
+        }
     }
 
     /// Lets go of it.
