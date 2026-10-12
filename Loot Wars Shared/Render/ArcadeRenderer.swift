@@ -77,9 +77,14 @@ final class ArcadeRenderer {
     /// machine that overhangs the space it reserved is a machine that looks like it
     /// does not fit - which it does not. The art is drawn narrower than 2:3 for
     /// exactly this reason, so it fills the height and leaves a sliver at the sides.
+    ///
+    /// Inside the footprint less Furniture.inset all round, the same box the
+    /// machine's hitbox is, so it stands clear of the wall and the next machine.
     static func fit(_ kind: ArcadeKind) -> ArtFit.Fit {
-        ArtFit.contained(kind == .mini ? "Mini Arcade" : "Arcade",
-                         within: Vec2(x: Double(kind.width), y: Double(kind.height)))
+        let gap = GameConfig.Furniture.inset * 2
+        return ArtFit.contained(kind == .mini ? "Mini Arcade" : "Arcade",
+                                within: Vec2(x: Double(kind.width) - gap,
+                                             y: Double(kind.height) - gap))
     }
 
     func build(mapHeight: Int) {
@@ -450,7 +455,8 @@ final class ArcadeRenderer {
         sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
 
         let footing = GridGeometry.point(
-            for: Vec2(x: machine.centre.x, y: Double(machine.origin.row)))
+            for: Vec2(x: machine.centre.x,
+                      y: Double(machine.origin.row) + GameConfig.Furniture.inset))
         sprite.position = CGPoint(x: footing.x - fit.content.midX,
                                   y: footing.y - fit.size.height / 2 - fit.content.minY)
 

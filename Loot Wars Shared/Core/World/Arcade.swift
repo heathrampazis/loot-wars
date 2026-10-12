@@ -118,10 +118,12 @@ struct Arcade {
     }
 
     /// Solid, and exactly the size the renderer draws - the machine you see is the
-    /// machine you bump into.
+    /// machine you bump into. In from the edge of its tiles by Furniture.inset on
+    /// every side, so it sits in its footprint rather than filling it.
     var hitbox: Box {
-        Box(centre: centre,
-            size: Vec2(x: Double(width), y: Double(height)))
+        let gap = GameConfig.Furniture.inset * 2
+        return Box(centre: centre,
+                   size: Vec2(x: Double(width) - gap, y: Double(height) - gap))
     }
 
     /// The footprint plus a margin of ground around it.

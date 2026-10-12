@@ -284,17 +284,27 @@ final class TurretRenderer {
         let baseLine = Double(turret.origin.row) + GameConfig.Player.halfDepth
         root.zPosition = 10 + (Double(mapHeight) - baseLine) * 0.001
 
+        // Everything drawn hangs off this, shrunk by Furniture.inset all round
+        // and lifted by it, so the turret sits in its two by two the way its
+        // hitbox does. On a node of its own rather than on root, because the
+        // hit and placing animations scale root and would undo it.
+        let inset = GameConfig.Furniture.inset
+        let frame = SKNode()
+        frame.setScale(CGFloat((Double(Turret.width) - inset * 2) / Double(Turret.width)))
+        frame.position = CGPoint(x: 0, y: GridGeometry.length(ofTiles: inset))
+        root.addChild(frame)
+
         let side = GridGeometry.length(ofTiles: Double(Turret.width))
         let body = SKSpriteNode(texture: TurretArt.body(for: turret.owner),
                                 size: CGSize(width: side, height: side))
         body.anchorPoint = CGPoint(x: 0.5, y: 0)
-        root.addChild(body)
+        frame.addChild(body)
 
         let mount = SKNode()
         mount.position = GridGeometry.point(for: TurretArt.pivot)
         mount.zPosition = 0.0001
         mount.zRotation = CGFloat(turret.heading)
-        root.addChild(mount)
+        frame.addChild(mount)
 
         // Sized by LENGTH, with the height following the texture's own shape, so a
         // drawn barrel from the catalogue keeps its proportions.
@@ -315,7 +325,7 @@ final class TurretRenderer {
                                     size: CGSize(width: capSide, height: capSide))
             made.position = mount.position
             made.zPosition = 0.0002
-            root.addChild(made)
+            frame.addChild(made)
             cap = made
         }
 
