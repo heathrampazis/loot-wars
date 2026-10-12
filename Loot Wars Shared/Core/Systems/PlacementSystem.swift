@@ -161,4 +161,38 @@ enum PlacementSystem {
 
     /// How far the suggestion will walk out looking for a clear spot.
     private static let suggestionReach = 4
+
+    /// The spot a finger at this point means, nudged to the nearest one that
+    /// will take if the exact one will not.
+    ///
+    /// A two-by-two turret or a two-by-three machine covers a lot of tiles, and
+    /// one of them landing on the placer, a wall or the spawn pad turned the
+    /// whole outline red even though a spot one tile over was clear. So within a
+    /// tile of the finger, the closest spot that works wins; past that, the
+    /// exact spot stands in red, so the outline never wanders off on its own.
+    static func aimed(_ type: ItemType, tappedAt point: Vec2,
+                      by actor: Actor, in world: World) -> GridPoint? {
+        guard let exact = origin(of: type, tappedAt: point),
+              let size = footprint(of: type) else { return nil }
+        if canPlace(type, at: exact, by: actor, in: world) { return exact }
+
+        // The eight neighbours, nearest to the finger first. Ties broken by
+        // position so the same tap always lands the same way.
+        func distance(_ spot: GridPoint) -> Double {
+            let centre = Vec2(x: Double(spot.col) + Double(size.width) / 2,
+                              y: Double(spot.row) + Double(size.height) / 2)
+            return (centre - point).length
+        }
+        var around: [GridPoint] = []
+        for dCol in -1...1 {
+            for dRow in -1...1 where dCol != 0 || dRow != 0 {
+                around.append(GridPoint(col: exact.col + dCol, row: exact.row + dRow))
+            }
+        }
+        around.sort {
+            let a = distance($0), b = distance($1)
+            return a != b ? a < b : ($0.row, $0.col) < ($1.row, $1.col)
+        }
+        return around.first { canPlace(type, at: $0, by: actor, in: world) } ?? exact
+    }
 }

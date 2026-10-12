@@ -45,6 +45,21 @@ final class SoundPlayer {
     private var nodes: [Sound: [AVAudioPlayerNode]] = [:]
 
     private var next: [Sound: Int] = [:]
+
+    /// Everything except the sounds that take precedence goes through this, so
+    /// all of it can be turned down at once while one of those plays.
+    private let others = AVAudioMixerNode()
+
+    /// Bumped by each duck, so an older one's recovery stops when a newer one
+    /// starts rather than fighting it.
+    private var duckGeneration = 0
+
+    /// How far everything else dips under a sound that takes precedence, at full
+    /// volume; a quieter one (an elimination across the map) dips it less.
+    private static let duckDepth: Float = 0.65
+    /// How long it stays down, and how long it takes to come back up.
+    private static let duckHold: TimeInterval = 0.45
+    private static let duckRelease: TimeInterval = 0.4
     private var lastPlayed: [Sound: TimeInterval] = [:]
 
     /// How far off to the side something has to be to sit fully in one ear.
@@ -76,8 +91,12 @@ final class SoundPlayer {
         // it - and building the mixer half way through wiring nodes into it is how
         // an engine ends up with a connection to something that did not exist yet.
         let mixer = engine.mainMixerNode
+        engine.attach(others)
+        engine.connect(others, to: mixer, format: nil)
 
-        for sound in Sound.allCases { load(sound, into: mixer) }
+        for sound in Sound.allCases {
+            load(sound, into: sound.takesPrecedence ? mixer : others)
+        }
 
         resume()
     }
@@ -88,11 +107,26 @@ final class SoundPlayer {
     /// part and it would otherwise land on whichever frame first fired a gun -
     /// which is to say, on the first interesting thing that happens in a match.
     private func load(_ sound: Sound, into mixer: AVAudioMixerNode) {
-        var takes: [AVAudioPCMBuffer] = []
-        for file in sound.files {
-            if let buffer = read(file) { takes.append(buffer) }
-        }
+        let takes = sound.files.compactMap { read($0) }
         guard let first = takes.first else { return }
+
+        // Several takes of one sound are brought to the same level as each
+        // other - down to the quietest, so nothing can clip - so one take is
+        // never noticeably louder than the next.
+        if takes.count > 1 {
+            let levels = takes.map(SoundPlayer.loudness)
+            if let quietest = levels.filter({ $0 > 0 }).min() {
+                for (take, level) in zip(takes, levels) where level > quietest {
+                    SoundPlayer.scale(take, by: quietest / level)
+                }
+            }
+        }
+
+        // A file recorded too quietly is raised here, once, rather than on every
+        // play - a player's volume cannot go past 1.
+        if sound.boost > 1 {
+            for take in takes { SoundPlayer.scale(take, by: sound.boost) }
+        }
 
         buffers[sound] = takes
 
@@ -108,6 +142,35 @@ final class SoundPlayer {
         }
 
         nodes[sound] = pool
+    }
+
+    private static func scale(_ buffer: AVAudioPCMBuffer, by factor: Float) {
+        guard let channels = buffer.floatChannelData else { return }
+        for channel in 0..<Int(buffer.format.channelCount) {
+            let samples = channels[channel]
+            for index in 0..<Int(buffer.frameLength) {
+                samples[index] *= factor
+            }
+        }
+    }
+
+    /// How loud a take is at its loudest tenth of a second: the RMS of the
+    /// first channel over the busiest window.
+    private static func loudness(_ buffer: AVAudioPCMBuffer) -> Float {
+        guard let channels = buffer.floatChannelData else { return 0 }
+        let samples = channels[0]
+        let count = Int(buffer.frameLength)
+        let window = max(1, min(count, Int(buffer.format.sampleRate / 10)))
+        let stride = max(1, window / 5)
+        var best: Float = 0
+        var start = 0
+        while start + window <= count {
+            var sum: Float = 0
+            for index in start..<(start + window) { sum += samples[index] * samples[index] }
+            best = max(best, (sum / Float(window)).squareRoot())
+            start += stride
+        }
+        return best
     }
 
     /// One file, decoded whole into memory.
@@ -183,7 +246,7 @@ final class SoundPlayer {
     /// An interface sound: dead centre, full volume, because it did not happen
     /// anywhere on the map - it happened to you.
     func play(_ sound: Sound) {
-        start(sound, volume: sound.gain, pan: 0)
+        start(sound, volume: sound.playGain, pan: 0)
     }
 
     /// A sound that happened at a place on the map, heard from another.
@@ -212,7 +275,7 @@ final class SoundPlayer {
         // belongs and leaves the near half alone.
         let near = 1 - distance / earshot
         let fade = sound.fadesEvenly ? near : near * near
-        let volume = Float(fade) * sound.gain * loudness
+        let volume = Float(fade) * sound.playGain * loudness
 
         let sideways = away.x / SoundPlayer.fullyOneSide
         let pan = max(-1, min(1, Float(sideways))) * SoundPlayer.widest
@@ -266,9 +329,36 @@ final class SoundPlayer {
         node.volume = max(0, min(1, volume))
         node.pan = pan
 
+        if sound.takesPrecedence { duck(by: node.volume) }
+
         // interrupts, so a voice that is still busy is taken over rather than
         // queued behind itself. Queued is the wrong answer for every sound here:
         // a second gunshot belongs now or not at all, never in two seconds' time.
         node.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
+    }
+
+    /// Turns everything else down at once, holds it, then brings it back up
+    /// over a moment, so the sound that takes precedence is heard over the
+    /// gunfire rather than lost in it.
+    private func duck(by strength: Float) {
+        let low = 1 - SoundPlayer.duckDepth * max(0, min(1, strength))
+        // Never raised by a weaker duck while a stronger one is still holding.
+        others.outputVolume = min(others.outputVolume, low)
+
+        duckGeneration += 1
+        let generation = duckGeneration
+        let steps = 8
+        let hold = UInt64(SoundPlayer.duckHold * 1_000_000_000)
+        let tick = UInt64(SoundPlayer.duckRelease / Double(steps) * 1_000_000_000)
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: hold)
+            for step in 1...steps {
+                guard let self, self.duckGeneration == generation else { return }
+                let share = Float(step) / Float(steps)
+                self.others.outputVolume = low + (1 - low) * share
+                if step < steps { try? await Task.sleep(nanoseconds: tick) }
+            }
+        }
     }
 }

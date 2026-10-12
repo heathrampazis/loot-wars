@@ -40,10 +40,13 @@ final class ProjectileRenderer {
             // Everybody's, including from behind a wall where you cannot see who
             // fired. Especially from behind a wall: a shot you can hear and cannot
             // see is the game telling you somebody is in your base.
+            // The shot's SOUND is not played here any more. A bullet fired point
+            // blank into a machine, a chest or a wall is spawned and stopped in
+            // the same tick, so it is never seen here at all - and the gun went
+            // silent exactly when you were closest to what you were shooting.
+            // The shooter's own renderer plays it instead, off the trigger
+            // being pulled: see ActorRenderer and TurretRenderer.onFire.
             let known = nodesByProjectile[projectile.id]
-            if known == nil {
-                SoundPlayer.shared.play(.pop, at: projectile.position, heardFrom: ears)
-            }
 
             let sprite = known ?? makeNode(for: projectile.id)
             sprite.position = GridGeometry.point(for: projectile.position)

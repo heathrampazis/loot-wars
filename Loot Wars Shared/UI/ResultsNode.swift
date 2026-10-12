@@ -358,6 +358,11 @@ final class ResultsNode: SKNode {
 
         if podium, let place {
             trophy.setScale(0)
+            // First place gets its fanfare on the trophy's pop.
+            if place == 0 {
+                run(.sequence([.wait(forDuration: 0.28),
+                               .run { SoundPlayer.shared.play(.victory) }]))
+            }
             trophy.run(.sequence([
                 .wait(forDuration: 0.28),
                 .scale(to: 1.25, duration: 0.14),

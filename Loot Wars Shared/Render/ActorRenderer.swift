@@ -395,7 +395,14 @@ final class ActorRenderer {
             }
 
             // A cooldown that jumped up is a shot just fired.
-            if actor.shootCooldown > nodes.lastShotCooldown { nodes.recoil = 1 }
+            // The sound goes with it, off the trigger rather than the bullet: a
+            // point-blank shot never shows up as a bullet at all.
+            if actor.shootCooldown > nodes.lastShotCooldown {
+                nodes.recoil = 1
+                if let ears {
+                    SoundPlayer.shared.play(.pop, at: actor.position, heardFrom: ears)
+                }
+            }
             nodes.lastShotCooldown = actor.shootCooldown
 
             // Decays towards nothing at a fixed rate per second rather than per

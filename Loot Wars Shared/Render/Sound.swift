@@ -72,6 +72,44 @@ enum Sound: CaseIterable {
     case lootbox
     /// Tokens picked up off the ground. Yours only.
     case token
+    /// A turret firing. Its own sound, lower and heavier than a blaster's pop,
+    /// so you can tell a turret has opened up on you without looking.
+    case turretShot
+    /// Somebody knocked out. Full volume for your own kill, heard from where it
+    /// happened for everybody else's.
+    case elimination
+    /// An item sold back for tokens.
+    case sell
+    /// An arcade hitting the jackpot, anybody's.
+    case jackpot
+    /// Your shot landed on somebody. Nine takes cut from Hitmarkers.mp3, pitched
+    /// down about three semitones and softened on top, each trimmed to start on
+    /// its first sound so it lands on the same frame as the
+    /// hit, and a different one each time so a burst does not sound like a loop.
+    case hitMarker
+    /// You took damage. Yours only. The classic hit marker sounds, as recorded:
+    /// nine takes cut from Hitmarkers.mp3, not pitched or softened (the hit
+    /// markers for YOUR shots are the pitched-down, softened versions).
+    case damage
+    /// A shot striking an arcade, a chest, a turret or a wall: a dull thunk,
+    /// so hitting furniture sounds different from hitting a person. Four takes:
+    /// the hit marker recordings pitched well down and muffled.
+    case objectHit
+    /// A chest broken open in a raid, anybody's.
+    case chestBreak
+    /// A turret destroyed, anybody's.
+    case turretBreak
+    /// You were knocked out. Two takes.
+    case playerElimination
+    /// A supply drop hitting the ground, timed to the moment it lands.
+    case supplyDrop
+    /// The clock in the last ten seconds, alternating tick and tock. Both cut
+    /// from Time.mp3.
+    case tick
+    case tock
+    /// You came first: the fanfare on the results screen as the gold trophy
+    /// pops up.
+    case victory
 
     /// The file, split because they are not all the same format.
     var file: (name: String, kind: String) {
@@ -97,6 +135,20 @@ enum Sound: CaseIterable {
         case .stinkGas:  return ("Stink Gas", "wav")
         case .lootbox:   return ("Lootbox", "mp3")
         case .token:     return ("Token", "wav")
+        case .turretShot: return ("Turret Shot", "wav")
+        case .elimination: return ("Elimination", "wav")
+        case .sell:      return ("Sell", "wav")
+        case .jackpot:   return ("Jackpot", "mp3")
+        case .hitMarker: return ("Hit Marker 1", "wav")
+        case .damage:    return ("Damage 1", "wav")
+        case .objectHit: return ("Object Hit 1", "wav")
+        case .chestBreak: return ("Chest Break", "mp3")
+        case .turretBreak: return ("Turret Break", "wav")
+        case .playerElimination: return ("Player Elimination", "wav")
+        case .supplyDrop: return ("Supply Drop", "mp3")
+        case .tick:      return ("Tick", "wav")
+        case .tock:      return ("Tock", "wav")
+        case .victory:   return ("Victory", "wav")
         }
     }
 
@@ -108,6 +160,11 @@ enum Sound: CaseIterable {
         case .stepGrass: return (1...6).map { ("Step Grass \($0)", "wav") }
         case .stepSnow:  return (1...6).map { ("Step Snow \($0)", "wav") }
         case .fuse:      return (1...4).map { ("Fuse \($0)", "wav") }
+        case .hitMarker: return (1...9).map { ("Hit Marker \($0)", "wav") }
+        case .damage:    return (1...9).map { ("Damage \($0)", "wav") }
+        case .objectHit: return (1...4).map { ("Object Hit \($0)", "wav") }
+        case .playerElimination: return [("Player Elimination", "wav"),
+                                         ("Player Elimination 3", "wav")]
         default:         return [file]
         }
     }
@@ -150,6 +207,27 @@ enum Sound: CaseIterable {
         // Close by: yours, and somebody looting right next to you.
         case .lootbox: return 12
         case .token: return nil
+        // A little further than a blaster: a turret is the base telling you it
+        // has seen you.
+        case .turretShot: return 20
+        // A fight you could walk to, the same reach as gunfire.
+        case .elimination: return 18
+        case .sell: return nil
+        // Far enough to hear one go off in the next base along and go for it.
+        case .jackpot: return 20
+        case .hitMarker: return nil
+        case .damage: return nil
+        // Your own shooting and the base next to you.
+        case .objectHit: return 12
+        // A raid next door is worth knowing about.
+        case .chestBreak: return 22
+        case .turretBreak: return 24
+        case .playerElimination: return nil
+        // Most of the map: a drop landing is everybody's business, and the pan
+        // says which way it came down.
+        case .supplyDrop: return 60
+        case .tick, .tock: return nil
+        case .victory: return nil
         case .play, .purchase, .upgrade, .collect, .select, .tap,
              .heal, .exit, .error, .notification: return nil
         }
@@ -179,6 +257,17 @@ enum Sound: CaseIterable {
         case .stinkGas: return 3
         case .lootbox: return 3
         case .token: return 3
+        case .turretShot: return 4
+        case .elimination: return 3
+        case .sell: return 2
+        case .jackpot: return 2
+        // Shots land four and a half a second; each one gets its own tick.
+        case .hitMarker: return 4
+        case .damage: return 2
+        case .objectHit: return 4
+        case .chestBreak, .turretBreak, .playerElimination, .supplyDrop: return 2
+        case .tick, .tock: return 2
+        case .victory: return 1
         case .play, .purchase, .upgrade, .select, .tap,
              .heal, .exit, .error, .notification: return 2
         }
@@ -209,6 +298,17 @@ enum Sound: CaseIterable {
         // A kill scatters a pile and it is swept up across a few frames. One
         // jingle for the lot, not one per coin.
         case .token: return 0.08
+        case .turretShot: return 0.05
+        case .elimination: return 0.05
+        case .sell: return 0.05
+        case .jackpot: return 0.1
+        case .hitMarker: return 0.05
+        // Gas hurts in small steps; one thud every so often, not one per step.
+        case .damage: return 0.15
+        case .objectHit: return 0.06
+        case .chestBreak, .turretBreak, .playerElimination, .supplyDrop: return 0.05
+        case .tick, .tock: return 0.02
+        case .victory: return 0.5
         case .bomb, .complete, .play, .purchase, .upgrade, .select,
              .heal, .exit, .error, .notification: return 0.02
         }
@@ -225,35 +325,94 @@ enum Sound: CaseIterable {
     }
 
     /// Per-sound trim, so the mix can be balanced without re-exporting anything.
+    ///
+    /// Balanced by measurement, not by ear one sound at a time. Every file was
+    /// measured at its loudest tenth of a second (weighted the way hearing is),
+    /// and each gain here brings it to a level for its kind of sound:
+    ///
+    ///   big moments (bomb, arcade breaking, a kill)     loudest
+    ///   rewards (play, buying, selling, tokens, crates) a step under
+    ///   the interface (taps, back, refusals)            under that
+    ///   the constant stuff (gunfire, building, fuses)   quiet, it never stops
+    ///   footsteps and hit markers                       barely there, by request
+    ///
+    /// Above 1 is allowed for a file recorded too quietly: SoundPlayer boosts
+    /// the samples once when it loads them, since a player's volume stops at 1.
     var gain: Float {
         switch self {
-        // The quietest thing in the game, because it is the commonest by an order
-        // of magnitude. A pop at the same level as a purchase, four and a half
-        // times a second, is the only sound here capable of making somebody turn
-        // the volume off.
-        case .pop:      return 0.42
-        // Barely there. Three and a half a second while you walk, so it has to
-        // sit well under everything else or it turns into noise.
+        // Big moments.
+        case .bomb:        return 1.15
+        case .arcadeBreak: return 1.05
+        case .elimination: return 1.0
+        case .jackpot:     return 1.45
+        case .stinkGas:    return 0.5
+        case .complete:    return 1.6
+
+        // Rewards.
+        case .play:     return 1.2
+        case .upgrade:  return 0.64
+        case .purchase: return 0.98
+        case .sell:     return 1.9
+        case .token:    return 1.3
+        case .lootbox:  return 0.75
+        case .collect:  return 1.7
+        case .heal:     return 0.76
+
+        // The interface. A refusal and a line of text are the game interrupting
+        // you, so they sit with the taps rather than above them.
+        case .select:       return 0.9
+        case .tap:          return 1.1
+        case .exit:         return 0.94
+        case .error:        return 0.7
+        case .notification: return 1.15
+
+        // The constant stuff. Gunfire was the loudest thing in the game by a
+        // distance and is also the commonest; the turret's shot more so.
+        case .pop:        return 0.2
+        case .turretShot: return 0.26
+        case .block:      return 0.5
+        case .fuse:       return 0.32
+        // Under your own hit markers: landing a hit should always be the
+        // louder of the two, so in a trade you hear yourself winning it.
+        // You also feel this one and see the flinch.
+        case .damage:     return 0.43
+        // About as loud as your hit markers: hitting something either way.
+        case .objectHit:  return 0.78
+
+        // Big moments, alongside the bomb and the arcade breaking.
+        case .chestBreak:        return 0.66
+        case .turretBreak:       return 0.74
+        case .playerElimination: return 2.7
+        case .supplyDrop:        return 1.08
+
+        // The clock: with the interface, clear but not urgent-loud. The two
+        // recordings differ, so each has its own trim to sound even.
+        case .tick: return 1.3
+        case .tock: return 0.76
+
+        // The biggest moment there is, and nothing else is playing over it.
+        case .victory: return 1.2
+
+        // Tuned by ear already and kept: these are meant to be barely there.
         case .stepGrass, .stepSnow: return 0.1
-        // Frequent while you build, so kept below the things you only do once.
-        case .block: return 0.6
-        case .arcadeBreak: return 0.9
-        // A hiss under the bang that follows it, not a sound of its own.
-        case .fuse: return 0.45
-        case .stinkGas: return 0.85
-        case .lootbox: return 0.8
-        case .token: return 0.75
-        case .tap:      return 0.55
-        case .collect:  return 0.7
-        case .bomb:     return 0.9
-        // Quieter than the things you chose to do. A refusal and a line of text
-        // are the game interrupting you, and an interruption that is as loud as
-        // your own actions stops reading as a footnote and starts reading as a
-        // telling-off.
-        case .error:        return 0.6
-        case .notification: return 0.6
-        case .exit:         return 0.8
-        case .play, .purchase, .upgrade, .select, .complete, .heal: return 1
+
+        // Your hits: soft, but clearly over the damage you take - about 4 dB
+        // above it, and a touch under the gunfire around them.
+        case .hitMarker:            return 0.73
         }
     }
+
+    /// Whether this sound cuts through everything else: when it plays, every
+    /// other sound dips for a moment so it is heard clearly. See SoundPlayer.duck.
+    var takesPrecedence: Bool {
+        self == .elimination || self == .playerElimination
+    }
+
+    /// What the player node is set to: the gain, up to 1. Anything above that
+    /// is applied to the samples at load - see `boost`.
+    var playGain: Float { min(gain, 1) }
+
+    /// How much the samples themselves are raised when loaded, for a gain
+    /// above 1. One for everything else.
+    var boost: Float { max(gain, 1) }
 }
