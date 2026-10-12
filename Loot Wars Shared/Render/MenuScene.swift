@@ -127,6 +127,11 @@ final class MenuScene: SKScene {
 
     /// Your level, top left, and the roadmap behind it.
     private var levelBadge: LevelBadgeNode?
+
+    /// What the badge hangs off, scaled up on a big screen. The scale goes on
+    /// this rather than on the badge, because the badge's own press animation
+    /// sets its scale back to one and would undo it - see InterfaceScale.
+    private let badgeHolder = SKNode()
     /// Whether the badge was drawn in dev mode, so turning it on or off in
     /// Settings redraws it.
     private var badgeDevMode = false
@@ -489,6 +494,7 @@ final class MenuScene: SKScene {
     /// notch the same way the record is.
     private func buildLevelBadge() {
         levelBadge?.removeFromParent()
+        badgeHolder.removeFromParent()
         badgeDevMode = Prefs.devMode
 
         let margin: CGFloat = 18 * uiScale
@@ -496,11 +502,12 @@ final class MenuScene: SKScene {
         let side = max(insets.left, insets.right)
 
         let badge = LevelBadgeNode()
-        badge.setScale(uiScale)
-        badge.position = CGPoint(x: side + margin,
-                                 y: insets.bottom + margin + LevelBadgeNode.size.height * uiScale)
-        badge.zPosition = 10
-        addChild(badge)
+        badgeHolder.setScale(uiScale)
+        badgeHolder.position = CGPoint(x: side + margin,
+                                       y: insets.bottom + margin + LevelBadgeNode.size.height * uiScale)
+        badgeHolder.zPosition = 10
+        badgeHolder.addChild(badge)
+        addChild(badgeHolder)
         levelBadge = badge
     }
 
