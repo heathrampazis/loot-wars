@@ -25,10 +25,32 @@ final class StatCounterNode: SKNode {
 
     static let height: CGFloat = 24
 
-    private static let iconHeight: CGFloat = 15
-    private static let gap: CGFloat = 6
+    static let iconHeight: CGFloat = 15
+
+    /// The air between the icon and the number. Wide enough that nothing either
+    /// of them does - the number's pulse, the icon's punch - ever closes it: the
+    /// number grows away from the icon (it is anchored on its left edge), and the
+    /// icon's punch takes at most three points of it on each side.
+    private static let gap: CGFloat = 9
+
+    /// How the icon reacts to the number going up.
+    enum Motion {
+        /// A coin: flips twice and hops, throwing off gold sparks.
+        case coin
+        /// The crosshair: punches up and turns a quarter as it settles, the same
+        /// "got them" the elimination banner's crosshair gives, with a ring
+        /// going out from it.
+        case target
+    }
+    private let motion: Motion
 
     private let icon = SKSpriteNode()
+
+    /// The icon's resting width, kept apart from `icon.size`. A sprite's size
+    /// follows its scale, so the coin's flip and the crosshair's punch would
+    /// otherwise change the room the counter asks for, and the panel would
+    /// twitch wider and narrower every time one played.
+    private var iconWidth: CGFloat = 0
 
     /// Where the icon sits in the row. The icon's own position is left free for
     /// the hop and the shake, which re-centring would otherwise cancel.
@@ -36,19 +58,27 @@ final class StatCounterNode: SKNode {
     private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private var lastValue = Int.min
 
-    init(iconNamed iconName: String) {
+    convenience init(iconNamed iconName: String) {
+        self.init(icon: SKTexture(imageNamed: iconName), motion: .coin)
+    }
+
+    /// - Parameter iconHeight: how tall the icon is drawn. A thin line icon like
+    ///   the crosshair needs a little more than a solid coin to read as the same
+    ///   weight beside it.
+    init(icon texture: SKTexture, motion: Motion, iconHeight: CGFloat = StatCounterNode.iconHeight) {
+        self.motion = motion
         super.init()
 
-        let texture = SKTexture(imageNamed: iconName)
         let art = texture.size()
 
         // Sized by height, not width. The icons are not all the same shape, and a
         // fixed width would make a wide one tower over a narrow one.
-        let height = StatCounterNode.iconHeight
+        let height = iconHeight
         let width = art.height > 0 ? height * (art.width / art.height) : height
 
         icon.texture = texture
         icon.size = CGSize(width: width, height: height)
+        iconWidth = width
         addChild(iconHolder)
         iconHolder.addChild(icon)
 
@@ -58,6 +88,7 @@ final class StatCounterNode: SKNode {
         label.verticalAlignmentMode = .center
         addChild(label)
 
+        place()
         setValue(0)
     }
 
@@ -84,7 +115,6 @@ final class StatCounterNode: SKNode {
 
     private func show(_ value: Int) {
         label.text = "\(value)"
-        centre()
     }
 
     /// Counts up (or down) to the new number over a moment rather than jumping,
@@ -107,12 +137,49 @@ final class StatCounterNode: SKNode {
         ]), withKey: "roll")
     }
 
+    /// The crosshair: a punch up and back, a quarter turn, and a ring going out
+    /// from it - one more down. Never bigger than 1.4, so it never reaches the
+    /// number beside it.
+    private func punch() {
+        let up = SKAction.scale(to: 1.4, duration: 0.08)
+        up.timingMode = .easeOut
+        let back = SKAction.scale(to: 1, duration: 0.18)
+        back.timingMode = .easeIn
+        icon.run(.group([
+            .sequence([up, back]),
+            .rotate(byAngle: -.pi / 2, duration: 0.26)
+        ]), withKey: "coin")
+
+        let ring = SKShapeNode(circleOfRadius: icon.size.height / 2)
+        ring.strokeColor = .white
+        ring.lineWidth = 2
+        ring.fillColor = .clear
+        ring.position = iconHolder.position
+        ring.zPosition = -1
+        addChild(ring)
+        let spread = SKAction.scale(to: 2.2, duration: 0.35)
+        spread.timingMode = .easeOut
+        ring.run(.sequence([
+            .group([spread, .fadeOut(withDuration: 0.35)]),
+            .removeFromParent()
+        ]))
+    }
+
     /// The coin itself: a flip and a hop when tokens come in, with a few
     /// sparks thrown off it; a shake when they go out.
     private func animateIcon(gained: Bool) {
         icon.removeAction(forKey: "coin")
         icon.xScale = 1
+        icon.yScale = 1
+        // The crosshair is the same every quarter turn, so this snap back is
+        // invisible and keeps the angle from piling up.
+        icon.zRotation = 0
         icon.position = .zero
+
+        if case .target = motion {
+            punch()
+            return
+        }
 
         if gained {
             let up = SKAction.moveBy(x: 0, y: 4, duration: 0.1)
@@ -150,14 +217,30 @@ final class StatCounterNode: SKNode {
         }
     }
 
-    /// Re-centres the icon and the number as one pair.
+    /// The room this counter needs for its number: the icon, the gap, and one
+    /// widest-digit's width per digit. Steady while the number rolls, and it
+    /// only grows when the number gains a digit - see MatchPanelNode.
+    var reservedWidth: CGFloat {
+        let digits = max(1, String(max(lastValue, 0)).count)
+        return iconWidth + StatCounterNode.gap + StatCounterNode.digitWidth * CGFloat(digits)
+    }
+
+    private static let digitWidth: CGFloat = {
+        let probe = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        probe.fontSize = 16
+        probe.text = "88888888"
+        return ceil(probe.frame.width / 8)
+    }()
+
+    /// The icon at the counter's origin, which is its LEFT edge, and the number
+    /// after it.
     ///
-    /// Measured rather than assumed, and only on a change, so the cost lands on the
-    /// frame a token was picked up rather than on all of them.
-    private func centre() {
-        let width = icon.size.width + StatCounterNode.gap + label.frame.width
-        iconHolder.position = CGPoint(x: -width / 2 + icon.size.width / 2, y: 0)
-        label.position = CGPoint(x: -width / 2 + icon.size.width + StatCounterNode.gap, y: 0)
+    /// Never measured off the number's real width. A 1 is narrower than an 8,
+    /// and centring on the real width made the pair slide on every pickup, so
+    /// the icon now stays put and only the digits change.
+    private func place() {
+        iconHolder.position = CGPoint(x: iconWidth / 2, y: 0)
+        label.position = CGPoint(x: iconWidth + StatCounterNode.gap, y: 0)
     }
 
     private func announce(_ delta: Int) {
@@ -185,7 +268,7 @@ final class StatCounterNode: SKNode {
         // Below rather than above, because this row sits inside the match panel and
         // anything rising off the top of it would climb through the panel's own top
         // edge and then off the screen. Downward, the strip underneath is clear.
-        float.position = CGPoint(x: 0, y: -StatCounterNode.height / 2 - 4)
+        float.position = CGPoint(x: reservedWidth / 2, y: -StatCounterNode.height / 2 - 4)
         float.zPosition = 2
         addChild(float)
 

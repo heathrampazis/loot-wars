@@ -960,7 +960,7 @@ final class GameScene: SKScene {
 
         // Just left of the timer, its top edge level with the timer's.
         pauseButton.position = CGPoint(
-            x: matchPanel.position.x - MatchPanelNode.size.width / 2 - 10 - PauseButtonNode.side / 2,
+            x: matchPanel.position.x - matchPanel.width / 2 - 10 - PauseButtonNode.side / 2,
             y: matchPanel.position.y - PauseButtonNode.side / 2)
 
         // IN the corner, where the health panel used to be. Nothing to clamp
@@ -1148,6 +1148,10 @@ final class GameScene: SKScene {
         actorRenderer.sync(with: world, dt: frameDelta, heardFrom: ears)
         feelHits(in: world)
         matchPanel.update(with: world)
+        // The panel fits its numbers and grows when one gains a digit, so the
+        // pause button follows its left edge rather than a fixed spot.
+        pauseButton.position.x = matchPanel.position.x - matchPanel.width / 2
+            - 10 - PauseButtonNode.side / 2
         repositionForSafeAreaIfNeeded()
         leaderboard.update(with: world)
         
