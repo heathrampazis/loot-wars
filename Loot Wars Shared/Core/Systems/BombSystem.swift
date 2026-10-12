@@ -93,6 +93,16 @@ enum BombSystem {
                 continue
             }
 
+            // Or somebody. A blast bomb that meets an enemy goes off on them, so
+            // it can be thrown AT a person rather than only at a wall. Before,
+            // it flew straight through and landed behind them, and a blast this
+            // small almost never caught anyone. Stink bombs still sail on: their
+            // whole effect is the cloud where they land.
+            if case .blast = bomb.kind, hitsEnemy(bomb, in: world) {
+                detonate(bomb, from: before, in: world)
+                continue
+            }
+
             // Out of throw. A bomb that ran out of arc still explodes rather than
             // vanishing.
             if bomb.distanceRemaining <= 0 {
@@ -124,6 +134,22 @@ enum BombSystem {
         if world.turrets.values.contains(where: { $0.hitbox.contains(point) }) { return true }
 
         return world.trees.contains { $0.contains(point) }
+    }
+
+    /// Whether this bomb has reached an enemy who is alive and can be hurt.
+    /// The body is widened a little, the size of the bomb itself, so one that
+    /// clips somebody's shoulder counts as a hit.
+    private static func hitsEnemy(_ bomb: Bomb, in world: World) -> Bool {
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let actor = world.actors[id],
+                  actor.isAlive,
+                  actor.team != bomb.team,
+                  actor.invulnerability <= 0 else { continue }
+            if actor.hitbox.expanded(by: GameConfig.Bomb.spriteSize / 2).contains(bomb.position) {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - Detonation
@@ -237,14 +263,26 @@ enum BombSystem {
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let actor = world.actors[id], actor.isAlive else { continue }
 
-            let distance = (actor.position - bomb.position).length
+            // Not the thrower. A bomb thrown at somebody standing in front of you
+            // goes off within reach of you too, and being hurt by your own throw
+            // would make it useless up close, which is where a fight is.
+            guard id != bomb.owner else { continue }
+
+            // Measured to the nearest point of the body, the way turrets are,
+            // rather than to its middle. A person is nearly two tiles tall, so a
+            // bomb going off against them was a tile from their centre and did a
+            // fraction of its damage on what was plainly a direct hit.
+            let nearest = actor.hitbox.closestPoint(to: bomb.position)
+            let distance = (nearest - bomb.position).length
             guard distance <= radius,
-                  !isShielded(actor.position, from: origin, by: cover) else { continue }
+                  !isShielded(nearest, from: origin, by: cover) else { continue }
 
             // Falls off towards the edge, so being caught at the rim is a warning
             // rather than a death sentence.
             let share = 1 - (distance / radius)
-            let hurt = Int((Double(GameConfig.Bomb.damage) * share).rounded())
+            let full = max(Double(GameConfig.Bomb.damage),
+                           Double(actor.maxHealth) * GameConfig.Bomb.damageShare)
+            let hurt = Int((full * share).rounded())
             CombatSystem.damage(id, amount: max(1, hurt), from: bomb.owner, in: world)
         }
 

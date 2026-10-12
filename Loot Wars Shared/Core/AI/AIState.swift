@@ -52,6 +52,10 @@ struct AIState {
     /// Counts down to being handed a bomb, if it has none.
     var bombSupplyTimer: Double = 0
 
+    /// Spaces out bombs thrown in a fight, so a bot does not empty its bag at
+    /// one person in a second.
+    var fightBombTimer: Double = 0
+
     /// Counts down to the next look around for enemies.
     var threatScanTimer: Double = 0
 
