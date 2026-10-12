@@ -2944,8 +2944,10 @@ enum GameConfig {
         /// a tenth of a tile - which is what a chest lid does.
         ///
         /// The width came down from 1.05 and can stay down: narrower only ever
-        /// widens the gap it has to be walked past in.
-        static let size = Vec2(x: 0.95, y: 0.70)
+        /// widens the gap it has to be walked past in. Down again from 0.95 to
+        /// keep Furniture.inset clear of the tile's sides, so a chest sits in its
+        /// tile rather than touching the walls either side of it.
+        static let size = Vec2(x: 1 - Furniture.inset * 2, y: 0.70)
 
         /// How far past your own hitbox you can reach to open one. Small, because a
         /// chest is solid and you are already touching it when you are beside it.
@@ -3523,5 +3525,21 @@ enum GameConfig {
     enum Night {
         /// The share of matches that fall at night.
         static let chance: Double = 0.2
+    }
+
+    // MARK: - Furniture
+
+    /// Things stood up in a base: arcades, turrets and chests.
+    enum Furniture {
+        /// How far each one sits in from the edge of the tiles it takes, in
+        /// tiles, on every side. Drawn and solid alike.
+        ///
+        /// They used to fill their tiles exactly, so a machine stood flush
+        /// against the wall beside it and the next machine along, and a base
+        /// read as crammed rather than laid out. A small gap all round makes each
+        /// piece sit IN its space. The tiles taken are the same, so where things
+        /// can go does not change; only how they look in it, and how close you
+        /// can stand.
+        static let inset: Double = 0.1
     }
 }

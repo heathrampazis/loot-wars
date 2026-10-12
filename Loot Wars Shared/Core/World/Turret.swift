@@ -89,9 +89,12 @@ struct Turret {
              y: Double(origin.row) + Double(Turret.height) / 2)
     }
 
-    /// Solid, and exactly the size the renderer draws.
+    /// Solid, and exactly the size the renderer draws. In from the edge of its
+    /// tiles by Furniture.inset on every side, like a machine.
     var hitbox: Box {
-        Box(centre: centre, size: Vec2(x: Double(Turret.width), y: Double(Turret.height)))
+        let gap = GameConfig.Furniture.inset * 2
+        return Box(centre: centre,
+                   size: Vec2(x: Double(Turret.width) - gap, y: Double(Turret.height) - gap))
     }
 
     /// Where a shot leaves it, for a barrel pointing this way.
