@@ -22,7 +22,7 @@ final class GlassNode: SKCropNode {
     private static let all = NSHashTable<GlassNode>.weakObjects()
 
     private let pane = SKSpriteNode()
-    private let area: CGRect
+    private var area: CGRect
 
     /// - Parameters:
     ///   - path: the control's shape, in the space this node is added to.
@@ -46,6 +46,16 @@ final class GlassNode: SKCropNode {
         zPosition = -1
         alpha = strength
         GlassNode.all.add(self)
+    }
+
+    /// Gives the glass a new shape in place, for a control that changes size.
+    /// The pane keeps its last patch until the next fill, so it never blinks
+    /// out the way a fresh glass would for its first frame.
+    func reshape(to path: CGPath) {
+        area = path.boundingBoxOfPath
+        (maskNode as? SKShapeNode)?.path = path
+        pane.size = area.size
+        pane.position = CGPoint(x: area.midX, y: area.midY)
     }
 
     required init?(coder aDecoder: NSCoder) {
