@@ -529,6 +529,8 @@ final class GameScene: SKScene {
         blockRenderer.onWallBuilt = { [weak self] tile in
             guard let self else { return }
             SoundPlayer.shared.play(.block, at: tile.center, heardFrom: self.ears)
+            // Yours: a wall going up within arm's reach is one you built.
+            if (tile.center - self.ears).length < 2.5 { Haptics.shared.play(.build) }
         }
         worldLayer.addChild(wallDamageRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
@@ -1015,6 +1017,31 @@ final class GameScene: SKScene {
 
     /// Re-blurs the map behind the controls and hands each one its patch. After
     /// the renderers, so the glass shows this frame's map rather than the last.
+    /// How far away a bomb can be and still be felt, in tiles.
+    static let blastFeltWithin: Double = 7
+
+    /// What the last frame saw, so the next one can tell what changed.
+    private var feltHealth: Int?
+    private var feltShotsHit = 0
+
+    /// A buzz for your shots landing and for being hit. Neither is an event in
+    /// the world - a hit is just a number going down - so this watches the two
+    /// numbers that say so: your shots that landed, and your health.
+    private func feelHits(in world: World) {
+        guard let me = world.localPlayer else { return }
+
+        let landed = world.stats[me.id]?.shotsHit ?? 0
+        if landed > feltShotsHit { Haptics.shared.play(.hit) }
+        feltShotsHit = landed
+
+        // Only while alive: dying and respawning move health too, and dying has
+        // a buzz of its own.
+        if me.isAlive, let before = feltHealth, me.health < before {
+            Haptics.shared.play(.hurt)
+        }
+        feltHealth = me.isAlive ? me.health : nil
+    }
+
     private func refreshGlass() {
         guard GlassBackdrop.enabled, let view else { return }
         let camera = cameraController.node
@@ -1049,6 +1076,7 @@ final class GameScene: SKScene {
         bombRenderer.sync(with: world)
         projectileRenderer.sync(with: world, heardFrom: ears)
         actorRenderer.sync(with: world, dt: frameDelta, heardFrom: ears)
+        feelHits(in: world)
         matchPanel.update(with: world)
         repositionForSafeAreaIfNeeded()
         leaderboard.update(with: world)
@@ -1298,6 +1326,11 @@ final class GameScene: SKScene {
             case .blast(let position):
                 bombRenderer.flash(at: position)
                 SoundPlayer.shared.play(.bomb, at: position, heardFrom: ears)
+                // Felt when it is close enough to matter, harder the closer.
+                let away = (position - ears).length
+                if away < GameScene.blastFeltWithin {
+                    Haptics.shared.play(.blast(near: 1 - away / GameScene.blastFeltWithin))
+                }
 
             case .jackpot(let position):
                 effectsRenderer.jackpot(at: position)
@@ -1458,6 +1491,7 @@ final class GameScene: SKScene {
                 // depending on which one you used would be telling you about the
                 // interface instead of about the helmet.
                 SoundPlayer.shared.play(bought.isGear ? .upgrade : .purchase)
+                Haptics.shared.play(.success)
 
                 // Nothing is armed here any more. A heal you just bought used to be
                 // selected for you, so the corner button would already be showing a
@@ -1505,7 +1539,10 @@ final class GameScene: SKScene {
                 // Taken from the EVENT rather than worked out later, because by the
                 // time anything is drawn the body has been stripped and moved home,
                 // and nothing left in the world says who did it.
-                if victim == world.localPlayerID { killedBy = killer }
+                if victim == world.localPlayerID {
+                    killedBy = killer
+                    Haptics.shared.play(.died)
+                }
 
                 effectsRenderer.mark(killAt: position,
                                      points: points,
@@ -1518,6 +1555,7 @@ final class GameScene: SKScene {
                     hint.hide()
                     killBanner.confirm()
                     SoundPlayer.shared.play(.upgrade)
+                    Haptics.shared.play(.kill)
                 }
             }
         }
@@ -1730,7 +1768,10 @@ final class GameScene: SKScene {
 
         let raided = world.intruder(in: team) != nil
             || world.buildLockRemaining(for: team) > 0
-        if raided, !wasRaided { SoundPlayer.shared.play(.notification) }
+        if raided, !wasRaided {
+            SoundPlayer.shared.play(.notification)
+            Haptics.shared.play(.warning)
+        }
         wasRaided = raided
         baseCompass.setAlarm(raided)
 
@@ -1990,6 +2031,7 @@ extension GameScene {
                     // offer up: both of those can change in a few seconds.
                     quickBuy.refuse()
                     SoundPlayer.shared.play(.error)
+                    Haptics.shared.play(.error)
                     continue
                 }
 
@@ -2061,6 +2103,7 @@ extension GameScene {
                 } else {
                     healButton.refuse()
                     SoundPlayer.shared.play(.error)
+                    Haptics.shared.play(.error)
                 }
                 continue
             }
@@ -2498,6 +2541,7 @@ extension GameScene {
 
         guard player.canUse(slot: slot) else {
             SoundPlayer.shared.play(.error)
+            Haptics.shared.play(.error)
             hotbar.refuse(slot: slot, saying: GameScene.refusal(for: stack.type))
             return
         }
@@ -2507,6 +2551,7 @@ extension GameScene {
         if PlacementSystem.baseIsFull(for: stack.type, team: player.team, in: world),
            let cap = PlacementSystem.limit(of: stack.type) {
             SoundPlayer.shared.play(.error)
+            Haptics.shared.play(.error)
             hotbar.refuse(slot: slot, saying: "Base full - \(cap) max")
             return
         }
@@ -2601,6 +2646,7 @@ extension GameScene {
                   ShopSystem.sellPrice(of: stack.type) > 0 else {
                 shopPanel.refuse()
                 SoundPlayer.shared.play(.error)
+                Haptics.shared.play(.error)
                 return
             }
 
@@ -2621,6 +2667,7 @@ extension GameScene {
                   ShopSystem.canBuy(item, actor: player, in: world) else {
                 shopPanel.refuse()
                 SoundPlayer.shared.play(.error)
+                Haptics.shared.play(.error)
                 return
             }
 
@@ -2655,6 +2702,7 @@ extension GameScene {
                 chestPanel.refuse(slot: slot)
                 chestPanel.note("YOUR BAG IS FULL")
                 SoundPlayer.shared.play(.error)
+                Haptics.shared.play(.error)
                 return
             }
 
@@ -2684,6 +2732,7 @@ extension GameScene {
                 hotbar.deny(slot: slot)
                 chestPanel.note("THE CHEST IS FULL")
                 SoundPlayer.shared.play(.error)
+                Haptics.shared.play(.error)
                 return
             }
 
@@ -2906,6 +2955,7 @@ extension GameScene {
 
         blueprint.refuse(at: tile)
         SoundPlayer.shared.play(.error)
+        Haptics.shared.play(.error)
 
 
         return false

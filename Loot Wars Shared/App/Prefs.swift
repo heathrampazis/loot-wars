@@ -33,6 +33,7 @@ enum Prefs {
         static let taughtHolding  = "taughtHolding"
         static let lessonsVersion = "lessonsVersion"
         static let soundOn = "soundOn"
+        static let vibrationOn = "vibrationOn"
         static let tipsOn = "tipsOn"
         static let leftHanded = "leftHanded"
         static let easyControls = "easyControls"
@@ -130,6 +131,13 @@ enum Prefs {
     static var soundOn: Bool {
         get { store.object(forKey: Key.soundOn) as? Bool ?? true }
         set { store.set(newValue, forKey: Key.soundOn) }
+    }
+
+    /// Vibration on or off - every buzz goes through Haptics, which asks this.
+    /// On until somebody turns it off.
+    static var vibrationOn: Bool {
+        get { store.object(forKey: Key.vibrationOn) as? Bool ?? true }
+        set { store.set(newValue, forKey: Key.vibrationOn) }
     }
 
     /// Mirror the controls: move stick on the right, aim stick on the left. Read

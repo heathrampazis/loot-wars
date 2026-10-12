@@ -60,7 +60,7 @@ final class SettingsSheetContent: MenuSheetContent {
     var onAbout: (() -> Void)?
 
     private enum Row: Int, CaseIterable {
-        case sound, leftHanded, easyControls, difficulty, tips, about
+        case sound, vibration, leftHanded, easyControls, difficulty, tips, about
     }
 
     private static let rowHeight: CGFloat = 56
@@ -73,6 +73,7 @@ final class SettingsSheetContent: MenuSheetContent {
     private var difficultyButton: SKShapeNode?
     private var difficultyLabel: SKLabelNode?
     private var soundToggle: MenuToggleNode?
+    private var vibrationToggle: MenuToggleNode?
     private var handToggle: MenuToggleNode?
     private var easyToggle: MenuToggleNode?
     private var tipsToggle: MenuToggleNode?
@@ -81,7 +82,9 @@ final class SettingsSheetContent: MenuSheetContent {
     func layOut(width: CGFloat, maxHeight: CGFloat) -> CGFloat {
         self.width = width
         node.removeAllChildren()
-        rowHeight = max(44, min(SettingsSheetContent.rowHeight,
+        // Down to 37 rather than 44 on the shortest screen, so seven rows still
+        // fit on an SE.
+        rowHeight = max(37, min(SettingsSheetContent.rowHeight,
                                 (maxHeight / CGFloat(Row.allCases.count)).rounded(.down)))
 
         for row in Row.allCases {
@@ -99,6 +102,13 @@ final class SettingsSheetContent: MenuSheetContent {
                 toggle.position = CGPoint(x: width / 2 - MenuToggleNode.trackSize.width / 2 - 4, y: centreY)
                 node.addChild(toggle)
                 soundToggle = toggle
+
+            case .vibration:
+                addLabels("Vibration", detail: nil, y: centreY)
+                let toggle = MenuToggleNode(isOn: Prefs.vibrationOn)
+                toggle.position = CGPoint(x: width / 2 - MenuToggleNode.trackSize.width / 2 - 4, y: centreY)
+                node.addChild(toggle)
+                vibrationToggle = toggle
 
             case .leftHanded:
                 addLabels("Left-handed controls", detail: "Move on the right, aim on the left", y: centreY)
@@ -147,6 +157,13 @@ final class SettingsSheetContent: MenuSheetContent {
             soundToggle?.set(on)
             // Heard only when turning it ON, which is the confirmation it worked.
             SoundPlayer.shared.play(.select)
+
+        case .vibration:
+            Prefs.vibrationOn.toggle()
+            vibrationToggle?.set(Prefs.vibrationOn)
+            SoundPlayer.shared.play(.select)
+            // Felt when turning it on, which is the confirmation it worked.
+            Haptics.shared.play(.success)
 
         case .leftHanded:
             Prefs.leftHanded.toggle()
