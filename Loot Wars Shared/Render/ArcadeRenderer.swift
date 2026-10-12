@@ -94,6 +94,9 @@ final class ArcadeRenderer {
     /// Told where a machine broke, so the match can play the sound of it.
     var onBreak: ((Vec2) -> Void)?
 
+    /// Told where a machine was put down, so the match can play the sound of it.
+    var onPlaced: ((Vec2) -> Void)?
+
     func sync(with world: World) {
         for (id, machine) in world.arcades where nodesByArcade[id] == nil {
             make(machine)
@@ -104,6 +107,7 @@ final class ArcadeRenderer {
             // the single best thing that happens to a base all match.
             if hasSynced, machine.owner != nil {
                 standUp(machine)
+                onPlaced?(machine.centre)
             }
         }
 

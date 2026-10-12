@@ -55,13 +55,26 @@ final class TurretRenderer {
         self.mapHeight = mapHeight
     }
 
+    /// Told where a turret was put down, so the match can play the sound of it.
+    var onPlaced: ((Vec2) -> Void)?
+
+    /// Told where a turret fired, so the match can play its shot. Off the
+    /// trigger rather than the bullet, which a point-blank shot never shows.
+    var onFire: ((Vec2) -> Void)?
+
+    /// Told where a turret was destroyed, so the match can play the sound of it.
+    var onBreak: ((Vec2) -> Void)?
+
     func sync(with world: World) {
         // Sorted so two turrets appearing on the same frame are built in the same
         // order every run - it decides nothing, but it costs nothing either.
         for id in world.turrets.keys.sorted(by: { $0.raw < $1.raw }) where parts[id] == nil {
             guard let turret = world.turrets[id] else { continue }
             make(turret)
-            if hasSynced { standUp(id) }
+            if hasSynced {
+                standUp(id)
+                onPlaced?(turret.centre)
+            }
         }
 
         hasSynced = true
@@ -79,6 +92,7 @@ final class TurretRenderer {
             // The cooldown only ever goes up at the moment of a shot.
             if let previous = lastCooldowns[id], turret.cooldown > previous + 0.0001 {
                 fire(turretParts)
+                onFire?(turret.centre)
             }
             lastCooldowns[id] = turret.cooldown
 
@@ -96,6 +110,10 @@ final class TurretRenderer {
                 bar.run(.sequence([.fadeOut(withDuration: 0.14), .removeFromParent()]))
             }
             bars[id] = nil
+
+            // Its middle, a tile up from the base line the root stands on.
+            let base = GridGeometry.position(for: gone.root.position)
+            onBreak?(Vec2(x: base.x, y: base.y + Double(Turret.height) / 2))
 
             knockOut(gone)
         }

@@ -235,6 +235,32 @@ final class GameScene: SKScene {
     private let glass = GlassBackdrop()
     private let pauseMenu = PauseMenuNode()
     private var matchPaused = false
+
+    /// The clock in the last ten seconds: a tick each half second, then twice as
+    /// fast for the last five. Counted off the match's own time, so a pause
+    /// pauses it and nothing ticks after the whistle.
+    private var nextTickAt = GameScene.tickFrom
+    private var tickIsTock = false
+    private static let tickFrom: Double = 10
+    private static let tickFastFrom: Double = 5
+
+    private func updateClock() {
+        guard world != nil, !world.isOver else { return }
+        let left = world.timeRemaining
+        guard left > 0 else { return }
+        if left > GameScene.tickFrom {
+            nextTickAt = GameScene.tickFrom
+            return
+        }
+        guard left <= nextTickAt else { return }
+
+        SoundPlayer.shared.play(tickIsTock ? .tock : .tick)
+        tickIsTock.toggle()
+        let step = left > GameScene.tickFastFrom ? 0.5 : 0.25
+        // From the beat, not from now, so a slow frame does not drift it.
+        nextTickAt -= step
+        while nextTickAt >= left { nextTickAt -= step }
+    }
     private let hotbar = HotbarNode()
     private let chestPanel = ChestPanelNode()
     private let respawnBanner = RespawnBanner()
@@ -534,11 +560,49 @@ final class GameScene: SKScene {
         }
         worldLayer.addChild(wallDamageRenderer.node)
         worldLayer.addChild(arcadeRenderer.node)
+        // Put down: the same thud, then the coin jingle as the gold stars come
+        // off it. The jingle is yours only - it is not a sound that carries -
+        // so a bot setting one up across the map is just the thud.
+        arcadeRenderer.onPlaced = { [weak self] position in
+            guard let self else { return }
+            SoundPlayer.shared.play(.block, at: position, heardFrom: self.ears)
+            guard (position - self.ears).length < 4 else { return }
+            self.run(.sequence([.wait(forDuration: 0.12), .run {
+                SoundPlayer.shared.play(.token)
+            }]))
+        }
         arcadeRenderer.onBreak = { [weak self] position in
             guard let self else { return }
             SoundPlayer.shared.play(.arcadeBreak, at: position, heardFrom: self.ears)
         }
         worldLayer.addChild(turretRenderer.node)
+        // Put down: the thud of a wall going up, then the chime of a base
+        // closing as the barrel spins round - a defence switching on.
+        turretRenderer.onBreak = { [weak self] position in
+            guard let self else { return }
+            SoundPlayer.shared.play(.turretBreak, at: position, heardFrom: self.ears)
+        }
+        // The crate falls for a little over half a second; the sound's impact is
+        // about a tenth of a second in, so it starts just before the landing.
+        supplyRenderer.onLand = { [weak self] position in
+            guard let self else { return }
+            self.run(.sequence([.wait(forDuration: 0.42), .run { [weak self] in
+                guard let self else { return }
+                SoundPlayer.shared.play(.supplyDrop, at: position, heardFrom: self.ears)
+            }]))
+        }
+        turretRenderer.onFire = { [weak self] position in
+            guard let self else { return }
+            SoundPlayer.shared.play(.turretShot, at: position, heardFrom: self.ears)
+        }
+        turretRenderer.onPlaced = { [weak self] position in
+            guard let self else { return }
+            SoundPlayer.shared.play(.block, at: position, heardFrom: self.ears)
+            self.run(.sequence([.wait(forDuration: 0.12), .run { [weak self] in
+                guard let self else { return }
+                SoundPlayer.shared.play(.complete, at: position, heardFrom: self.ears)
+            }]))
+        }
         worldLayer.addChild(lootboxRenderer.node)
         lootboxRenderer.onOpened = { [weak self] position in
             guard let self else { return }
@@ -1031,12 +1095,17 @@ final class GameScene: SKScene {
         guard let me = world.localPlayer else { return }
 
         let landed = world.stats[me.id]?.shotsHit ?? 0
-        if landed > feltShotsHit { Haptics.shared.play(.hit) }
+        if landed > feltShotsHit {
+            // The same frame the shot lands and its impact puff appears.
+            SoundPlayer.shared.play(.hitMarker)
+            Haptics.shared.play(.hit)
+        }
         feltShotsHit = landed
 
         // Only while alive: dying and respawning move health too, and dying has
         // a buzz of its own.
         if me.isAlive, let before = feltHealth, me.health < before {
+            SoundPlayer.shared.play(.damage)
             Haptics.shared.play(.hurt)
         }
         feltHealth = me.isAlive ? me.health : nil
@@ -1069,6 +1138,7 @@ final class GameScene: SKScene {
         lootboxRenderer.sync(with: world)
         supplyRenderer.sync(with: world)
         updateSupplyDrops()
+        updateClock()
         chestRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
         turretRenderer.sync(with: world)
@@ -1334,6 +1404,7 @@ final class GameScene: SKScene {
 
             case .jackpot(let position):
                 effectsRenderer.jackpot(at: position)
+                SoundPlayer.shared.play(.jackpot, at: position, heardFrom: ears)
 
             case .supplyDropOpened(let position):
                 // The biggest crate in the game going off, heard from wherever it
@@ -1388,6 +1459,7 @@ final class GameScene: SKScene {
                 // The same burst a crate gets, scaled by what came out of it.
                 effectsRenderer.jackpot(at: position)
                 bombRenderer.flash(at: position)
+                SoundPlayer.shared.play(.chestBreak, at: position, heardFrom: ears)
                 _ = items   // the pile that lands says how much better than this
 
             case .machineHit(let id, let position):
@@ -1398,6 +1470,7 @@ final class GameScene: SKScene {
                 // then left it standing.
                 arcadeRenderer.hit(id)
                 effectsRenderer.machineStruck(at: position)
+                SoundPlayer.shared.play(.objectHit, at: position, heardFrom: ears)
 
             case .machineDestroyed(_, let position):
                 // The cabinet's own break-up and the coins flying out of it are
@@ -1413,16 +1486,19 @@ final class GameScene: SKScene {
                 // the screen says somebody is in there taking it.
                 chestRenderer.hit(id)
                 effectsRenderer.machineStruck(at: position)
+                SoundPlayer.shared.play(.objectHit, at: position, heardFrom: ears)
 
             case .turretHit(let id, let position):
                 // Sparks off the casing, the same as the other furniture.
                 turretRenderer.hit(id)
                 effectsRenderer.machineStruck(at: position)
+                SoundPlayer.shared.play(.objectHit, at: position, heardFrom: ears)
 
             case .wallHit(let tile, let position):
                 // Your own wall, being shot down on purpose.
                 blockRenderer.hit(at: tile)
                 effectsRenderer.machineStruck(at: position)
+                SoundPlayer.shared.play(.objectHit, at: position, heardFrom: ears)
 
             case .sealed(let team, let chests):
                 // Everybody's, not only yours. Eight bases close over a match and
@@ -1471,7 +1547,7 @@ final class GameScene: SKScene {
 
             case .sold(let slot, let tokens, let seller):
                 guard seller == world.localPlayerID else { break }
-                SoundPlayer.shared.play(.purchase)
+                SoundPlayer.shared.play(.sell)
 
                 // Sold from the shop's SELL tab, the bar is hidden behind the
                 // panel, so the panel answers instead.
@@ -1542,6 +1618,7 @@ final class GameScene: SKScene {
                 if victim == world.localPlayerID {
                     killedBy = killer
                     Haptics.shared.play(.died)
+                    SoundPlayer.shared.play(.playerElimination)
                 }
 
                 effectsRenderer.mark(killAt: position,
@@ -1554,8 +1631,12 @@ final class GameScene: SKScene {
                 if killer == world.localPlayerID, victim != world.localPlayerID {
                     hint.hide()
                     killBanner.confirm()
-                    SoundPlayer.shared.play(.upgrade)
+                    SoundPlayer.shared.play(.elimination)
                     Haptics.shared.play(.kill)
+                } else if victim != world.localPlayerID {
+                    // Anybody else's, from where it happened. Not your own death:
+                    // that is not a moment worth celebrating.
+                    SoundPlayer.shared.play(.elimination, at: position, heardFrom: ears)
                 }
             }
         }

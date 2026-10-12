@@ -54,10 +54,16 @@ final class SupplyDropRenderer {
     /// colour does.
     private static let scale: CGFloat = 1.15
 
+    /// Told where a drop has started to fall, so the match can play it landing.
+    var onLand: ((Vec2) -> Void)?
+
     func sync(with world: World) {
         for drop in world.supplyDrops where parts[drop.id] == nil {
             make(drop)
-            if hasSynced { land(drop.id) }
+            if hasSynced {
+                land(drop.id)
+                onLand?(drop.position)
+            }
         }
         hasSynced = true
 
