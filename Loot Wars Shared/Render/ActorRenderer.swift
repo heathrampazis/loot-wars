@@ -138,6 +138,10 @@ final class ActorRenderer {
         /// elimination or a respawn, and each gets its own moment.
         var wasAlive: Bool?
 
+        /// The drawn figure's moving parts, or nil when the PNGs are in use -
+        /// see PlayerArt.enabled.
+        var parts: PlayerFigure?
+
         /// Where the walk cycle has got to, advanced by DISTANCE rather than by
         /// time, so a figure that is being shoved along a wall does not moonwalk
         /// and a stationary one does not jog on the spot.
@@ -238,6 +242,12 @@ final class ActorRenderer {
             // to the sprite alone so the bar above never flips with it.
             nodes.sprite.xScale = actor.facesLeft ? -1 : 1
 
+            // The eyes follow the aim, in the figure's own space: forward is +x
+            // whichever way it faces, because the mirror flips the parts too.
+            nodes.parts?.look(towards: CGVector(dx: actor.aim.x * (actor.facesLeft ? -1 : 1),
+                                                dy: actor.aim.y),
+                              dt: dt)
+
             // Actors lower down the screen draw in front of those behind them.
             nodes.root.zPosition = 10 + (Double(world.map.height) - actor.position.y) * 0.001
 
@@ -335,6 +345,7 @@ final class ActorRenderer {
                 ofTiles: hop * ActorRenderer.walkBob * (1 - still)
                     + (breath + 1) / 2 * ActorRenderer.breathLift * still)
 
+
             // And a lean, which is what stops the hop reading as a hiccup. It
             // leans INTO the direction of travel, so it flips with the figure. It
             // fades out with the walk: a figure standing still has nothing to lean
@@ -371,7 +382,11 @@ final class ActorRenderer {
             // actor coming at them is.
             if nodes.lastHelmet != actor.helmet {
                 nodes.lastHelmet = actor.helmet
-                nodes.sprite.texture = texture(for: actor.helmet)
+                if let parts = nodes.parts {
+                    parts.setHelmet(actor.helmet)
+                } else {
+                    nodes.sprite.texture = texture(for: actor.helmet)
+                }
             }
 
             if nodes.lastBlaster != actor.blaster {
@@ -517,6 +532,10 @@ final class ActorRenderer {
                                blaster: blaster,
                                goalLabel: goalLabel)
 
+        if PlayerArt.enabled {
+            nodes.parts = PlayerFigure(on: sprite)
+        }
+
         // root -> body -> figure -> sprite, and each layer owns exactly one kind
         // of movement: the root is where the actor IS, the body is the walk, the
         // figure is whatever just happened to it, and the sprite is which way it is
@@ -650,7 +669,11 @@ final class ActorRenderer {
         let chest = CGPoint(x: point.x, y: point.y + tile * 0.8)
 
         // The figure itself.
-        let ghost = SKSpriteNode(texture: nodes.sprite.texture, size: nodes.sprite.size)
+        // A copy of the whole figure, helmet and eyes and all.
+        let ghost = (nodes.sprite.copy() as? SKSpriteNode)
+            ?? SKSpriteNode(texture: nodes.sprite.texture, size: nodes.sprite.size)
+        ghost.removeAllActions()
+        ghost.enumerateChildNodes(withName: ".//*") { child, _ in child.removeAllActions() }
         ghost.anchorPoint = nodes.sprite.anchorPoint
         ghost.xScale = nodes.sprite.xScale
         ghost.position = point
@@ -809,6 +832,8 @@ final class ActorRenderer {
     /// Keyed, so a burst of hits restarts them rather than stacking up into a
     /// permanently dark actor standing permanently sideways.
     private func hurt(_ nodes: ActorNodes) {
+        nodes.parts?.flinch()
+
         nodes.sprite.removeAction(forKey: "hit")
         nodes.sprite.run(.sequence([
             .colorize(with: .black, colorBlendFactor: 0.35, duration: 0.04),
