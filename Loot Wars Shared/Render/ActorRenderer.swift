@@ -134,6 +134,14 @@ final class ActorRenderer {
         /// WorldEvent for where that line is drawn.
         var lastHealth: Int = Int.max
 
+        /// Alive last frame, or nil before the first. A change either way is an
+        /// elimination or a respawn, and each gets its own moment.
+        var wasAlive: Bool?
+
+        /// The drawn figure's moving parts, or nil when the PNGs are in use -
+        /// see PlayerArt.enabled.
+        var parts: PlayerFigure?
+
         /// Where the walk cycle has got to, advanced by DISTANCE rather than by
         /// time, so a figure that is being shoved along a wall does not moonwalk
         /// and a stationary one does not jog on the spot.
@@ -221,6 +229,11 @@ final class ActorRenderer {
         for (id, actor) in world.actors {
             let nodes = nodesByActor[id] ?? makeNodes(for: actor)
 
+            // Where it was drawn last frame, before this one moves it. An
+            // eliminated actor is taken straight home by the world, so this is
+            // the only record of where it actually went down.
+            let wasAt = nodes.root.position
+
             // The art is a standing figure, so it stands ON the hitbox rather than
             // being centred in it: the sprite's feet sit at the bottom of the box.
             nodes.root.position = GridGeometry.point(for: actor.feet)
@@ -229,12 +242,30 @@ final class ActorRenderer {
             // to the sprite alone so the bar above never flips with it.
             nodes.sprite.xScale = actor.facesLeft ? -1 : 1
 
+            // The eyes follow the aim, in the figure's own space: forward is +x
+            // whichever way it faces, because the mirror flips the parts too.
+            nodes.parts?.look(towards: CGVector(dx: actor.aim.x * (actor.facesLeft ? -1 : 1),
+                                                dy: actor.aim.y),
+                              dt: dt)
+
             // Actors lower down the screen draw in front of those behind them.
             nodes.root.zPosition = 10 + (Double(world.map.height) - actor.position.y) * 0.001
 
             // The dead are simply not drawn. Nothing is removed, because the actor
             // itself still exists and is counting down to respawn.
             nodes.root.isHidden = !actor.isAlive
+
+            if let was = nodes.wasAlive, was != actor.isAlive {
+                if actor.isAlive {
+                    respawned(nodes, team: actor.team)
+                    // Back at full health is not a heal; without this the heal
+                    // animation would fire on the same frame and fight the drop.
+                    nodes.lastHealth = actor.health
+                } else {
+                    eliminated(nodes, at: wasAt, team: actor.team)
+                }
+            }
+            nodes.wasAlive = actor.isAlive
 
             // Spawn protection reads as a ghost, so it is obvious why shots are
             // passing straight through someone.
@@ -314,6 +345,7 @@ final class ActorRenderer {
                 ofTiles: hop * ActorRenderer.walkBob * (1 - still)
                     + (breath + 1) / 2 * ActorRenderer.breathLift * still)
 
+
             // And a lean, which is what stops the hop reading as a hiccup. It
             // leans INTO the direction of travel, so it flips with the figure. It
             // fades out with the walk: a figure standing still has nothing to lean
@@ -350,7 +382,11 @@ final class ActorRenderer {
             // actor coming at them is.
             if nodes.lastHelmet != actor.helmet {
                 nodes.lastHelmet = actor.helmet
-                nodes.sprite.texture = texture(for: actor.helmet)
+                if let parts = nodes.parts {
+                    parts.setHelmet(actor.helmet)
+                } else {
+                    nodes.sprite.texture = texture(for: actor.helmet)
+                }
             }
 
             if nodes.lastBlaster != actor.blaster {
@@ -496,6 +532,10 @@ final class ActorRenderer {
                                blaster: blaster,
                                goalLabel: goalLabel)
 
+        if PlayerArt.enabled {
+            nodes.parts = PlayerFigure(on: sprite)
+        }
+
         // root -> body -> figure -> sprite, and each layer owns exactly one kind
         // of movement: the root is where the actor IS, the body is the walk, the
         // figure is whatever just happened to it, and the sprite is which way it is
@@ -617,6 +657,161 @@ final class ActorRenderer {
         muzzle.setScale(CGFloat(0.62 + recoil * 0.38))
     }
 
+    // MARK: - Going down and coming back
+
+    /// Knocked out. A copy of the figure where it stood flashes white, stretches
+    /// up and pops away, in a puff of smoke and a burst of its team's colour.
+    /// The real figure is already hidden; this is drawn over the spot instead.
+    private func eliminated(_ nodes: ActorNodes, at point: CGPoint, team: TeamID) {
+        let z = nodes.root.zPosition + 0.0005
+        let colour = RenderPalette.vibrantColour(for: team)
+        let tile = GridGeometry.length(ofTiles: 1)
+        let chest = CGPoint(x: point.x, y: point.y + tile * 0.8)
+
+        // The figure itself.
+        // A copy of the whole figure, helmet and eyes and all.
+        let ghost = (nodes.sprite.copy() as? SKSpriteNode)
+            ?? SKSpriteNode(texture: nodes.sprite.texture, size: nodes.sprite.size)
+        ghost.removeAllActions()
+        ghost.enumerateChildNodes(withName: ".//*") { child, _ in child.removeAllActions() }
+        ghost.anchorPoint = nodes.sprite.anchorPoint
+        ghost.xScale = nodes.sprite.xScale
+        ghost.position = point
+        ghost.zPosition = z
+        ghost.color = .white
+        ghost.colorBlendFactor = 0
+        node.addChild(ghost)
+
+        let lean: CGFloat = nodes.sprite.xScale < 0 ? 0.5 : -0.5
+        let flip = nodes.sprite.xScale
+        ghost.run(.sequence([
+            .group([.colorize(withColorBlendFactor: 0.85, duration: 0.05),
+                    .scaleX(to: 1.18 * flip, y: 0.84, duration: 0.06)]),
+            .group([.scaleX(to: 0.7 * flip, y: 1.25, duration: 0.08),
+                    .moveBy(x: 0, y: tile * 0.15, duration: 0.08)]),
+            .group([.scale(to: 0, duration: 0.16),
+                    .rotate(byAngle: lean, duration: 0.16),
+                    .fadeOut(withDuration: 0.16)]),
+            .removeFromParent()
+        ]))
+
+        // A puff of smoke where it stood.
+        for index in 0..<6 {
+            let angle = CGFloat(index) / 6 * .pi * 2 + CGFloat.random(in: -0.3...0.3)
+            let reach = tile * CGFloat.random(in: 0.45...0.75)
+            let puff = SKSpriteNode(texture: GlowArt.pool)
+            puff.size = CGSize(width: tile * 0.7, height: tile * 0.7)
+            puff.color = SKColor(white: 0.92, alpha: 1)
+            puff.colorBlendFactor = 1
+            puff.position = chest
+            puff.zPosition = z + 0.0001
+            puff.alpha = 0.9
+            puff.setScale(0.35)
+            node.addChild(puff)
+
+            let out = SKAction.moveBy(x: cos(angle) * reach, y: sin(angle) * reach * 0.8,
+                                      duration: 0.42)
+            out.timingMode = .easeOut
+            puff.run(.sequence([
+                .wait(forDuration: 0.1),
+                .group([out, .scale(to: 1, duration: 0.42),
+                        .sequence([.wait(forDuration: 0.12), .fadeOut(withDuration: 0.3)])]),
+                .removeFromParent()
+            ]))
+        }
+
+        // And bits of team colour thrown out and falling.
+        for _ in 0..<10 {
+            let angle = CGFloat.random(in: 0.15...(.pi - 0.15))
+            let speed = tile * CGFloat.random(in: 0.9...1.6)
+            let bit = SKSpriteNode(color: colour,
+                                   size: CGSize(width: tile * 0.14, height: tile * 0.14))
+            bit.position = chest
+            bit.zPosition = z + 0.0002
+            bit.zRotation = CGFloat.random(in: 0...(.pi))
+            node.addChild(bit)
+
+            let rise = SKAction.moveBy(x: cos(angle) * speed * 0.5, y: sin(angle) * speed * 0.5,
+                                       duration: 0.22)
+            rise.timingMode = .easeOut
+            let fall = SKAction.moveBy(x: cos(angle) * speed * 0.3, y: -tile * 0.9, duration: 0.4)
+            fall.timingMode = .easeIn
+            bit.run(.sequence([
+                .wait(forDuration: 0.1),
+                .group([.sequence([rise, fall]),
+                        .rotate(byAngle: CGFloat.random(in: -6...6), duration: 0.62),
+                        .sequence([.wait(forDuration: 0.35), .fadeOut(withDuration: 0.27)])]),
+                .removeFromParent()
+            ]))
+        }
+
+        groundRing(at: point, colour: colour, z: nodes.ring.zPosition, grow: 2.0)
+    }
+
+    /// Back in. The figure drops in from just above and lands with a squash,
+    /// on a ring of its team's colour spreading across the ground.
+    private func respawned(_ nodes: ActorNodes, team: TeamID) {
+        let tile = GridGeometry.length(ofTiles: 1)
+
+        nodes.figure.removeAllActions()
+        nodes.figure.position = CGPoint(x: 0, y: tile * 0.9)
+        nodes.figure.setScale(0.55)
+
+        let drop = SKAction.group([.moveTo(y: 0, duration: 0.16),
+                                   .scale(to: 1, duration: 0.16)])
+        drop.timingMode = .easeIn
+        nodes.figure.run(.sequence([
+            drop,
+            .scaleX(to: 1.2, y: 0.8, duration: 0.06),
+            .scaleX(to: 0.95, y: 1.06, duration: 0.08),
+            .scale(to: 1, duration: 0.08)
+        ]))
+
+        let colour = RenderPalette.vibrantColour(for: team)
+        let feet = nodes.root.position
+        groundRing(at: feet, colour: colour, z: nodes.ring.zPosition, grow: 2.4, after: 0.16)
+
+        // A soft glow of the same colour where it landed.
+        let glow = SKSpriteNode(texture: GlowArt.pool)
+        glow.size = CGSize(width: tile * 2.2, height: tile * 1.1)
+        glow.color = colour
+        glow.colorBlendFactor = 1
+        glow.position = feet
+        glow.zPosition = nodes.ring.zPosition - 0.0001
+        glow.alpha = 0
+        groundNode.addChild(glow)
+        glow.run(.sequence([
+            .wait(forDuration: 0.14),
+            .fadeAlpha(to: 0.8, duration: 0.05),
+            .fadeOut(withDuration: 0.45),
+            .removeFromParent()
+        ]))
+    }
+
+    /// A ring spreading out across the ground and fading.
+    private func groundRing(at point: CGPoint, colour: SKColor, z: CGFloat,
+                            grow: CGFloat, after delay: TimeInterval = 0) {
+        let tile = GridGeometry.length(ofTiles: 1)
+        let ring = SKShapeNode(ellipseOf: CGSize(width: tile * 0.9, height: tile * 0.45))
+        ring.strokeColor = colour
+        ring.fillColor = .clear
+        ring.lineWidth = 3
+        ring.position = point
+        ring.zPosition = z + 0.0001
+        ring.setScale(0.3)
+        ring.alpha = 0
+        groundNode.addChild(ring)
+
+        let spread = SKAction.scale(to: grow, duration: 0.35)
+        spread.timingMode = .easeOut
+        ring.run(.sequence([
+            .wait(forDuration: delay),
+            .fadeIn(withDuration: 0.01),
+            .group([spread, .sequence([.wait(forDuration: 0.1), .fadeOut(withDuration: 0.25)])]),
+            .removeFromParent()
+        ]))
+    }
+
     /// Took a hit: a flinch, and a moment of shadow.
     ///
     /// Two colours have been tried on the figure itself and both were wrong for the
@@ -637,6 +832,8 @@ final class ActorRenderer {
     /// Keyed, so a burst of hits restarts them rather than stacking up into a
     /// permanently dark actor standing permanently sideways.
     private func hurt(_ nodes: ActorNodes) {
+        nodes.parts?.flinch()
+
         nodes.sprite.removeAction(forKey: "hit")
         nodes.sprite.run(.sequence([
             .colorize(with: .black, colorBlendFactor: 0.35, duration: 0.04),

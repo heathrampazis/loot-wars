@@ -29,6 +29,10 @@ final class StatCounterNode: SKNode {
     private static let gap: CGFloat = 6
 
     private let icon = SKSpriteNode()
+
+    /// Where the icon sits in the row. The icon's own position is left free for
+    /// the hop and the shake, which re-centring would otherwise cancel.
+    private let iconHolder = SKNode()
     private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private var lastValue = Int.min
 
@@ -45,7 +49,8 @@ final class StatCounterNode: SKNode {
 
         icon.texture = texture
         icon.size = CGSize(width: width, height: height)
-        addChild(icon)
+        addChild(iconHolder)
+        iconHolder.addChild(icon)
 
         label.fontSize = 16
         label.fontColor = .white
@@ -66,13 +71,83 @@ final class StatCounterNode: SKNode {
 
         let previous = lastValue
         lastValue = value
-        label.text = "\(value)"
-        centre()
 
         // The first paint is not a change - the counter opening on zero should not
         // announce itself.
-        guard previous != Int.min else { return }
+        guard previous != Int.min else {
+            show(value)
+            return
+        }
+        roll(from: previous, to: value)
         announce(value - previous)
+    }
+
+    private func show(_ value: Int) {
+        label.text = "\(value)"
+        centre()
+    }
+
+    /// Counts up (or down) to the new number over a moment rather than jumping,
+    /// so a payment reads as tokens arriving rather than a digit changing.
+    private func roll(from start: Int, to end: Int) {
+        label.removeAction(forKey: "roll")
+        let steps = abs(end - start)
+        guard steps > 1 else {
+            show(end)
+            return
+        }
+        let duration = min(0.45, 0.12 + Double(steps) * 0.02)
+        label.run(.sequence([
+            .customAction(withDuration: duration) { [weak self] _, elapsed in
+                let share = Double(elapsed) / duration
+                let eased = 1 - (1 - share) * (1 - share)
+                self?.show(start + Int((Double(end - start) * eased).rounded()))
+            },
+            .run { [weak self] in self?.show(end) }
+        ]), withKey: "roll")
+    }
+
+    /// The coin itself: a flip and a hop when tokens come in, with a few
+    /// sparks thrown off it; a shake when they go out.
+    private func animateIcon(gained: Bool) {
+        icon.removeAction(forKey: "coin")
+        icon.xScale = 1
+        icon.position = .zero
+
+        if gained {
+            let up = SKAction.moveBy(x: 0, y: 4, duration: 0.1)
+            up.timingMode = .easeOut
+            let down = SKAction.moveBy(x: 0, y: -4, duration: 0.12)
+            down.timingMode = .easeIn
+            icon.run(.group([
+                .sequence([up, down]),
+                .sequence([.scaleX(to: 0.15, duration: 0.07), .scaleX(to: 1, duration: 0.07),
+                           .scaleX(to: 0.15, duration: 0.07), .scaleX(to: 1, duration: 0.07)])
+            ]), withKey: "coin")
+
+            for index in 0..<5 {
+                let angle = CGFloat(index) / 5 * .pi * 2 + 0.3
+                let spark = SKShapeNode(circleOfRadius: 1.8)
+                spark.fillColor = RenderPalette.treasure
+                spark.strokeColor = .clear
+                spark.position = iconHolder.position
+                spark.zPosition = 3
+                addChild(spark)
+                let out = SKAction.moveBy(x: cos(angle) * 13, y: sin(angle) * 13, duration: 0.3)
+                out.timingMode = .easeOut
+                spark.run(.sequence([
+                    .group([out, .sequence([.wait(forDuration: 0.12), .fadeOut(withDuration: 0.18)])]),
+                    .removeFromParent()
+                ]))
+            }
+        } else {
+            icon.run(.sequence([
+                .moveBy(x: -2.5, y: 0, duration: 0.03),
+                .moveBy(x: 5, y: 0, duration: 0.05),
+                .moveBy(x: -5, y: 0, duration: 0.05),
+                .moveBy(x: 2.5, y: 0, duration: 0.03)
+            ]), withKey: "coin")
+        }
     }
 
     /// Re-centres the icon and the number as one pair.
@@ -81,13 +156,14 @@ final class StatCounterNode: SKNode {
     /// frame a token was picked up rather than on all of them.
     private func centre() {
         let width = icon.size.width + StatCounterNode.gap + label.frame.width
-        icon.position = CGPoint(x: -width / 2 + icon.size.width / 2, y: 0)
+        iconHolder.position = CGPoint(x: -width / 2 + icon.size.width / 2, y: 0)
         label.position = CGPoint(x: -width / 2 + icon.size.width + StatCounterNode.gap, y: 0)
     }
 
     private func announce(_ delta: Int) {
         guard delta != 0 else { return }
         let gained = delta > 0
+        animateIcon(gained: gained)
 
         label.removeAction(forKey: "pulse")
         label.setScale(1)
