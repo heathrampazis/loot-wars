@@ -38,6 +38,7 @@ enum AIBrain {
         state.stashCooldown = max(0, state.stashCooldown - dt)
         state.healTimer = max(0, state.healTimer - dt)
         state.placeTimer = max(0, state.placeTimer - dt)
+        state.fightBombTimer = max(0, state.fightBombTimer - dt)
 
         // Noticing the base is finished, so a gap in it later can be told apart
         // from never having built it. Checked here rather than on the decision
@@ -144,6 +145,9 @@ enum AIBrain {
 
         if let slot = bombToThrow(state: state, actor: actor, in: world) {
             commands.append(.useItem(slot: slot))
+        } else if let slot = fightBomb(&state, actor: actor, in: world) {
+            commands.append(.useItem(slot: slot))
+            actor.ai = state
         }
 
         if let slot = stinkToThrow(state: state, actor: actor, in: world) {
@@ -2648,6 +2652,68 @@ enum AIBrain {
                 <= GameConfig.AI.throwTolerance else { return nil }
 
         return slot
+    }
+
+    /// A blast bomb thrown at the person this bot is fighting, or nil.
+    ///
+    /// Bombs go off on contact with an enemy now, so one is a weapon as well as
+    /// a key. The whole of the care here is not spending the key: raids are what
+    /// make a base worth building, and a bot that threw its only bomb at somebody
+    /// in the open would have nothing to open a wall with. So it throws spares
+    /// freely, and its last one only when that costs nothing - a replacement is
+    /// moments away, or it is about to die and lose it anyway.
+    ///
+    /// Not at somebody stood by the bot's own wall: the blast takes walls with it,
+    /// and a bot blowing a hole in its own base to hit a raider is a bot helping
+    /// the raid.
+    private static func fightBomb(_ state: inout AIState, actor: Actor, in world: World) -> Int? {
+        let enemyID: ActorID
+        switch state.goal {
+        case .fight(let id), .defend(let id): enemyID = id
+        default: return nil
+        }
+
+        guard state.fightBombTimer <= 0,
+              let enemy = world.actors[enemyID], enemy.isAlive,
+              enemy.invulnerability <= 0 else { return nil }
+
+        guard let slot = BombSystem.loadedSlot(of: actor),
+              BombSystem.canThrow(actor, from: slot) else { return nil }
+
+        // A spare, or a last bomb that costs no raid.
+        let spare = actor.inventory.count(of: .bomb) > GameConfig.AI.fightBombReserve
+        let restocking = world.bombsAtFullSupply
+            && state.bombSupplyTimer <= GameConfig.AI.fightBombRestockWithin
+        let desperate = Double(actor.health)
+            < Double(actor.maxHealth) * GameConfig.AI.fightBombDesperateBelow
+        guard spare || restocking || desperate else { return nil }
+
+        let towards = enemy.position - actor.position
+        guard towards.length <= GameConfig.Bomb.throwRange * GameConfig.AI.fightBombReach,
+              abs(shortestAngle(from: actor.aim.angle, to: towards.angle))
+                <= GameConfig.AI.throwTolerance,
+              hasLineOfSight(from: actor.position, to: enemy.position, in: world),
+              !nearOwnWall(enemy.position, team: actor.team, in: world) else { return nil }
+
+        state.fightBombTimer = GameConfig.AI.fightBombInterval
+        return slot
+    }
+
+    /// Whether a blast here would take one of this team's own walls with it.
+    private static func nearOwnWall(_ point: Vec2, team: TeamID, in world: World) -> Bool {
+        let radius = GameConfig.Bomb.blastRadius + 0.5
+        let reach = Int(radius.rounded(.up))
+        let centre = GridPoint(containing: point)
+
+        for dCol in -reach...reach {
+            for dRow in -reach...reach {
+                let tile = GridPoint(col: centre.col + dCol, row: centre.row + dRow)
+                guard world.map.contains(tile),
+                      world.map[tile].blockOwner == team else { continue }
+                if (tile.center - point).length <= radius { return true }
+            }
+        }
+        return false
     }
 
     /// A stink bomb worth throwing, or nil.

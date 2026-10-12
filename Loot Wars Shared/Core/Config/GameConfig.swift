@@ -1380,6 +1380,33 @@ enum GameConfig {
         /// need the precision a shot does.
         static let throwTolerance: Double = 0.45
 
+        /// Bombs in a fight. A bot throws one at the person it is fighting, but
+        /// never at the cost of a raid: it always keeps one back to open a wall
+        /// with, and throws that last one only when it would get it back anyway.
+        /// See AIBrain.fightBomb.
+        ///
+        /// How many it keeps back for raiding.
+        static let fightBombReserve = 1
+
+        /// Seconds between two bombs thrown in fights.
+        static let fightBombInterval: Double = 5
+
+        /// How far it throws at a person, as a share of the full throw. Less than
+        /// all of it, because people move, and a bomb thrown at the very end of
+        /// its range has the longest flight to be dodged in.
+        static let fightBombReach: Double = 0.8
+
+        /// The last bomb may go when a new one is due within this many seconds -
+        /// see AISystem.resupply, which tops an empty pocket back up to one. The
+        /// raid it was kept for waits a few seconds at most, and is usually still
+        /// a walk away.
+        static let fightBombRestockWithin: Double = 4
+
+        /// Or when the bot is down to this share of its health. Everything in its
+        /// bag is lost when it dies, the reserve bomb included, so throwing it now
+        /// costs no raid that dying would not.
+        static let fightBombDesperateBelow: Double = 0.3
+
         /// How a bot deals with gas, and the reason a stink bomb used to be worth
         /// nothing at all.
         ///
@@ -2083,9 +2110,18 @@ enum GameConfig {
         /// Everything within this of the blast loses its walls, in tiles.
         static let blastRadius: Double = 1.4
 
-        /// Damage at the centre of the blast, falling to nothing at the edge.
-        /// Terrain and trees are untouched - only walls come down.
-        static let damage = 45
+        /// Damage to a person caught right in the blast, falling to nothing at
+        /// the edge. Terrain and trees are untouched - only walls come down.
+        /// Walls, chests and turrets have their own numbers.
+        ///
+        /// A direct hit takes this much, or damageShare of the target's health
+        /// if that is more. Without the share a bomb that hurt at the start of a
+        /// match would be a scratch by the end of it, once everybody wears a
+        /// good helmet. Together: three quarters of a bare head, and about two
+        /// fifths of anybody's later on. Two direct hits and a few shots is a kill;
+        /// one is not.
+        static let damage = 75
+        static let damageShare: Double = 0.4
 
         /// How big the bomb is drawn, in tiles.
         static let spriteSize: Double = 0.55
