@@ -944,6 +944,37 @@ final class ActorRenderer {
         ]), withKey: "react")
     }
 
+    /// Happy eyes and one small bob. Played for anybody's elimination, so you
+    /// can watch an enemy gloat, and when you tap your own figure.
+    ///
+    /// Kept small on purpose: a big double hop read as the figure being
+    /// knocked about rather than pleased. The eyes carry it; the bob only
+    /// lifts it. On the figure, like the charge, so the walk underneath keeps
+    /// going.
+    func cheer(_ id: ActorID) {
+        guard let nodes = nodesByActor[id], !nodes.root.isHidden else { return }
+        nodes.parts?.cheer()
+
+        let up = SKAction.group([.scaleX(to: 0.97, y: 1.04, duration: 0.1),
+                                 .moveTo(y: 3, duration: 0.1)])
+        up.timingMode = .easeOut
+        let down = SKAction.group([.scaleX(to: 1, y: 1, duration: 0.12),
+                                   .moveTo(y: 0, duration: 0.12)])
+        down.timingMode = .easeIn
+        nodes.figure.removeAction(forKey: "react")
+        nodes.figure.run(.sequence([up, down]), withKey: "react")
+    }
+
+    /// Whether a point is on this actor's figure, for a tap. Measured off what
+    /// is drawn - body, helmet, blaster and bar - with a little extra round it,
+    /// because a figure is small under a thumb.
+    func isFigure(of id: ActorID, at point: CGPoint, in space: SKNode) -> Bool {
+        guard let nodes = nodesByActor[id], !nodes.root.isHidden,
+              let parent = nodes.root.parent else { return false }
+        let local = parent.convert(point, from: space)
+        return nodes.root.calculateAccumulatedFrame().insetBy(dx: -6, dy: -6).contains(local)
+    }
+
     private func setHealth(_ fraction: Double, on nodes: ActorNodes) {
         let clamped = min(max(fraction, 0), 1)
         guard abs(clamped - nodes.lastHealthFraction) > 0.002 else { return }

@@ -1629,6 +1629,11 @@ final class GameScene: SKScene {
                                      points: points,
                                      mine: killer == world.localPlayerID)
 
+                // Whoever got them is pleased about it - you or anybody else.
+                if let killer, killer != victim {
+                    actorRenderer.cheer(killer)
+                }
+
                 // Yours: the banner under the clock, and a sound, so a kill
                 // registers even when your eyes were on something else. The hint
                 // shares that strip of screen and gives way.
@@ -2964,6 +2969,14 @@ extension GameScene {
     }
 
     private func tapMap(at pointInWorld: CGPoint) {
+        // Your own figure: a tap on it is a little happy emote, not a wall. Asked
+        // first, because the tile you stand on would only refuse the wall anyway.
+        let me = world.localPlayerID
+        if actorRenderer.isFigure(of: me, at: pointInWorld, in: worldLayer) {
+            actorRenderer.cheer(me)
+            return
+        }
+
         // A crate or a chest you are standing at opens when you tap IT, not only
         // when you find the button in the corner.
         //

@@ -105,6 +105,24 @@ enum PlayerArt {
     static let eyeWhite: SKTexture = disc(diameter: eyeDiameter, colour: .white)
     static let pupil: SKTexture = disc(diameter: pupilDiameter, colour: .black)
 
+    /// A happy eye: a black arch, the ^ of a closed smiling eye, drawn in the
+    /// eye's own square so it swaps in for the white and pupil without moving.
+    static let happyEye: SKTexture = {
+        let pad: CGFloat = 2
+        let side = eyeDiameter + pad * 2
+        return draw(CGSize(width: side, height: side)) { _ in
+            // y runs DOWN here, so going clockwise from the left to the right
+            // passes over the top.
+            let arch = UIBezierPath(arcCenter: CGPoint(x: side / 2, y: side * 0.66),
+                                    radius: eyeDiameter * 0.38,
+                                    startAngle: .pi, endAngle: 0, clockwise: true)
+            arch.lineWidth = line * 0.62
+            arch.lineCapStyle = .round
+            UIColor.black.setStroke()
+            arch.stroke()
+        }
+    }()
+
     private static func disc(diameter: CGFloat, colour: UIColor) -> SKTexture {
         let pad: CGFloat = 2
         return draw(CGSize(width: diameter + pad * 2, height: diameter + pad * 2)) { _ in
@@ -145,6 +163,8 @@ final class PlayerFigure {
     private let eyeLine = SKNode()
     private var eyes: [SKNode] = []
     private var pupils: [SKSpriteNode] = []
+    private var whites: [SKSpriteNode] = []
+    private var happies: [SKSpriteNode] = []
 
     private let kx: CGFloat
     private let ky: CGFloat
@@ -181,8 +201,17 @@ final class PlayerFigure {
             pupil.zPosition = 0.001
             eye.addChild(pupil)
 
+            let happy = SKSpriteNode(texture: PlayerArt.happyEye,
+                                     size: CGSize(width: (PlayerArt.eyeDiameter + 4) * kx,
+                                                  height: (PlayerArt.eyeDiameter + 4) * ky))
+            happy.zPosition = 0.002
+            happy.isHidden = true
+            eye.addChild(happy)
+
             eyes.append(eye)
             pupils.append(pupil)
+            whites.append(white)
+            happies.append(happy)
         }
         placePupils()
 
@@ -262,6 +291,36 @@ final class PlayerFigure {
             .group([.moveTo(y: helmetRest.y, duration: 0.12),
                     .rotate(toAngle: 0, duration: 0.12)])
         ]), withKey: "clank")
+    }
+
+    /// A happy moment: the eyes close into happy arches briefly, popping in
+    /// a little big, then open again. No blinking while they are shut - a blink
+    /// squashing a smile reads as a wince.
+    func cheer() {
+        eyeLine.removeAction(forKey: "blink")
+        eyeLine.removeAction(forKey: "cheer")
+        eyeLine.yScale = 1
+
+        let show = SKAction.run { [weak self] in
+            guard let self else { return }
+            for white in self.whites { white.isHidden = true }
+            for pupil in self.pupils { pupil.isHidden = true }
+            for happy in self.happies {
+                happy.isHidden = false
+                happy.removeAllActions()
+                happy.setScale(0.6)
+                happy.run(.sequence([.scale(to: 1.15, duration: 0.09),
+                                     .scale(to: 1, duration: 0.12)]))
+            }
+        }
+        let hide = SKAction.run { [weak self] in
+            guard let self else { return }
+            for white in self.whites { white.isHidden = false }
+            for pupil in self.pupils { pupil.isHidden = false }
+            for happy in self.happies { happy.isHidden = true }
+            self.startBlinking()
+        }
+        eyeLine.run(.sequence([show, .wait(forDuration: 0.55), hide]), withKey: "cheer")
     }
 
     /// A blink every few seconds, at its own random pace, so a crowd of figures
