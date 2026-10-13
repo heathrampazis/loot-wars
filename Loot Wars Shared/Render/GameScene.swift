@@ -521,6 +521,11 @@ final class GameScene: SKScene {
         world.setLocalName(Prefs.playerName)
         world.setLocalAssist(Prefs.easyControls)
 
+        // Fresh faces: nobody from the last two matches, then this match's
+        // names remembered for the next.
+        world.avoidNames(Set(Prefs.recentBotNames))
+        Prefs.recentBotNames = world.botNames + Prefs.recentBotNames
+
         // Before anything draws an item, so a turret on the floor is in your
         // colour from the first frame - see ItemArt.viewer.
         ItemArt.viewer = world.localPlayer?.team
