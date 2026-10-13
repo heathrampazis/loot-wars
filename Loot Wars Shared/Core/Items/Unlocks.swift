@@ -137,8 +137,18 @@ enum Roadmap {
         (55, .cosmicBlaster)
     ]
 
-    /// The level the roadmap ends at. Levelling carries on past it.
+    /// The level the roadmap ends at, and the highest level there is. Nothing
+    /// unlocks past the last milestone, so there is nothing to level up for.
     static var finalLevel: Int { milestones.last?.level ?? 1 }
+
+    /// The XP that reaches the final level. Anything over it counts for nothing,
+    /// so it is where a player's total stops.
+    static var maxXP: Int {
+        (1..<finalLevel).reduce(0) { $0 + xpToNext(from: $1) }
+    }
+
+    /// Whether this level is the top one.
+    static func isMax(_ level: Int) -> Bool { level >= finalLevel }
 
     /// XP to go from this level to the next.
     ///
@@ -150,12 +160,19 @@ enum Roadmap {
     }
 
     /// Where a running XP total puts you: the level, and how far into it.
+    ///
+    /// Stops at the final level. There it reads as a full bar - `into` equal to
+    /// `needed` - so anything drawing progress shows it complete.
     static func level(forXP xp: Int) -> (level: Int, into: Int, needed: Int) {
         var level = 1
         var left = max(0, xp)
-        while left >= xpToNext(from: level) {
+        while !isMax(level), left >= xpToNext(from: level) {
             left -= xpToNext(from: level)
             level += 1
+        }
+        if isMax(level) {
+            let needed = xpToNext(from: level)
+            return (level, needed, needed)
         }
         return (level, left, xpToNext(from: level))
     }

@@ -73,7 +73,9 @@ final class RoadmapSheetContent: MenuSheetContent {
         node.addChild(title)
 
         let xp = SKLabelNode()
-        xp.attributedText = MenuButtonNode.text("\(progress.into) / \(progress.needed) XP", size: 12,
+        let xpText = Roadmap.isMax(progress.level)
+            ? "MAX LEVEL" : "\(progress.into) / \(progress.needed) XP"
+        xp.attributedText = MenuButtonNode.text(xpText, size: 12,
                                        weight: .semibold, colour: SKColor(white: 0, alpha: 0.5))
         xp.horizontalAlignmentMode = .right
         xp.verticalAlignmentMode = .center
