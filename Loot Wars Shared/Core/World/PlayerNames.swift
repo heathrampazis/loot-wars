@@ -22,6 +22,10 @@ enum PlayerNames {
     /// Laser - the kind a player types on a cabinet's high score table. Every one
     /// starts with a capital. Never fewer than seven - every bot needs its own -
     /// and none longer than maxLength.
+    ///
+    /// Long on purpose (Oct 2026, 70 to 507). Seven are drawn a match, and with
+    /// a short list the same handful kept turning up; the last two matches' names
+    /// are also kept out of the next one - see World.avoidNames.
     static let bots: [String] = [
         "Tron", "Flame", "Laser", "Skirmish", "Blaze", "Volt", "Pulse", "Neon", "Flux",
         "Nova", "Zap", "Bolt", "Ion", "Photon", "Vector", "Glitch", "Spark", "Ember",
@@ -30,7 +34,62 @@ enum PlayerNames {
         "Orbit", "Zenith", "Havoc", "Striker", "Fury", "Storm", "Frost", "Shadow",
         "Phantom", "Ghost", "Spectre", "Raider", "Ranger", "Jet", "Dash", "Ace", "Hex",
         "Byte", "Pixel", "Torque", "Gamma", "Omega", "Nexus", "Quasar", "Saber", "Talon",
-        "Vortex", "Apex", "Halo", "Cinder", "Radar", "Rogue", "Siren", "Sonic"
+        "Vortex", "Apex", "Halo", "Cinder", "Radar", "Rogue", "Siren", "Sonic", "Astro",
+        "Atlas", "Axel", "Bandit", "Banjo", "Beacon", "Bingo", "Biscuit", "Blink", "Blip",
+        "Bongo", "Boomer", "Bounce", "Brawler", "Buzz", "Cactus", "Captain", "Chaos",
+        "Charger", "Chomp", "Chrome", "Circuit", "Clank", "Clutch", "Combo", "Cosmo",
+        "Crash", "Crunch", "Cyclone", "Dazzle", "Diesel", "Dingo", "Domino", "Doodle",
+        "Drift", "Dynamo", "Eclipse", "Falcon", "Fizz", "Flash", "Flicker", "Frenzy",
+        "Fuse", "Gadget", "Galaxy", "Gizmo", "Glider", "Goblin", "Gravity", "Griffin",
+        "Grizzly", "Hammer", "Hawk", "Hopper", "Hornet", "Hydra", "Jackal", "Jinx", "Joker",
+        "Jolt", "Jumbo", "Karma", "Kazoo", "Kiwi", "Kraken", "Lightning", "Lucky", "Lynx",
+        "Maverick", "Meteor", "Mirage", "Mojo", "Monsoon", "Mustang", "Nebula", "Nimbus",
+        "Ninja", "Noodle", "Nugget", "Octane", "Outlaw", "Panda", "Pepper", "Pinball",
+        "Piston", "Pogo", "Pretzel", "Prism", "Puma", "Quake", "Quirk", "Radium", "Rascal",
+        "Razor", "Rebel", "Ripple", "Rumble", "Rusty", "Scout", "Scrappy", "Sherbet",
+        "Shock", "Shuriken", "Sizzle", "Skipper", "Slick", "Smash", "Snapper", "Sparky",
+        "Sprocket", "Squid", "Stinger", "Stomp", "Sunny", "Tango", "Thunder", "Tiger",
+        "Tinker", "Tornado", "Tracer", "Trigger", "Twister", "Typhoon", "Vandal", "Velvet",
+        "Waffle", "Warp", "Wasp", "Whiz", "Wildcat", "Wizard", "Wolf", "Yeti", "Zigzag",
+        "Zippy", "Zoom", "Jester", "Kodiak", "Marble", "Mango", "Pickle", "Pixie", "Boost",
+        "Breaker", "Bullet", "Cannon", "Crystal", "Dart", "Fang", "Glow", "Grim",
+        "Hurricane", "Igloo", "Jaguar", "Kettle", "Lasso", "Magnet", "Mammoth", "Nacho",
+        "Oddball", "Paddle", "Pebble", "Quiver", "Rocky", "Sapphire", "Scorch", "Sledge",
+        "Sprout", "Tundra", "Volcano", "Walnut", "Wrench", "Yonder", "Zephyr", "Acorn",
+        "Agent", "Alpha", "Amber", "Anvil", "Archer", "Arrow", "Aspen", "Aurora",
+        "Avalanche", "Badger", "Bamboo", "Barnacle", "Baron", "Bash", "Bazooka", "Beetle",
+        "Bishop", "Blaster", "Blizzard", "Blossom", "Bluebird", "Bobcat", "Boulder",
+        "Bramble", "Brick", "Bronco", "Bubbles", "Buckshot", "Bumble", "Bumper", "Buster",
+        "Button", "Cadet", "Calypso", "Camo", "Candle", "Caramel", "Cargo", "Cashew",
+        "Catapult", "Cheddar", "Cheetah", "Cherry", "Chili", "Chip", "Chunky", "Cinnamon",
+        "Clover", "Coconut", "Condor", "Copper", "Coral", "Corsair", "Cougar", "Coyote",
+        "Cricket", "Crusher", "Cupcake", "Dagger", "Daisy", "Dandy", "Dawn", "Decoy",
+        "Delta", "Digger", "Dodger", "Doughnut", "Dragon", "Drummer", "Duke", "Dusk",
+        "Dusty", "Eagle", "Emerald", "Ensign", "Fiddle", "Firefly", "Flapjack", "Flint",
+        "Flipper", "Fluffy", "Foxtrot", "Freckles", "Frisbee", "Fudge", "Gale", "Gecko",
+        "Ginger", "Gladiator", "Glimmer", "Gnome", "Goose", "Granite", "Gremlin", "Grinder",
+        "Gumball", "Gumdrop", "Gusto", "Harpoon", "Harvest", "Hazel", "Hiccup", "Honey",
+        "Hotshot", "Husky", "Iceberg", "Indigo", "Iron", "Ivy", "Jackpot", "Jade",
+        "Javelin", "Jelly", "Jigsaw", "Juggler", "Juniper", "Kayak", "Kernel", "Kingpin",
+        "Kipper", "Knight", "Koala", "Lancer", "Lantern", "Lemon", "Leopard", "Lime",
+        "Lobster", "Lollipop", "Lotus", "Lumberjack", "Mackerel", "Magpie", "Major",
+        "Mallard", "Mamba", "Maple", "Marshal", "Meatball", "Mercury", "Midnight", "Minnow",
+        "Mint", "Mischief", "Mocha", "Mongoose", "Moose", "Morsel", "Muffin", "Mystic",
+        "Narwhal", "Nectar", "Nibbles", "Nutmeg", "Oak", "Oasis", "Ocelot", "Olive",
+        "Oracle", "Otter", "Paladin", "Panther", "Parsnip", "Peanut", "Pelican", "Penguin",
+        "Peppermint", "Pigeon", "Pilot", "Pirate", "Plum", "Popcorn", "Poppy", "Possum",
+        "Puddle", "Pumpkin", "Quartz", "Quokka", "Rabbit", "Raccoon", "Radish", "Rainbow",
+        "Rambler", "Raven", "Reef", "Rhino", "Riddle", "Robin", "Rookie", "Rooster", "Ruby",
+        "Rudder", "Saffron", "Sage", "Salsa", "Sardine", "Scamp", "Scooter", "Scrambler",
+        "Sentinel", "Sergeant", "Shamrock", "Shark", "Sheriff", "Shrimp", "Skunk",
+        "Slingshot", "Slugger", "Smokey", "Snowball", "Sparrow", "Sphinx", "Spike",
+        "Spinner", "Splash", "Sprinkles", "Squirrel", "Stallion", "Stardust", "Stingray",
+        "Strudel", "Sundae", "Swift", "Tadpole", "Taffy", "Tank", "Thistle", "Toast",
+        "Toffee", "Tomahawk", "Topaz", "Tortoise", "Trooper", "Truffle", "Tumble", "Turnip",
+        "Tusk", "Valiant", "Vulture", "Walrus", "Warden", "Warrior", "Weasel", "Whisker",
+        "Wombat", "Yak", "Zebra", "Zinger", "Zucchini", "Breeze", "Cosmic", "Gusty",
+        "Hopscotch", "Kaboom", "Marshmallow", "Pancake", "Ratchet", "Sasquatch", "Snorkel",
+        "Squeak", "Thimble", "Wobble"
     ]
 
     /// Whether a character may go in a name: letters, numbers, a space and a

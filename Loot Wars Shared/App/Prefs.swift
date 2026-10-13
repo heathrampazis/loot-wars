@@ -41,6 +41,7 @@ enum Prefs {
         static let devMode = "devMode"
         static let difficulty = "difficulty"
         static let playerName = "playerName"
+        static let recentBotNames = "recentBotNames"
     }
 
     /// Bumped whenever a lesson CHANGES, which wipes every "you have seen this"
@@ -158,6 +159,13 @@ enum Prefs {
 
     /// The name over your head and on the leaderboard, typed on the title screen. Always
     /// cleaned - see PlayerNames.clean - and "You" until one is chosen.
+    /// The bots' names from the last couple of matches, newest first, so the
+    /// next match can leave them out - see World.avoidNames.
+    static var recentBotNames: [String] {
+        get { store.stringArray(forKey: Key.recentBotNames) ?? [] }
+        set { store.set(Array(newValue.prefix(14)), forKey: Key.recentBotNames) }
+    }
+
     static var playerName: String {
         get { PlayerNames.clean(store.string(forKey: Key.playerName) ?? "") }
         set { store.set(PlayerNames.clean(newValue), forKey: Key.playerName) }

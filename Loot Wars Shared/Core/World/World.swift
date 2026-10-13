@@ -174,6 +174,10 @@ final class World {
     /// exactly, bots included.
     var rng: SeededRandom
 
+    /// What is left of the shuffled bot names after the bots took theirs -
+    /// spares for avoidNames.
+    private var unusedNames: [String] = []
+
     /// What each team has scored. The leaderboard reads this and nothing else.
     private(set) var scores: [TeamID: Int] = [:]
 
@@ -418,6 +422,7 @@ final class World {
                 actors[id]?.name = pool.isEmpty ? "bot \(id.raw)" : pool.removeFirst()
             }
         }
+        unusedNames = pool
     }
 
     /// Switches assisted controls on or off for the player - from Settings, before
@@ -426,6 +431,29 @@ final class World {
         actors[localPlayerID]?.assisted = on
         // The chores are not part of the setting - every player gets them.
         actors[localPlayerID]?.autoChores = true
+    }
+
+    /// Swaps out any bot name seen in the last few matches, so the same few do
+    /// not keep coming round - from the screen, before the first step.
+    ///
+    /// Takes replacements from the rest of the shuffled list in order and draws
+    /// nothing new, so it never moves the world's generator: the same seed and
+    /// the same recent names always give the same match.
+    func avoidNames(_ recent: Set<String>) {
+        guard !recent.isEmpty else { return }
+        var spare = unusedNames.filter { !recent.contains($0) }
+        for id in actors.keys.sorted(by: { $0.raw < $1.raw }) where id != localPlayerID {
+            guard let name = actors[id]?.name, recent.contains(name), !spare.isEmpty else { continue }
+            actors[id]?.name = spare.removeFirst()
+        }
+        unusedNames = spare
+    }
+
+    /// The bots' names this match, in id order, for the screen to remember.
+    var botNames: [String] {
+        actors.keys.sorted(by: { $0.raw < $1.raw })
+            .filter { $0 != localPlayerID }
+            .compactMap { actors[$0]?.name }
     }
 
     /// Sets the player's own name - from Settings, before the first step.
