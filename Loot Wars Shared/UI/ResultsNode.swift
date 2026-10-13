@@ -431,11 +431,14 @@ final class ResultsNode: SKNode {
         let start = Roadmap.level(forXP: award.xpBefore)
         setLevel(start.level)
         setXPBar(CGFloat(start.into) / CGFloat(start.needed))
-        xpGained.attributedText = ResultsNode.ink("+\(award.gained) XP", size: 13,
-                                                  weight: .bold, faint: true)
+        // At the top level there is nothing to earn, so it says so rather than
+        // showing +0.
+        let topped = Roadmap.isMax(start.level)
+        xpGained.attributedText = ResultsNode.ink(topped ? "MAX LEVEL" : "+\(award.gained) XP",
+                                                  size: 13, weight: .bold, faint: true)
 
         // The extra for a harder game, in the green the game uses for good news.
-        xpBonus.isHidden = award.multiplier < 1.001
+        xpBonus.isHidden = topped || award.multiplier < 1.001
         let bonus = (award.multiplier * 100).rounded() / 100
         var number = String(format: "%.2f", bonus)
         while number.hasSuffix("0") { number.removeLast() }
@@ -451,6 +454,9 @@ final class ResultsNode: SKNode {
 
         while left > 0 {
             let here = Roadmap.level(forXP: xp)
+            // The award is capped at the top level, but stop here too so the
+            // bar can never be asked to fill a level that does not exist.
+            if Roadmap.isMax(here.level) { break }
             let room = here.needed - here.into
             let from = CGFloat(here.into) / CGFloat(here.needed)
 
@@ -459,7 +465,8 @@ final class ResultsNode: SKNode {
                 let next = here.level + 1
                 steps.append(.run { [weak self] in
                     self?.setLevel(next)
-                    self?.setXPBar(0)
+                    // The top level is a full bar, not a fresh one to fill.
+                    self?.setXPBar(Roadmap.isMax(next) ? 1 : 0)
                     self?.levelLabel.run(.sequence([.scale(to: 1.3, duration: 0.08),
                                                     .scale(to: 1, duration: 0.14)]))
                 })

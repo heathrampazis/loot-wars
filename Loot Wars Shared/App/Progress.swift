@@ -57,7 +57,10 @@ enum Progress {
         let before = Prefs.totalXP
         let multiplier = difficulty.xpMultiplier
             * (assisted ? 1 : Difficulty.unassistedXPBonus)
-        let gained = Int((Double(Roadmap.matchXP(score: score, place: place)) * multiplier).rounded())
+        // Nothing is earned past the top level. Capped here so the total stops
+        // at it and the results screen has nothing to fill.
+        let earned = Int((Double(Roadmap.matchXP(score: score, place: place)) * multiplier).rounded())
+        let gained = max(0, min(earned, Roadmap.maxXP - before))
 
         let oldLevel = Roadmap.level(forXP: before).level
         let newLevel = Roadmap.level(forXP: before + gained).level
@@ -65,7 +68,7 @@ enum Progress {
             .filter { $0.level > oldLevel && $0.level <= newLevel }
             .map { $0.feature }
 
-        Prefs.totalXP = before + gained
+        Prefs.totalXP = max(before, before + gained)
         return Award(xpBefore: before, gained: gained, multiplier: multiplier, unlocked: unlocked)
     }
 }
