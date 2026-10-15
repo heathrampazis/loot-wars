@@ -194,7 +194,7 @@ enum Roadmap {
 
     /// How long a match runs at this level, in seconds.
     ///
-    /// Three minutes at every level now (Oct 2026) - it used to grow to five as
+    /// Two and a half minutes at every level now (Oct 2026) - it used to grow to five as
     /// the game filled up. Kept as a function of level so it can vary again.
     /// Everything that runs on the match's progress - loot bands, the late-game
     /// respawn kit, supply drops - stretches to fit.
