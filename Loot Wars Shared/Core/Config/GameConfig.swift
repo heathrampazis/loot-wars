@@ -49,6 +49,30 @@ enum GameConfig {
         /// ground and their advantage - taking it off them there is worth more.
         static let killInTheirBase = 25
 
+        // MARK: - Stakes (Oct 2026)
+        //
+        // Dying used to cost nothing on the scoreboard and staying alive earned
+        // nothing extra, so a match was eight people trading eliminations with no
+        // reason to back off. These four give a life some weight.
+
+        /// On top of the kill, for taking out a raider inside YOUR walls. The
+        /// reverse of killInTheirBase, and the reason to stay home and hold it.
+        static let homeDefence = 40
+
+        /// What a bounty grows by for each elimination in a row. Somebody on a
+        /// streak is worth this much per elimination to whoever stops them.
+        static let bountyPerKill = 25
+        /// How many in a row before a bounty shows. One lucky elimination is not
+        /// a streak.
+        static let bountyStreak = 2
+        static let bountyCap = 150
+
+        /// The share of your score lost when you are eliminated, and the most it
+        /// can ever be. Small and capped, so a death stings without deciding the
+        /// match - but it always costs something, so a life is worth keeping.
+        static let deathShare: Double = 0.10
+        static let deathCap = 50
+
         /// Nothing (Oct 2026), from 10. Opening crates was where most of a
         /// player's points came from, which scored looting rather than winning.
         /// A crate pays in what is inside it, and in a token.
@@ -134,7 +158,15 @@ enum GameConfig {
         static let holdInterval: Double = 5
 
         /// Paid for a wall with no hole in it.
-        static let holdStanding = 3
+        ///
+        /// 4, up from 3, and it now climbs (Oct 2026): holdStreakStep more for
+        /// every tick in a row the wall has stood, up to holdStreakCap steps. A
+        /// base kept shut pays 4, 5, 6 ... up to 10 a tick before what is in the
+        /// chest - roughly 200 points over a match for one that goes up early and
+        /// is never opened, against 50 for a kill. Upkeep is a real way to score.
+        static let holdStanding = 4
+        static let holdStreakStep = 1
+        static let holdStreakCap = 6
 
         /// Paid for each item sitting in your chests, up to the cap.
         ///
@@ -191,6 +223,10 @@ enum GameConfig {
         /// something you cannot finish. At one it pays 109 and reaches Mythical -
         /// still a long climb, with the top rung left as something to be denied.
         static let perTierKilled = 1
+
+        /// Extra tokens for seeing a raider off inside your own walls - see
+        /// Score.homeDefence.
+        static let homeDefence = 5
 
         /// Every crate. Small, because you open a great many of them and it is the
         /// one source that needs no decision at all - at two a crate it out-earned
@@ -629,7 +665,19 @@ enum GameConfig {
         /// 3-minute matches (Oct 2026): 30 -> 18.
         /// 2-minute matches (Oct 2026): 18 -> 12.
         /// 2.5-minute matches (Oct 2026): 12 -> 15.
-        static let bombGrace: Double = 15
+        /// Match phases (Oct 2026): 15 -> 20, and tied to the opening - the
+        /// opening IS the stretch with no bombs. See opening.
+        static var bombGrace: Double { opening }
+
+        /// The opening phase: no bombs anywhere and no bots out hunting. Twenty
+        /// seconds to loot, build and get a wall up before the raids start, so a
+        /// match has a beginning instead of starting at full volume.
+        static let opening: Double = 20
+
+        /// The final stretch: every point earned is multiplied, so the last half
+        /// minute can still turn the board over and nobody coasts to the whistle.
+        static let finalStretch: Double = 30
+        static let finalMultiplier = 2
 
         /// When the bomb supply reaches full strength, in seconds.
         ///
@@ -776,8 +824,14 @@ enum GameConfig {
         /// rather than a way to win one. The delay is unchanged and is what stops
         /// it ticking during a fight on your doorstep, where a defender who heals
         /// mid-firefight is a defender nobody can kill at home.
-        static let recoveryPortion: Double = 0.10
-        static let recoveryTick: Double = 1.5
+        ///
+        /// Faster again (Oct 2026): 12% every 1.2 seconds after four quiet
+        /// seconds, so a full bar in about ten. Going home to patch up was too
+        /// slow to notice; a seven-second version was tried and made the player
+        /// too hard to kill. Ten is a real reason to go home without making home
+        /// a fortress.
+        static let recoveryPortion: Double = 0.12
+        static let recoveryTick: Double = 1.2
         static let recoveryDelay: Double = 4
 
         /// Seconds spent dead before respawning at your own claim.
@@ -952,19 +1006,11 @@ enum GameConfig {
         static let passageMargin: Double = 0.2
     }
 
-    /// Player help: auto building and Assisted controls - see AssistSystem.
+    /// Player help: auto building, and the help the difficulty gives - see
+    /// AssistSystem and Difficulty.assistAimCone.
     enum Assist {
-        /// A heal is used for you once your health is below this share of full.
-        /// Half: low enough that a scratch does not burn a bandage, high enough
-        /// that the heal lands while you are still in the fight.
-        static let healBelow: Double = 0.5
         /// Seconds between two heals used for you.
         static let healGap: Double = 0.6
-
-        /// Aim help: a shot within this angle of an enemy, in radians, is turned
-        /// onto them. About 25 degrees either side - generous, since it is for
-        /// people who find the aim stick hard.
-        static let aimCone: Double = 0.44
 
         /// A power-up is switched on for you if you were hit this recently, in
         /// seconds, or are shooting at somebody.
@@ -992,10 +1038,6 @@ enum GameConfig {
         /// moves out to meet you. Long enough that walking past, or out of the
         /// base, leaves it where it is.
         static let followDelay: Double = 1.2
-
-        /// Hurt with no heal in the bag, the best one you can afford is bought for
-        /// you, then used. No more often than this, in seconds.
-        static let buyGap: Double = 1.0
     }
 
     enum AI {
@@ -1300,7 +1342,10 @@ enum GameConfig {
         /// 1.05 now (Oct 2026): the player was winning every match with little
         /// competition. That puts an aim-limited hit rate at about 43%, up from 35% -
         /// sharper, still short of the 54% that made every exchange a loss.
-        static let aimSpread: Double = 1.05
+        ///
+        /// 0.92 (Oct 2026, later): still too easy, the player rarely died. About
+        /// 49% now - a bot wins a fair exchange about half the time.
+        static let aimSpread: Double = 0.92
 
         /// Chance, at each change of mind, that a bot reverses the way it is
         /// circling. Never reversing reads as a machine on rails; reversing every
@@ -1313,12 +1358,47 @@ enum GameConfig {
         /// they stop feeling like people.
         ///
         /// 0.15...0.3 now, about a quarter quicker again, with the aim above.
-        static let reactionDelay: ClosedRange<Double> = 0.15...0.3
+        /// 0.12...0.24 (Oct 2026, later), a fifth quicker again with the aim.
+        static let reactionDelay: ClosedRange<Double> = 0.12...0.24
 
         /// Below this share of its health, a bot breaks off and runs for home -
         /// but only while an enemy is actually near. Once it is safe it gets back
         /// to work rather than cowering in its base for the rest of the match.
+        ///
+        /// Briefly 0.25 (Oct 2026), then back to 0.35: bots seeing every fight
+        /// through read as reckless rather than hard. They are tougher now by
+        /// being choosier - see mendBelow, fightFitAt and outgearedBy - not by
+        /// refusing to run.
         static let retreatHealthFraction: Double = 0.35
+
+        // Picking fights, and going home to mend (Oct 2026). A bot used to walk
+        // back out into the open on a sliver of health with nothing in its bag.
+        // Now it goes home, lets its base heal it, and only goes looking for a
+        // fight again when it is whole and carrying heals - and it leaves people
+        // with much better gear alone unless they come to it.
+
+        /// Below this share of health, with not enough healing in the bag to get
+        /// back to mendUntil, a bot stops what it is doing and goes home to mend.
+        static let mendBelow: Double = 0.55
+        /// ...and stays there, letting its base heal it, until it is back to this.
+        static let mendUntil: Double = 0.9
+
+        /// A bot only STARTS a fight - one nobody forced on it - at this share of
+        /// health or more, and carrying emergencyHealingStock. Shot at, or with
+        /// somebody in its base, it fights whatever shape it is in.
+        static let fightFitAt: Double = 0.7
+
+        /// How much better somebody's gear has to be (Actor.gearWorth, helmet tier
+        /// plus blaster tier) before a bot will not pick a fight with them. Three
+        /// is two rungs of helmet and one of blaster, or thereabouts: a fight it
+        /// would expect to lose.
+        static let outgearedBy = 3
+        /// And when one of them does start on it anyway, it breaks off at this
+        /// share of health rather than retreatHealthFraction.
+        static let outgearedRetreat: Double = 0.6
+
+        /// How far from the middle of its base a mending bot paces, in tiles.
+        static let mendPaceRadius: Double = 1.5
 
         // Patching up. These read as one set of habits: finish the fight, catch
         // your breath, top up, and never spend a medkit on a scratch - unless you
@@ -1651,6 +1731,12 @@ enum GameConfig {
         /// 3-minute matches (Oct 2026): 30 -> 18.
         /// 2-minute matches (Oct 2026): 18 -> 12.
         static let huntPatience: Double = 12
+
+        /// A bounty this size is worth a detour: a bot with its hunt urge ready
+        /// goes after anybody carrying one within bountyHuntRange tiles, on any
+        /// difficulty. A streak should make you a target.
+        static let bountyHuntsAt = 50
+        static let bountyHuntRange: Double = 24
 
         /// How far off a bot can pick a hunt's trail up from.
         ///
@@ -2227,6 +2313,9 @@ enum GameConfig {
         /// REDUCED (token pass): 1.0 -> 0.5. Killing a bot used to hand over its
         /// whole purse, which is where a good player's income snowballed. Half
         /// spills; the other half stays with the victim.
+        ///
+        /// Oct 2026: the other half no longer stays - the victim drops to zero
+        /// and only this share reaches the ground. See CombatSystem.kill.
         static let tokenShare: Double = 0.5
 
         /// The odds that one item off a carried healing stack lands on the ground.

@@ -113,12 +113,24 @@ struct Actor {
     /// time there is something to spend it on.
     var tokens: Int = 0
 
+    /// Eliminations since this actor last went down - see bounty.
+    var streak = 0
+
+    /// What taking this actor out is worth on top of the kill, in points. It
+    /// grows with every elimination in a row and is gone the moment they fall -
+    /// see GameConfig.Score.bountyPerKill.
+    var bounty: Int {
+        guard streak >= GameConfig.Score.bountyStreak else { return 0 }
+        return min(GameConfig.Score.bountyCap, streak * GameConfig.Score.bountyPerKill)
+    }
+
     /// A bot's memory. nil for anything driven from outside - the local player
     /// today, a remote player later.
     var ai: AIState?
 
-    /// Assisted controls: aim assist, heals and power-ups - see AssistSystem.
-    /// Off for everyone unless the player switched it on in Settings.
+    /// Whether this is a player the difficulty's help is for: aim assist, heals
+    /// and power-ups, as much as Difficulty.assistAimCone and friends give. See
+    /// AssistSystem. On for the local player, off for bots and puppets.
     var assisted = false
 
     /// The player's chores done for them - crates open as you reach them and
@@ -128,9 +140,8 @@ struct Actor {
     var autoChores = false
     /// Seconds before assisted controls will use another heal.
     var assistHealWait: Double = 0
-    /// Seconds before auto building will lay another wall, or buy another heal.
+    /// Seconds before auto building will lay another wall.
     var assistBuildWait: Double = 0
-    var assistBuyWait: Double = 0
     /// How long auto building has seen you stood just over your base's outline,
     /// and the tile the base is following you to once that has gone on long
     /// enough - see AssistSystem.basePlan.

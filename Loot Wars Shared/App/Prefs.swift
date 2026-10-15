@@ -36,7 +36,6 @@ enum Prefs {
         static let vibrationOn = "vibrationOn"
         static let tipsOn = "tipsOn"
         static let leftHanded = "leftHanded"
-        static let easyControls = "easyControls"
         static let totalXP = "totalXP"
         static let devMode = "devMode"
         static let difficulty = "difficulty"
@@ -146,15 +145,6 @@ enum Prefs {
     static var leftHanded: Bool {
         get { store.bool(forKey: Key.leftHanded) }
         set { store.set(newValue, forKey: Key.leftHanded) }
-    }
-
-    /// Assisted controls: aim assist, heals used (and bought) for you when your
-    /// health drops low, and power-ups switched on when a fight starts. Off until
-    /// switched on. Opening crates and building your base happen for everyone
-    /// either way. Read by GameScene at the start of a match - see AssistSystem.
-    static var easyControls: Bool {
-        get { store.bool(forKey: Key.easyControls) }
-        set { store.set(newValue, forKey: Key.easyControls) }
     }
 
     /// The name over your head and on the leaderboard, typed on the title screen. Always

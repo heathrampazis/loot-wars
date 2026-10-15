@@ -143,4 +143,21 @@ enum WorldEvent {
     /// wearing, which has been stripped by then too - the whole point of this
     /// event is that the answers do not survive the frame they were worked out in.
     case kill(victim: ActorID, by: ActorID?, at: Vec2, points: Int, tokens: Int)
+
+    /// The match moved into a new phase - see World.Phase.
+    case phase(World.Phase)
+
+    /// A streak was ended and its bounty paid to whoever ended it. Recorded
+    /// alongside the kill, whose points already include it.
+    case bounty(points: Int, on: ActorID, by: ActorID)
+
+    /// A raider was taken out inside the killer's own walls. Alongside the kill,
+    /// whose points already include the bonus.
+    case defended(by: ActorID, at: Vec2)
+
+    /// Points a team lost because one of them was eliminated.
+    case pointsLost(Int, by: ActorID)
+
+    /// Somebody came back from the dead wearing gear out of their own chest.
+    case rearmed(ActorID, helmet: HelmetTier?, blaster: BlasterTier?)
 }

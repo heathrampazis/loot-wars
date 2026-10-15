@@ -99,7 +99,14 @@ final class KillBannerNode: SKNode {
     }
 
     /// Somebody just went down to you.
-    func confirm() {
+    ///
+    /// - Parameter title: ELIMINATION, or what made this one special - a bounty
+    ///   claimed, or a raider seen off at home.
+    func confirm(title text: String = "ELIMINATION") {
+        if title.text != text {
+            title.text = text
+            layOut()
+        }
         let stacking = !isHidden && action(forKey: "hold") != nil
         streak = stacking ? streak + 1 : 1
 

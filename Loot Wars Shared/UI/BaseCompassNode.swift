@@ -111,6 +111,38 @@ final class BaseCompassNode: SKNode {
         arrow.zRotation = atan2(dy, dx)
     }
 
+    /// Whether the marker is up - your base is off screen.
+    var isShowing: Bool { !marker.isHidden }
+
+    /// Your base just paid out while you are away from it: the number rises off
+    /// the marker, so the income is seen wherever you are.
+    func earned(_ points: Int) {
+        guard points > 0, !marker.isHidden else { return }
+
+        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        label.text = "+\(points)"
+        label.fontSize = 13
+        label.fontColor = RenderPalette.countBadge
+        label.verticalAlignmentMode = .center
+        label.position = CGPoint(x: marker.position.x,
+                                 y: marker.position.y + BaseCompassNode.radius + 6)
+        label.zPosition = 2
+        label.alpha = 0
+        label.setScale(0.7)
+        addChild(label)
+
+        label.run(.sequence([
+            .group([.fadeIn(withDuration: 0.15), .scale(to: 1, duration: 0.15)]),
+            .group([.moveBy(x: 0, y: 14, duration: 0.8),
+                    .sequence([.wait(forDuration: 0.3), .fadeOut(withDuration: 0.5)])]),
+            .removeFromParent()
+        ]))
+
+        body.removeAction(forKey: "paid")
+        body.run(.sequence([.scale(to: 1.15, duration: 0.08),
+                            .scale(to: 1, duration: 0.12)]), withKey: "paid")
+    }
+
     /// Your base is being raided: the marker turns red and shakes in short
     /// bursts, so it is noticed from the corner of an eye in the middle of
     /// something else. Calm again when the raid is over.

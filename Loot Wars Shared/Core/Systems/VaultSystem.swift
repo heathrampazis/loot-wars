@@ -38,22 +38,34 @@ enum VaultSystem {
             // true for a base that was never finished, which is the same answer for
             // a different reason and the right one either way: this pays for a wall
             // that is SHUT, and an unbuilt base is not shut.
-            guard !world.baseIsBreached(team) else { continue }
+            guard !world.baseIsBreached(team) else {
+                world.holdStreak[team] = 0
+                continue
+            }
+
+            // Upkeep pays more the longer it is kept up: a step more each tick the
+            // wall has stood, to a cap. Keeping a base is worth more than building
+            // one and walking away, and a raid that opens it costs the owner the
+            // whole climb, not just one tick.
+            let streak = world.holdStreak[team, default: 0]
+            world.holdStreak[team] = streak + 1
 
             let banked = min(world.storedItemCount(ownedBy: team),
                              GameConfig.Score.holdItemCap)
 
             let points = GameConfig.Score.holdStanding
+                + min(streak, GameConfig.Score.holdStreakCap) * GameConfig.Score.holdStreakStep
                 + banked * GameConfig.Score.holdPerStoredItem
 
-            world.award(points, to: team)
+            // What landed, which is double in the final stretch.
+            let paid = world.award(points, to: team)
 
             // Announced rather than noticed, because a score arriving on a clock is
             // the one thing a renderer cannot work out by looking: nothing about
             // the world changed except a number in a table nobody is reading.
             guard let claim = world.claim(for: team) else { continue }
 
-            world.record(.vault(points: points, for: team,
+            world.record(.vault(points: paid, for: team,
                                 at: Vec2(x: Double(claim.centreTile.col) + 0.5,
                                          y: Double(claim.centreTile.row) + 0.5)))
         }

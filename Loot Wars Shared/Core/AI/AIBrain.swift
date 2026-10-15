@@ -328,7 +328,7 @@ enum AIBrain {
                     * world.difficulty.urgeScale
                 state.huntMark = nil
             }
-        case .wander, .fight, .retreat, .raid:
+        case .wander, .fight, .retreat, .raid, .mend:
             // Raiding needs no patience of its own: it ends the moment the wall
             // falls or the last bomb is spent, and raidTarget stops offering it.
             break
@@ -463,7 +463,7 @@ enum AIBrain {
         // is most of why a bot on its last legs looks like it is loitering.
         if case .fight(let id) = state.goal {
             let healthLeft = Double(actor.health) / Double(actor.maxHealth)
-            if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
+            if healthLeft < retreatLine(for: actor, against: world.actors[id], state: state) {
                 state.goal = .retreat(from: id)
                 state.goalAge = 0
             }
@@ -516,6 +516,12 @@ enum AIBrain {
             // rather than merely walked up to.
             guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
 
+        case .mend:
+            // Going home to mend: seeing somebody is no reason to turn round and
+            // pick a fight on a sliver of health. Being hit is - then it fights
+            // or runs on the health it has, like anybody would.
+            guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
+
         case .wander, .loot, .collect, .build, .farm, .stash, .rearm, .defend, .hunt:
             // All interruptible, and the hunt MOST of all: getting close enough to
             // be interrupted is the entire job it was given. This is the line
@@ -531,7 +537,7 @@ enum AIBrain {
 
         let healthLeft = Double(actor.health) / Double(actor.maxHealth)
 
-        if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
+        if healthLeft < retreatLine(for: actor, against: enemy, state: state) {
             state.goal = .retreat(from: enemy.id)
         } else {
             // Spotting somebody is no longer a reason to drop everything. It has to
@@ -574,7 +580,8 @@ enum AIBrain {
             //
             // Running is judged on seeing ANYBODY, unlike fighting. You flee from
             // whoever is there; you do not pick who to flee from.
-            if healthLeft < GameConfig.AI.retreatHealthFraction * state.caution {
+            // Earlier against somebody much better kitted - see retreatLine.
+            if healthLeft < retreatLine(for: actor, against: enemy, state: state) {
                 return .retreat(from: enemy.id)
             }
 
@@ -619,6 +626,15 @@ enum AIBrain {
         // defender who needed line of sight would be told about it after the raid.
         if let intruder = world.intruder(in: actor.team) {
             return .defend(intruder)
+        }
+
+        // Hurt, and not carrying enough to patch itself up: home, and stay there
+        // until the base has healed it. Under defending, because a bot at home
+        // with an intruder in its base is exactly where it should be anyway; over
+        // everything voluntary, because walking out to raid or hunt on a sliver
+        // of health with nothing in the bag is just handing somebody a kill.
+        if needsToMend(actor, state: state, in: world) {
+            return .mend
         }
 
         // Ganging up on whoever is running away with the match: joining a fight
@@ -743,7 +759,9 @@ enum AIBrain {
         }
 
         // The urge picks a BASE, not a chest: an empty chest is no reason to leave a player alone.
-        if state.raidUrgeTimer <= 0,
+        // Not in the opening: those seconds are for looting and building, and a
+        // match that starts at full volume has nowhere to build to.
+        if state.raidUrgeTimer <= 0, !world.isOpening,
            let raid = raidGoal(for: actor, in: world) {
             return raid
         }
@@ -754,7 +772,7 @@ enum AIBrain {
         // deny - but above everything else here, because an open base is a clock:
         // the owner is on their way home to shut it, and after that the machine is
         // behind a wall again.
-        if state.raidUrgeTimer <= 0,
+        if state.raidUrgeTimer <= 0, !world.isOpening,
            let machine = machineWorthWrecking(for: actor, in: world) {
             return .wreck(machine.id)
         }
@@ -1050,9 +1068,13 @@ enum AIBrain {
     /// Sorted by id, because two teams on the same lead would otherwise resolve out
     /// of dictionary order and two runs of one seed would diverge.
     private static func worthHunting(for actor: Actor, in world: World) -> Actor? {
-        guard world.difficulty.pressesTheLeader else { return nil }
-        guard actor.inventory.totalHealing(of: actor.maxHealth)
-                >= GameConfig.AI.emergencyHealingStock else { return nil }
+        // Nobody goes looking for a fight in the opening - see Match.opening -
+        // and nobody goes looking for one hurt or without heals.
+        guard !world.isOpening, fitToPickFight(actor) else { return nil }
+
+        guard world.difficulty.pressesTheLeader else {
+            return bountyWorthHunting(for: actor, in: world)
+        }
 
         var best: Actor?
         var bestLead = GameConfig.AI.huntsLeaderAt
@@ -1069,7 +1091,40 @@ enum AIBrain {
             best = candidate
         }
 
-        return best
+        return best ?? bountyWorthHunting(for: actor, in: world)
+    }
+
+    /// Somebody nearby on a streak, with a bounty worth the walk.
+    ///
+    /// On every difficulty, unlike the leader hunt: a bounty is the game saying
+    /// "this one is worth stopping", and bots should hear it the way a person
+    /// does. Nearest first, so it goes for the one it can actually reach; then
+    /// the bigger bounty, then id, so a seed always picks the same.
+    private static func bountyWorthHunting(for actor: Actor, in world: World) -> Actor? {
+        var best: (actor: Actor, distance: Double)?
+
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let candidate = world.actors[id],
+                  candidate.isAlive,
+                  candidate.team != actor.team,
+                  candidate.bounty >= GameConfig.AI.bountyHuntsAt,
+                  !outgeared(actor, by: candidate) else { continue }
+
+            let distance = (candidate.position - actor.position).length
+            guard distance <= GameConfig.AI.bountyHuntRange else { continue }
+
+            if let current = best {
+                if distance < current.distance - 0.001
+                    || (abs(distance - current.distance) <= 0.001
+                        && candidate.bounty > current.actor.bounty) {
+                    best = (candidate, distance)
+                }
+            } else {
+                best = (candidate, distance)
+            }
+        }
+
+        return best?.actor
     }
 
     // MARK: - Ganging up
@@ -1253,7 +1308,7 @@ enum AIBrain {
         case .raid(let tile):
             return world.map[tile].blockOwner
         case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
-             .rearm, .defend, .hunt:
+             .rearm, .defend, .hunt, .mend:
             return nil
         }
     }
@@ -1593,6 +1648,50 @@ enum AIBrain {
     /// a kill is priced by what the victim was carrying, so a well-equipped bot
     /// hunting a fresh spawn is spending a minute on 50 points when a chest is
     /// worth more. The AI is just agreeing with the scoreboard.
+    /// Whether somebody's gear is far enough ahead of this bot's that it will
+    /// not pick a fight with them - see GameConfig.AI.outgearedBy.
+    private static func outgeared(_ actor: Actor, by enemy: Actor) -> Bool {
+        enemy.gearWorth - actor.gearWorth >= GameConfig.AI.outgearedBy
+    }
+
+    /// Healthy and carrying heals: fit to START a fight.
+    private static func fitToPickFight(_ actor: Actor) -> Bool {
+        Double(actor.health) / Double(max(1, actor.maxHealth)) >= GameConfig.AI.fightFitAt
+            && actor.inventory.totalHealing(of: actor.maxHealth)
+                >= GameConfig.AI.emergencyHealingStock
+    }
+
+    /// The share of health at which this bot breaks off from this enemy. Higher
+    /// against somebody much better kitted: a fight you are losing on gear is
+    /// one to leave early.
+    private static func retreatLine(for actor: Actor, against enemy: Actor?,
+                                    state: AIState) -> Double {
+        let usual = GameConfig.AI.retreatHealthFraction * state.caution
+        guard let enemy, outgeared(actor, by: enemy) else { return usual }
+        return max(usual, GameConfig.AI.outgearedRetreat)
+    }
+
+    /// Whether this bot should be at home mending rather than out in the match.
+    ///
+    /// Goes when it is below mendBelow and what it is carrying would not get it
+    /// back to mendUntil - a bot with heals uses them instead, see healToUse.
+    /// Once it has gone, it stays until it is back to mendUntil, whatever it
+    /// picks up on the way: going home for two seconds and straight back out
+    /// would be the same mistake as not going at all.
+    private static func needsToMend(_ actor: Actor, state: AIState, in world: World) -> Bool {
+        guard world.claim(for: actor.team) != nil else { return false }
+        let share = Double(actor.health) / Double(max(1, actor.maxHealth))
+
+        if case .mend = state.goal {
+            return share < GameConfig.AI.mendUntil
+        }
+
+        guard share < GameConfig.AI.mendBelow else { return false }
+        let healing = Double(actor.inventory.totalHealing(of: actor.maxHealth))
+        let reachable = (Double(actor.health) + healing) / Double(max(1, actor.maxHealth))
+        return reachable < GameConfig.AI.mendUntil
+    }
+
     static func shouldEngage(_ enemy: Actor, actor: Actor, in world: World) -> Bool {
         // Shot at. Nothing else matters.
         if actor.secondsSinceHit < GameConfig.AI.combatRecency { return true }
@@ -1604,6 +1703,17 @@ enum AIBrain {
         if world.claim(for: actor.team)?
             .contains(GridPoint(containing: enemy.feet)) == true { return true }
 
+        // Everything below is a fight this bot would be CHOOSING, and it does
+        // not choose one hurt or empty-handed - see GameConfig.AI.fightFitAt.
+        guard fitToPickFight(actor) else { return false }
+
+        // Nor one against somebody with far better gear. If they come to it, the
+        // lines above have it fight back; it just will not go looking. Unless
+        // another bot is already in a fight with them: safety in numbers, and it
+        // keeps a player in top gear from being left alone entirely.
+        if outgeared(actor, by: enemy),
+           gang(on: enemy, except: actor.id, in: world).fighting == 0 { return false }
+
         // Whoever is winning is worth stopping, wherever they are and whatever they
         // happen to be wearing. A slope rather than the cliff this used to be:
         // "level with the best score" made the leader worth chasing and the team
@@ -1611,6 +1721,9 @@ enum AIBrain {
         // fifties is a coin toss rather than a judgement.
         if world.difficulty.pressesTheLeader,
            world.lead(of: enemy.team) >= GameConfig.AI.leaderChaseAt { return true }
+
+        // A bounty in sight is worth taking a swing at - see Score.bountyPerKill.
+        if enemy.bounty >= GameConfig.AI.bountyHuntsAt { return true }
 
         // Otherwise the target has to be worth the ground between them, and the
         // further away they are the more they have to be worth. Somebody a step
@@ -1788,6 +1901,27 @@ enum AIBrain {
         switch state.goal {
         case .wander:
             return
+
+        case .mend:
+            // Mended, or with no home to mend in: back to the rest of the match.
+            guard let home = world.claim(for: actor.team)?.centreTile.center,
+                  needsToMend(actor, state: state, in: world) else {
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+                return
+            }
+            // Walk home, then pace slowly round the middle of the base rather
+            // than standing on one spot - still inside the walls, so it heals.
+            let fromHome = actor.position - home
+            if fromHome.length > GameConfig.AI.mendPaceRadius + 1 {
+                steer(&state, actor: actor, to: home)
+            } else if fromHome.length < 0.01 {
+                state.desiredHeading = Vec2(x: state.strafeDirection, y: 0)
+            } else {
+                let outward = fromHome.normalized()
+                state.desiredHeading = Vec2(x: -outward.y, y: outward.x) * state.strafeDirection
+            }
 
         case .loot(let id):
             if let drop = world.lootboxes[id], drop.supply,
@@ -2636,7 +2770,7 @@ enum AIBrain {
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
         case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
-             .rearm, .wreck, .silence, .defend, .hunt:
+             .rearm, .wreck, .silence, .defend, .hunt, .mend:
             target = nil
         }
 
@@ -3013,7 +3147,7 @@ enum AIBrain {
         // .defend used to appear here as well as three lines up, where it binds.
         // The second one was unreachable and the compiler said so on every build.
         case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash,
-             .rearm, .wreck, .silence, .hunt:
+             .rearm, .wreck, .silence, .hunt, .mend:
             targetID = nil
         }
 

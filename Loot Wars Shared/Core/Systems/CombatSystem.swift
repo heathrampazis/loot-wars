@@ -26,7 +26,7 @@ enum CombatSystem {
     ///
     /// The third reason to have a base, after the chest and the machine, and the
     /// one that costs nothing to understand: home is where you get better. A full
-    /// bar in about fifteen seconds - quick enough to make playing safe a real
+    /// bar in about ten seconds - quick enough to make playing safe a real
     /// choice, slow enough that it is a reason to go home between fights rather
     /// than a way to win one.
     ///
@@ -121,8 +121,14 @@ enum CombatSystem {
             // Blaster 6 are not the same job, and used to pay the same.
             let worth = actor.gearWorth
 
+            // Seen off inside the killer's own walls: a raider who came for their
+            // chest and did not leave. The reason to stay home and hold it.
+            let defended = world.claim(for: killer.team)?
+                .contains(GridPoint(containing: actor.feet)) == true
+
             earned.tokens = GameConfig.Tokens.perKill
                 + worth * GameConfig.Tokens.perTierKilled
+                + (defended ? GameConfig.Tokens.homeDefence : 0)
             world.awardTokens(earned.tokens, to: attacker)
 
             var points = GameConfig.Score.kill + worth * GameConfig.Score.killPerTier
@@ -134,11 +140,41 @@ enum CombatSystem {
                 points += GameConfig.Score.killInTheirBase
             }
 
-            earned.points = points
-            world.award(points, to: killer.team)
+            if defended {
+                points += GameConfig.Score.homeDefence
+                world.record(.defended(by: attacker, at: actor.position))
+            }
+
+            // Ending a streak pays what it had grown to.
+            let bounty = actor.bounty
+            if bounty > 0 {
+                points += bounty
+                world.record(.bounty(points: bounty, on: actor.id, by: attacker))
+            }
+
+            // What actually landed, which is double in the final stretch.
+            earned.points = world.award(points, to: killer.team)
 
             world.tally(attacker) { $0.kills += 1 }
+
+            // And the killer's own streak grows. The victim is a different actor,
+            // so writing the killer back here cannot clobber anything. Not for a
+            // shot or a bomb that landed after its owner went down: a streak is
+            // eliminations in one life.
+            if killer.isAlive { world.actors[attacker]?.streak += 1 }
         }
+
+        // Every elimination costs the team that took it, whoever did it - your
+        // own bomb included. A slice of the score, capped, so it stings without
+        // deciding the match.
+        let lost = min(GameConfig.Score.deathCap,
+                       Int((Double(world.score(for: actor.team)) * GameConfig.Score.deathShare)
+                            .rounded(.down)))
+        if lost > 0 {
+            world.award(-lost, to: actor.team)
+            world.record(.pointsLost(lost, by: actor.id))
+        }
+        actor.streak = 0
 
         world.tally(actor.id) { $0.deaths += 1 }
 
@@ -212,9 +248,13 @@ enum CombatSystem {
             .rounded(.down))
 
         if spilled > 0 {
-            actor.tokens -= spilled
             drop(.token(spilled), chance: 1, at: actor.position, in: world)
         }
+
+        // And the rest is simply gone (Oct 2026): you stand back up with nothing.
+        // Tokens in your pocket are tokens at risk - spend them, or lose them.
+        // Only tokenShare reaches the ground, so what a kill pays is unchanged.
+        actor.tokens = 0
 
         // The bag goes with the body.
         //

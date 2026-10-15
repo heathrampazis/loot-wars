@@ -28,6 +28,51 @@ enum RespawnSystem {
         }
     }
 
+    /// Takes the best helmet and the best blaster out of this actor's own chests,
+    /// if they beat what it is wearing, and puts them on.
+    ///
+    /// Chests in id order, so two chests holding the same tier always give up
+    /// the same one and a seed replays the same.
+    private static func rearm(_ actor: inout Actor, in world: World) {
+        var bestHelmet: (chest: ChestID, slot: Int, tier: HelmetTier)?
+        var bestBlaster: (chest: ChestID, slot: Int, tier: BlasterTier)?
+
+        let mine = world.chests.keys.sorted(by: { $0.raw < $1.raw })
+            .compactMap { world.chests[$0] }
+            .filter { $0.owner == actor.team }
+
+        for chest in mine {
+            for (index, slot) in chest.contents.slots.enumerated() {
+                guard let stack = slot else { continue }
+                switch stack.type {
+                case .helmet(let tier) where tier > actor.helmet
+                        && tier > (bestHelmet?.tier ?? HelmetTier.none):
+                    bestHelmet = (chest.id, index, tier)
+                case .blaster(let tier) where tier > actor.blaster
+                        && tier > (bestBlaster?.tier ?? BlasterTier.starting):
+                    bestBlaster = (chest.id, index, tier)
+                default:
+                    break
+                }
+            }
+        }
+
+        if let pick = bestHelmet {
+            _ = world.chests[pick.chest]?.contents.consume(at: pick.slot)
+            actor.helmet = pick.tier
+            // Health is scaled by the helmet - fill it after, not before.
+            actor.health = actor.maxHealth
+        }
+        if let pick = bestBlaster {
+            _ = world.chests[pick.chest]?.contents.consume(at: pick.slot)
+            actor.blaster = pick.tier
+        }
+
+        if bestHelmet != nil || bestBlaster != nil {
+            world.record(.rearmed(actor.id, helmet: bestHelmet?.tier, blaster: bestBlaster?.tier))
+        }
+    }
+
     private static func respawn(_ actor: inout Actor, in world: World) {
         actor.respawnTimer = nil
         actor.health = actor.maxHealth
@@ -45,6 +90,15 @@ enum RespawnSystem {
         // so that the middle is somewhere you could not move from - see
         // World.spawnPoint.
         actor.position = world.spawnPoint(for: actor.team)
+
+        // People put on the best gear waiting in their own chests. This is what a
+        // chest is FOR: you come back with nothing on you, and a spare helmet
+        // and blaster banked at home is the difference between walking back out
+        // ready and walking back out bare. Bots have their own way of doing the
+        // same - they walk home and take it out, see AIBrain.reArmWanted.
+        if actor.ai == nil {
+            rearm(&actor, in: world)
+        }
 
         // Bots are topped up to the late-match gear floor; people come back with nothing,
         // so the only gear that survives a death is gear stored in a chest.

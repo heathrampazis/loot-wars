@@ -34,7 +34,8 @@ final class MatchPanelNode: SKNode {
     /// only needs a rough size.
     static let size = CGSize(width: 200, height: 32)
 
-    private static let urgentBelow: Double = 30
+    /// Red for the final stretch, when points count double - see Match.finalStretch.
+    private static let urgentBelow: Double = GameConfig.Match.finalStretch
 
     private static let iconSize: CGFloat = 18
     private static let iconGap: CGFloat = 7
