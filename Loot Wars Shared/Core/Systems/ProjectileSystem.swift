@@ -38,7 +38,7 @@ enum ProjectileSystem {
                 continue
             }
 
-            if world.trees.contains(where: { $0.contains(projectile.position) }) { continue }
+            if world.isInTree(projectile.position) { continue }
 
             // Somebody's machine takes the hit rather than merely absorbing it.
             //

@@ -133,7 +133,7 @@ enum BombSystem {
         // in the wall behind, and the aiming line would show it doing so.
         if world.turrets.values.contains(where: { $0.hitbox.contains(point) }) { return true }
 
-        return world.trees.contains { $0.contains(point) }
+        return world.isInTree(point)
     }
 
     /// Whether this bomb has reached an enemy who is alive and can be hurt.

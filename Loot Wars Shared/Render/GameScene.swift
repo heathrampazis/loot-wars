@@ -700,12 +700,20 @@ final class GameScene: SKScene {
     /// Where the controls and panels are on screen right now, for the edge
     /// markers to keep off - see EdgeMarker. Only what is showing.
     private func hudFrames() -> [CGRect] {
+        // Measured once a frame, however many markers ask. Measuring walks every
+        // node under each control, and both compasses used to do it separately.
+        if let held = hudFrameCache, held.time == lastUpdateTime { return held.rects }
+
         let parts: [SKNode] = [hotbar, moveStick, aimStick, healButton, throwButton,
                                openButton, shopButton, quickBuy, leaderboard,
                                matchPanel, pauseButton]
-        return parts.filter { !$0.isHidden && $0.alpha > 0.01 }
+        let rects = parts.filter { !$0.isHidden && $0.alpha > 0.01 }
             .map { $0.calculateAccumulatedFrame() }
+        hudFrameCache = (lastUpdateTime, rects)
+        return rects
     }
+
+    private var hudFrameCache: (time: TimeInterval, rects: [CGRect])?
 
     // MARK: - Pausing
 

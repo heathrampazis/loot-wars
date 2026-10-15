@@ -130,6 +130,12 @@ final class World {
     /// Round obstacles. Not tiles - see TreePatch for why.
     let trees: [TreePatch]
 
+    /// For each tile, which trees reach into it - so "is this point in a tree"
+    /// looks at the one or two trees near it rather than all of them. Asked
+    /// many times a tick, by every bullet and every line-of-sight check, which
+    /// is why it is worth the index. Trees never change, so it is built once.
+    private let treeIndex: [[Int]]
+
     /// Every tile a clump overlaps, worked out once at the start of the match.
     ///
     /// Forty-five clumps, and asking "is there a tree on this tile" used to walk
@@ -369,6 +375,7 @@ final class World {
         self.isNight = World.isNight(seed: generated.seed)
         self.claims = generated.claims
         self.trees = generated.trees
+        self.treeIndex = World.indexTrees(generated.trees, in: generated.map)
         self.baseLayouts = generated.baseLayouts
 
         // Offset from the map's seed, so play does not replay the same number
@@ -664,6 +671,9 @@ final class World {
     /// separate `lootboxes.values.contains` checks means four of them are one day
     /// going to be right and one is not.
     func structureBlocks(_ point: Vec2) -> Bool {
+        // Nothing stands on this tile at all: the common case, answered from the
+        // tile set without asking seventy-odd structures one at a time.
+        guard structureTiles.contains(GridPoint(containing: point)) else { return false }
         if lootboxes.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         if arcades.values.contains(where: { $0.hitbox.contains(point) }) { return true }
         if chests.values.contains(where: { $0.hitbox.contains(point) }) { return true }
@@ -1077,8 +1087,46 @@ final class World {
         let tile = GridPoint(containing: point)
 
         guard map.contains(tile), !map.isOccupied(tile) else { return false }
-        guard !trees.contains(where: { $0.contains(point) }) else { return false }
+        guard !isInTree(point) else { return false }
         return !structureBlocks(point)
+    }
+
+    // MARK: - Trees
+
+    private static func indexTrees(_ trees: [TreePatch], in map: TileMap) -> [[Int]] {
+        var index = Array(repeating: [Int](), count: map.width * map.height)
+        for (number, tree) in trees.enumerated() {
+            // Every tile the circle could reach, then asked properly.
+            let low = GridPoint(col: Int((tree.centre.x - tree.radius).rounded(.down)),
+                                row: Int((tree.centre.y - tree.radius).rounded(.down)))
+            let high = GridPoint(col: Int((tree.centre.x + tree.radius).rounded(.down)),
+                                 row: Int((tree.centre.y + tree.radius).rounded(.down)))
+            let rows = (max(0, low.row), min(map.height - 1, high.row))
+            let cols = (max(0, low.col), min(map.width - 1, high.col))
+            guard rows.0 <= rows.1, cols.0 <= cols.1 else { continue }
+            for row in rows.0...rows.1 {
+                for col in cols.0...cols.1 {
+                    let tile = GridPoint(col: col, row: row)
+                    if tree.overlaps(tile) { index[row * map.width + col].append(number) }
+                }
+            }
+        }
+        return index
+    }
+
+    /// Whether a point is inside any tree. The same answer as asking every tree,
+    /// from the few that reach the point's tile - see treeIndex.
+    func isInTree(_ point: Vec2) -> Bool {
+        let tile = GridPoint(containing: point)
+        // Off the map nothing is indexed: ask them all, which is the old way and
+        // rare enough not to matter.
+        guard map.contains(tile) else {
+            return trees.contains(where: { $0.contains(point) })
+        }
+        for number in treeIndex[tile.row * map.width + tile.col] where trees[number].contains(point) {
+            return true
+        }
+        return false
     }
 
     // MARK: - Arcades

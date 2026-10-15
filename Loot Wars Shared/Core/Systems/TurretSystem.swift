@@ -239,7 +239,7 @@ enum TurretSystem {
             let point = turret.centre + direction * travelled
 
             if world.map.isOccupied(GridPoint(containing: point)) { return false }
-            if world.trees.contains(where: { $0.contains(point) }) { return false }
+            if world.isInTree(point) { return false }
             if world.structureBlocks(point) { return false }
 
             travelled += GameConfig.Turret.sightStep
