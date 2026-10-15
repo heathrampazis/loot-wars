@@ -12,13 +12,16 @@
 //    the outline moves out to meet you if you linger just outside it, and walls
 //    left inside the new outline come down as you pass them.
 //
-//  With Assisted controls on (Actor.assisted):
+//  For a player being helped (Actor.assisted), as much as the match's
+//  difficulty gives - see Difficulty.assistAimCone and friends. Easy gets all
+//  of it, Medium less, Hard only the last-ditch heal, Hardcore none:
 //  - A shot fired roughly at somebody is bent onto them (aim assist).
-//  - A heal is used when your health drops low - bought first if you have none.
+//  - A heal you are carrying is used when your health drops low. Never bought
+//    for you: spending tokens is your call (Oct 2026).
 //  - A power-up you are carrying switches on when a fight starts.
 //
-//  Per actor rather than per match, so in a match with real people each
-//  player's setting only touches them.
+//  Actor.assisted only says whether this actor is a player the help is for
+//  (the How to Play puppets are not); how much help comes from the difficulty.
 //
 
 import Foundation
@@ -32,7 +35,6 @@ enum AssistSystem {
 
             actor.assistHealWait = max(0, actor.assistHealWait - dt)
             actor.assistBuildWait = max(0, actor.assistBuildWait - dt)
-            actor.assistBuyWait = max(0, actor.assistBuyWait - dt)
             defer { world.actors[id] = actor }
             guard actor.isAlive else { continue }
 
@@ -42,10 +44,11 @@ enum AssistSystem {
             // where it was pointed. Noted, so a power-up can tell a fight has
             // started from the player's side too, not only from being hit.
             var lockedOn = false
-            if actor.assisted, let list = commands[id] {
+            let level = world.difficulty
+            if actor.assisted, let cone = level.assistAimCone, let list = commands[id] {
                 commands[id] = list.map { command in
                     guard case .shoot(let direction) = command,
-                          let aimed = assistedAim(direction, for: actor, in: world) else {
+                          let aimed = assistedAim(direction, cone: cone, for: actor, in: world) else {
                         return command
                     }
                     lockedOn = true
@@ -62,16 +65,16 @@ enum AssistSystem {
             // Heals: below the line, the best one in the bag - the smallest that
             // fills you up, or the biggest if none does. A short wait after each,
             // so two can not go in the same instant and the heal reads as a beat.
+            //
+            // Only what you are carrying. It used to buy one when the bag was
+            // empty, which made an assisted player nearly impossible to kill:
+            // every token was a heal waiting to happen.
             let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
-            if actor.assisted, actor.assistHealWait <= 0, healthLeft < GameConfig.Assist.healBelow {
+            if actor.assisted, let healBelow = level.assistHealBelow,
+               actor.assistHealWait <= 0, healthLeft < healBelow {
                 if let slot = ConsumableSystem.bestHeal(for: actor) {
                     added.append(.useItem(slot: slot))
                     actor.assistHealWait = GameConfig.Assist.healGap
-                } else if actor.assistBuyWait <= 0, let heal = bestHealToBuy(for: actor, in: world) {
-                    // Nothing in the bag: buy one. It is used on a later tick by
-                    // the line above, once it is in the bag.
-                    added.append(.buyItem(heal))
-                    actor.assistBuyWait = GameConfig.Assist.buyGap
                 }
             }
 
@@ -92,7 +95,8 @@ enum AssistSystem {
             // Power-ups: switched on when a fight starts - you were just hit, or
             // you are shooting at somebody - and only when none is running.
             let inFight = lockedOn || actor.secondsSinceHit < GameConfig.Assist.perkHitWithin
-            if actor.assisted, inFight, actor.perk == nil, let slot = bestPerk(for: actor) {
+            if actor.assisted, level.assistPerks, inFight, actor.perk == nil,
+               let slot = bestPerk(for: actor, healBelow: level.assistHealBelow ?? 0) {
                 added.append(.useItem(slot: slot))
             }
 
@@ -107,10 +111,10 @@ enum AssistSystem {
     /// The shot turned onto the enemy nearest to where it was aimed, if one is
     /// inside the aim help's cone, in range and in plain sight - or nil to leave
     /// the shot alone. Aimed where they will be, the way the bots aim.
-    private static func assistedAim(_ direction: Vec2, for actor: Actor, in world: World) -> Vec2? {
+    private static func assistedAim(_ direction: Vec2, cone: Double,
+                                    for actor: Actor, in world: World) -> Vec2? {
         guard direction.length > 0.01 else { return nil }
         let aim = direction.normalized()
-        let cone = GameConfig.Assist.aimCone
 
         var best: (point: Vec2, score: Double)?
 
@@ -150,9 +154,9 @@ enum AssistSystem {
     /// The power-up worth switching on, or nil. Low on health, the ones that
     /// keep you alive come first; otherwise the ones that win the fight. Health
     /// back is never used near full health, where it would be wasted.
-    private static func bestPerk(for actor: Actor) -> Int? {
+    private static func bestPerk(for actor: Actor, healBelow: Double) -> Int? {
         let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
-        let order: [Perk] = healthLeft < GameConfig.Assist.healBelow
+        let order: [Perk] = healthLeft < healBelow
             ? [.overdrive, .regeneration, .resistance, .strength, .speed]
             : [.strength, .resistance, .overdrive, .speed, .regeneration]
 
@@ -287,19 +291,5 @@ enum AssistSystem {
             best = (tile, away)
         }
         return best?.tile
-    }
-
-    // MARK: - Buying heals
-
-    /// The biggest heal on the shelf you can afford, as the quick buy offers it.
-    private static func bestHealToBuy(for actor: Actor, in world: World) -> ItemType? {
-        GameConfig.Shop.tabs
-            .flatMap { tab -> [GameConfig.Shop.Item] in
-                if case .shelf(let items) = tab.stock { return items }
-                return []
-            }
-            .filter { $0.type.isHealing && ShopSystem.canBuy($0.type, actor: actor, in: world) }
-            .max { $0.price < $1.price }?
-            .type
     }
 }

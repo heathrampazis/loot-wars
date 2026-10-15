@@ -37,26 +37,28 @@ enum Progress {
         Prefs.devMode ? .all : Roadmap.unlocks(atLevel: level)
     }
 
-    /// How long your next match runs. The full length in dev mode.
+    /// How long your next match runs.
+    ///
+    /// Set by the difficulty now - longer on Hard and Hardcore, see
+    /// Difficulty.matchLength. Roadmap.matchLength is kept as the per-level
+    /// hook, and is the same at every level.
     static var matchLength: Double {
-        Prefs.devMode ? GameConfig.Match.duration : Roadmap.matchLength(atLevel: level)
+        Prefs.difficulty.matchLength
     }
 
     /// Adds a finished match to your XP and says what changed.
     ///
-    /// Harder difficulties pay more, and playing without Assisted controls pays
-    /// a little more on top - Hardcore with no assists is about half as much
-    /// again as Easy. See Difficulty.xpMultiplier.
+    /// Harder difficulties pay more - Hardcore is about half as much again as
+    /// Easy. The help you get is part of the difficulty now, so there is no
+    /// separate bonus for playing without it. See Difficulty.xpMultiplier.
     ///
     /// - Parameters:
     ///   - place: 0 for first.
     ///   - difficulty: what the match was played on.
-    ///   - assisted: whether Assisted controls were on.
     static func award(score: Int, place: Int,
-                      difficulty: Difficulty = .hard, assisted: Bool = false) -> Award {
+                      difficulty: Difficulty = .hard) -> Award {
         let before = Prefs.totalXP
         let multiplier = difficulty.xpMultiplier
-            * (assisted ? 1 : Difficulty.unassistedXPBonus)
         // Nothing is earned past the top level. Capped here so the total stops
         // at it and the results screen has nothing to fill.
         let earned = Int((Double(Roadmap.matchXP(score: score, place: place)) * multiplier).rounded())

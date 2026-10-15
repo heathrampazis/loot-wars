@@ -5,7 +5,7 @@
 //  What goes inside the menu's sheet: the settings, and the About page behind
 //  them.
 //
-//  A short list - sound, left-handed controls, assisted controls, difficulty, tips
+//  A short list - sound, left-handed controls, difficulty, tips
 //  on or off, and About. (Dev mode no longer has a row - see Prefs.devMode.)
 //  A short page of things people actually change on a phone reads as finished; a
 //  long one reads as a checklist. Each row is its own tap target, the whole width
@@ -60,7 +60,7 @@ final class SettingsSheetContent: MenuSheetContent {
     var onAbout: (() -> Void)?
 
     private enum Row: Int, CaseIterable {
-        case sound, vibration, leftHanded, easyControls, difficulty, tips, about
+        case sound, vibration, leftHanded, difficulty, tips, about
     }
 
     private static let rowHeight: CGFloat = 56
@@ -75,14 +75,25 @@ final class SettingsSheetContent: MenuSheetContent {
     private var soundToggle: MenuToggleNode?
     private var vibrationToggle: MenuToggleNode?
     private var handToggle: MenuToggleNode?
-    private var easyToggle: MenuToggleNode?
     private var tipsToggle: MenuToggleNode?
+    private var difficultyDetailLabel: SKLabelNode?
+
+    /// What the chosen difficulty means, in a few words. The help you get is
+    /// part of it now - there is no separate Assisted controls switch.
+    private var difficultyDetail: String {
+        switch Prefs.difficulty {
+        case .easy:     return "Aim help, auto heals, soft bots"
+        case .medium:   return "Some aim help, tougher bots"
+        case .hard:     return "No aim help, sharp bots"
+        case .hardcore: return "No help at all"
+        }
+    }
 
 
     func layOut(width: CGFloat, maxHeight: CGFloat) -> CGFloat {
         self.width = width
         node.removeAllChildren()
-        // Down to 37 rather than 44 on the shortest screen, so seven rows still
+        // Down to 37 rather than 44 on the shortest screen, so every row still
         // fit on an SE.
         rowHeight = max(37, min(SettingsSheetContent.rowHeight,
                                 (maxHeight / CGFloat(Row.allCases.count)).rounded(.down)))
@@ -117,15 +128,8 @@ final class SettingsSheetContent: MenuSheetContent {
                 node.addChild(toggle)
                 handToggle = toggle
 
-            case .easyControls:
-                addLabels("Assisted controls", detail: "Aim assist and auto healing", y: centreY)
-                let toggle = MenuToggleNode(isOn: Prefs.easyControls)
-                toggle.position = CGPoint(x: width / 2 - MenuToggleNode.trackSize.width / 2 - 4, y: centreY)
-                node.addChild(toggle)
-                easyToggle = toggle
-
             case .difficulty:
-                addLabels("Difficulty", detail: "How hard the other players are", y: centreY)
+                difficultyDetailLabel = addLabels("Difficulty", detail: difficultyDetail, y: centreY)
                 addDifficultyButton(y: centreY)
 
             case .tips:
@@ -170,11 +174,6 @@ final class SettingsSheetContent: MenuSheetContent {
             handToggle?.set(Prefs.leftHanded)
             SoundPlayer.shared.play(.select)
 
-        case .easyControls:
-            Prefs.easyControls.toggle()
-            easyToggle?.set(Prefs.easyControls)
-            SoundPlayer.shared.play(.select)
-
         case .difficulty:
             Prefs.difficulty = Prefs.difficulty.next
             SoundPlayer.shared.play(.select)
@@ -195,7 +194,8 @@ final class SettingsSheetContent: MenuSheetContent {
 
     // MARK: - Pieces
 
-    private func addLabels(_ title: String, detail: String?, y: CGFloat) {
+    @discardableResult
+    private func addLabels(_ title: String, detail: String?, y: CGFloat) -> SKLabelNode? {
         let left = -width / 2 + 6
 
         let label = SKLabelNode()
@@ -206,7 +206,7 @@ final class SettingsSheetContent: MenuSheetContent {
         label.position = CGPoint(x: left, y: detail == nil ? y : y + 8)
         node.addChild(label)
 
-        guard let detail else { return }
+        guard let detail else { return nil }
         let small = SKLabelNode()
         small.attributedText = Sheet.text(detail, size: 12, weight: .regular,
                                           colour: SKColor(white: 0, alpha: 0.45))
@@ -214,6 +214,7 @@ final class SettingsSheetContent: MenuSheetContent {
         small.verticalAlignmentMode = .center
         small.position = CGPoint(x: left, y: y - 10)
         node.addChild(small)
+        return small
     }
 
     /// Easy, Medium, Hard or Hardcore, on a pill. Tapping the row steps to the
@@ -251,6 +252,9 @@ final class SettingsSheetContent: MenuSheetContent {
         difficultyButton?.strokeColor = tone.edge
         difficultyLabel?.attributedText = Sheet.text(difficulty.title, size: 13, weight: .bold,
                                                      colour: .white)
+        difficultyDetailLabel?.attributedText = Sheet.text(difficultyDetail, size: 12,
+                                                           weight: .regular,
+                                                           colour: SKColor(white: 0, alpha: 0.45))
     }
 }
 

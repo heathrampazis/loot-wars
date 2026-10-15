@@ -55,8 +55,27 @@ enum ItemArt {
             return CGSize(width: box, height: box)
         }
 
-        let scale = min(box / art.width, box / art.height)
+        let scale = min(box / art.width, box / art.height) * boost(for: texture)
         return CGSize(width: art.width * scale, height: art.height * scale)
+    }
+
+    /// Art drawn with more empty space round it than the rest, scaled up to sit
+    /// at the same size as its neighbours. The disco ball fills about 60% of its
+    /// canvas where the other power-ups fill over 80%, so on the ground, in the
+    /// hotbar and in the shop it read as the smallest thing there - the opposite
+    /// of what the best power-up should look like.
+    ///
+    /// Safe to go past 1: it is the PADDING that grows into the box, not the art
+    /// past its edge.
+    private static let artBoost: [Pickup: CGFloat] = [
+        .item(.perk(.overdrive)): 1.35
+    ]
+
+    private static func boost(for texture: SKTexture) -> CGFloat {
+        for (pickup, boost) in artBoost where cache[pickup] === texture {
+            return boost
+        }
+        return 1
     }
 
     /// What to call it on screen.

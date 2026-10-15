@@ -56,6 +56,13 @@ final class GameScene: SKScene {
     /// when a raid starts rather than every frame of it.
     private var wasRaided = false
 
+    /// What the next kill banner should say, when the kill was more than a kill.
+    /// Set by the bounty and defence events, which arrive just ahead of it.
+    private var killTitle: String?
+
+    /// Your bounty last frame, so the moment one appears on you can be said.
+    private var lastBounty = 0
+
     /// How many supply drops this screen has already called out, so each one is
     /// announced once, on the frame it lands.
     private var supplyDropsAnnounced = 0
@@ -519,7 +526,9 @@ final class GameScene: SKScene {
         world.duration = Progress.matchLength
         world.difficulty = Prefs.difficulty
         world.setLocalName(Prefs.playerName)
-        world.setLocalAssist(Prefs.easyControls)
+        // You are a player the help is for; how MUCH help is the difficulty's
+        // call - see Difficulty.assistAimCone.
+        world.setLocalAssist(true)
 
         // Fresh faces: nobody from the last two matches, then this match's
         // names remembered for the next.
@@ -1153,6 +1162,13 @@ final class GameScene: SKScene {
         actorRenderer.sync(with: world, dt: frameDelta, heardFrom: ears)
         feelHits(in: world)
         matchPanel.update(with: world)
+
+        // A bounty landing on you is worth one line: you are a target now.
+        let bounty = world.localPlayer?.bounty ?? 0
+        if bounty > 0, lastBounty == 0, !world.isOver {
+            hint.show("ON A STREAK: YOU HAVE A BOUNTY", seconds: 2.0)
+        }
+        lastBounty = bounty
         // The panel fits its numbers and grows when one gains a digit, so the
         // pause button follows its left edge rather than a fixed spot.
         pauseButton.position.x = matchPanel.position.x - matchPanel.width / 2
@@ -1546,7 +1562,13 @@ final class GameScene: SKScene {
                 // arithmetic nobody asked for.
                 guard team == world.localPlayer?.team else { break }
 
-                effectsRenderer.earned(at: position, points: points)
+                // Over the base when you can see it; off the arrow home when you
+                // cannot, so the income is noticed wherever you are.
+                if baseCompass.isShowing {
+                    baseCompass.earned(points)
+                } else {
+                    effectsRenderer.earned(at: position, points: points)
+                }
 
                 // And once, ever, the sentence that explains what the number is.
                 if tipsOn, !Prefs.taughtHolding {
@@ -1644,13 +1666,49 @@ final class GameScene: SKScene {
                 // shares that strip of screen and gives way.
                 if killer == world.localPlayerID, victim != world.localPlayerID {
                     hint.hide()
-                    killBanner.confirm()
+                    killBanner.confirm(title: killTitle ?? "ELIMINATION")
                     SoundPlayer.shared.play(.elimination)
                     Haptics.shared.play(.kill)
                 } else if victim != world.localPlayerID {
                     // Anybody else's, from where it happened. Not your own death:
                     // that is not a moment worth celebrating.
                     SoundPlayer.shared.play(.elimination, at: position, heardFrom: ears)
+                }
+                killTitle = nil
+
+            case .phase(let phase):
+                // The match changing gear, said once each, so it has a shape: a
+                // calm start, the raids, and a last half minute worth fighting for.
+                switch phase {
+                case .opening:
+                    break
+                case .raiding:
+                    // The hint makes its own sound.
+                    hint.show("RAIDS ARE OPEN", seconds: 2.2)
+                case .finale:
+                    hint.show("FINAL 30: DOUBLE POINTS", seconds: 2.6)
+                    Haptics.shared.play(.warning)
+                }
+
+            case .bounty(let points, _, let hunter):
+                // The kill that follows says so. A bounty beats a defence, being
+                // the rarer of the two.
+                if hunter == world.localPlayerID { killTitle = "BOUNTY +\(points)" }
+
+            case .defended(let defender, _):
+                if defender == world.localPlayerID, killTitle == nil {
+                    killTitle = "BASE DEFENDED"
+                }
+
+            case .pointsLost:
+                // Not shown: the respawn panel stays about getting back in.
+                // The leaderboard already says where you stand.
+                break
+
+            case .rearmed(let who, _, _):
+                // Your chest paying you back, the moment it does.
+                if who == world.localPlayerID {
+                    hint.show("GEARED UP FROM YOUR CHEST", seconds: 2.0)
                 }
             }
         }
@@ -1786,8 +1844,7 @@ final class GameScene: SKScene {
         if let team = world.localPlayer?.team,
            let place = world.standings.firstIndex(where: { $0.team == team }) {
             award = Progress.award(score: world.score(for: team), place: place,
-                                   difficulty: world.difficulty,
-                                   assisted: world.localPlayer?.assisted ?? false)
+                                   difficulty: world.difficulty)
         }
 
         results.show(with: world, award: award)

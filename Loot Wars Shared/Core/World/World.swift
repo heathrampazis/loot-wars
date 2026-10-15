@@ -52,6 +52,23 @@ final class World {
     /// Seconds left on the clock, floored at zero.
     var timeRemaining: Double { max(0, duration - elapsed) }
 
+    /// The three parts of a match: a calm opening to loot and build, the raids,
+    /// and a final stretch where points count double. See GameConfig.Match.
+    enum Phase: Equatable {
+        case opening, raiding, finale
+    }
+
+    var phase: Phase {
+        if elapsed < GameConfig.Match.opening { return .opening }
+        if timeRemaining <= GameConfig.Match.finalStretch { return .finale }
+        return .raiding
+    }
+
+    var isOpening: Bool { phase == .opening }
+
+    /// The phase last announced, so each change is recorded once - see step.
+    private var announcedPhase: Phase = .opening
+
     /// How long this match runs, in seconds. The full length unless the screen
     /// that made the world says otherwise - shorter while a player is early in
     /// the roadmap, see Roadmap.matchLength. Set before the first step.
@@ -300,9 +317,18 @@ final class World {
         tally(id) { $0.tokensEarned += count }
     }
 
-    func award(_ points: Int, to team: TeamID) {
-        guard points != 0 else { return }
-        scores[team, default: 0] += points
+    /// Adds points to a team, or takes them away.
+    ///
+    /// Gains are multiplied in the final stretch; losses never are. Returns
+    /// what was actually added, so anything showing a number shows the real one.
+    @discardableResult
+    func award(_ points: Int, to team: TeamID) -> Int {
+        guard points != 0 else { return 0 }
+        let paid = points > 0 && phase == .finale && !isOver
+            ? points * GameConfig.Match.finalMultiplier
+            : points
+        scores[team, default: 0] = max(0, scores[team, default: 0] + paid)
+        return paid
     }
 
     /// Teams best first, ties broken by id so two teams on the same score never
@@ -425,8 +451,8 @@ final class World {
         unusedNames = pool
     }
 
-    /// Switches assisted controls on or off for the player - from Settings, before
-    /// the first step. See AssistSystem.
+    /// Marks the player as one the difficulty's help is for - before the first
+    /// step. How much help is Difficulty's call; see AssistSystem.
     func setLocalAssist(_ on: Bool) {
         actors[localPlayerID]?.assisted = on
         // The chores are not part of the setting - every player gets them.
@@ -1483,6 +1509,11 @@ final class World {
     /// a permanent shimmer; together, it reads as a tick.
     var holdTimer: Double = GameConfig.Score.holdInterval
 
+    /// How many pay ticks in a row each team's wall has stood shut. The longer a
+    /// base is kept up, the more each tick pays - see Score.holdStreakStep. Back
+    /// to nothing the moment it is opened.
+    var holdStreak: [TeamID: Int] = [:]
+
     /// Everything this team has banked, counted across all of its chests.
     func storedItemCount(ownedBy team: TeamID) -> Int {
         chests.values
@@ -1829,6 +1860,12 @@ final class World {
         VaultSystem.update(self, dt: dt)
         tick += 1
         elapsed += dt
+
+        // Each change of phase announced once, for the screen to say so.
+        if phase != announcedPhase, !isOver {
+            announcedPhase = phase
+            record(.phase(phase))
+        }
     }
 
     private func applyMovementInput(_ commands: [ActorID: [Command]]) {

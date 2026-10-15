@@ -51,6 +51,9 @@ enum AIGoal: Equatable {
     /// to .fight the moment there is something to shoot at. Keeping the two apart
     /// is what stops a hunt being an aimbot with a long lead.
     case hunt(ActorID)
+    /// Hurt and short of heals: home, and staying there while the base heals it
+    /// - see GameConfig.AI.mendBelow.
+    case mend
 
     var isBuild: Bool {
         if case .build = self { return true }
@@ -113,6 +116,7 @@ enum AIGoal: Equatable {
         case .robChest: return "rob"
         case .stash: return "stash"
         case .hunt: return "hunt"
+        case .mend: return "mend"
         }
     }
 }
