@@ -32,6 +32,10 @@ final class GlassNode: SKCropNode {
         area = path.boundingBoxOfPath
         super.init()
 
+        // Glass switched off: an empty node with no mask and nothing to draw, so
+        // it costs nothing - see GlassBackdrop.enabled.
+        guard GlassBackdrop.enabled else { return }
+
         let mask = SKShapeNode(path: path)
         mask.fillColor = .white
         mask.strokeColor = .clear

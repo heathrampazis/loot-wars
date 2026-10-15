@@ -203,9 +203,13 @@ enum RenderPalette {
     static let projectileOutline = SKColor.black
 
     // HUD. Panel and track alphas solved from the mockup: the panel is this dark
-    // olive at 70% over the ground, the track a further 35% of black on top.
+    // olive, the track a further 35% of black on top.
+    //
+    // 90%, up from 70% (Oct 2026): the frosted glass behind the controls was
+    // switched off for performance, and at 70% the sharp map showing through
+    // made the plates busy. Nearly solid reads as a clean panel instead.
     static let hudPanel  = SKColor(red: 0x3B / 255.0, green: 0x46 / 255.0,
-                                   blue: 0x27 / 255.0, alpha: 0.70)
+                                   blue: 0x27 / 255.0, alpha: 0.90)
     static let hudTrack  = SKColor(white: 0.0, alpha: 0.35)
     static let healthBar = rgb(0xFF, 0x51, 0x7B)
 
@@ -226,7 +230,9 @@ enum RenderPalette {
     }
     /// Hotbar slots are plain black at 42% in the reference, not the HUD's olive -
     /// the ground shows through them far more.
-    static let hotbarSlot = SKColor(white: 0.0, alpha: 0.42)
+    /// 60%, up from 42% with the glass switched off (Oct 2026), for the same
+    /// reason as hudPanel.
+    static let hotbarSlot = SKColor(white: 0.0, alpha: 0.6)
 
     /// The rim round every in-match control - the sticks, buttons, hotbar and
     /// panels all ask for this one colour. None for now: they read cleaner

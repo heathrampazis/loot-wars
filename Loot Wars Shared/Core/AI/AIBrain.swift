@@ -3274,7 +3274,7 @@ enum AIBrain {
 
     private static func blocksShot(_ point: Vec2, in world: World) -> Bool {
         if world.map.isOccupied(GridPoint(containing: point)) { return true }
-        if world.trees.contains(where: { $0.contains(point) }) { return true }
+        if world.isInTree(point) { return true }
         if world.structureBlocks(point) { return true }
         return false
     }
@@ -3446,7 +3446,7 @@ enum AIBrain {
 
         guard world.map.contains(tile) else { return false }
         guard !world.map.blocksMovement(at: tile, for: team) else { return false }
-        guard !world.trees.contains(where: { $0.contains(point) }) else { return false }
+        guard !world.isInTree(point) else { return false }
         guard !world.structureBlocks(point) else { return false }
 
         return true

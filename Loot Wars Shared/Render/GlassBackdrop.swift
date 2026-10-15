@@ -23,7 +23,13 @@ final class GlassBackdrop {
 
     /// Off draws the controls exactly as before, with no glass behind them -
     /// the switch to throw if a phone cannot keep up.
-    static let enabled = true
+    ///
+    /// OFF (Oct 2026, performance pass). Capturing and blurring the map, plus a
+    /// masked layer behind every control, was the most expensive thing on the
+    /// screen; refreshing it less often made it visibly jitter. The controls
+    /// are a solid plate now - see RenderPalette.hudPanel. Flip this back to
+    /// bring the glass back; nothing else needs to change.
+    static let enabled = false
 
     /// How small the map is drawn before it is blurred. A quarter of the pixels
     /// along each side is a sixteenth of the work, and a blur hides the loss.
@@ -33,6 +39,9 @@ final class GlassBackdrop {
     private static let radius: Double = 3.5
 
     /// Redrawn every this many frames.
+    ///
+    /// 4 was tried (Oct 2026) and visibly jittered, so it is back to 2 for if
+    /// the glass is ever switched back on.
     private static let refreshEvery = 2
 
     /// Extra map captured round the screen, in points, so the blur does not fade
