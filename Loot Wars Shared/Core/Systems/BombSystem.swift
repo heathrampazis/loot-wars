@@ -133,6 +133,12 @@ enum BombSystem {
         // in the wall behind, and the aiming line would show it doing so.
         if world.turrets.values.contains(where: { $0.hitbox.contains(point) }) { return true }
 
+        // And a chest, for the same reason (Oct 2026). A bomb thrown at one
+        // sailed over it and went off on the far side, so it only ever caught
+        // the chest at the edge of the blast. Stopped against its side it goes
+        // off right on it - see the chest damage in detonate.
+        if world.chests.values.contains(where: { $0.hitbox.contains(point) }) { return true }
+
         return world.isInTree(point)
     }
 
