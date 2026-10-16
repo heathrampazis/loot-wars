@@ -3189,7 +3189,9 @@ enum GameConfig {
         /// source of tokens and let a player buy the ladder far too early.
         /// 3-minute matches (Oct 2026): 3.9 -> 2.4.
         /// 2-minute matches (Oct 2026): 2.4 -> 1.6.
-        static let emitInterval: Double = 1.6
+        /// More tokens (Oct 2026): 1.6 -> 1.25, about 28% more from every
+        /// machine - the map's and the ones in bases (miniRate scales off this).
+        static let emitInterval: Double = 1.25
 
         /// What a shut wall is worth, as a multiplier on the interval.
         ///
