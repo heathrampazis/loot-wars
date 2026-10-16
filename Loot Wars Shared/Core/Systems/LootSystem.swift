@@ -69,6 +69,9 @@ enum LootSystem {
                                             rare: rare,
                                             unlocks: world.unlocks,
                                             perkBoost: byBot ? world.difficulty.botPerkBoost : 1,
+                                            // More heals for people on the
+                                            // easier settings; bots unchanged.
+                                            healBoost: byBot ? 1 : world.difficulty.crateHealBoost,
                                             using: &world.rng)
                 world.spawnGroundItem(pickup, at: box.position)
 

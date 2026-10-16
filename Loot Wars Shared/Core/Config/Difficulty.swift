@@ -92,6 +92,27 @@ enum Difficulty: Int, CaseIterable {
     /// Whether a power-up you are carrying switches on for you in a fight.
     var assistPerks: Bool { self == .easy || self == .medium }
 
+    /// How far into a match before bots start raiding, nought to one, on top
+    /// of the opening's no-raid stretch. Easy holds raids back until a third of
+    /// the way in, so there is time to build and settle before anyone comes.
+    var raidsFrom: Double {
+        switch self {
+        case .easy:     return 0.33
+        case .medium, .hard, .hardcore: return 0
+        }
+    }
+
+    /// How much likelier bandages and medkits are in a crate a PLAYER opens
+    /// (Oct 2026). More heals all round, most on Easy; Hardcore unchanged.
+    var crateHealBoost: Double {
+        switch self {
+        case .easy:     return 1.8
+        case .medium:   return 1.5
+        case .hard:     return 1.3
+        case .hardcore: return 1.0
+        }
+    }
+
     // MARK: - Match length
 
     /// How long a match runs, in seconds.
@@ -129,9 +150,12 @@ enum Difficulty: Int, CaseIterable {
     }
 
     /// How much longer (or shorter) a bot waits between raids, and between hunts.
+    ///
+    /// Easy 3.5, up from 2.4 (Oct 2026): Easy should feel easy, and raids were
+    /// still the thing that made it not.
     var urgeScale: Double {
         switch self {
-        case .easy:     return 2.4
+        case .easy:     return 3.5
         case .medium:   return 1.6
         case .hard:     return 1
         case .hardcore: return 0.75
@@ -141,7 +165,7 @@ enum Difficulty: Int, CaseIterable {
     /// How much longer (or shorter) before a bot with no bomb is handed one.
     var bombSupplyScale: Double {
         switch self {
-        case .easy:     return 3
+        case .easy:     return 5
         case .medium:   return 1.8
         case .hard:     return 1
         case .hardcore: return 0.7

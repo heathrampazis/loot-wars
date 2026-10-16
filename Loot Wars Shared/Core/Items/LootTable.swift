@@ -224,14 +224,19 @@ enum LootTable {
     ///     taken out and the rest of the table renormalised round it.
     ///   - perkBoost: how much likelier the power-up rows are than this band
     ///     says - more than one for a bot opening it, see AI.cratePerkBoost.
+    ///   - healBoost: how much likelier the bandage and medkit rows are - more
+    ///     than one for a player on the easier settings, see
+    ///     Difficulty.crateHealBoost.
     static func roll(bombShare: Double,
                      at progress: Double,
                      rare: Bool = false,
                      unlocks: Unlocks = .all,
                      perkBoost: Double = 1,
+                     healBoost: Double = 1,
                      using rng: inout SeededRandom) -> Pickup {
         let rolled = plain(bombShare: bombShare, at: progress, rare: rare,
-                           unlocks: unlocks, perkBoost: perkBoost, using: &rng)
+                           unlocks: unlocks, perkBoost: perkBoost,
+                           healBoost: healBoost, using: &rng)
         return rare ? upgraded(rolled, unlocks: unlocks) : rolled
     }
 
@@ -240,10 +245,16 @@ enum LootTable {
                               rare: Bool,
                               unlocks: Unlocks,
                               perkBoost: Double,
+                              healBoost: Double,
                               using rng: inout SeededRandom) -> Pickup {
         let table = table(at: progress)
         let share = min(1, max(0, bombShare))
         var rows = table.compactMap { row -> (pickup: Pickup, weight: Int)? in
+            // More heals, on the settings that want them (Oct 2026).
+            if case .item(let type) = row.pickup, type.isHealing {
+                return (pickup: row.pickup,
+                        weight: Int((Double(row.weight) * healBoost).rounded()))
+            }
             guard row.pickup == .item(.bomb) else { return row }
 
             // Bombs come out of the purple crates and nothing else (Oct 2026). One

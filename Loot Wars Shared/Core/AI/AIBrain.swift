@@ -762,6 +762,7 @@ enum AIBrain {
         // Not in the opening: those seconds are for looting and building, and a
         // match that starts at full volume has nowhere to build to.
         if state.raidUrgeTimer <= 0, !world.isOpening,
+           world.matchProgress >= world.difficulty.raidsFrom,
            let raid = raidGoal(for: actor, in: world) {
             return raid
         }
@@ -773,6 +774,7 @@ enum AIBrain {
         // the owner is on their way home to shut it, and after that the machine is
         // behind a wall again.
         if state.raidUrgeTimer <= 0, !world.isOpening,
+           world.matchProgress >= world.difficulty.raidsFrom,
            let machine = machineWorthWrecking(for: actor, in: world) {
             return .wreck(machine.id)
         }
