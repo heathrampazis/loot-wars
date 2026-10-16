@@ -44,10 +44,18 @@ enum MapFactory {
         // After the bases, so region borders can bend round them.
         let biomes = BiomeFactory.generate(width: map.width, height: map.height,
                                            seed: seed, around: claims)
-        let trees = plantTrees(in: map, biomes: biomes, avoiding: claims, using: &rng)
         // Machines first: they are big and there are only a handful, so they get
-        // the pick of the open ground. Crates then fit around them.
-        let arcades = placeArcades(in: map, avoiding: claims, and: trees, using: &rng)
+        // the pick of the open ground, and the trees then grow round them. Crates
+        // then fit around both.
+        //
+        // The trees used to go first, despite what this comment said. Once they
+        // were spread evenly with walkable gaps between them, the open middle of
+        // the map was dotted with clumps and a machine - which needs a clear block
+        // two tiles round it - often found nowhere to stand, so maps came up with
+        // no machines at all (Oct 2026).
+        let arcades = placeArcades(in: map, avoiding: claims, and: [], using: &rng)
+        let trees = plantTrees(in: map, biomes: biomes, avoiding: claims,
+                               and: arcades, using: &rng)
         let lootboxes = scatterLootboxes(in: map, avoiding: claims, and: trees,
                                          around: arcades, using: &rng)
 
@@ -183,7 +191,12 @@ enum MapFactory {
     private static func plantTrees(in map: TileMap,
                                    biomes: BiomeMap,
                                    avoiding claims: [TeamID: BaseClaim],
+                                   and arcades: [Arcade],
                                    using rng: inout SeededRandom) -> [TreePatch] {
+        // The clear block round every machine - its footprint and the rings it
+        // pays tokens into - which no tree may reach into.
+        let machineTiles = Set(arcades.flatMap { $0.tiles(within: GameConfig.Arcade.clearance) })
+
         var planted: [TreePatch] = []
 
         // treePatchCount is for an all-plains map; scale it by how dense this map's biomes are.
@@ -227,6 +240,7 @@ enum MapFactory {
             guard keep < local / densest else { continue }
 
             guard isClear(candidate, of: planted, and: claims, biomes: biomes, in: map) else { continue }
+            guard !machineTiles.contains(where: { candidate.overlaps($0) }) else { continue }
             planted.append(candidate)
         }
 

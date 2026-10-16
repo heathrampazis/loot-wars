@@ -34,6 +34,7 @@ final class GameScene: SKScene {
     private var night: NightOverlay?
     private let tileRenderer = TileMapRenderer()
     private let claimRenderer = ClaimRenderer()
+    private let arcadePadRenderer = ArcadePadRenderer()
     private let treeRenderer = TreeRenderer()
     private let blockRenderer = BlockRenderer()
     private let arcadeRenderer = ArcadeRenderer()
@@ -545,6 +546,7 @@ final class GameScene: SKScene {
 
         tileRenderer.build(from: generated.map, biomes: generated.biomes)
         claimRenderer.build(claims: generated.claims)
+        arcadePadRenderer.build(arcades: generated.arcades)
         treeRenderer.build(patches: generated.trees, biomes: generated.biomes)
         effectsRenderer.biomes = generated.biomes
         actorRenderer.biomes = generated.biomes
@@ -552,6 +554,7 @@ final class GameScene: SKScene {
         turretRenderer.build(mapHeight: generated.map.height)
         worldLayer.addChild(tileRenderer.node)
         worldLayer.addChild(claimRenderer.node)
+        worldLayer.addChild(arcadePadRenderer.node)
 
         if world.isNight {
             let overlay = NightOverlay()
