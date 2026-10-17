@@ -8,9 +8,11 @@
 //
 //  For every player (Actor.autoChores):
 //  - A crate opens the moment you are in reach of it.
-//  - Your base follows you: walls go up on its outline as you walk along it,
-//    the outline moves out to meet you if you linger just outside it, and walls
-//    left inside the new outline come down as you pass them.
+//  - Your base goes up on the recommended square as you walk along it. It
+//    sticks to that square; only if you build off it yourself does the outline
+//    reshape round your walls, and walls left inside it come down as you pass.
+//    (Following you round the claim is still here behind
+//    GameConfig.Assist.followsYou, off since Oct 2026.)
 //
 //  For a player being helped (Actor.assisted), as much as the match's
 //  difficulty gives - see Difficulty.assistAimCone and friends. Easy gets all
@@ -192,6 +194,13 @@ enum AssistSystem {
             actor.assistOutsideTime = 0
             actor.assistFollowing = nil
             return nil
+        }
+
+        // Sticking to the recommended square: nothing to follow.
+        guard GameConfig.Assist.followsYou else {
+            actor.assistOutsideTime = 0
+            actor.assistFollowing = nil
+            return world.basePlan(for: actor.team, walls: base.ownWalls, towardsMiddle: true)
         }
 
         if base.ownWalls.isEmpty {

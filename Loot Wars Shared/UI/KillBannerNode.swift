@@ -28,9 +28,9 @@ final class KillBannerNode: SKNode {
 
     private let panel = SKShapeNode()
     private let mark = SKSpriteNode(texture: Glyphs.crosshair)
-    private let title = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let title = GameLabel(fontNamed: "AvenirNext-Bold")
     private let badge = SKShapeNode(circleOfRadius: 9)
-    private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let count = GameLabel(fontNamed: "AvenirNext-Bold")
 
     private var streak = 0
 

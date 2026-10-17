@@ -430,8 +430,10 @@ final class ActorRenderer {
     /// The tag's typeface, kept as a UIFont too so the words can be centred on
     /// their capitals rather than on the font's whole box - which leaves room
     /// for descenders under every name and makes it sit high in its pill.
-    private static let nameFont = UIFont(name: "AvenirNext-Bold", size: nameFontSize)
-        ?? UIFont.boldSystemFont(ofSize: nameFontSize)
+    private static let nameFont = GameFont.rounded
+        ? GameFont.of(size: nameFontSize, weight: .heavy)
+        : UIFont(name: "AvenirNext-Bold", size: nameFontSize)
+            ?? UIFont.boldSystemFont(ofSize: nameFontSize)
 
     /// Fills a name tag: a team-coloured dot and the name in white, on a dark
     /// pill sized to fit. The dot is the same one the leaderboard uses, so a
@@ -440,7 +442,7 @@ final class ActorRenderer {
         tag.removeAllChildren()
         guard !name.isEmpty else { return }
 
-        let label = SKLabelNode(fontNamed: nameFont.fontName)
+        let label = GameLabel(fontNamed: "AvenirNext-Bold")
         label.fontSize = nameFontSize
         label.fontColor = SKColor(white: 1, alpha: mine ? 1 : 0.92)
         label.horizontalAlignmentMode = .left
@@ -512,7 +514,7 @@ final class ActorRenderer {
         // something is genuinely hard to read otherwise.
         var goalLabel: SKLabelNode?
         if GameConfig.AI.showDebugLabels, actor.ai != nil {
-            let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            let label = GameLabel(fontNamed: "AvenirNext-Bold")
             label.fontSize = 10
             label.fontColor = .white
             label.alpha = 0.8

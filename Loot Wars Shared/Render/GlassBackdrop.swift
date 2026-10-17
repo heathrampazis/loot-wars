@@ -31,6 +31,15 @@ final class GlassBackdrop {
     /// bring the glass back; nothing else needs to change.
     static let enabled = false
 
+    /// Glass behind the shop panel alone, while it is open (Oct 2026).
+    ///
+    /// The shop is the one place the cost is fine: it is open for a few seconds,
+    /// the move stick is put away so the camera is nearly still, and it is the
+    /// screen that most wants to look special. The blur only runs while the
+    /// panel is up - see GameScene.refreshGlass. False to go back to the plain
+    /// plate.
+    static let shopOnly = true
+
     /// How small the map is drawn before it is blurred. A quarter of the pixels
     /// along each side is a sixteenth of the work, and a blur hides the loss.
     private static let downscale: CGFloat = 0.25

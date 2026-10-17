@@ -162,11 +162,11 @@ final class GameScene: SKScene {
                                               fill: RenderPalette.hudPanel,
                                               // Grown with the plate, at the same
                                               // 0.73 the button has always worn.
-                                              // The reference draws it at 0.6,
-                                              // which left more air round it than
-                                              // the button wanted.
                                               glyphSize: 58,
-                                              glass: true, shadow: true)
+                                              glass: true, shadow: true,
+                                              // The word under the bag, in the
+                                              // title screen's lettering.
+                                              caption: "SHOP")
     private let shopPanel = ShopPanelNode()
 
     /// One offer, unprompted, for a few seconds - see QuickBuyNode.
@@ -1137,7 +1137,9 @@ final class GameScene: SKScene {
     }
 
     private func refreshGlass() {
-        guard GlassBackdrop.enabled, let view else { return }
+        // Everywhere, or just behind the shop while it is open.
+        let wanted = GlassBackdrop.enabled || (GlassBackdrop.shopOnly && shopPanel.isOpen)
+        guard wanted, let view else { return }
         let camera = cameraController.node
         glass.refresh(view: view, world: worldLayer, centre: camera.position,
                       zoom: camera.xScale, screen: size)
@@ -1566,20 +1568,10 @@ final class GameScene: SKScene {
 
                 SoundPlayer.shared.play(.complete, at: heart, heardFrom: ears)
 
-            case .vault(let points, let team, let position):
-                // Only your own base, and only when you can see it. Somebody else's
-                // wall paying out is a number over a base you are not standing in,
-                // and eight of those every twelve seconds is a screen full of
-                // arithmetic nobody asked for.
+            case .vault(_, let team, _):
+                // No number any more (Oct 2026): floating points over the base were
+                // noise. The score on the leaderboard still goes up.
                 guard team == world.localPlayer?.team else { break }
-
-                // Over the base when you can see it; off the arrow home when you
-                // cannot, so the income is noticed wherever you are.
-                if baseCompass.isShowing {
-                    baseCompass.earned(points)
-                } else {
-                    effectsRenderer.earned(at: position, points: points)
-                }
 
                 // And once, ever, the sentence that explains what the number is.
                 if tipsOn, !Prefs.taughtHolding {
@@ -1652,7 +1644,7 @@ final class GameScene: SKScene {
                 guard who == world.localPlayerID else { break }
                 SoundPlayer.shared.play(.token)
 
-            case .kill(let victim, let killer, let position, let points, _):
+            case .kill(let victim, let killer, let position, _, _):
                 // Remembered so the camera can go and watch them - see aimCamera.
                 // Taken from the EVENT rather than worked out later, because by the
                 // time anything is drawn the body has been stripped and moved home,
@@ -1664,7 +1656,6 @@ final class GameScene: SKScene {
                 }
 
                 effectsRenderer.mark(killAt: position,
-                                     points: points,
                                      mine: killer == world.localPlayerID)
 
                 // Whoever got them is pleased about it - you or anybody else.
@@ -1715,6 +1706,14 @@ final class GameScene: SKScene {
                 // Not shown: the respawn panel stays about getting back in.
                 // The leaderboard already says where you stand.
                 break
+
+            case .hurt(let victim, let amount, let attacker, let position):
+                // Only the hits you land. Not the ones you take - your health bar
+                // already says that - and not every exchange between bots, which
+                // would be a screen full of numbers.
+                if attacker == world.localPlayerID, victim != world.localPlayerID {
+                    effectsRenderer.damage(at: position, amount: amount)
+                }
 
             case .rearmed(let who, _, _):
                 // Your chest paying you back, the moment it does.
@@ -1865,6 +1864,21 @@ final class GameScene: SKScene {
         // away - see Prefs, and the menu, which reads both.
         if let team = world.localPlayer?.team {
             Prefs.finishedMatch(scoring: world.score(for: team))
+        }
+
+        // A podium finish is the moment to ask for a rating - see RatePrompt.
+        // After a pause, so the results land first, and only if they are still
+        // up: never over the start of the next match.
+        if let team = world.localPlayer?.team,
+           let place = world.standings.firstIndex(where: { $0.team == team }),
+           RatePrompt.shouldAsk(afterPlace: place) {
+            run(.sequence([
+                .wait(forDuration: 2.5),
+                .run { [weak self] in
+                    guard let self, self.world?.isOver == true, !self.results.isHidden else { return }
+                    RatePrompt.ask(in: self.view?.window?.windowScene)
+                }
+            ]), withKey: "ratePrompt")
         }
 
         // Everything you could press goes, including the chest panel if you happened

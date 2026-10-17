@@ -252,7 +252,7 @@ final class ChestPanelNode: SKNode {
         holder.zPosition = 60
         addChild(holder)
 
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let label = GameLabel(fontNamed: "AvenirNext-Bold")
         label.text = text
         label.fontSize = 15
         label.fontColor = .white

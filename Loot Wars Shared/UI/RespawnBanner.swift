@@ -16,8 +16,8 @@ final class RespawnBanner: SKNode {
         roundedRect: CGRect(x: -120, y: -34, width: 240, height: 68),
         cornerWidth: 16, cornerHeight: 16, transform: nil))
 
-    private let title = SKLabelNode(fontNamed: "AvenirNext-Bold")
-    private let countdown = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let title = GameLabel(fontNamed: "AvenirNext-Bold")
+    private let countdown = GameLabel(fontNamed: "AvenirNext-Bold")
 
     override init() {
         super.init()

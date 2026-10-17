@@ -48,7 +48,7 @@ final class MatchPanelNode: SKNode {
     /// the widest digits, and never moves - a panel that twitched every second
     /// as a 1 became a 0 would be worse than one a little too wide.
     private static let clockTextWidth: CGFloat = {
-        let probe = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let probe = GameLabel(fontNamed: "AvenirNext-Bold")
         probe.fontSize = 19
         probe.text = "8:88"
         return ceil(probe.frame.width)
@@ -57,7 +57,7 @@ final class MatchPanelNode: SKNode {
     private let panel = SKShapeNode()
     private var glass: GlassNode?
     private let clockIcon = SKSpriteNode(texture: Glyphs.clock)
-    private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let label = GameLabel(fontNamed: "AvenirNext-Bold")
     private let purse = StatCounterNode(iconNamed: "Token")
 
     /// Your eliminations this match, beside the same crosshair the elimination

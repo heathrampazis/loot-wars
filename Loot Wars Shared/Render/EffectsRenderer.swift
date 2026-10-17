@@ -767,12 +767,12 @@ final class EffectsRenderer {
 
     // MARK: - Kills
 
-    /// The mark left where somebody went down, and what it paid.
+    /// The ring left where somebody went down.
     ///
-    /// Everyone gets the ring, because a kill anywhere on screen is worth knowing
-    /// about. The number is only for YOURS - a floating score above every death in
-    /// an eight-way match would be arithmetic nobody asked for.
-    func mark(killAt position: Vec2, points: Int, mine: Bool) {
+    /// Everyone gets it, because a kill anywhere on screen is worth knowing
+    /// about. It used to carry the points the kill paid too; those went in Oct
+    /// 2026 - floating score numbers were noise.
+    func mark(killAt position: Vec2, mine: Bool) {
         let origin = GridGeometry.point(for: position)
 
         let ring = SKShapeNode(circleOfRadius: GridGeometry.length(ofTiles: 0.5))
@@ -787,63 +787,51 @@ final class EffectsRenderer {
             .group([.scale(to: 2.6, duration: 0.34), .fadeOut(withDuration: 0.34)]),
             .removeFromParent()
         ]))
-
-        guard mine, points > 0 else { return }
-
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        label.text = "+\(points)"
-        label.fontSize = 18
-        label.fontColor = RenderPalette.countBadge
-        label.verticalAlignmentMode = .center
-        label.position = CGPoint(x: origin.x, y: origin.y + 14)
-        label.zPosition = 14
-        node.addChild(label)
-
-        label.setScale(0.6)
-        label.run(.sequence([
-            .group([.scale(to: 1.15, duration: 0.12), .moveBy(x: 0, y: 10, duration: 0.12)]),
-            .scale(to: 1.0, duration: 0.1),
-            .group([.moveBy(x: 0, y: 22, duration: 0.6),
-                    .sequence([.wait(forDuration: 0.25), .fadeOut(withDuration: 0.35)])]),
-            .removeFromParent()
-        ]))
     }
 
-    /// A quiet number rising off your own base, for points that arrived on a clock.
+    /// A damage number popping off somebody you hit.
     ///
-    /// Deliberately NOT the kill mark. That draws a ring, and a ring means somebody
-    /// died on that spot - borrowing it for a wall that is simply still standing
-    /// would be the screen telling a small lie every twelve seconds. What is left
-    /// when the ring comes off is the part that was always doing the work: the
-    /// number, floating up and away.
+    /// In the title screen's lettering - white, black outline, held still -
+    /// so it belongs to the same game as the logo rather than looking like a debug
+    /// readout. Each one is drawn once and kept; a match only ever needs a few
+    /// dozen different numbers.
     ///
-    /// Smaller and slower than a kill's, too. This one arrives twenty times a match
-    /// whether or not you are looking at it, so it has to be readable when you are
-    /// standing at home and ignorable when you are not.
-    func earned(at position: Vec2, points: Int) {
-        guard points > 0 else { return }
+    /// Bigger hits come up a little bigger. Numbers step sideways in turn so a
+    /// burst of shots fans out rather than stacking into one unreadable blob.
+    func damage(at position: Vec2, amount: Int) {
+        guard amount > 0 else { return }
+
+        let art: (texture: SKTexture, size: CGSize)
+        if let cached = damageArt[amount] {
+            art = cached
+        } else {
+            art = LogoArt.make("\(amount)", size: 19, bounce: false)
+            damageArt[amount] = art
+        }
 
         let origin = GridGeometry.point(for: position)
+        let sideways = EffectsRenderer.damageFan[damageStep % EffectsRenderer.damageFan.count]
+        damageStep += 1
 
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        label.text = "+\(points)"
-        label.fontSize = 15
-        label.fontColor = RenderPalette.countBadge
-        label.verticalAlignmentMode = .center
-        label.position = CGPoint(x: origin.x, y: origin.y)
-        label.zPosition = 14
-        label.alpha = 0
+        let label = SKSpriteNode(texture: art.texture, size: art.size)
+        label.position = CGPoint(x: origin.x + sideways,
+                                 y: origin.y + GridGeometry.length(ofTiles: 0.7))
+        label.zPosition = 15
         node.addChild(label)
 
-        label.setScale(0.7)
+        let peak = 1.1 + min(0.4, CGFloat(amount) / 100)
+        label.setScale(0.4)
         label.run(.sequence([
-            .group([.fadeAlpha(to: 0.95, duration: 0.18),
-                    .scale(to: 1.0, duration: 0.18)]),
-            .group([.moveBy(x: 0, y: 26, duration: 0.9),
-                    .sequence([.wait(forDuration: 0.35),
-                               .fadeOut(withDuration: 0.55)])]),
+            .scale(to: peak, duration: 0.08),
+            .scale(to: 1.0, duration: 0.08),
+            .group([.moveBy(x: sideways * 0.4, y: 22, duration: 0.55),
+                    .sequence([.wait(forDuration: 0.25), .fadeOut(withDuration: 0.3)])]),
             .removeFromParent()
         ]))
     }
 
+    /// Each damage number's sideways step, in turn.
+    private static let damageFan: [CGFloat] = [-8, 7, -3, 10, -11, 4]
+    private var damageStep = 0
+    private var damageArt: [Int: (texture: SKTexture, size: CGSize)] = [:]
 }

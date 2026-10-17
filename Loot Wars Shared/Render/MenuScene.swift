@@ -718,10 +718,10 @@ extension MenuScene: UITextFieldDelegate {
                                  height: bottomRight.y - topLeft.y)
 
         let fontSize = (field.size.height * 0.4).rounded()
-        nameInput.font = UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        nameInput.font = GameFont.of(size: fontSize, weight: .bold)
         nameInput.attributedPlaceholder = NSAttributedString(
             string: "Enter your name",
-            attributes: [.font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
+            attributes: [.font: GameFont.of(size: fontSize, weight: .semibold),
                          .foregroundColor: UIColor(white: 0, alpha: 0.38)])
     }
 
@@ -772,7 +772,7 @@ extension MenuScene: UITextFieldDelegate {
         let size = nameInput.font?.pointSize ?? 16
         nameInput.attributedPlaceholder = NSAttributedString(
             string: text,
-            attributes: [.font: UIFont.systemFont(ofSize: size, weight: .semibold),
+            attributes: [.font: GameFont.of(size: size, weight: .semibold),
                          .foregroundColor: warning ? RenderPalette.menuDanger.face
                                                    : UIColor(white: 0, alpha: 0.38)])
     }

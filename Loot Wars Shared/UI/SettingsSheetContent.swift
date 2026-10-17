@@ -390,7 +390,7 @@ private enum Sheet {
     static func text(_ string: String, size: CGFloat, weight: UIFont.Weight,
                      colour: SKColor) -> NSAttributedString {
         NSAttributedString(string: string, attributes: [
-            .font: UIFont.systemFont(ofSize: size, weight: weight),
+            .font: GameFont.of(size: size, weight: weight),
             .foregroundColor: colour
         ])
     }

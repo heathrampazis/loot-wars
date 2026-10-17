@@ -37,6 +37,10 @@ final class ActionButtonNode: SKNode {
     private let base: SKShapeNode
     private let glyph = SKSpriteNode()
 
+    /// How strongly the glyph shows when the button is not recommending itself.
+    /// White symbols sit back a little at 85%; coloured art wants all of itself.
+    private let restingGlyphAlpha: CGFloat
+
     private(set) var isPressed = false
     private(set) var isEnabled = true
     private(set) var isHighlighted = false
@@ -48,8 +52,11 @@ final class ActionButtonNode: SKNode {
          fill: SKColor = RenderPalette.controlBackground,
          glyphSize: CGFloat? = nil,
          glass: Bool = false,
-         shadow: Bool = false) {
+         shadow: Bool = false,
+         glyphAlpha: CGFloat = 0.85,
+         caption: String? = nil) {
         self.grabRadius = grabRadius
+        self.restingGlyphAlpha = glyphAlpha
         // Defaults to half the button, which is right for art that already has its
         // own margin. The drawn glyphs do not, so they say how big they want to be.
         self.glyphSize = glyphSize ?? radius
@@ -85,11 +92,21 @@ final class ActionButtonNode: SKNode {
             addChild(under)
         }
 
-        glyph.alpha = 0.85
+        glyph.alpha = glyphAlpha
 
         zPosition = 1000
         addChild(base)
         addChild(glyph)
+
+        // A word under the glyph, in the title screen's lettering. The glyph moves
+        // up to make room; the word sits just inside the bottom edge.
+        if let caption {
+            let art = LogoArt.make(caption, size: radius * 0.4, bounce: false)
+            let word = SKSpriteNode(texture: art.texture, size: art.size)
+            word.position = CGPoint(x: 0, y: -radius + radius * 0.1 + art.size.height / 2)
+            addChild(word)
+            glyph.position = CGPoint(x: 0, y: radius * 0.2)
+        }
 
         setGlyph(texture)
     }
@@ -124,7 +141,7 @@ final class ActionButtonNode: SKNode {
         isHighlighted = on
         base.strokeColor = on ? RenderPalette.recommend : RenderPalette.glassRim
         base.lineWidth = on ? 4 : RenderPalette.glassRimWidth
-        glyph.alpha = on ? 1 : 0.85
+        glyph.alpha = on ? 1 : restingGlyphAlpha
 
         // The breathing is on the disc alone: the whole button's scale belongs to
         // the press, and the art staying still keeps it easy to read.
@@ -163,7 +180,15 @@ final class ActionButtonNode: SKNode {
 
         guard caught else { return false }
         isPressed = true
-        setScale(0.92)
+
+        // Squashed in quickly, under the thumb. Takes over from a nudge that
+        // happened to be running, which also uses the button's scale.
+        removeAction(forKey: "nudge")
+        removeAction(forKey: "press")
+        zRotation = 0
+        let squash = SKAction.scale(to: 0.86, duration: 0.05)
+        squash.timingMode = .easeOut
+        run(squash, withKey: "press")
         return true
     }
 
@@ -184,8 +209,21 @@ final class ActionButtonNode: SKNode {
         ]), withKey: "nudge")
     }
 
+    /// Let go: springs back past full size and settles, so a press pops. A
+    /// button that was not being pressed just stays as it is.
     func end() {
+        let wasPressed = isPressed
         isPressed = false
-        setScale(1.0)
+        removeAction(forKey: "press")
+        guard wasPressed else {
+            if action(forKey: "nudge") == nil { setScale(1.0) }
+            return
+        }
+
+        let spring = SKAction.scale(to: 1.1, duration: 0.08)
+        spring.timingMode = .easeOut
+        let settle = SKAction.scale(to: 1.0, duration: 0.12)
+        settle.timingMode = .easeInEaseOut
+        run(.sequence([spring, settle]), withKey: "press")
     }
 }
