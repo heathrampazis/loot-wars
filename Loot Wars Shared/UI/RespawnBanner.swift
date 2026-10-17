@@ -16,16 +16,21 @@ final class RespawnBanner: SKNode {
         roundedRect: CGRect(x: -120, y: -34, width: 240, height: 68),
         cornerWidth: 16, cornerHeight: 16, transform: nil))
 
-    private let title = SKLabelNode(fontNamed: "AvenirNext-Bold")
-    private let countdown = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let title = GameLabel(fontNamed: "AvenirNext-Bold")
+    private let countdown = GameLabel(fontNamed: "AvenirNext-Bold")
 
     override init() {
         super.init()
         zPosition = 1200
         isHidden = true
 
-        panel.fillColor = RenderPalette.hudPanel
+        // A plain plate a touch darker than the rest of the HUD. Glass was
+        // tried here and is off - see GlassBackdrop.respawn.
+        panel.fillColor = GlassBackdrop.respawn ? RenderPalette.shopPanel : RenderPalette.respawnPanel
         panel.strokeColor = .clear
+        if GlassBackdrop.respawn, let path = panel.path {
+            panel.addChild(GlassNode(path: path, always: true))
+        }
         addChild(panel)
 
         title.text = "RESPAWNING"

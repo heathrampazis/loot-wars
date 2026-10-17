@@ -131,7 +131,7 @@ final class HotbarNode: SKNode {
         tag.zPosition = 25
         tag.alpha = 0
 
-        let word = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let word = GameLabel(fontNamed: "AvenirNext-Bold")
         word.text = "SELL"
         word.fontSize = 14
         word.fontColor = .white
@@ -139,7 +139,7 @@ final class HotbarNode: SKNode {
         word.verticalAlignmentMode = .center
         word.zPosition = 2
 
-        let amount = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let amount = GameLabel(fontNamed: "AvenirNext-Bold")
         amount.text = "+\(price)"
         amount.fontSize = 14
         amount.fontColor = .white
@@ -264,7 +264,7 @@ final class HotbarNode: SKNode {
         addChild(payout)
         payouts[index] = payout
 
-        let amount = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let amount = GameLabel(fontNamed: "AvenirNext-Bold")
         amount.text = "+\(tokens)"
         amount.fontSize = HotbarNode.slotSize * 0.3
         amount.fontColor = RenderPalette.payout
@@ -387,7 +387,7 @@ final class HotbarNode: SKNode {
         addChild(note)
         self.note = note
 
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let label = GameLabel(fontNamed: "AvenirNext-Bold")
         label.text = reason
         label.fontSize = HotbarNode.slotSize * 0.26
         label.fontColor = .white

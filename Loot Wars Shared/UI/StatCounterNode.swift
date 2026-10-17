@@ -55,7 +55,7 @@ final class StatCounterNode: SKNode {
     /// Where the icon sits in the row. The icon's own position is left free for
     /// the hop and the shake, which re-centring would otherwise cancel.
     private let iconHolder = SKNode()
-    private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let label = GameLabel(fontNamed: "AvenirNext-Bold")
     private var lastValue = Int.min
 
     convenience init(iconNamed iconName: String) {
@@ -226,7 +226,7 @@ final class StatCounterNode: SKNode {
     }
 
     private static let digitWidth: CGFloat = {
-        let probe = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let probe = GameLabel(fontNamed: "AvenirNext-Bold")
         probe.fontSize = 16
         probe.text = "88888888"
         return ceil(probe.frame.width / 8)
@@ -258,7 +258,7 @@ final class StatCounterNode: SKNode {
         // A number that rises off the counter and fades. Made fresh each time
         // rather than reused, so two payments a moment apart both get seen instead
         // of the second one restarting the first.
-        let float = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let float = GameLabel(fontNamed: "AvenirNext-Bold")
         float.text = gained ? "+\(delta)" : "\(delta)"
         float.fontSize = 15
         float.fontColor = gained ? RenderPalette.placementValid : RenderPalette.placementBlocked

@@ -28,7 +28,7 @@ final class RebuildTimerNode: SKNode {
 
     private let holder = SKNode()
     private let panel = SKShapeNode()
-    private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let label = GameLabel(fontNamed: "AvenirNext-Bold")
 
     private var shownSeconds = -1
     private var suppressed = false

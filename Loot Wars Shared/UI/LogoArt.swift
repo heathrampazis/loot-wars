@@ -33,7 +33,14 @@ import CoreText
 enum LogoArt {
 
     /// The name at this size, as a texture and the size to draw it at.
-    static func make(_ text: String, size fontSize: CGFloat) -> (texture: SKTexture, size: CGSize) {
+    ///
+    /// Also lends its lettering to the rest of the game - the shop button's label
+    /// and the damage numbers - so those read as the same hand as the title.
+    /// Fill is white unless asked; bounce can be switched off for text that has
+    /// to sit still.
+    static func make(_ text: String, size fontSize: CGFloat,
+                     fill: UIColor = .white,
+                     bounce: Bool = true) -> (texture: SKTexture, size: CGSize) {
         // How much each letter is swollen, and the black round that.
         //
         // No puff any more: swelling the letters closed up the narrow gaps
@@ -50,7 +57,8 @@ enum LogoArt {
         let spacing = -fontSize * 0.01
 
         let font = roundedFont(size: fontSize)
-        let letters = bouncedLetters(of: text, in: font, size: fontSize, spacing: spacing)
+        let letters = bouncedLetters(of: text, in: font, size: fontSize, spacing: spacing,
+                                     bounce: bounce)
 
         let whole = CGMutablePath()
         for letter in letters { whole.addPath(letter) }
@@ -87,7 +95,7 @@ enum LogoArt {
                                          lineCap: .round, lineJoin: .round,
                                          miterLimit: 10)
 
-                cg.setFillColor(UIColor.white.cgColor)
+                cg.setFillColor(fill.cgColor)
                 cg.addPath(letter)
                 cg.fillPath()
                 cg.addPath(puffed)
@@ -117,7 +125,8 @@ enum LogoArt {
     /// Every letter as its own path, laid out by Core Text, pulled together, and
     /// each nudged and turned about its own middle.
     private static func bouncedLetters(of text: String, in font: UIFont,
-                                       size: CGFloat, spacing: CGFloat) -> [CGPath] {
+                                       size: CGFloat, spacing: CGFloat,
+                                       bounce: Bool) -> [CGPath] {
         let attributed = NSAttributedString(string: text, attributes: [
             .font: font,
             .kern: spacing
@@ -148,9 +157,9 @@ enum LogoArt {
                 let step = index % lift.count
                 index += 1
 
-                let turn = lean[step] * .pi / 180
+                let turn = bounce ? lean[step] * .pi / 180 : 0
                 let transform = CGAffineTransform(translationX: positions[glyph].x,
-                                                  y: positions[glyph].y + lift[step] * size)
+                                                  y: positions[glyph].y + (bounce ? lift[step] * size : 0))
                     .translatedBy(x: middle.x, y: middle.y)
                     .rotated(by: turn)
                     .translatedBy(x: -middle.x, y: -middle.y)

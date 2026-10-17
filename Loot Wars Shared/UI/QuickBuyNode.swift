@@ -48,7 +48,7 @@ final class QuickBuyNode: SKNode {
     private let flash = SKShapeNode()
     private let glow = SKSpriteNode(texture: GlowArt.pool)
     private let icon = SKSpriteNode()
-    private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let price = GameLabel(fontNamed: "AvenirNext-Bold")
     private let token = SKSpriteNode()
 
     /// What is currently being offered, so the same offer is not re-announced

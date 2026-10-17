@@ -58,7 +58,7 @@ final class LegalSheetContent: MenuSheetContent {
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineSpacing = 3
             label.attributedText = NSAttributedString(string: text, attributes: [
-                .font: UIFont.systemFont(ofSize: size, weight: weight),
+                .font: GameFont.of(size: size, weight: weight),
                 .foregroundColor: colour,
                 .paragraphStyle: paragraph
             ])

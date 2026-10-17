@@ -317,7 +317,7 @@ final class HowToPlayContent: MenuSheetContent {
         paragraph.alignment = .center
         paragraph.lineSpacing = 3
         return NSAttributedString(string: string, attributes: [
-            .font: UIFont.systemFont(ofSize: size, weight: weight),
+            .font: GameFont.of(size: size, weight: weight),
             .foregroundColor: colour,
             .paragraphStyle: paragraph
         ])

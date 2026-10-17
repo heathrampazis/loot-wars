@@ -47,13 +47,47 @@ final class TreeRenderer {
             sprite.zRotation = CGFloat(patch.initialRotation)
             sprite.zPosition = 2    // above the ground and claim tints, below walls
 
-            // Cacti stand still; only leafy trees sway round.
+            // Leafy trees turn slowly round. Cacti do not spin - they rock a
+            // little and breathe instead, so the desert is not dead still.
             if biome != .desert {
                 sprite.run(spinAction(radiansPerSecond: patch.spin))
+            } else {
+                sprite.run(cactusIdle(around: CGFloat(patch.initialRotation),
+                                      seed: patch.initialRotation / (2 * Double.pi)))
             }
 
             node.addChild(sprite)
         }
+    }
+
+    /// A cactus's idle: a small rock either side of where it stands and a slow
+    /// swell, on slightly different beats so it never looks mechanical. Paced
+    /// and started from where the patch was turned to, so no two cacti move
+    /// together.
+    private func cactusIdle(around rest: CGFloat, seed: Double) -> SKAction {
+        let wobble = abs(seed).truncatingRemainder(dividingBy: 1)   // 0..<1, steady per cactus
+        let lean: CGFloat = 0.045
+        let rockTime = 1.6 + wobble * 0.8
+        let breathTime = 1.3 + wobble * 0.6
+
+        func eased(_ action: SKAction) -> SKAction {
+            action.timingMode = .easeInEaseOut
+            return action
+        }
+
+        let rock = SKAction.repeatForever(.sequence([
+            eased(.rotate(toAngle: rest + lean, duration: rockTime)),
+            eased(.rotate(toAngle: rest - lean, duration: rockTime))
+        ]))
+        let breathe = SKAction.repeatForever(.sequence([
+            eased(.scale(to: 1.03, duration: breathTime)),
+            eased(.scale(to: 1.0, duration: breathTime))
+        ]))
+
+        return .sequence([
+            .wait(forDuration: wobble * 1.2),
+            .group([rock, breathe])
+        ])
     }
 
     private func spinAction(radiansPerSecond: Double) -> SKAction {

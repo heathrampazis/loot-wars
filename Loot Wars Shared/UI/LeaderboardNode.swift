@@ -48,9 +48,9 @@ final class LeaderboardNode: SKNode {
         let holder = SKNode()
         let highlight: SKShapeNode
         let dot: SKShapeNode
-        let rank = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        let name = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
-        let score = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let rank = GameLabel(fontNamed: "AvenirNext-Bold")
+        let name = GameLabel(fontNamed: "AvenirNext-DemiBold")
+        let score = GameLabel(fontNamed: "AvenirNext-Bold")
 
         init() {
             let w = LeaderboardNode.width - LeaderboardNode.padding * 2

@@ -104,7 +104,7 @@ final class SupplyDropRenderer {
 
         let size: CGFloat = drop.isLocked ? 15 : 13
         drawn.label.attributedText = NSAttributedString(string: text, attributes: [
-            .font: UIFont.systemFont(ofSize: size, weight: .heavy),
+            .font: GameFont.of(size: size, weight: .heavy),
             .foregroundColor: drop.isLocked ? SKColor.white : RenderPalette.treasure
         ])
 

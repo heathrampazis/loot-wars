@@ -202,14 +202,17 @@ enum RenderPalette {
     static let projectile        = rgb(0xB3, 0xF0, 0xFA)
     static let projectileOutline = SKColor.black
 
-    // HUD. Panel and track alphas solved from the mockup: the panel is this dark
-    // olive, the track a further 35% of black on top.
-    //
-    // 90%, up from 70% (Oct 2026): the frosted glass behind the controls was
-    // switched off for performance, and at 70% the sharp map showing through
-    // made the plates busy. Nearly solid reads as a clean panel instead.
-    static let hudPanel  = SKColor(red: 0x3B / 255.0, green: 0x46 / 255.0,
-                                   blue: 0x27 / 255.0, alpha: 0.90)
+    // HUD. Every panel - chest, shop, timer, leaderboard, pause, banners - is
+    // see-through black at 60%, the same as the hotbar slots, so the whole HUD
+    // is one material. It was a dark olive until Oct 2026, which read as too
+    // green behind the loot. The track is a further 35% of black on top.
+    static let hudPanel  = SKColor(white: 0.0, alpha: 0.6)
+    /// The shop's plate, over its frosted glass - lighter, so the blurred map's
+    /// colour shows through. See GlassBackdrop.shopOnly.
+    static let shopPanel = SKColor(white: 0.0, alpha: 0.42)
+    /// The respawn banner: a touch darker than the other panels, so the
+    /// countdown stands out over whatever the death camera is showing.
+    static let respawnPanel = SKColor(white: 0.0, alpha: 0.7)
     static let hudTrack  = SKColor(white: 0.0, alpha: 0.35)
     static let healthBar = rgb(0xFF, 0x51, 0x7B)
 

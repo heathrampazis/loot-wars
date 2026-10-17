@@ -51,7 +51,7 @@ final class HintNode: SKNode {
     private static let padding: CGFloat = 12
 
     private let plate = SKShapeNode()
-    private let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let label = GameLabel(fontNamed: "AvenirNext-Bold")
 
     /// What it is currently saying, so re-offering the same hint while it is still
     /// up leaves it alone rather than restarting the animation under the player.

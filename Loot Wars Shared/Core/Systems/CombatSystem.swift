@@ -89,6 +89,7 @@ enum CombatSystem {
 
         actor.health -= taken
         actor.secondsSinceHit = 0
+        world.record(.hurt(id, amount: taken, by: attacker, at: actor.position))
 
         if actor.health <= 0 {
             kill(&actor, by: attacker, in: world)

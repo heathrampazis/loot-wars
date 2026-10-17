@@ -1038,6 +1038,13 @@ enum GameConfig {
         /// moves out to meet you. Long enough that walking past, or out of the
         /// base, leaves it where it is.
         static let followDelay: Double = 1.2
+        /// Whether auto building moves your base out to meet you when you stand
+        /// just outside it, and starts it round wherever you are.
+        ///
+        /// Off (Oct 2026): it sticks to the recommended square, which keeps
+        /// bases square. It only reshapes once you build off the square yourself
+        /// - see World.basePlan. True brings the following back.
+        static let followsYou = false
     }
 
     enum AI {
@@ -3649,7 +3656,10 @@ enum GameConfig {
     /// it is drawn changes - see NightOverlay.
     enum Night {
         /// The share of matches that fall at night.
-        static let chance: Double = 0.2
+        ///
+        /// Off (Oct 2026): every match is played by day. The night code is all
+        /// still here - set this back to 0.2 to bring it back.
+        static let chance: Double = 0
     }
 
     // MARK: - Furniture

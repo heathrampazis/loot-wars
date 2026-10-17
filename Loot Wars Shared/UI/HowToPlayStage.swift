@@ -523,8 +523,8 @@ final class HowToPlayStage {
                 let ring = world.enclosure(of: team).wall
                 guard !ring.isEmpty else { break }
                 effects.seal(GameScene.sweptRound(ring), chests: chests)
-            case .kill(_, _, let position, let points, _):
-                effects.mark(killAt: position, points: points, mine: false)
+            case .kill(_, _, let position, _, _):
+                effects.mark(killAt: position, mine: false)
             default:
                 break
             }

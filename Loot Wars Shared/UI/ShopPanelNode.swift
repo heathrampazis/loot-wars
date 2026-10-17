@@ -98,6 +98,10 @@ final class ShopPanelNode: SKNode {
     private struct Card {
         let holder: SKNode
 
+        /// The point the card hangs from - the peg through its hole. Turning
+        /// this swings the card like stock on a toy shop's pegboard.
+        let hanger: SKNode
+
         /// A pool of the item's rarity colour behind the artwork - the same
         /// language the hotbar and the ground use, rather than a coloured panel.
         let glow: SKSpriteNode
@@ -110,6 +114,9 @@ final class ShopPanelNode: SKNode {
         /// The darker lip under the price button. Recoloured with it, and the
         /// reason the button reads as something you press rather than a label.
         let bevel: SKShapeNode
+
+        /// The outline round the whole button, in the lip's colour.
+        let edge: SKShapeNode
 
         /// Lit for a moment when the sale goes through. Its own node rather than a
         /// colour on the plate, because the plate's fill and the holder's alpha are
@@ -148,7 +155,7 @@ final class ShopPanelNode: SKNode {
     private static let tabSize = CGSize(width: 82, height: 28)
 
     /// Said in the SELL tab when there is nothing in your bag.
-    private let emptyNote = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let emptyNote = GameLabel(fontNamed: "AvenirNext-Bold")
 
     private let panel = SKShapeNode()
     private let back = SKNode()
@@ -161,7 +168,7 @@ final class ShopPanelNode: SKNode {
     /// How far a swipe has to travel to turn the page, in points. Short of it,
     /// the cards spring back.
     private static let swipeToTurn: CGFloat = 70
-    private let purse = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let purse = GameLabel(fontNamed: "AvenirNext-Bold")
 
     private var cards: [Card] = []
 
@@ -192,6 +199,10 @@ final class ShopPanelNode: SKNode {
     /// redraw is about to put it at.
     private var pendingDeal: TimeInterval?
 
+    /// The deck is hidden while a page change waits for its redraw - see
+    /// setMode. Shown again at the end of the next update.
+    private var deckWaiting = false
+
     // MARK: - Building
 
     override init() {
@@ -214,7 +225,9 @@ final class ShopPanelNode: SKNode {
             transform: nil
         )
 
-        panel.fillColor = RenderPalette.hudPanel
+        // Lighter than the other panels when it has glass behind it, so the
+        // frosted colours of the map come through - that is the point of it.
+        panel.fillColor = GlassBackdrop.shopOnly ? RenderPalette.shopPanel : RenderPalette.hudPanel
 
         // A thin edge, the same as every in-match control. Small, and it does more
         // than it sounds: the panel and the map behind it are both mid-toned, and
@@ -222,8 +235,10 @@ final class ShopPanelNode: SKNode {
         panel.strokeColor = RenderPalette.glassRim
         panel.lineWidth = RenderPalette.glassRimWidth
 
-        // Frosted map behind it - see GlassNode.
-        if let path = panel.path { panel.addChild(GlassNode(path: path)) }
+        // Frosted map behind it - see GlassNode and GlassBackdrop.shopOnly.
+        if let path = panel.path {
+            panel.addChild(GlassNode(path: path, always: GlassBackdrop.shopOnly))
+        }
 
         addChild(panel)
 
@@ -319,7 +334,7 @@ final class ShopPanelNode: SKNode {
             plate.strokeColor = .clear
             node.addChild(plate)
 
-            let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            let label = GameLabel(fontNamed: "AvenirNext-Bold")
             label.text = mode == .buy ? "BUY" : "SELL"
             label.fontSize = 14
             label.horizontalAlignmentMode = .center
@@ -348,7 +363,7 @@ final class ShopPanelNode: SKNode {
         for tab in tabs {
             let chosen = tab.mode == mode
             tab.plate.fillColor = chosen ? SKColor(white: 1, alpha: 0.92) : SKColor(white: 1, alpha: 0.08)
-            tab.label.fontColor = chosen ? RenderPalette.hudPanel : SKColor(white: 1, alpha: 0.75)
+            tab.label.fontColor = chosen ? RenderPalette.menuInk : SKColor(white: 1, alpha: 0.75)
         }
     }
 
@@ -363,31 +378,47 @@ final class ShopPanelNode: SKNode {
             settleDeck()
             return
         }
-        let width = ShopPanelNode.panelSize.width
-        let leaving: CGFloat = mode == .sell ? -width : width
+        // A short nudge and a fade, then the new page's cards are dealt in the
+        // way the shop opens (Oct 2026). It used to slide the whole page off
+        // the panel and the next one on from the far side, which with only a
+        // card or two on a page meant watching one card travel the width of
+        // the screen - it took too long and looked odd.
+        let away: CGFloat = mode == .sell ? -1 : 1
 
         deck.removeAction(forKey: "slide")
         deck.position.x = offset
 
-        let out = SKAction.moveTo(x: leaving, duration: 0.14)
-        out.timingMode = .easeIn
-        let inbound = SKAction.moveTo(x: 0, duration: 0.2)
-        inbound.timingMode = .easeOut
+        let nudge = SKAction.moveTo(x: away * max(abs(offset), 36), duration: 0.1)
+        nudge.timingMode = .easeIn
 
         deck.run(.sequence([
-            out,
+            .group([nudge, .fadeOut(withDuration: 0.1)]),
             .run { [weak self] in
                 guard let self else { return }
                 self.mode = mode
                 self.lastDrawn = []
                 self.lastPressed = nil
                 self.drawTabs()
-                self.deck.position.x = -leaving
-            },
-            // A frame for the redraw, so the old cards never slide back in.
-            .wait(forDuration: 0.02),
-            inbound
+                self.popTab(mode)
+
+                // Back in place but still hidden: the next update redraws the
+                // page, deals its cards and only then shows the deck, so the
+                // old cards are never seen in the new place.
+                self.deck.position.x = 0
+                self.deckWaiting = true
+                self.pendingDeal = 0
+            }
         ]), withKey: "slide")
+    }
+
+    /// The tab just chosen gives a small bounce, so the switch is felt there too.
+    private func popTab(_ mode: Mode) {
+        guard let tab = tabs.first(where: { $0.mode == mode }) else { return }
+        tab.node.removeAction(forKey: "pop")
+        tab.node.setScale(0.92)
+        let grow = SKAction.scale(to: 1.06, duration: 0.08)
+        grow.timingMode = .easeOut
+        tab.node.run(.sequence([grow, .scale(to: 1, duration: 0.08)]), withKey: "pop")
     }
 
     // MARK: - Swiping
@@ -494,12 +525,53 @@ final class ShopPanelNode: SKNode {
     /// stack is not a compromise anyway - it is how a shelf label works, and the
     /// eye running down one card and along to the next is the same motion it makes
     /// in a shop.
+    /// The hang hole: a slot with rounded ends and a round bump rising out of
+    /// its middle, the shape punched in the top of toy packaging. Centred on
+    /// the peg.
+    private static func hangHole(at peg: CGPoint) -> CGPath {
+        let slotHalf: CGFloat = 3.5          // the slot's half height
+        let slotReach: CGFloat = 11.5        // centre to the middle of each round end
+        let dome: CGFloat = 5.5              // the bump's radius
+        let slotY = peg.y - 2
+        let domeY = slotY + 2.5
+
+        // Where the slot's top edge meets the bump.
+        let lift = slotY + slotHalf - domeY
+        let meet = (dome * dome - lift * lift).squareRoot()
+        let meetAngle = asin(lift / dome)
+
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: peg.x - slotReach, y: slotY - slotHalf))
+        path.addLine(to: CGPoint(x: peg.x + slotReach, y: slotY - slotHalf))
+        path.addArc(center: CGPoint(x: peg.x + slotReach, y: slotY), radius: slotHalf,
+                    startAngle: -.pi / 2, endAngle: .pi / 2, clockwise: false)
+        path.addLine(to: CGPoint(x: peg.x + meet, y: slotY + slotHalf))
+        path.addArc(center: CGPoint(x: peg.x, y: domeY), radius: dome,
+                    startAngle: meetAngle, endAngle: .pi - meetAngle, clockwise: false)
+        path.addLine(to: CGPoint(x: peg.x - slotReach, y: slotY + slotHalf))
+        path.addArc(center: CGPoint(x: peg.x - slotReach, y: slotY), radius: slotHalf,
+                    startAngle: .pi / 2, endAngle: 3 * .pi / 2, clockwise: false)
+        path.closeSubpath()
+        return path
+    }
+
     private func makeCard(at index: Int) -> Card {
         let card = ShopPanelNode.cardSize
         let holder = SKNode()
 
         holder.position = ShopPanelNode.home(of: index, outOf: ShopPanelNode.slots)
         deck.addChild(holder)
+
+        // Hung from a peg, like toys on a shop wall: the card's parts sit on a
+        // body that hangs from the peg through its hole, so turning the hanger
+        // swings the whole card from the top - see dealCards.
+        let hangY = card.height / 2 - 10
+        let hanger = SKNode()
+        hanger.position = CGPoint(x: 0, y: hangY)
+        holder.addChild(hanger)
+        let body = SKNode()
+        body.position = CGPoint(x: 0, y: -hangY)
+        hanger.addChild(body)
 
         let outline = CGPath(
             roundedRect: CGRect(
@@ -517,7 +589,16 @@ final class ShopPanelNode: SKNode {
         plate.fillColor = SKColor(white: 1, alpha: 0.10)
         plate.strokeColor = SKColor(white: 1, alpha: 0.10)
         plate.lineWidth = 1
-        holder.addChild(plate)
+        body.addChild(plate)
+
+        // The hang hole punched through the top, the shape toy packaging uses -
+        // a slot with a round bump in the middle. No peg drawn in it; the hole
+        // says enough on its own.
+        let hole = SKShapeNode(path: ShopPanelNode.hangHole(at: CGPoint(x: 0, y: hangY)))
+        hole.fillColor = SKColor(white: 0, alpha: 0.22)
+        hole.strokeColor = SKColor(white: 1, alpha: 0.2)
+        hole.lineWidth = 1
+        body.addChild(hole)
 
         let flash = SKShapeNode(path: outline)
         flash.fillColor = RenderPalette.placementValid
@@ -525,16 +606,18 @@ final class ShopPanelNode: SKNode {
         flash.lineWidth = 3
         flash.alpha = 0
         flash.zPosition = 5
-        holder.addChild(flash)
+        body.addChild(flash)
 
         // The picture, on its own tile at the top.
-        let tileCentre = CGPoint(x: 0, y: card.height / 2 - 44)
+        // Smaller than it was (66) and lower, to leave the hole room. The
+        // picture and the name sit centred between the hole and the price.
+        let tileCentre = CGPoint(x: 0, y: card.height / 2 - 56)
 
         let tile = SKShapeNode(
             path: CGPath(
-                roundedRect: CGRect(x: -33, y: -33, width: 66, height: 66),
-                cornerWidth: 14,
-                cornerHeight: 14,
+                roundedRect: CGRect(x: -29, y: -29, width: 58, height: 58),
+                cornerWidth: 12,
+                cornerHeight: 12,
                 transform: nil
             )
         )
@@ -542,7 +625,7 @@ final class ShopPanelNode: SKNode {
         tile.fillColor = SKColor(white: 1, alpha: 0.14)
         tile.strokeColor = .clear
         tile.position = tileCentre
-        holder.addChild(tile)
+        body.addChild(tile)
 
         let glow = SKSpriteNode(texture: GlowArt.pool)
         glow.size = CGSize(width: 80, height: 80)
@@ -550,20 +633,20 @@ final class ShopPanelNode: SKNode {
         glow.alpha = 0.7
         glow.position = tileCentre
         glow.zPosition = 0.5
-        holder.addChild(glow)
+        body.addChild(glow)
 
         let icon = SKSpriteNode()
         icon.position = tileCentre
         icon.zPosition = 1
-        holder.addChild(icon)
+        body.addChild(icon)
 
-        let name = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let name = GameLabel(fontNamed: "AvenirNext-Bold")
         name.fontSize = 16
         name.fontColor = .white
         name.horizontalAlignmentMode = .center
         name.verticalAlignmentMode = .center
-        name.position = CGPoint(x: 0, y: -card.height / 2 + 74)
-        holder.addChild(name)
+        name.position = CGPoint(x: 0, y: -card.height / 2 + 66)
+        body.addChild(name)
 
         // The price button: a solid capsule sitting on the bottom margin like a
         // price tag on a shelf edge.
@@ -602,13 +685,37 @@ final class ShopPanelNode: SKNode {
         let bevel = capsule(offsetBy: 3)
         bevel.fillColor = RenderPalette.affordableDeep
         bevel.strokeColor = .clear
-        holder.addChild(bevel)
+        body.addChild(bevel)
 
         // Both fills are recoloured on every redraw - see update.
         let pill = capsule(offsetBy: 0)
         pill.fillColor = RenderPalette.affordable
         pill.strokeColor = .clear
-        holder.addChild(pill)
+        body.addChild(pill)
+
+        // An outline round the whole button, lip and all, in the lip's own
+        // darker shade - so it follows the button: deep green when you can
+        // afford it, dark grey when you cannot. Black was tried (Oct 2026) and
+        // was a touch heavy; an outline on the pill alone, before that, read as
+        // loot lying on the card.
+        let edge = SKShapeNode(
+            path: CGPath(
+                roundedRect: CGRect(
+                    x: pillCentre.x - pillWidth / 2,
+                    y: pillCentre.y - 16 - 3,
+                    width: pillWidth,
+                    height: 32 + 3
+                ),
+                cornerWidth: 16,
+                cornerHeight: 16,
+                transform: nil
+            )
+        )
+        edge.fillColor = .clear
+        edge.strokeColor = RenderPalette.affordableDeep
+        edge.lineWidth = 2.5
+        edge.zPosition = 0.5
+        body.addChild(edge)
 
         // The coin and the number are CENTRED as a pair rather than pinned to the
         // ends of the pill: at this width a number pushed to one edge and a coin to
@@ -619,9 +726,9 @@ final class ShopPanelNode: SKNode {
         token.size = ItemArt.size(of: tokenTexture, fittingInto: 21)
         token.position = CGPoint(x: pillCentre.x + 10, y: pillCentre.y)
         token.zPosition = 1
-        holder.addChild(token)
+        body.addChild(token)
 
-        let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        let price = GameLabel(fontNamed: "AvenirNext-Bold")
         // Number first, coin after it - the way a price is spoken. The pair is
         // centred on the button rather than pushed to its ends, which at this width
         // is the difference between one price and two things sharing a capsule.
@@ -631,16 +738,18 @@ final class ShopPanelNode: SKNode {
         price.verticalAlignmentMode = .center
         price.position = CGPoint(x: pillCentre.x - 4, y: pillCentre.y)
         price.zPosition = 1
-        holder.addChild(price)
+        body.addChild(price)
 
         return Card(
             holder: holder,
+            hanger: hanger,
             glow: glow,
             icon: icon,
             name: name,
             price: price,
             pill: pill,
             bevel: bevel,
+            edge: edge,
             flash: flash,
             type: nil
         )
@@ -659,20 +768,30 @@ final class ShopPanelNode: SKNode {
         drawTabs()
         deck.removeAction(forKey: "slide")
         deck.position = .zero
+        deck.alpha = 1
+        deckWaiting = false
 
         // Comes up rather than appearing. A panel this size arriving between two
         // frames reads as a glitch - the eye gets no chance to follow where it came
         // from, so it has to re-find everything on it. An eighth of a second of
         // scale and fade is enough to be followed and short enough that nobody
         // waiting to buy a bandage notices they waited.
+        //
+        // Springy (Oct 2026): it overshoots a touch and settles, so it pops
+        // rather than slides.
         removeAction(forKey: "curtain")
         alpha = 0
-        setScale(0.94)
+        setScale(0.86)
+
+        let grow = SKAction.scale(to: 1.04, duration: 0.14)
+        grow.timingMode = .easeOut
+        let settle = SKAction.scale(to: 1, duration: 0.09)
+        settle.timingMode = .easeInEaseOut
 
         run(
             .group([
-                .fadeIn(withDuration: 0.13),
-                .scale(to: 1, duration: 0.15)
+                .fadeIn(withDuration: 0.12),
+                .sequence([grow, settle])
             ]),
             withKey: "curtain"
         )
@@ -1009,6 +1128,22 @@ final class ShopPanelNode: SKNode {
     /// A stagger rather than all at once, and only 30 milliseconds of it. Together
     /// they read as a hand being dealt - which is what opening a shop is - where
     /// simultaneous movement reads as the panel twitching.
+    /// A swing that starts this far over, in radians, and dies away to still.
+    private static func swing(from angle: CGFloat) -> SKAction {
+        var steps: [SKAction] = []
+        var reach = angle
+        for _ in 0..<2 {
+            let step = SKAction.rotate(toAngle: reach, duration: 0.14)
+            step.timingMode = .easeInEaseOut
+            steps.append(step)
+            reach *= -0.4
+        }
+        let rest = SKAction.rotate(toAngle: 0, duration: 0.14)
+        rest.timingMode = .easeInEaseOut
+        steps.append(rest)
+        return .sequence(steps)
+    }
+
     private func dealCards(from delay: TimeInterval) {
         for (index, card) in cards.enumerated() where !card.holder.isHidden {
             card.holder.removeAction(forKey: "deal")
@@ -1019,14 +1154,34 @@ final class ShopPanelNode: SKNode {
             let home = card.holder.position
 
             card.holder.alpha = 0
-            card.holder.position = CGPoint(x: home.x, y: home.y - 14)
+            card.holder.position = CGPoint(x: home.x, y: home.y - 18)
+            card.holder.setScale(0.9)
+
+            // Up past where it belongs and back, so each card lands with a hop.
+            let rise = SKAction.move(to: CGPoint(x: home.x, y: home.y + 5), duration: 0.13)
+            rise.timingMode = .easeOut
+            let land = SKAction.move(to: home, duration: 0.08)
+            land.timingMode = .easeIn
+            let swell = SKAction.scale(to: 1.04, duration: 0.13)
+            swell.timingMode = .easeOut
+
+            // And a small swing from the hole as it lands, dying away quickly.
+            // Kept gentle on purpose: a bigger one read as obnoxious.
+            card.hanger.removeAction(forKey: "swing")
+            card.hanger.zRotation = 0
+            let side: CGFloat = index % 2 == 0 ? 1 : -1
+            card.hanger.run(.sequence([
+                .wait(forDuration: delay + Double(index) * 0.035 + 0.1),
+                ShopPanelNode.swing(from: 0.04 * side)
+            ]), withKey: "swing")
 
             card.holder.run(
                 .sequence([
-                    .wait(forDuration: delay + Double(index) * 0.03),
+                    .wait(forDuration: delay + Double(index) * 0.035),
                     .group([
-                        .fadeAlpha(to: settled, duration: 0.12),
-                        .move(to: home, duration: 0.14)
+                        .fadeAlpha(to: settled, duration: 0.1),
+                        .sequence([rise, land]),
+                        .sequence([swell, .scale(to: 1, duration: 0.08)])
                     ])
                 ]),
                 withKey: "deal"
@@ -1038,6 +1193,14 @@ final class ShopPanelNode: SKNode {
 
     func update(with world: World) {
         guard isOpen, let player = world.localPlayer else { return }
+
+        // A page change finished: the new page is drawn and dealt by now.
+        defer {
+            if deckWaiting {
+                deckWaiting = false
+                deck.alpha = 1
+            }
+        }
 
         guard mode == .buy else {
             drawSellTab(for: player)
@@ -1108,6 +1271,7 @@ final class ShopPanelNode: SKNode {
             card.bevel.fillColor = affordable
                 ? RenderPalette.affordableDeep
                 : RenderPalette.unaffordableDeep
+            card.edge.strokeColor = card.bevel.fillColor
 
             cards[index] = card
         }
@@ -1172,6 +1336,7 @@ final class ShopPanelNode: SKNode {
             card.holder.alpha = sellable ? 1.0 : 0.45
             card.pill.fillColor = sellable ? RenderPalette.affordable : RenderPalette.unaffordable
             card.bevel.fillColor = sellable ? RenderPalette.affordableDeep : RenderPalette.unaffordableDeep
+            card.edge.strokeColor = card.bevel.fillColor
 
             cards[index] = card
         }

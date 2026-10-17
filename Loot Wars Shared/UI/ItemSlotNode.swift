@@ -66,7 +66,7 @@ final class ItemSlotNode: SKNode {
     private let rarityPlate: SKShapeNode
 
     private let badge = SKNode()
-    private let count = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let count = GameLabel(fontNamed: "AvenirNext-Bold")
 
     /// The SELL button, shown only while the shop is open.
     ///
@@ -81,7 +81,7 @@ final class ItemSlotNode: SKNode {
     /// place on a 66-point square that is both obvious and empty, and the badge
     /// already proves it works: nobody has ever failed to notice a stack count.
     private let sellButton = SKNode()
-    private let price = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let price = GameLabel(fontNamed: "AvenirNext-Bold")
 
     /// Local origin is the centre of the slot.
     /// - Parameter glass: frosted map behind the slot - see GlassNode. Off by

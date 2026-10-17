@@ -41,6 +41,7 @@ enum Prefs {
         static let difficulty = "difficulty"
         static let playerName = "playerName"
         static let recentBotNames = "recentBotNames"
+        static let reviewAskedVersion = "reviewAskedVersion"
     }
 
     /// Bumped whenever a lesson CHANGES, which wipes every "you have seen this"
@@ -151,6 +152,13 @@ enum Prefs {
     /// cleaned - see PlayerNames.clean - and "You" until one is chosen.
     /// The bots' names from the last couple of matches, newest first, so the
     /// next match can leave them out - see World.avoidNames.
+    /// The app version the rate prompt was last asked in, so it asks at most
+    /// once per version - see RatePrompt.
+    static var reviewAskedVersion: String? {
+        get { store.string(forKey: Key.reviewAskedVersion) }
+        set { store.set(newValue, forKey: Key.reviewAskedVersion) }
+    }
+
     static var recentBotNames: [String] {
         get { store.stringArray(forKey: Key.recentBotNames) ?? [] }
         set { store.set(Array(newValue.prefix(14)), forKey: Key.recentBotNames) }

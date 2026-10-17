@@ -144,6 +144,15 @@ enum WorldEvent {
     /// event is that the answers do not survive the frame they were worked out in.
     case kill(victim: ActorID, by: ActorID?, at: Vec2, points: Int, tokens: Int)
 
+    /// Somebody took damage, how much, and from whom.
+    ///
+    /// The exception to the note at the top of this file, and the reason is the
+    /// same one the kill gives. The hit itself shows in the state - health goes
+    /// down - but WHO did it does not, and the damage numbers need it: they
+    /// show only the hits you land and the ones you take, not every exchange
+    /// between two bots on the far side of the screen.
+    case hurt(ActorID, amount: Int, by: ActorID?, at: Vec2)
+
     /// The match moved into a new phase - see World.Phase.
     case phase(World.Phase)
 

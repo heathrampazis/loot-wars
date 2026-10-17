@@ -28,13 +28,15 @@ final class GlassNode: SKCropNode {
     ///   - path: the control's shape, in the space this node is added to.
     ///   - strength: how much of the blur shows, 0 to 1. Below 1 the sharp map
     ///     shows through it too, for a lighter frost.
-    init(path: CGPath, strength: CGFloat = 1) {
+    ///   - always: shown even with the glass switched off everywhere else - the
+    ///     shop's, see GlassBackdrop.shopOnly.
+    init(path: CGPath, strength: CGFloat = 1, always: Bool = false) {
         area = path.boundingBoxOfPath
         super.init()
 
         // Glass switched off: an empty node with no mask and nothing to draw, so
         // it costs nothing - see GlassBackdrop.enabled.
-        guard GlassBackdrop.enabled else { return }
+        guard GlassBackdrop.enabled || always else { return }
 
         let mask = SKShapeNode(path: path)
         mask.fillColor = .white

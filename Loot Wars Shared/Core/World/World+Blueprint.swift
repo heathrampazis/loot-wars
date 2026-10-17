@@ -83,6 +83,24 @@ extension World {
                   following feet: GridPoint? = nil) -> BasePlan? {
         guard let claim = self.claim(for: team) else { return nil }
 
+        // The recommended square comes first (Oct 2026). While every wall you
+        // have is on it, the plan IS that square - its gaps in build order -
+        // and nothing about where you walk moves it. Following the player and
+        // growing round them made bases come out in odd shapes. Only once you
+        // build somewhere off it yourself does the plan below take over and
+        // shape itself round what you actually built.
+        let template = baseLayouts[team]?.tiles ?? []
+        let onTemplate = Set(template)
+        if !template.isEmpty, walls.allSatisfy({ onTemplate.contains($0) }) {
+            let cols = template.map(\.col), rows = template.map(\.row)
+            let free = template.filter { BuildSystem.isBuildableTile($0, for: team, in: self) }
+            return BasePlan(lowCol: cols.min() ?? 0, highCol: cols.max() ?? 0,
+                            lowRow: rows.min() ?? 0, highRow: rows.max() ?? 0,
+                            gaps: free.filter { BuildSystem.keepsWallThin($0, for: team, in: self) },
+                            blocked: free.filter { !BuildSystem.keepsWallThin($0, for: team, in: self) },
+                            hasBox: true)
+        }
+
         let limitLow = claim.origin
         let limitHigh = GridPoint(col: claim.origin.col + claim.size - 1,
                                   row: claim.origin.row + claim.size - 1)
