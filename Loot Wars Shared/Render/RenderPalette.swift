@@ -210,6 +210,9 @@ enum RenderPalette {
     /// The shop's plate, over its frosted glass - lighter, so the blurred map's
     /// colour shows through. See GlassBackdrop.shopOnly.
     static let shopPanel = SKColor(white: 0.0, alpha: 0.42)
+    /// The respawn banner: a touch darker than the other panels, so the
+    /// countdown stands out over whatever the death camera is showing.
+    static let respawnPanel = SKColor(white: 0.0, alpha: 0.7)
     static let hudTrack  = SKColor(white: 0.0, alpha: 0.35)
     static let healthBar = rgb(0xFF, 0x51, 0x7B)
 

@@ -199,6 +199,10 @@ final class ShopPanelNode: SKNode {
     /// redraw is about to put it at.
     private var pendingDeal: TimeInterval?
 
+    /// The deck is hidden while a page change waits for its redraw - see
+    /// setMode. Shown again at the end of the next update.
+    private var deckWaiting = false
+
     // MARK: - Building
 
     override init() {
@@ -374,31 +378,47 @@ final class ShopPanelNode: SKNode {
             settleDeck()
             return
         }
-        let width = ShopPanelNode.panelSize.width
-        let leaving: CGFloat = mode == .sell ? -width : width
+        // A short nudge and a fade, then the new page's cards are dealt in the
+        // way the shop opens (Oct 2026). It used to slide the whole page off
+        // the panel and the next one on from the far side, which with only a
+        // card or two on a page meant watching one card travel the width of
+        // the screen - it took too long and looked odd.
+        let away: CGFloat = mode == .sell ? -1 : 1
 
         deck.removeAction(forKey: "slide")
         deck.position.x = offset
 
-        let out = SKAction.moveTo(x: leaving, duration: 0.14)
-        out.timingMode = .easeIn
-        let inbound = SKAction.moveTo(x: 0, duration: 0.2)
-        inbound.timingMode = .easeOut
+        let nudge = SKAction.moveTo(x: away * max(abs(offset), 36), duration: 0.1)
+        nudge.timingMode = .easeIn
 
         deck.run(.sequence([
-            out,
+            .group([nudge, .fadeOut(withDuration: 0.1)]),
             .run { [weak self] in
                 guard let self else { return }
                 self.mode = mode
                 self.lastDrawn = []
                 self.lastPressed = nil
                 self.drawTabs()
-                self.deck.position.x = -leaving
-            },
-            // A frame for the redraw, so the old cards never slide back in.
-            .wait(forDuration: 0.02),
-            inbound
+                self.popTab(mode)
+
+                // Back in place but still hidden: the next update redraws the
+                // page, deals its cards and only then shows the deck, so the
+                // old cards are never seen in the new place.
+                self.deck.position.x = 0
+                self.deckWaiting = true
+                self.pendingDeal = 0
+            }
         ]), withKey: "slide")
+    }
+
+    /// The tab just chosen gives a small bounce, so the switch is felt there too.
+    private func popTab(_ mode: Mode) {
+        guard let tab = tabs.first(where: { $0.mode == mode }) else { return }
+        tab.node.removeAction(forKey: "pop")
+        tab.node.setScale(0.92)
+        let grow = SKAction.scale(to: 1.06, duration: 0.08)
+        grow.timingMode = .easeOut
+        tab.node.run(.sequence([grow, .scale(to: 1, duration: 0.08)]), withKey: "pop")
     }
 
     // MARK: - Swiping
@@ -748,6 +768,8 @@ final class ShopPanelNode: SKNode {
         drawTabs()
         deck.removeAction(forKey: "slide")
         deck.position = .zero
+        deck.alpha = 1
+        deckWaiting = false
 
         // Comes up rather than appearing. A panel this size arriving between two
         // frames reads as a glitch - the eye gets no chance to follow where it came
@@ -1171,6 +1193,14 @@ final class ShopPanelNode: SKNode {
 
     func update(with world: World) {
         guard isOpen, let player = world.localPlayer else { return }
+
+        // A page change finished: the new page is drawn and dealt by now.
+        defer {
+            if deckWaiting {
+                deckWaiting = false
+                deck.alpha = 1
+            }
+        }
 
         guard mode == .buy else {
             drawSellTab(for: player)

@@ -1138,7 +1138,9 @@ final class GameScene: SKScene {
 
     private func refreshGlass() {
         // Everywhere, or just behind the shop while it is open.
-        let wanted = GlassBackdrop.enabled || (GlassBackdrop.shopOnly && shopPanel.isOpen)
+        let wanted = GlassBackdrop.enabled
+            || (GlassBackdrop.shopOnly && shopPanel.isOpen)
+            || (GlassBackdrop.respawn && !respawnBanner.isHidden)
         guard wanted, let view else { return }
         let camera = cameraController.node
         glass.refresh(view: view, world: worldLayer, centre: camera.position,

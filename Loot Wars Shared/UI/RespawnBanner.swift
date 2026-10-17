@@ -24,8 +24,13 @@ final class RespawnBanner: SKNode {
         zPosition = 1200
         isHidden = true
 
-        panel.fillColor = RenderPalette.hudPanel
+        // A plain plate a touch darker than the rest of the HUD. Glass was
+        // tried here and is off - see GlassBackdrop.respawn.
+        panel.fillColor = GlassBackdrop.respawn ? RenderPalette.shopPanel : RenderPalette.respawnPanel
         panel.strokeColor = .clear
+        if GlassBackdrop.respawn, let path = panel.path {
+            panel.addChild(GlassNode(path: path, always: true))
+        }
         addChild(panel)
 
         title.text = "RESPAWNING"

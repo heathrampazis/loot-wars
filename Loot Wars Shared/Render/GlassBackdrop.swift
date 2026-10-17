@@ -40,6 +40,11 @@ final class GlassBackdrop {
     /// plate.
     static let shopOnly = true
 
+    /// Glass behind the respawn banner too, while you are waiting to come back.
+    /// Tried (Oct 2026) and turned off - a plain, slightly darker plate read
+    /// better there. True brings it back; the blur only runs while it is up.
+    static let respawn = false
+
     /// How small the map is drawn before it is blurred. A quarter of the pixels
     /// along each side is a sixteenth of the work, and a blur hides the loss.
     private static let downscale: CGFloat = 0.25
