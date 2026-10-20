@@ -203,6 +203,10 @@ final class ShopPanelNode: SKNode {
     /// setMode. Shown again at the end of the next update.
     private var deckWaiting = false
 
+    /// A page change waiting for its redraw: which side the new cards glide in
+    /// from (-1 left, 1 right). Spent by update, like pendingDeal.
+    private var pendingGlide: CGFloat?
+
     // MARK: - Building
 
     override init() {
@@ -378,21 +382,22 @@ final class ShopPanelNode: SKNode {
             settleDeck()
             return
         }
-        // A short nudge and a fade, then the new page's cards are dealt in the
-        // way the shop opens (Oct 2026). It used to slide the whole page off
-        // the panel and the next one on from the far side, which with only a
-        // card or two on a page meant watching one card travel the width of
-        // the screen - it took too long and looked odd.
+        // A quick nudge and fade one way, and the new page's cards glide in
+        // from the other (Oct 2026). It used to slide the whole page off the
+        // panel and the next one on from the far side, which with a card or two
+        // on a page meant watching one card cross the screen; then it faded out
+        // and dealt the new page in with hops, which left a beat of empty panel
+        // in the middle that read as a stall. Now the two halves nearly meet.
         let away: CGFloat = mode == .sell ? -1 : 1
 
         deck.removeAction(forKey: "slide")
         deck.position.x = offset
 
-        let nudge = SKAction.moveTo(x: away * max(abs(offset), 36), duration: 0.1)
+        let nudge = SKAction.moveTo(x: away * max(abs(offset), 24), duration: 0.07)
         nudge.timingMode = .easeIn
 
         deck.run(.sequence([
-            .group([nudge, .fadeOut(withDuration: 0.1)]),
+            .group([nudge, .fadeOut(withDuration: 0.07)]),
             .run { [weak self] in
                 guard let self else { return }
                 self.mode = mode
@@ -406,7 +411,7 @@ final class ShopPanelNode: SKNode {
                 // old cards are never seen in the new place.
                 self.deck.position.x = 0
                 self.deckWaiting = true
-                self.pendingDeal = 0
+                self.pendingGlide = -away
             }
         ]), withKey: "slide")
     }
@@ -770,6 +775,7 @@ final class ShopPanelNode: SKNode {
         deck.position = .zero
         deck.alpha = 1
         deckWaiting = false
+        pendingGlide = nil
 
         // Comes up rather than appearing. A panel this size arriving between two
         // frames reads as a glitch - the eye gets no chance to follow where it came
@@ -1144,6 +1150,45 @@ final class ShopPanelNode: SKNode {
         return .sequence(steps)
     }
 
+    /// Runs whichever entrance is waiting: the deal when the shop opens, or the
+    /// glide when the page changes.
+    private func startPendingMotion() {
+        if let delay = pendingDeal {
+            pendingDeal = nil
+            dealCards(from: delay)
+        }
+        if let side = pendingGlide {
+            pendingGlide = nil
+            glideCards(from: side)
+        }
+    }
+
+    /// The page-change entrance: each card slides a short way in from one side
+    /// and fades up, one just after another. Quicker and flatter than the deal,
+    /// with no hop or swing - it is a page turning, not stock arriving.
+    private func glideCards(from side: CGFloat) {
+        for (index, card) in cards.enumerated() where !card.holder.isHidden {
+            card.holder.removeAction(forKey: "deal")
+            card.hanger.removeAction(forKey: "swing")
+            card.hanger.zRotation = 0
+            card.holder.setScale(1)
+
+            let settled = card.holder.alpha
+            let home = card.holder.position
+
+            card.holder.alpha = 0
+            card.holder.position = CGPoint(x: home.x + side * 28, y: home.y)
+
+            let glide = SKAction.move(to: home, duration: 0.16)
+            glide.timingMode = .easeOut
+
+            card.holder.run(.sequence([
+                .wait(forDuration: Double(index) * 0.02),
+                .group([glide, .fadeAlpha(to: settled, duration: 0.1)])
+            ]), withKey: "deal")
+        }
+    }
+
     private func dealCards(from delay: TimeInterval) {
         for (index, card) in cards.enumerated() where !card.holder.isHidden {
             card.holder.removeAction(forKey: "deal")
@@ -1277,10 +1322,7 @@ final class ShopPanelNode: SKNode {
         }
 
         // Last, so every card is where it belongs before anything moves.
-        if let delay = pendingDeal {
-            pendingDeal = nil
-            dealCards(from: delay)
-        }
+        startPendingMotion()
     }
 
     /// The SELL tab: one card per thing in your bag, with what the shop pays for
@@ -1341,9 +1383,6 @@ final class ShopPanelNode: SKNode {
             cards[index] = card
         }
 
-        if let delay = pendingDeal {
-            pendingDeal = nil
-            dealCards(from: delay)
-        }
+        startPendingMotion()
     }
 }
