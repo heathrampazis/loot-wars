@@ -2305,6 +2305,13 @@ enum AIBrain {
                                     in world: World) -> Bool {
         guard target.id == world.localPlayerID else { return true }
 
+        // Shot by them a moment ago: they gave themselves away, so this bot may
+        // answer from wherever it is - see GameConfig.AI.returnFireWindow.
+        if actor.lastHitBy == target.id,
+           actor.secondsSinceHit < GameConfig.AI.returnFireWindow {
+            return true
+        }
+
         let away = actor.position - target.position
         let half = world.visibleHalfExtent
 
@@ -3161,7 +3168,7 @@ enum AIBrain {
         let towards = enemy.position - actor.position
         guard towards.length <= GameConfig.Blaster.range else { return nil }
 
-        // And they have to be able to SEE it coming. The blaster reaches twelve
+        // And they have to be able to SEE it coming. The blaster reaches ten
         // tiles and a landscape screen shows under six of them vertically, so
         // without this a bot would open fire from above or below the camera - which
         // is the one thing the old engage cap was genuinely there to prevent.
