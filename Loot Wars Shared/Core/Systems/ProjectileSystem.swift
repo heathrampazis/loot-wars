@@ -29,6 +29,14 @@ enum ProjectileSystem {
 
             if projectile.distanceRemaining <= 0 { continue }
 
+            // The player's shots - their blaster's and their turrets' - end at
+            // the edge of their screen (Oct 2026). Nothing can be hit that they
+            // cannot see, the same courtesy the bots extend: they may not shoot
+            // the player from off screen either. Above and below is where this
+            // bites; a landscape screen shows about five tiles each way.
+            if projectile.owner == world.localPlayerID,
+               offScreen(projectile.position, in: world) { continue }
+
             // Walls stop bullets - including your own. You can walk through your
             // base, but you cannot shoot through it.
             let tile = GridPoint(containing: projectile.position)
@@ -66,6 +74,17 @@ enum ProjectileSystem {
         }
 
         world.projectiles = survivors
+    }
+
+    /// Whether a point is outside the local player's screen. The camera follows
+    /// the player, so the screen is the visible half extent either side of them.
+    /// Headless (tests, the How to Play stage) the extent is huge and this never
+    /// fires.
+    static func offScreen(_ point: Vec2, in world: World) -> Bool {
+        guard let me = world.localPlayer else { return false }
+        let away = point - me.position
+        let half = world.visibleHalfExtent
+        return abs(away.x) > half.x || abs(away.y) > half.y
     }
 
     /// Damages an owned machine the shot landed on. Returns whether the shot was

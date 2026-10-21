@@ -2305,13 +2305,6 @@ enum AIBrain {
                                     in world: World) -> Bool {
         guard target.id == world.localPlayerID else { return true }
 
-        // Shot by them a moment ago: they gave themselves away, so this bot may
-        // answer from wherever it is - see GameConfig.AI.returnFireWindow.
-        if actor.lastHitBy == target.id,
-           actor.secondsSinceHit < GameConfig.AI.returnFireWindow {
-            return true
-        }
-
         let away = actor.position - target.position
         let half = world.visibleHalfExtent
 
