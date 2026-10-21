@@ -49,11 +49,6 @@ struct Actor {
     /// spawn does not count as having just been in a fight.
     var secondsSinceHit: Double = 999
 
-    /// Who hurt this actor last, if anybody - read with secondsSinceHit. Lets
-    /// a bot fire back at somebody who shot it from off screen; see
-    /// GameConfig.AI.returnFireWindow.
-    var lastHitBy: ActorID?
-
     /// Seconds of spawn protection left.
     var invulnerability: Double = 0
 

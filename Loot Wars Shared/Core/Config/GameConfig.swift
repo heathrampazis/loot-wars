@@ -1427,16 +1427,6 @@ enum GameConfig {
         /// Having been shot this recently counts as still being in the fight.
         static let combatRecency: Double = 3.0
 
-        /// A bot shot by the player may fire back for this long, in seconds,
-        /// even from off the player's screen (Oct 2026).
-        ///
-        /// The off-screen courtesy - see AIBrain.canOpenFire - is about not
-        /// being ambushed by something you could not see. It was never meant to
-        /// let the player snipe from above or below the camera while the target
-        /// stood there unable to answer. Shooting somebody gives your position
-        /// away; for this long they know where you are.
-        static let returnFireWindow: Double = 3.0
-
         /// How close a visible enemy has to be for a bot to power up BEFORE the
         /// fight rather than once it is already in it. Inside this the shooting is
         /// about to start, and a perk drunk now is a perk working in the first
@@ -3602,13 +3592,13 @@ enum GameConfig {
         static let fireRate: Double = 4.5
         /// Tiles a shot travels before fizzling out.
         ///
-        /// 10, down from 12 (Oct 2026). At 12 a shot carried past the side of a
-        /// landscape screen (about 11 tiles each way) and well beyond the top and
-        /// bottom (about 5), so the player could pick bots off from out of their
-        /// sight while they were not allowed to fire back. 10 ends a shot on screen
-        /// sideways; the gap above and below is closed by bots returning fire -
-        /// see AI.returnFireWindow. Still past where bots like to fight (0.72 of
-        /// the 12-tile engage range, about 8.6).
+        /// 10, down from 12 (Oct 2026). Still past where bots like to fight (0.72
+        /// of the 12-tile engage range, about 8.6).
+        ///
+        /// The player's shots have a second limit on top: they stop at the edge
+        /// of the screen - see ProjectileSystem.offScreen - so nothing can be hit
+        /// that the player cannot see, just as bots may not shoot the player from
+        /// off screen (AIBrain.canOpenFire).
         static let range: Double = 10
         /// How far in front of an actor's centre the weapon is gripped, in tiles.
         /// Shared by the simulation and the renderer, so the shot leaves the barrel
