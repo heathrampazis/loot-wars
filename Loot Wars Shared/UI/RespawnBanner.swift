@@ -59,6 +59,19 @@ final class RespawnBanner: SKNode {
         }
 
         isHidden = false
+
+        // Out of lives: no countdown, just where you finished. Final already -
+        // everyone still in is ahead of you, everyone out before you is behind.
+        if player.isOut {
+            title.text = "YOU'RE OUT"
+            let place = world.standings.firstIndex { $0.team == player.team } ?? 0
+            countdown.text = ResultsNode.ordinal(place + 1)
+            return
+        }
+
+        // Coming back for the last time. Said here, while there is time to
+        // read it, rather than once you are back and busy.
+        title.text = player.onLastLife ? "1 LIFE LEFT" : "RESPAWNING"
         countdown.text = "\(max(1, Int(remaining.rounded(.up))))"
     }
 }

@@ -31,7 +31,7 @@ final class HowToPlayContent: MenuSheetContent {
         let (move, aim) = Prefs.leftHanded ? ("right", "left") : ("left", "right")
         return [
             Page(title: "Win the match",
-                 body: "Score the most points to win. Dying costs points, and the last 30 seconds count double.",
+                 body: "You have \(GameConfig.Lives.perPlayer == 1 ? "1 life" : "\(GameConfig.Lives.perPlayer) lives"). Last one standing wins. If time runs out, most points wins. The last 30 seconds count double.",
                  scene: .win),
             Page(title: "Move and shoot",
                  body: "The \(move) stick moves you. Hold the \(aim) stick to aim and fire.",

@@ -188,7 +188,7 @@ enum Difficulty: Int, CaseIterable {
         case .easy:     return 0.6
         case .medium:   return 0.35
         case .hard:     return GameConfig.AI.buysAnythingAfter
-        case .hardcore: return 0.05
+        case .hardcore: return 0
         }
     }
 

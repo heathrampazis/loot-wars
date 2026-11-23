@@ -672,7 +672,9 @@ enum GameConfig {
         /// The opening phase: no bombs anywhere and no bots out hunting. Twenty
         /// seconds to loot, build and get a wall up before the raids start, so a
         /// match has a beginning instead of starting at full volume.
-        static let opening: Double = 20
+        /// 20 -> 8 (Nov 2026, one life): Heath wants it action packed from the
+        /// moment the match starts. Bombs, raids and hunts from eight seconds.
+        static let opening: Double = 8
 
         /// The final stretch: every point earned is multiplied, so the last half
         /// minute can still turn the board over and nobody coasts to the whistle.
@@ -692,6 +694,39 @@ enum GameConfig {
 
         /// How much of its weight the bomb row carries the moment bombs start.
         static let bombStartShare: Double = 0.35
+    }
+
+    /// Two lives each (Nov 2026). Heath: "there isn't enough drive to finish a
+    /// game". Die twice and you are out for the rest of the match. The last
+    /// player standing wins; if the clock runs out first, the most points wins.
+    enum Lives {
+        /// Lives per player. Die this many times and you never respawn.
+        /// 2, then 1 (Nov 2026): one life tried and kept. One death and you are
+        /// out, so every bot plays its "last life" from the start - see the
+        /// lastLife values below.
+        static let perPlayer = 1
+
+        /// Whether anyone still in beats everyone who is out, whatever the
+        /// points. Out players are placed by when they went: last out is best.
+        /// false ranks everyone on points alone.
+        static let survivorsRankFirst = true
+
+        /// Seconds the match keeps running after YOU are knocked out, or after the
+        /// last of the others is, so the moment is seen before the results come
+        /// up. The bots do not play on without you.
+        static let outLinger: Double = 3.0
+
+        /// How a bot plays its last life. Pickier about fights, quicker to leave
+        /// one, quicker to go home and mend. See AIBrain.wary. With one life
+        /// this is how bots play all match.
+        /// 0.85 and 0.5 at first; 0.8 and 0.42 (Nov 2026) so bots still play
+        /// carefully but commit to a fight a little longer.
+        /// Switched off with one life: see carefulLastLife.
+        static let carefulLastLife = false
+        static let lastLifeFightFitAt: Double = 0.8
+        static let lastLifeOutgearedBy = 2
+        static let lastLifeRetreatAt: Double = 0.42
+        static let lastLifeMendBelow: Double = 0.7
     }
 
     enum Map {
@@ -879,6 +914,9 @@ enum GameConfig {
         /// the ladder by the end, for the reason given below.
         /// Everybody respawns to the same floor, bots included, which is what stops
         /// the last minute filling up with free kills.
+        /// (Until Nov 2026 the code only gave it to bots, despite this. With two
+        /// lives that left your second life bare against kitted bots. Fixed in
+        /// RespawnSystem: the player gets the floor and the heals too.)
         static let respawnFloor: [(progress: Double, helmet: HelmetTier, blaster: BlasterTier)] = [
             // Raised a long way, on purpose, and it is the main lever on a match
             // a strong player was winning at a walk. Death takes everything, and
@@ -898,6 +936,12 @@ enum GameConfig {
             (0.70, .legendary, .four),
             (0.85, .mythical,  .five)
         ]
+
+        /// Whether anybody gets respawnFloor and respawnHeals at all. Off (Nov
+        /// 2026): everyone respawns with nothing but what is in their own chests.
+        /// Heath: "all players spawn with nothing. If an enemy stores some good
+        /// items in their chest they can use these."
+        static let respawnsWithKit = false
 
         /// Healing handed back on a respawn, by how far the match has run.
         ///
@@ -1204,7 +1248,9 @@ enum GameConfig {
         /// starter kit for the first minute and a half of a match, which is where
         /// the player's lead was being built. Gear compounds, so starting the ladder
         /// earlier is most of what makes a bot a fight in the first half.
-        static let buysAnythingAfter: Double = 0.15
+        /// 0.15 -> 0.05 (Nov 2026): bots buy gear from the shop from almost the
+        /// start, part of letting them keep pace with the player.
+        static let buysAnythingAfter: Double = 0.05
 
         /// How little healing a bot has to be carrying before it buys some.
         ///
@@ -1304,8 +1350,13 @@ enum GameConfig {
         ///
         /// A bot still walks away from a naked spawn across the map. It just comes
         /// for anybody carrying anything.
-        static let worthChasingGear = 2
-        static let worthChasingAtRange = 5
+        /// Nov 2026, one life: Heath, "players are too soft... i dont mind them
+        /// going ham at each other... difficult and action packed from the
+        /// moment we play".
+        /// 2 -> 0: a bot comes for anybody it can see, starter kit or not.
+        static let worthChasingGear = 0
+        /// 5 -> 2 (Nov 2026, one life), with worthChasingGear.
+        static let worthChasingAtRange = 2
 
 
 
@@ -1352,7 +1403,11 @@ enum GameConfig {
         ///
         /// 0.92 (Oct 2026, later): still too easy, the player rarely died. About
         /// 49% now - a bot wins a fair exchange about half the time.
-        static let aimSpread: Double = 0.92
+        /// 0.88 (Nov 2026, with lives): a touch sharper so you die a little more
+        /// often, about 51%. 0.83 (about 54%) felt unfair before.
+        /// 0.85 (Nov 2026, one life): Heath wants it intense and difficult and
+        /// asked for bots that fight harder. About 53%, before the late ramp.
+        static let aimSpread: Double = 0.85
 
         /// Chance, at each change of mind, that a bot reverses the way it is
         /// circling. Never reversing reads as a machine on rails; reversing every
@@ -1366,7 +1421,44 @@ enum GameConfig {
         ///
         /// 0.15...0.3 now, about a quarter quicker again, with the aim above.
         /// 0.12...0.24 (Oct 2026, later), a fifth quicker again with the aim.
-        static let reactionDelay: ClosedRange<Double> = 0.12...0.24
+        /// 0.11...0.22 (Nov 2026, with lives), a little quicker again.
+        /// 0.10...0.20 (Nov 2026, one life), with the aim above.
+        static let reactionDelay: ClosedRange<Double> = 0.10...0.20
+
+        /// The opening seconds in which bots hit EACH OTHER softer (Nov 2026).
+        /// With one life, bots were knocking each other out in the first few
+        /// seconds, before anyone had looted. They still fight and can still
+        /// knock each other out, just less often: a bot's shot at another bot
+        /// lands at botTruceDamage of its strength at the start, climbing to full
+        /// by botTruce seconds. The player is not part of it either way. Heath:
+        /// "they can still shoot and sometimes kill, but make it less likely".
+        static let botTruce: Double = 15
+        /// 1 = off. Was 0.4 (Nov 2026); Heath then: "i dont mind them going ham
+        /// at each other". Back to 0.4 later the same day, climbing to
+        /// botVsBotDamage, when the field was emptying too early.
+        static let botTruceDamage: Double = 0.4
+
+        /// And for the rest of the match, bot on bot lands at this share (Nov
+        /// 2026, one life). Bots were wiping each other out and leaving a 1v1
+        /// for the last minute; this keeps the field full. The ramp above climbs
+        /// to this, not to one. The player is never part of it: full damage
+        /// both ways. Heath: "more players alive longer".
+        /// 1 = off (was 0.6), see botTruceDamage. Then 0.55 (Nov 2026): Heath,
+        /// "players are still not lasting long enough. the end of the game
+        /// should feel like a pvp frenzy, not just 1-2 players left". Bots
+        /// still fight each other all match, at full aggression; each fight
+        /// just takes nearly twice as long to finish, so more of them are
+        /// still standing for the end. The player is never part of it.
+        static let botVsBotDamage: Double = 0.55
+
+        /// Bots sharpen up towards the end (Nov 2026). From lateFrom of the way
+        /// through the match to the whistle, their aim spread tightens by up to
+        /// lateAimTighten and their reactions quicken by up to lateReactionQuicken.
+        /// Heath: "increase the difficulty slightly towards the end". Small on
+        /// purpose: about 51% hit rate at the start, about 54% by the end.
+        static let lateFrom: Double = 0.6
+        static let lateAimTighten: Double = 0.07
+        static let lateReactionQuicken: Double = 0.15
 
         /// Below this share of its health, a bot breaks off and runs for home -
         /// but only while an enemy is actually near. Once it is safe it gets back
@@ -1376,7 +1468,11 @@ enum GameConfig {
         /// through read as reckless rather than hard. They are tougher now by
         /// being choosier - see mendBelow, fightFitAt and outgearedBy - not by
         /// refusing to run.
-        static let retreatHealthFraction: Double = 0.35
+        /// Nov 2026, one life: Heath, "players are too soft... i dont mind them
+        /// going ham at each other... difficult and action packed from the
+        /// moment we play".
+        /// 0.35 -> 0.25: bots stay in a fight much longer.
+        static let retreatHealthFraction: Double = 0.25
 
         // Picking fights, and going home to mend (Oct 2026). A bot used to walk
         // back out into the open on a sliver of health with nothing in its bag.
@@ -1386,20 +1482,26 @@ enum GameConfig {
 
         /// Below this share of health, with not enough healing in the bag to get
         /// back to mendUntil, a bot stops what it is doing and goes home to mend.
-        static let mendBelow: Double = 0.55
+        /// 0.55 -> 0.4 (Nov 2026, one life): less time at home.
+        static let mendBelow: Double = 0.4
         /// ...and stays there, letting its base heal it, until it is back to this.
         static let mendUntil: Double = 0.9
 
         /// A bot only STARTS a fight - one nobody forced on it - at this share of
         /// health or more, and carrying emergencyHealingStock. Shot at, or with
         /// somebody in its base, it fights whatever shape it is in.
-        static let fightFitAt: Double = 0.7
+        /// Nov 2026, one life: Heath, "players are too soft... i dont mind them
+        /// going ham at each other... difficult and action packed from the
+        /// moment we play".
+        /// 0.7 -> 0.5, and no heals needed to start one (AIBrain.fitToPickFight).
+        static let fightFitAt: Double = 0.5
 
         /// How much better somebody's gear has to be (Actor.gearWorth, helmet tier
         /// plus blaster tier) before a bot will not pick a fight with them. Three
         /// is two rungs of helmet and one of blaster, or thereabouts: a fight it
         /// would expect to lose.
-        static let outgearedBy = 3
+        /// 3 -> 4 (Nov 2026, one life): bots take on better-kitted people.
+        static let outgearedBy = 4
         /// And when one of them does start on it anyway, it breaks off at this
         /// share of health rather than retreatHealthFraction.
         static let outgearedRetreat: Double = 0.6
@@ -1456,6 +1558,16 @@ enum GameConfig {
         /// five early, and one in seven to one in three late. The player's crates
         /// are untouched.
         static let cratePerkBoost: Double = 2.5
+
+        /// Gear from crates a bot opens (Nov 2026): helmets and blasters this
+        /// many times as likely, and crateRungUpChance of being a rung better.
+        /// Heath: "player upgrades a bit less quickly and enemies upgrade
+        /// faster". Not on Easy. See Loot.playerGearShare for your side.
+        /// 1.5 and 0.25 at first; 2 and 0.4 (Nov 2026) - Heath: "it would be
+        /// nice to see some slightly stronger players too, i feel like the
+        /// player always upgrades before the others".
+        static let crateGearBoost: Double = 2
+        static let crateRungUpChance: Double = 0.4
 
         /// And even once the shooting stops, a beat before patching up. Winding a
         /// bandage on the same frame the last bullet lands is a tell that nobody is
@@ -1598,7 +1710,8 @@ enum GameConfig {
         /// rather than the player against seven bots on 400.
         /// 3-minute matches (Oct 2026): 14...26 -> 8...16.
         /// 2-minute matches (Oct 2026): 8...16 -> 5...11.
-        static let raidUrgeInterval: ClosedRange<Double> = 5...11
+        /// 5...11 -> 4...8 (Nov 2026, one life): Heath wants bots to raid more.
+        static let raidUrgeInterval: ClosedRange<Double> = 4...8
 
         /// How far a bot will travel for an enemy chest it could get at.
         ///
@@ -1716,7 +1829,8 @@ enum GameConfig {
         /// while it is still a contest rather than a formality.
         ///
         /// 0.32 now, with leaderChaseAt: the ganging up starts sooner.
-        static let huntsLeaderAt: Double = 0.32
+        /// 0.32 -> 0.25 (Nov 2026, one life): they come for the leader sooner.
+        static let huntsLeaderAt: Double = 0.25
 
         /// How long between one bot's hunts.
         ///
@@ -1727,7 +1841,9 @@ enum GameConfig {
         /// being griefed.
         /// 3-minute matches (Oct 2026): 25...50 -> 15...30.
         /// 2-minute matches (Oct 2026): 15...30 -> 10...20.
-        static let huntUrgeInterval: ClosedRange<Double> = 10...20
+        /// 10...20 -> 5...10 (Nov 2026, one life): bots go looking for people
+        /// twice as often.
+        static let huntUrgeInterval: ClosedRange<Double> = 5...10
 
         /// How long a bot will keep looking before giving up and going back to its
         /// own match.
@@ -1832,7 +1948,9 @@ enum GameConfig {
         /// score was never once broken into. At 100 a full runaway is THE target:
         /// worth more than any stocked bot base, and - past leaderChaseAt - worth
         /// crossing the whole map for (see AIBrain.chestWorthRobbing).
-        static let leaderWorth: Double = 100
+        /// 100 -> 140 (Nov 2026, one life): a leader's base is worth more of a
+        /// trip, so whoever is winning gets raided.
+        static let leaderWorth: Double = 140
 
         /// How much faster the raid and hunt urges come round while somebody else
         /// is running away with the match, at a full runaway lead.
@@ -1874,7 +1992,8 @@ enum GameConfig {
         /// is a judgement instead, and one nobody in an ordinary match ever trips.
         ///
         /// 0.3 now, so a player pulling clear meets it earlier in the match.
-        static let leaderChaseAt: Double = 0.3
+        /// 0.3 -> 0.25 (Nov 2026, one life).
+        static let leaderChaseAt: Double = 0.25
 
         // MARK: - Ganging up on the leader
 
@@ -2577,6 +2696,12 @@ enum GameConfig {
     }
 
     enum Loot {
+        /// How often helmets and blasters come out of crates YOU open, as a share
+        /// of the table's weight (Nov 2026). Heath: the player upgrades much
+        /// faster than the bots. 0.8 is a fifth less gear. Not on Easy. See
+        /// AI.crateGearBoost for the bots' side.
+        static let playerGearShare: Double = 0.8
+
         /// Lootboxes scattered across the map.
         /// The share of purple crates that are a bomb - the ONLY crates that hold
         /// one (see LootTable.plain). A share rather than a weight, so it is the

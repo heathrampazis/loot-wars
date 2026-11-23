@@ -704,7 +704,7 @@ enum AIBrain {
         // sixteen, so nothing ever followed anybody: a player who kept moving chose
         // every fight they were in, and choosing your fights is most of what
         // dominating a match consists of.
-        if state.huntUrgeTimer <= 0,
+        if state.huntUrgeTimer <= 0, fitForRisk(actor),
            let quarry = worthHunting(for: actor, in: world) {
             return .hunt(quarry.id)
         }
@@ -761,7 +761,7 @@ enum AIBrain {
         // The urge picks a BASE, not a chest: an empty chest is no reason to leave a player alone.
         // Not in the opening: those seconds are for looting and building, and a
         // match that starts at full volume has nowhere to build to.
-        if state.raidUrgeTimer <= 0, !world.isOpening,
+        if state.raidUrgeTimer <= 0, !world.isOpening, fitForRisk(actor),
            world.matchProgress >= world.difficulty.raidsFrom,
            let raid = raidGoal(for: actor, in: world) {
             return raid
@@ -773,7 +773,7 @@ enum AIBrain {
         // deny - but above everything else here, because an open base is a clock:
         // the owner is on their way home to shut it, and after that the machine is
         // behind a wall again.
-        if state.raidUrgeTimer <= 0, !world.isOpening,
+        if state.raidUrgeTimer <= 0, !world.isOpening, fitForRisk(actor),
            world.matchProgress >= world.difficulty.raidsFrom,
            let machine = machineWorthWrecking(for: actor, in: world) {
             return .wreck(machine.id)
@@ -1181,7 +1181,7 @@ enum AIBrain {
         guard world.difficulty.pressesTheLeader, fitToGangUp(actor),
               let runaway = world.runaway(against: actor.team),
               let quarry = leader(of: runaway.team, in: world),
-              quarry.invulnerability <= 0,
+              canTarget(quarry, by: actor, in: world),
               (quarry.position - actor.position).length <= GameConfig.AI.pileOnRange
         else { return nil }
 
@@ -1652,13 +1652,47 @@ enum AIBrain {
     /// worth more. The AI is just agreeing with the scoreboard.
     /// Whether somebody's gear is far enough ahead of this bot's that it will
     /// not pick a fight with them - see GameConfig.AI.outgearedBy.
-    private static func outgeared(_ actor: Actor, by enemy: Actor) -> Bool {
-        enemy.gearWorth - actor.gearWorth >= GameConfig.AI.outgearedBy
+    /// Playing its last life, so playing carefully. With one life each that is
+    /// the whole match. Tried switching it off for one-life matches (Nov 2026):
+    /// bots raided and hunted more, but wiped each other out and left a 1v1
+    /// for the last minute, and Heath preferred it on.
+    /// Off again later the same day (Lives.carefulLastLife): Heath wanted
+    /// bots going hard at everyone from the start.
+    private static func wary(_ actor: Actor) -> Bool {
+        GameConfig.Lives.carefulLastLife && actor.onLastLife
     }
 
-    /// Healthy and carrying heals: fit to START a fight.
+    /// Warier on its last life: a smaller gap is enough to keep away.
+    private static func outgeared(_ actor: Actor, by enemy: Actor) -> Bool {
+        let gap = wary(actor) ? GameConfig.Lives.lastLifeOutgearedBy : GameConfig.AI.outgearedBy
+        return enemy.gearWorth - actor.gearWorth >= gap
+    }
+
+    /// Whether this bot will set out on something dangerous: a hunt, a raid, a
+    /// wreck. Always, while it has a life to spare. On its last one only when
+    /// it is fit to pick a fight - healthy and carrying heals - so a bot down to
+    /// one life stays home, builds and loots until it is ready.
+    ///
+    /// The bar is the NORMAL fight bar (AI.fightFitAt), not the stricter
+    /// last-life one: with one life every bot is on its last, and holding raids
+    /// to the stricter bar meant bots barely raided at all (Nov 2026).
+    private static func fitForRisk(_ actor: Actor) -> Bool {
+        guard wary(actor) else { return true }
+        return Double(actor.health) / Double(max(1, actor.maxHealth)) >= GameConfig.AI.fightFitAt
+            && actor.inventory.totalHealing(of: actor.maxHealth)
+                >= GameConfig.AI.emergencyHealingStock
+    }
+
+    /// Healthy and carrying heals: fit to START a fight. On its last life it
+    /// wants to be nearer full first - see GameConfig.Lives.
     private static func fitToPickFight(_ actor: Actor) -> Bool {
-        Double(actor.health) / Double(max(1, actor.maxHealth)) >= GameConfig.AI.fightFitAt
+        let fitAt = wary(actor) ? GameConfig.Lives.lastLifeFightFitAt : GameConfig.AI.fightFitAt
+        let healthy = Double(actor.health) / Double(max(1, actor.maxHealth)) >= fitAt
+        // Heals only asked of a careful bot (Nov 2026). Nobody carries any in
+        // the first minute, so asking everyone meant nobody started a fight
+        // until well into the match.
+        guard wary(actor) else { return healthy }
+        return healthy
             && actor.inventory.totalHealing(of: actor.maxHealth)
                 >= GameConfig.AI.emergencyHealingStock
     }
@@ -1668,7 +1702,10 @@ enum AIBrain {
     /// one to leave early.
     private static func retreatLine(for actor: Actor, against enemy: Actor?,
                                     state: AIState) -> Double {
-        let usual = GameConfig.AI.retreatHealthFraction * state.caution
+        var usual = GameConfig.AI.retreatHealthFraction * state.caution
+        // One life left: break off at half, not at a third. Losing the fight
+        // now loses the match.
+        if wary(actor) { usual = max(usual, GameConfig.Lives.lastLifeRetreatAt) }
         guard let enemy, outgeared(actor, by: enemy) else { return usual }
         return max(usual, GameConfig.AI.outgearedRetreat)
     }
@@ -1688,7 +1725,8 @@ enum AIBrain {
             return share < GameConfig.AI.mendUntil
         }
 
-        guard share < GameConfig.AI.mendBelow else { return false }
+        let mendBelow = wary(actor) ? GameConfig.Lives.lastLifeMendBelow : GameConfig.AI.mendBelow
+        guard share < mendBelow else { return false }
         let healing = Double(actor.inventory.totalHealing(of: actor.maxHealth))
         let reachable = (Double(actor.health) + healing) / Double(max(1, actor.maxHealth))
         return reachable < GameConfig.AI.mendUntil
@@ -2811,7 +2849,7 @@ enum AIBrain {
 
         guard state.fightBombTimer <= 0,
               let enemy = world.actors[enemyID], enemy.isAlive,
-              enemy.invulnerability <= 0 else { return nil }
+              canTarget(enemy, by: actor, in: world) else { return nil }
 
         guard let slot = BombSystem.loadedSlot(of: actor),
               BombSystem.canThrow(actor, from: slot) else { return nil }
@@ -3071,6 +3109,13 @@ enum AIBrain {
 
     // MARK: - Fighting
 
+    /// Whether this bot may shoot at somebody right now: not while they are
+    /// spawn protected. (Bot on bot in the opening seconds is softened in
+    /// CombatSystem.damage rather than refused here - see AI.botTruce.)
+    private static func canTarget(_ enemy: Actor, by actor: Actor, in world: World) -> Bool {
+        enemy.invulnerability <= 0
+    }
+
     private static func nearestVisibleEnemy(to actor: Actor, in world: World) -> Actor? {
         // Cheap tests first. Line of sight is a raycast against every tree and
         // crate on the map, and this runs ten times a second per bot - so it is
@@ -3080,7 +3125,7 @@ enum AIBrain {
             .filter {
                 $0.team != actor.team
                     && $0.isAlive
-                    && $0.invulnerability <= 0
+                    && canTarget($0, by: actor, in: world)
                     && ($0.position - actor.position).length
                         < fightRanges(for: actor, in: world).engage
             }
@@ -3156,7 +3201,7 @@ enum AIBrain {
         guard let id = targetID,
               let enemy = world.actors[id],
               enemy.isAlive,
-              enemy.invulnerability <= 0 else { return nil }
+              canTarget(enemy, by: actor, in: world) else { return nil }
 
         let towards = enemy.position - actor.position
         guard towards.length <= GameConfig.Blaster.range else { return nil }
@@ -3202,6 +3247,7 @@ enum AIBrain {
         // and the point of this is to be competitive rather than to be a wall.
         let spread = GameConfig.AI.aimSpread * world.difficulty.aimSpreadScale
             * (1 - world.behind(actor.team) * GameConfig.AI.pressureAim)
+            * (1 - world.lateEdge * GameConfig.AI.lateAimTighten)
 
         let wobble = atan(spread / max(towards.length, 0.5))
         return Vec2.fromAngle((leadPoint - actor.position).angle + state.aimNoise * wobble)
@@ -3468,6 +3514,7 @@ enum AIBrain {
         return Double.random(in: range.lowerBound...max(range.lowerBound, upper),
                              using: &world.rng)
             * world.difficulty.reactionScale
+            * (1 - world.lateEdge * GameConfig.AI.lateReactionQuicken)
     }
 
     /// Rotates one heading towards another by at most `limit` radians.

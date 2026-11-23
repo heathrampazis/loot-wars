@@ -34,6 +34,9 @@ enum VaultSystem {
         world.holdTimer = GameConfig.Score.holdInterval
 
         for team in TeamID.all {
+            // Nobody left to pay. See GameConfig.Lives.
+            guard !world.isKnockedOut(team) else { continue }
+
             // A hole anywhere in the wall stops all of it. baseIsBreached is also
             // true for a base that was never finished, which is the same answer for
             // a different reason and the right one either way: this pays for a wall

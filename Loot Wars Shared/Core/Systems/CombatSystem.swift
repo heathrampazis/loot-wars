@@ -71,6 +71,14 @@ enum CombatSystem {
               actor.isAlive,
               actor.invulnerability <= 0 else { return }
 
+        // Bot on bot hits softer: least in the opening seconds, and a little
+        // under full all match, so bots fight but the field stays full. See
+        // AI.botTruce and AI.botVsBotDamage.
+        var share = actor.damageTakenShare
+        if let attacker, let shooter = world.actors[attacker] {
+            share *= world.botDamageShare(shooter, actor)
+        }
+
         // Every source of damage in the game comes through here, which is what
         // makes resistance one line rather than four. A bullet, a blast and a
         // lungful of gas are all blunted by the same share, and a perk added later
@@ -79,8 +87,7 @@ enum CombatSystem {
         //
         // Never below one. A perk that made you immune to something would be a perk
         // that ends fights by making them unwinnable for the other person.
-        let taken = max(1, Int((Double(max(1, amount))
-                                * actor.damageTakenShare).rounded()))
+        let taken = max(1, Int((Double(max(1, amount)) * share).rounded()))
 
         if let attacker, let source = world.actors[attacker], source.team != actor.team {
             let dealt = min(taken, actor.health)
@@ -179,11 +186,25 @@ enum CombatSystem {
 
         world.tally(actor.id) { $0.deaths += 1 }
 
+        // A life gone. The last one takes you out of the match - see
+        // GameConfig.Lives. Before the kill is announced, so the screen can call
+        // it a knockout rather than an elimination.
+        if let left = actor.livesLeft {
+            actor.livesLeft = max(0, left - 1)
+        }
+        if actor.isOut {
+            world.knockOut(actor.team)
+            let stillIn = world.actors.values.filter { !$0.isOut && $0.id != actor.id }.count
+            world.record(.knockedOut(actor.id, by: attacker, left: stillIn))
+        }
+
         world.record(.kill(victim: actor.id, by: attacker, at: actor.position,
                            points: earned.points, tokens: earned.tokens))
 
         actor.health = 0
-        actor.respawnTimer = GameConfig.Player.respawnDelay
+        // Out for good: a timer that never runs down, so everything that already
+        // skips the dead skips them for the rest of the match.
+        actor.respawnTimer = actor.isOut ? Double.infinity : GameConfig.Player.respawnDelay
 
         // Stop dead rather than sliding on with whatever was last pressed.
         actor.moveInput = .zero
