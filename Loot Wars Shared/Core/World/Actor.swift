@@ -54,6 +54,18 @@ struct Actor {
 
     var isAlive: Bool { respawnTimer == nil }
 
+    /// Lives left this match, counting the one being played. nil means no limit,
+    /// which is how How to Play and the title screen run. See GameConfig.Lives.
+    var livesLeft: Int? = GameConfig.Lives.perPlayer
+
+    /// Out of the match for good: died with no lives left. Never respawns, and
+    /// its respawnTimer stays at infinity so everything that skips the dead
+    /// skips it too.
+    var isOut: Bool { livesLeft == 0 }
+
+    /// Playing the last life - the one that ends the match for them.
+    var onLastLife: Bool { livesLeft == 1 }
+
     var ammo: Int = GameConfig.Blaster.magazineSize
 
     /// Counts down to the next portion of health handed back at home - see

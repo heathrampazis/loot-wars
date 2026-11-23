@@ -89,13 +89,77 @@ final class World {
         min(1, max(0, elapsed / duration))
     }
 
+    /// How far into the closing stretch the match is, nought to one: nothing
+    /// before GameConfig.AI.lateFrom, then a climb to one at the whistle. The
+    /// bots sharpen up on it - see AIBrain.
+    var lateEdge: Double {
+        let from = GameConfig.AI.lateFrom
+        return min(1, max(0, (matchProgress - from) / max(0.01, 1 - from)))
+    }
+
     /// Whether the whistle has gone.
     ///
     /// Nothing in Core acts on this - systems do not check it and would happily
     /// keep running. Stopping is the scene's job, because "should the simulation
     /// advance" is a question about the app rather than about the world, and a
     /// networked host would answer it somewhere else again.
-    var isOver: Bool { timeRemaining <= 0 }
+    var isOver: Bool {
+        timeRemaining <= 0 || lastOneStanding || localOutLongEnough
+    }
+
+    // MARK: - Lives
+
+    /// Teams knocked out of the match, first out first. See GameConfig.Lives.
+    private(set) var knockedOut: [TeamID] = []
+    private var knockedOutAt: [TeamID: Double] = [:]
+
+    func isKnockedOut(_ team: TeamID) -> Bool { knockedOutAt[team] != nil }
+
+    /// People still in the match, alive or waiting to respawn.
+    var stillIn: Int { actors.values.filter { !$0.isOut }.count }
+
+    /// Everyone else is out, and has been for long enough to see the last one
+    /// go. Only once somebody has actually gone, so a world with one person in
+    /// it - How to Play - is not over before it starts.
+    var lastOneStanding: Bool {
+        guard let last = knockedOut.last, let at = knockedOutAt[last] else { return false }
+        return stillIn <= 1 && elapsed - at >= GameConfig.Lives.outLinger
+    }
+
+    /// The local player went out long enough ago to have seen it. The match is
+    /// over for them then, and their place cannot change: everyone still in is
+    /// ahead of them and everyone already out is behind.
+    private var localOutLongEnough: Bool {
+        guard let team = localPlayer?.team, let at = knockedOutAt[team] else { return false }
+        return elapsed - at >= GameConfig.Lives.outLinger
+    }
+
+    /// Takes a team out of the match. Called once, by CombatSystem, on the death
+    /// that used up the last life.
+    func knockOut(_ team: TeamID) {
+        guard knockedOutAt[team] == nil else { return }
+        knockedOut.append(team)
+        knockedOutAt[team] = elapsed
+    }
+
+    /// How much of a hit lands when one bot shoots another, nought to one.
+    /// Starts at AI.botTruceDamage and climbs to AI.botVsBotDamage by
+    /// AI.botTruce seconds in, then stays there, so bots fight all match but
+    /// knock each other out less often and the field stays full. Always full
+    /// when the player is either side.
+    func botDamageShare(_ a: Actor, _ b: Actor) -> Double {
+        guard a.ai != nil, b.ai != nil else { return 1 }
+        let full = GameConfig.AI.botVsBotDamage
+        guard elapsed < GameConfig.AI.botTruce else { return full }
+        let start = GameConfig.AI.botTruceDamage
+        let t = elapsed / max(0.01, GameConfig.AI.botTruce)
+        return start + (full - start) * t
+    }
+
+    /// No limit on lives - How to Play and the title screen's wandering crowd.
+    func removeLifeLimit() {
+        for id in actors.keys { actors[id]?.livesLeft = nil }
+    }
 
     /// Who won, and by how much. Just the standings with a nicer name at the point
     /// where they stop changing.
@@ -292,7 +356,9 @@ final class World {
 
         var best: (team: TeamID, lead: Double)?
 
-        for other in TeamID.all where other != team {
+        // Never a team that is already out: their score is frozen and there is
+        // nobody left to stop.
+        for other in TeamID.all where other != team && !isKnockedOut(other) {
             let ahead = lead(of: other)
             guard ahead >= GameConfig.AI.leaderChaseAt, ahead > (best?.lead ?? 0) else { continue }
             best = (other, ahead)
@@ -329,7 +395,9 @@ final class World {
     /// what was actually added, so anything showing a number shows the real one.
     @discardableResult
     func award(_ points: Int, to team: TeamID) -> Int {
-        guard points != 0 else { return 0 }
+        // An out team's score is final. Their turret or a late bomb can still
+        // land something, and it should not move them on the board.
+        guard points != 0, !isKnockedOut(team) else { return 0 }
         let paid = points > 0 && phase == .finale && !isOver
             ? points * GameConfig.Match.finalMultiplier
             : points
@@ -339,10 +407,19 @@ final class World {
 
     /// Teams best first, ties broken by id so two teams on the same score never
     /// swap places from frame to frame.
+    ///
+    /// With lives (GameConfig.Lives.survivorsRankFirst), everyone still in comes
+    /// first, on points, then everyone out, last out first.
     var standings: [(team: TeamID, score: Int)] {
-        TeamID.all
-            .map { (team: $0, score: score(for: $0)) }
-            .sorted { $0.score == $1.score ? $0.team.raw < $1.team.raw : $0.score > $1.score }
+        let byPoints: ((team: TeamID, score: Int), (team: TeamID, score: Int)) -> Bool = {
+            $0.score == $1.score ? $0.team.raw < $1.team.raw : $0.score > $1.score
+        }
+        let rows = TeamID.all.map { (team: $0, score: score(for: $0)) }
+        guard GameConfig.Lives.survivorsRankFirst else { return rows.sorted(by: byPoints) }
+
+        let inRows = rows.filter { !isKnockedOut($0.team) }.sorted(by: byPoints)
+        let outRows = knockedOut.reversed().map { (team: $0, score: score(for: $0)) }
+        return inRows + outRows
     }
 
     /// How far the camera can see from the player, in tiles, on each axis.

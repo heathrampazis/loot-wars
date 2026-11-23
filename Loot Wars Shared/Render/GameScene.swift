@@ -1646,6 +1646,20 @@ final class GameScene: SKScene {
                 guard who == world.localPlayerID else { break }
                 SoundPlayer.shared.play(.token)
 
+            case .knockedOut(let victim, let killer, let left):
+                // Somebody used their last life. Yours is on the respawn banner;
+                // one you did keeps the usual ELIMINATION banner; anybody
+                // else's is news.
+                if victim == world.localPlayerID {
+                    hint.hide()
+                } else if killer == world.localPlayerID {
+                    break
+                } else if let name = world.actors[victim]?.name, !name.isEmpty {
+                    hint.show("\(name.uppercased()) IS OUT, \(left) LEFT", seconds: 2.2)
+                } else {
+                    hint.show("\(left) LEFT", seconds: 2.0)
+                }
+
             case .kill(let victim, let killer, let position, _, _):
                 // Remembered so the camera can go and watch them - see aimCamera.
                 // Taken from the EVENT rather than worked out later, because by the

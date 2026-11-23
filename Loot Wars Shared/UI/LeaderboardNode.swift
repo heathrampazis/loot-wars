@@ -152,7 +152,8 @@ final class LeaderboardNode: SKNode {
 
         // Only redraw when the order or a number actually changed. Scores move a few
         // times a minute; this runs sixty times a second.
-        let fingerprint = standings.flatMap { [$0.team.raw, $0.score] } + [you?.raw ?? -1]
+        let fingerprint = standings.flatMap { [$0.team.raw, $0.score] }
+            + [you?.raw ?? -1, world.knockedOut.count]
         guard fingerprint != lastDrawn else { return }
         lastDrawn = fingerprint
 
@@ -181,12 +182,18 @@ final class LeaderboardNode: SKNode {
         row.rank.text = "\(place + 1)"
         row.rank.fontColor = first ? RenderPalette.treasure : SKColor(white: 1, alpha: 0.55)
 
-        row.score.text = "\(standing.score)"
-        row.score.fontColor = SKColor(white: 1, alpha: mine ? 1 : 0.75)
+        // Out of lives: faded, with OUT where the points were.
+        let out = world.isKnockedOut(standing.team)
+        row.dot.alpha = out ? 0.4 : 1
+
+        row.score.text = out ? "OUT" : "\(standing.score)"
+        row.score.fontColor = out
+            ? SKColor(white: 1, alpha: 0.45)
+            : SKColor(white: 1, alpha: mine ? 1 : 0.75)
 
         // First place and you in bold, everybody else a step lighter.
         row.name.fontName = first || mine ? "AvenirNext-Bold" : "AvenirNext-DemiBold"
-        row.name.fontColor = SKColor(white: 1, alpha: mine || first ? 1 : 0.8)
+        row.name.fontColor = SKColor(white: 1, alpha: out ? 0.45 : (mine || first ? 1 : 0.8))
         let room = LeaderboardNode.scoreRight - LeaderboardNode.scoreRoom - LeaderboardNode.nameX
         LeaderboardNode.fit(row.name, world.name(of: standing.team), width: room)
     }

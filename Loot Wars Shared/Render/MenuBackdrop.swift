@@ -50,6 +50,7 @@ final class MenuBackdrop {
     func build() {
         let generated = MapFactory.generate(seed: UInt64.random(in: 0..<UInt64.max))
         world = World(generated: generated)
+        world.removeLifeLimit()
 
         furnish(generated)
         dress()

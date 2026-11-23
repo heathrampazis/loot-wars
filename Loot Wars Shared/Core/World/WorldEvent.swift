@@ -169,4 +169,9 @@ enum WorldEvent {
 
     /// Somebody came back from the dead wearing gear out of their own chest.
     case rearmed(ActorID, helmet: HelmetTier?, blaster: BlasterTier?)
+
+    /// Somebody used their last life and is out of the match. Recorded just
+    /// before the kill that did it, so the kill can be called a knockout.
+    /// `left` is how many are still in.
+    case knockedOut(ActorID, by: ActorID?, left: Int)
 }

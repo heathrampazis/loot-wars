@@ -233,11 +233,23 @@ enum LootTable {
                      unlocks: Unlocks = .all,
                      perkBoost: Double = 1,
                      healBoost: Double = 1,
+                     gearBoost: Double = 1,
+                     rungUpChance: Double = 0,
                      using rng: inout SeededRandom) -> Pickup {
         let rolled = plain(bombShare: bombShare, at: progress, rare: rare,
                            unlocks: unlocks, perkBoost: perkBoost,
-                           healBoost: healBoost, using: &rng)
-        return rare ? upgraded(rolled, unlocks: unlocks) : rolled
+                           healBoost: healBoost, gearBoost: gearBoost, using: &rng)
+        if rare { return upgraded(rolled, unlocks: unlocks) }
+
+        // A chance of one rung better on gear from an ordinary crate - how bots
+        // keep pace with the player (Nov 2026, see AI.crateRungUpChance). The
+        // draw is only made when there is a chance, so a player's crate rolls
+        // exactly as it always has.
+        if rungUpChance > 0, case .item(let type) = rolled, type.isGear,
+           Double.random(in: 0..<1, using: &rng) < rungUpChance {
+            return oneRungUp(rolled, unlocks: unlocks)
+        }
+        return rolled
     }
 
     private static func plain(bombShare: Double,
@@ -246,6 +258,7 @@ enum LootTable {
                               unlocks: Unlocks,
                               perkBoost: Double,
                               healBoost: Double,
+                              gearBoost: Double,
                               using rng: inout SeededRandom) -> Pickup {
         let table = table(at: progress)
         let share = min(1, max(0, bombShare))
@@ -254,6 +267,12 @@ enum LootTable {
             if case .item(let type) = row.pickup, type.isHealing {
                 return (pickup: row.pickup,
                         weight: Int((Double(row.weight) * healBoost).rounded()))
+            }
+            // Helmets and blasters more or less often, by who is opening it
+            // (Nov 2026) - see Loot.playerGearShare and AI.crateGearBoost.
+            if case .item(let type) = row.pickup, type.isGear {
+                return (pickup: row.pickup,
+                        weight: max(1, Int((Double(row.weight) * gearBoost).rounded())))
             }
             guard row.pickup == .item(.bomb) else { return row }
 

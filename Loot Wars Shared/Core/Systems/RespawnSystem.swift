@@ -91,18 +91,13 @@ enum RespawnSystem {
         // World.spawnPoint.
         actor.position = world.spawnPoint(for: actor.team)
 
-        // People put on the best gear waiting in their own chests. This is what a
-        // chest is FOR: you come back with nothing on you, and a spare helmet
-        // and blaster banked at home is the difference between walking back out
-        // ready and walking back out bare. Bots have their own way of doing the
-        // same - they walk home and take it out, see AIBrain.reArmWanted.
-        if actor.ai == nil {
-            rearm(&actor, in: world)
-        }
-
-        // Bots are topped up to the late-match gear floor; people come back with nothing,
-        // so the only gear that survives a death is gear stored in a chest.
-        if actor.ai != nil, let kit = GameConfig.Player.respawnKit(at: world.matchProgress) {
+        // Everybody comes back with nothing (Nov 2026): no free gear, no free
+        // heals, bots included. It used to be bots only that got the late-match
+        // floor, which with two lives made your second life hopeless against
+        // them. Now the only thing that survives a death is what is in your
+        // chest - see rearm below. Switch back with Player.respawnsWithKit.
+        if GameConfig.Player.respawnsWithKit,
+           let kit = GameConfig.Player.respawnKit(at: world.matchProgress) {
             if actor.helmet < kit.helmet {
                 actor.helmet = kit.helmet
                 // Health is scaled by the helmet, and it was just set to the old
@@ -114,12 +109,20 @@ enum RespawnSystem {
             if actor.blaster < kit.blaster { actor.blaster = kit.blaster }
         }
 
-        // Bots also get a few heals; people respawn completely bare.
-        if actor.ai != nil {
+        if GameConfig.Player.respawnsWithKit {
             for item in GameConfig.Player.respawnHealKit(at: world.matchProgress) {
                 _ = actor.inventory.add(item)
             }
         }
+
+        // Everybody puts on the best helmet and blaster waiting in their own
+        // chests. This is what a chest is FOR: gear banked at home is the
+        // difference between walking back out ready and walking back out bare.
+        // Bots too now, the same rule and the same instant, rather than walking
+        // home for it (AIBrain.reArmWanted still does that for gear that turns up
+        // in a chest later). Whatever a bot's chest happens to hold when it dies
+        // is what it comes back in - the luck of the draw.
+        rearm(&actor, in: world)
 
         // A bot that died halfway across the map should not come back still
         // pointed the way it was going. Face it out of its own base and let it

@@ -171,6 +171,8 @@ final class HowToPlayStage {
                                      seed: 7)
         world = World(generated: generated)
         world.setLocalName(Prefs.playerName)
+        // Puppets die on cue, over and over. Nobody runs out of lives here.
+        world.removeLifeLimit()
 
         // Puppets, every one. The script drives them; nobody thinks for them.
         for id in world.actors.keys {

@@ -64,6 +64,13 @@ enum LootSystem {
                 // Bots find power-ups more often than you do - see
                 // AI.cratePerkBoost.
                 let byBot = world.actors[id]?.ai != nil
+                // Gear balance (Nov 2026): you find helmets and blasters a
+                // little less often, bots a good deal more often and sometimes a
+                // rung better, so they keep pace. Not on Easy.
+                let balanced = world.difficulty != .easy
+                let gearBoost = !balanced ? 1
+                    : (byBot ? GameConfig.AI.crateGearBoost : GameConfig.Loot.playerGearShare)
+                let rungUp = balanced && byBot ? GameConfig.AI.crateRungUpChance : 0
                 let pickup = LootTable.roll(bombShare: world.bombShare,
                                             at: world.matchProgress,
                                             rare: rare,
@@ -72,6 +79,8 @@ enum LootSystem {
                                             // More heals for people on the
                                             // easier settings; bots unchanged.
                                             healBoost: byBot ? 1 : world.difficulty.crateHealBoost,
+                                            gearBoost: gearBoost,
+                                            rungUpChance: rungUp,
                                             using: &world.rng)
                 world.spawnGroundItem(pickup, at: box.position)
 

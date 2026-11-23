@@ -723,7 +723,7 @@ final class ResultsNode: SKNode {
         return n < 0 ? "-" + out : out
     }
 
-    private static func ordinal(_ n: Int) -> String {
+    static func ordinal(_ n: Int) -> String {
         switch n {
         case 1: return "1ST"
         case 2: return "2ND"
