@@ -187,7 +187,11 @@ enum LootTable {
     /// the band already offers an Epic, a rare crate is where a Legendary comes
     /// from, and that is the only place one is ever found.
     private static func upgraded(_ pickup: Pickup, unlocks: Unlocks) -> Pickup {
-        var result = oneRungUp(pickup, unlocks: unlocks)
+        // Loot.rareRungs up, not one (Nov 2026).
+        var result = pickup
+        for _ in 0..<max(1, GameConfig.Loot.rareRungs) {
+            result = oneRungUp(result, unlocks: unlocks)
+        }
 
         // And never green or grey out of a purple crate (Oct 2026). One rung up
         // from a Common helmet or a Blaster 2 is an Epic - green - which is what

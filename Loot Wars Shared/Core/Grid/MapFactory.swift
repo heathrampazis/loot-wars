@@ -31,6 +31,11 @@ struct GeneratedMap {
     let localTeam: TeamID
     /// Kept so the world can start its own generator from the same number.
     let seed: UInt64
+
+    /// Where rare crates turn up: one spot beside each map arcade (Nov 2026).
+    /// Rare crates appear here and nowhere else - see World.tickRareSites.
+    /// Empty for How to Play, which builds its own map.
+    var rareSites: [GridPoint] = []
 }
 
 enum MapFactory {
@@ -56,8 +61,11 @@ enum MapFactory {
         let arcades = placeArcades(in: map, avoiding: claims, and: [], using: &rng)
         let trees = plantTrees(in: map, biomes: biomes, avoiding: claims,
                                and: arcades, using: &rng)
+        // One rare-crate spot per machine. Chosen without the generator, so it
+        // costs the seed nothing.
+        let rareSites = findRareSites(around: arcades, in: map, avoiding: claims, and: trees)
         let lootboxes = scatterLootboxes(in: map, avoiding: claims, and: trees,
-                                         around: arcades, using: &rng)
+                                         around: arcades, reserving: rareSites, using: &rng)
 
         var baseLayouts: [TeamID: BaseLayout] = [:]
         for index in 0..<TeamID.count {
@@ -74,7 +82,8 @@ enum MapFactory {
                             arcades: arcades,
                             baseLayouts: baseLayouts,
                             localTeam: localTeam,
-                            seed: seed)
+                            seed: seed,
+                            rareSites: rareSites)
     }
 
     /// Eight claims, one to a sector, scattered inside a band around the middle.
@@ -394,6 +403,7 @@ extension MapFactory {
                                              avoiding claims: [TeamID: BaseClaim],
                                              and trees: [TreePatch],
                                              around arcades: [Arcade],
+                                             reserving rareSites: [GridPoint],
                                              using rng: inout SeededRandom) -> [Lootbox] {
         var placed: [Lootbox] = []
         let attempts = GameConfig.Loot.lootboxCount * 30
@@ -421,16 +431,49 @@ extension MapFactory {
             let centre = tile.center
             let tooClose = placed.contains {
                 ($0.position - centre).length < GameConfig.Loot.lootboxSpacing
+            } || rareSites.contains {
+                ($0.center - centre).length < GameConfig.Loot.lootboxSpacing
             }
             if tooClose { continue }
 
-            // A few start rare; most rare ones turn up later, as crates respawn -
-            // see GameConfig.Loot.rareChance. Drawn from the world's own
-            // generator, so a seed still replays exactly.
-            let rare = Double.random(in: 0..<1, using: &rng) < GameConfig.Loot.startingRareShare
-            placed.append(Lootbox(id: LootboxID(placed.count), tile: tile, rare: rare))
+            // Never rare (Nov 2026). Rare crates only turn up at the machines -
+            // see rareSites and World.tickRareSites.
+            placed.append(Lootbox(id: LootboxID(placed.count), tile: tile, rare: false))
         }
 
         return placed
+    }
+}
+
+// MARK: - Rare crate sites
+
+extension MapFactory {
+
+    /// One spot beside each map arcade where its rare crates turn up (Nov 2026).
+    /// Heath: rare crates "should also only spawn on arcade sites and be more
+    /// rare". In front of the machine if there is room, then either side, then
+    /// behind - the first open floor tile, in that fixed order, so no random
+    /// number is spent and a seed builds the same map it always did. Just
+    /// outside the ring where the machine pays tokens out.
+    fileprivate static func findRareSites(around arcades: [Arcade], in map: TileMap,
+                                          avoiding claims: [TeamID: BaseClaim],
+                                          and trees: [TreePatch]) -> [GridPoint] {
+        arcades.compactMap { arcade -> GridPoint? in
+            let c = arcade.origin.col, r = arcade.origin.row
+            let w = arcade.width, h = arcade.height
+            let candidates = [
+                GridPoint(col: c, row: r - 2), GridPoint(col: c + w - 1, row: r - 2),
+                GridPoint(col: c - 2, row: r), GridPoint(col: c + w + 1, row: r),
+                GridPoint(col: c, row: r + h + 1), GridPoint(col: c + w - 1, row: r + h + 1)
+            ]
+            return candidates.first { tile in
+                tile.col >= 1 && tile.row >= 1
+                    && tile.col <= map.width - 2 && tile.row <= map.height - 2
+                    && map[tile] == .floor
+                    && !claims.values.contains(where: { $0.contains(tile) })
+                    && !trees.contains(where: { $0.overlaps(tile) })
+                    && !arcades.contains(where: { $0.hitbox.expanded(by: 1).intersects(Box(tile: tile)) })
+            }
+        }
     }
 }

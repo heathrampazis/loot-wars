@@ -327,14 +327,16 @@ enum GameConfig {
         /// the second thing read.
         static let tabs: [Tab] = [
             Tab(name: "HEALING", stock: .shelf([
-                Item(type: .bandage, price: 6),
+                // Nov 2026, the shop nerf: 6 -> 9 and 11 -> 16. Heath: "items
+                // shouldnt be so easily purchased from there".
+                Item(type: .bandage, price: 9),
                 // Eleven, down from fifteen. At fifteen a medkit was worse than a
                 // bandage on every axis a player actually feels: 0.067 of a health
                 // bar per token against 0.083, and the same two bars per slot once
                 // you counted the deeper bandage stack. It was the premium option
                 // that lost to the cheap one, which is not a choice, it is a trap.
                 // At eleven it pays 0.091 a token and three bars a slot.
-                Item(type: .medkit,  price: 11)
+                Item(type: .medkit,  price: 16)
             ])),
             Tab(name: "GEAR", stock: .upgrades),
 
@@ -343,7 +345,7 @@ enum GameConfig {
             // sold out, and the quick offer pushes it (see ShopSystem.quickOffer);
             // one bought before the bomb grace ends waits until it can be thrown.
             Tab(name: "RAID", stock: .shelf([
-                Item(type: .bomb, price: 18)
+                Item(type: .bomb, price: 26)   // 18 -> 26 (Nov 2026)
             ]))
         ]
 
@@ -456,7 +458,9 @@ enum GameConfig {
         /// being a laundry - at anything near full price you could buy a bomb,
         /// think better of it, sell it back, and every price in here would stop
         /// meaning anything.
-        static let sellShare: Double = 0.20
+        /// 0.20 -> 0.13 (Nov 2026) with the dearer shop, so what selling pays
+        /// stays about where it was.
+        static let sellShare: Double = 0.13
 
         /// What something is notionally worth when nothing else names a price -
         /// the floor under ShopSystem.sellPrice, so no item is ever unsellable.
@@ -531,7 +535,12 @@ enum GameConfig {
         ///
         /// And every rung is lost on death, which is what stops a bought Cosmic from
         /// simply deciding the match. It is a lead to hold on to, not a purchase.
-        static let gearPrices: [Int] = [6, 12, 22, 40, 70]
+        ///
+        /// Nov 2026, the shop nerf: 6/12/22/40/70 -> 10/20/36/60/100, about 1.6x.
+        /// Heath: "I want the shop to be nerfed, items shouldnt be so easily
+        /// purchased from there". Crates (and rare crates above all) are where
+        /// gear should come from; the shop is a slow, dear top-up.
+        static let gearPrices: [Int] = [10, 20, 36, 60, 100]
 
         static let helmetPrices: [HelmetTier: Int] = [
             .common: gearPrices[0], .epic: gearPrices[1], .legendary: gearPrices[2],
@@ -1568,6 +1577,13 @@ enum GameConfig {
         /// player always upgrades before the others".
         static let crateGearBoost: Double = 2
         static let crateRungUpChance: Double = 0.4
+
+        /// How far a bot will go for a rare crate (Nov 2026). Inside this many
+        /// tiles it drops what it is doing and goes - just under defending its
+        /// base and an open supply drop. Heath: "Enemies should really target
+        /// these rare lootboxes where possible". Several bots wanting the same
+        /// crate is the point: it is where the fights should be.
+        static let rareCrateRange: Double = 40
 
         /// And even once the shooting stops, a beat before patching up. Winding a
         /// bandage on the same frame the last bullet lands is a tell that nobody is
@@ -2702,6 +2718,24 @@ enum GameConfig {
         /// AI.crateGearBoost for the bots' side.
         static let playerGearShare: Double = 0.8
 
+        /// Rare crates (Nov 2026): Heath, "rare lootboxes should also only spawn
+        /// on arcade sites and be more rare... I want rarer loot to feel rare
+        /// and meaningful". One spot by each map arcade (GeneratedMap.rareSites).
+        /// The first crate at each lands rareSiteFirst seconds in, the next
+        /// site rareSiteStagger later, and each comes back rareSiteRespawn
+        /// seconds after it is opened. With four machines that is about ten a
+        /// match, against twenty-odd before, and always in a known, contested
+        /// place. Ordinary crates are never rare now, so rareChance, rareCap and
+        /// startingRareShare are no longer used.
+        static let rareSiteFirst: Double = 20
+        static let rareSiteStagger: Double = 10
+        static let rareSiteRespawn: ClosedRange<Double> = 45...65
+
+        /// How many rungs a rare crate lifts the gear it rolls (Nov 2026). Was
+        /// one; two makes a rare crate the best thing on the map rather than a
+        /// slightly better crate. Still at least blue either way.
+        static let rareRungs = 2
+
         /// Lootboxes scattered across the map.
         /// The share of purple crates that are a bomb - the ONLY crates that hold
         /// one (see LootTable.plain). A share rather than a weight, so it is the
@@ -2942,7 +2976,9 @@ enum GameConfig {
         /// ground. What does change is that eight people are now competing over
         /// thirty-four of them instead of forty-two, which is the contest the
         /// smaller map was for.
-        static let lootboxCount = 34
+        /// 34 -> 24 -> 20 (Nov 2026): Heath wants fewer crates, so loot is
+        /// something you fight over rather than trip over.
+        static let lootboxCount = 20
 
         /// Minimum distance between two lootboxes, in tiles, so they do not cluster.
         static let lootboxSpacing: Double = 4
