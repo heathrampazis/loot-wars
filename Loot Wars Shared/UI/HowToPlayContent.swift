@@ -37,7 +37,7 @@ final class HowToPlayContent: MenuSheetContent {
                  body: "The \(move) stick moves you. Hold the \(aim) stick to aim and fire.",
                  scene: .moveAndShoot),
             Page(title: "Open crates",
-                 body: "Walk up to a crate and it opens. Purple crates hold better loot.",
+                 body: "Walk up to a crate and it opens. Purple crates appear by the arcades and hold the best loot.",
                  scene: .crates),
             Page(title: "Gear up",
                  body: "Walk over a better helmet or blaster to put it on. Rarer colours are stronger.",

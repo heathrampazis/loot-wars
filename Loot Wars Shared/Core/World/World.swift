@@ -243,12 +243,17 @@ final class World {
     /// An opened crate, waiting to come back in the same spot.
     private struct PendingLootbox {
         let tile: GridPoint
-        // No rarity carried: whether it comes back rare is rolled on the way
-        // back - see tickLootboxRespawns and GameConfig.Loot.rareChance.
+        // No rarity carried: an ordinary crate always comes back ordinary.
         var timer: Double
     }
 
     private var pendingLootboxes: [PendingLootbox] = []
+
+    /// Where rare crates turn up - one spot by each map arcade, see
+    /// GeneratedMap.rareSites - and how long until each one's next crate. nil
+    /// while a crate is standing there.
+    private(set) var rareSites: [GridPoint] = []
+    private var rareSiteTimers: [Double?] = []
 
     private var nextChestID = 0
     private var nextProjectileID = 0
@@ -476,6 +481,12 @@ final class World {
         }
         self.treeTiles = wooded
         self.nextLootboxID = generated.lootboxes.count
+        // The first rare crates come in one site at a time, a few seconds
+        // apart, so the machines do not all light up at once.
+        self.rareSites = generated.rareSites
+        self.rareSiteTimers = generated.rareSites.indices.map {
+            GameConfig.Loot.rareSiteFirst + Double($0) * GameConfig.Loot.rareSiteStagger
+        }
         var machines: [ArcadeID: Arcade] = [:]
         for machine in generated.arcades { machines[machine.id] = machine }
         self.arcades = machines
@@ -650,6 +661,13 @@ final class World {
         // A supply drop is a one-off. It lands, somebody takes it, it is gone.
         guard !crate.supply else { return }
 
+        // A rare crate goes back on its machine's clock, not the ordinary one.
+        if crate.rare, let index = rareSites.firstIndex(of: crate.tile) {
+            let range = GameConfig.Loot.rareSiteRespawn
+            rareSiteTimers[index] = Double.random(in: range, using: &rng)
+            return
+        }
+
         // Crates come back. Without that, seven bots strip the map bare within a
         // minute and there is nothing left to play around.
         pendingLootboxes.append(PendingLootbox(tile: crate.tile,
@@ -684,6 +702,7 @@ final class World {
     /// tile - so a supply drop never lands where a crate is about to reappear.
     func awaitsCrate(near tile: GridPoint) -> Bool {
         pendingLootboxes.contains { abs($0.tile.col - tile.col) <= 1 && abs($0.tile.row - tile.row) <= 1 }
+            || rareSites.contains { abs($0.col - tile.col) <= 1 && abs($0.row - tile.row) <= 1 }
     }
 
     /// Counts every supply drop's lock down.
@@ -695,7 +714,35 @@ final class World {
         }
     }
 
+    /// Puts a rare crate back on each machine's spot when its clock runs out.
+    /// The only place rare crates come from (Nov 2026).
+    private func tickRareSites(dt: Double) {
+        for index in rareSiteTimers.indices {
+            guard let timer = rareSiteTimers[index] else { continue }
+            let left = timer - dt
+            guard left <= 0 else {
+                rareSiteTimers[index] = left
+                continue
+            }
+
+            let tile = rareSites[index]
+            let crate = Lootbox(id: LootboxID(nextLootboxID), tile: tile, rare: true)
+            // Not under somebody, and not on top of something already there.
+            if actors.values.contains(where: { $0.isAlive && $0.hitbox.intersects(crate.hitbox) })
+                || lootboxes.values.contains(where: { $0.tile == tile }) {
+                rareSiteTimers[index] = 1
+                continue
+            }
+
+            nextLootboxID += 1
+            lootboxes[crate.id] = crate
+            rareSiteTimers[index] = nil
+            structuresChanged()
+        }
+    }
+
     func tickLootboxRespawns(dt: Double) {
+        tickRareSites(dt: dt)
         guard !pendingLootboxes.isEmpty else { return }
 
         var stillWaiting: [PendingLootbox] = []
@@ -710,10 +757,6 @@ final class World {
 
             // Crates are solid, so one appearing under somebody would shove them
             // out of the way. Wait for them to move on instead.
-            // Rare or not is decided HERE, on the way back, by how far the match
-            // has run - see GameConfig.Loot.rareChance - and never past the cap.
-            // Rolled only once the spot is clear, so waiting for somebody to move
-            // off it does not get extra chances at a rare one.
             let crate = Lootbox(id: LootboxID(nextLootboxID),
                                 tile: pending.tile,
                                 rare: false)
@@ -723,12 +766,9 @@ final class World {
                 continue
             }
 
-            var placed = crate
-            let rareStanding = lootboxes.values.filter { $0.rare }.count
-            if rareStanding < GameConfig.Loot.rareCap(at: matchProgress) {
-                placed.rare = Double.random(in: 0..<1, using: &rng)
-                    < GameConfig.Loot.rareChance(at: matchProgress)
-            }
+            // Never rare any more (Nov 2026): rare crates come only from the
+            // machines' spots - see tickRareSites.
+            let placed = crate
 
             nextLootboxID += 1
             lootboxes[placed.id] = placed

@@ -657,6 +657,13 @@ enum AIBrain {
             return .loot(drop.id)
         }
 
+        // A rare crate on a machine's spot (Nov 2026). Right under a supply
+        // drop: they are the two things on the map worth crossing it for, and
+        // the bots should be there when you are - see AI.rareCrateRange.
+        if let crate = rareCrateWorthTheTrip(for: actor, in: world) {
+            return .loot(crate.id)
+        }
+
         // Somebody has put a hole in a finished base. Everything else waits.
         //
         // Above the build commitment rather than folded into it, because this is
@@ -1916,6 +1923,23 @@ enum AIBrain {
     private static func isSupplyRun(_ goal: AIGoal, in world: World) -> Bool {
         guard case .loot(let id) = goal else { return false }
         return world.lootboxes[id]?.supply == true
+    }
+
+    /// The nearest rare crate within AI.rareCrateRange. In id order on a tie,
+    /// so a seed replays the same.
+    private static func rareCrateWorthTheTrip(for actor: Actor, in world: World) -> Lootbox? {
+        var best: Lootbox?
+        var shortest = GameConfig.AI.rareCrateRange
+
+        for id in world.lootboxes.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let crate = world.lootboxes[id], crate.rare, !crate.supply else { continue }
+            let distance = (crate.position - actor.position).length
+            guard distance < shortest else { continue }
+            shortest = distance
+            best = crate
+        }
+
+        return best
     }
 
     private static func nearestCrate(to actor: Actor, in world: World) -> Lootbox? {
