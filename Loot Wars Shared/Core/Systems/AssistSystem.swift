@@ -122,7 +122,7 @@ enum AssistSystem {
 
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let enemy = world.actors[id], enemy.team != actor.team,
-                  enemy.isAlive, enemy.invulnerability <= 0 else { continue }
+                  enemy.isAlive, enemy.invulnerability <= 0, !enemy.isHidden else { continue }
 
             let towards = enemy.position - actor.position
             let distance = towards.length
@@ -159,8 +159,8 @@ enum AssistSystem {
     private static func bestPerk(for actor: Actor, healBelow: Double) -> Int? {
         let healthLeft = Double(actor.health) / Double(max(1, actor.maxHealth))
         let order: [Perk] = healthLeft < healBelow
-            ? [.overdrive, .regeneration, .resistance, .strength, .speed]
-            : [.strength, .resistance, .overdrive, .speed, .regeneration]
+            ? [.overdrive, .regeneration, .resistance, .invisibility, .strength, .speed]
+            : [.strength, .resistance, .overdrive, .speed, .regeneration, .invisibility]
 
         for perk in order {
             if perk == .regeneration, healthLeft >= GameConfig.Assist.regenBelow { continue }

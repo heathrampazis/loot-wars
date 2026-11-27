@@ -54,6 +54,9 @@ enum Perk: Hashable, CaseIterable {
     case regeneration
     /// Thicker skin, and only that.
     case resistance
+    /// Unseen by enemies for the perk's length (Nov 2026) - see
+    /// Actor.isHidden. A slate candy. Not part of the disco ball.
+    case invisibility
 
     /// The ones that can actually be FOUND, and the only list anything handing a
     /// power-up out should ever read.
@@ -77,7 +80,7 @@ enum Perk: Hashable, CaseIterable {
     /// This says what is meant.
     var isObtainable: Bool {
         switch self {
-        case .overdrive, .strength, .speed, .regeneration, .resistance: return true
+        case .overdrive, .strength, .speed, .regeneration, .resistance, .invisibility: return true
         }
     }
 
@@ -91,7 +94,7 @@ enum Perk: Hashable, CaseIterable {
     var rarity: Rarity {
         switch self {
         case .overdrive: return .mythical
-        case .strength, .speed, .regeneration, .resistance: return .legendary
+        case .strength, .speed, .regeneration, .resistance, .invisibility: return .legendary
         }
     }
 
@@ -106,7 +109,7 @@ enum Perk: Hashable, CaseIterable {
         switch self {
         case .overdrive:  return GameConfig.Perks.speedBoost
         case .speed:      return GameConfig.Perks.soloSpeedBoost
-        case .strength, .regeneration, .resistance: return 1
+        case .strength, .regeneration, .resistance, .invisibility: return 1
         }
     }
 
@@ -114,7 +117,7 @@ enum Perk: Hashable, CaseIterable {
         switch self {
         case .overdrive:  return GameConfig.Perks.damageBoost
         case .strength:   return GameConfig.Perks.soloDamageBoost
-        case .speed, .regeneration, .resistance: return 1
+        case .speed, .regeneration, .resistance, .invisibility: return 1
         }
     }
 
@@ -123,7 +126,7 @@ enum Perk: Hashable, CaseIterable {
         switch self {
         case .overdrive:  return GameConfig.Perks.damageTaken
         case .resistance: return GameConfig.Perks.soloDamageTaken
-        case .strength, .speed, .regeneration: return 1
+        case .strength, .speed, .regeneration, .invisibility: return 1
         }
     }
 
@@ -133,7 +136,7 @@ enum Perk: Hashable, CaseIterable {
         switch self {
         case .overdrive:    return GameConfig.Perks.healPortion
         case .regeneration: return GameConfig.Perks.soloHealPortion
-        case .strength, .speed, .resistance: return 0
+        case .strength, .speed, .resistance, .invisibility: return 0
         }
     }
 
@@ -155,7 +158,7 @@ enum Perk: Hashable, CaseIterable {
         switch self {
         case .overdrive:
             return GameConfig.Loot.overdriveWeight(at: progress)
-        case .strength, .speed, .regeneration, .resistance:
+        case .strength, .speed, .regeneration, .resistance, .invisibility:
             return GameConfig.Loot.singlePerkWeight(at: progress)
         }
     }

@@ -96,6 +96,8 @@ enum CombatSystem {
 
         actor.health -= taken
         actor.secondsSinceHit = 0
+        // A hit shows an invisible player's outline for a moment.
+        if actor.perk == .invisibility { actor.revealTimer = GameConfig.Perks.revealTime }
         world.record(.hurt(id, amount: taken, by: attacker, at: actor.position))
 
         if actor.health <= 0 {

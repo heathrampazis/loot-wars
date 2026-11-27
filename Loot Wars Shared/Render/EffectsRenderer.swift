@@ -87,6 +87,18 @@ final class EffectsRenderer {
 
             guard actor.isAlive else { continue }
 
+            // Unseen (Nov 2026): no footprints and no aura to give them away,
+            // just a slate glint now and then - see Perks.sparkleInterval.
+            if actor.isHidden, id != world.localPlayerID {
+                let beat = Int(actor.perkRemaining / GameConfig.Perks.sparkleInterval)
+                let previous = lastPerk[id] ?? actor.perkRemaining
+                if Int(previous / GameConfig.Perks.sparkleInterval) != beat {
+                    aura(at: actor.position, step: 0, perk: .invisibility)
+                }
+                lastPerk[id] = actor.perkRemaining
+                continue
+            }
+
             if let previous = lastFeet[id] {
                 step(actor, travelling: actor.feet - previous)
             }

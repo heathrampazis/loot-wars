@@ -84,6 +84,15 @@ struct Actor {
     var perk: Perk?
     var perkRemaining: Double = 0
 
+    /// Seconds an invisible actor stays seen after being hit - see
+    /// Perks.revealTime.
+    var revealTimer: Double = 0
+
+    /// Unseen by enemies right now: running Invisibility and not just hit. Bots
+    /// and turrets do not aim at them (bots only from right beside them, see
+    /// Perks.spotRange), and enemy screens draw only a glint now and then.
+    var isHidden: Bool { perk == .invisibility && revealTimer <= 0 }
+
     /// Counts down to the next thing a running perk does.
     var perkTick: Double = 0
 

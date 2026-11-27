@@ -1153,7 +1153,7 @@ enum AIBrain {
 
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let candidate = world.actors[id],
-                  candidate.isAlive,
+                  candidate.isAlive, !candidate.isHidden,
                   candidate.team != actor.team else { continue }
 
             let ahead = world.lead(of: candidate.team)
@@ -1177,7 +1177,7 @@ enum AIBrain {
 
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let candidate = world.actors[id],
-                  candidate.isAlive,
+                  candidate.isAlive, !candidate.isHidden,
                   candidate.team != actor.team,
                   candidate.bounty >= GameConfig.AI.bountyHuntsAt,
                   !outgeared(actor, by: candidate) else { continue }
@@ -1558,7 +1558,12 @@ enum AIBrain {
 
             // Already open: straight to its turret, chests or machines. Shut: bomb the wall.
             let goal: AIGoal?
-            if world.baseIsBreached(team) {
+            // An open base that already has its share of raiders is left to
+            // them (Nov 2026) - see AI.maxRaidersPerBase.
+            if world.baseIsBreached(team),
+               raiders(on: team, except: actor.id, in: world) >= GameConfig.AI.maxRaidersPerBase {
+                goal = nil
+            } else if world.baseIsBreached(team) {
                 goal = remaining(at: team, for: actor, in: world)
             } else if hasBomb, let wall = breachTile(into: team, for: actor, in: world) {
                 goal = .raid(wall)
@@ -2020,13 +2025,25 @@ enum AIBrain {
             guard world.hasFlag(team), world.baseIsBreached(team),
                   let flag = world.flagPosition(of: team) else { continue }
             let distance = (flag - actor.position).length
+            // Only a bot already in the area, and only while the raid is not
+            // already crowded (Nov 2026): "not every player should swarm a
+            // base in a raid".
             guard distance <= GameConfig.AI.thirdPartyRange,
+                  raiders(on: team, except: actor.id, in: world) < GameConfig.AI.maxRaidersPerBase,
                   distance < (best?.distance ?? .greatestFiniteMagnitude) else { continue }
             best = (team, distance)
         }
 
         guard let team = best?.team else { return nil }
         return remaining(at: team, for: actor, in: world)
+    }
+
+    /// How many other bots are raiding this base right now - see
+    /// AI.maxRaidersPerBase.
+    private static func raiders(on team: TeamID, except id: ActorID, in world: World) -> Int {
+        world.actors.values.filter {
+            $0.id != id && $0.isAlive && $0.team != team && $0.ai?.raidingBase == team
+        }.count
     }
 
     /// The nearest rare crate within AI.rareCrateRange. In id order on a tie,
@@ -3229,6 +3246,9 @@ enum AIBrain {
                 return fighting || supplyRun || retreating || raidingFar
             case .regeneration:
                 return hurt || (fighting && actor.health < actor.maxHealth)
+            case .invisibility:
+                // Sneaking in, or slipping away.
+                return raidingFar || atRaid || retreating || supplyRun
             }
         }
 
@@ -3333,7 +3353,13 @@ enum AIBrain {
     /// spawn protected. (Bot on bot in the opening seconds is softened in
     /// CombatSystem.damage rather than refused here - see AI.botTruce.)
     private static func canTarget(_ enemy: Actor, by actor: Actor, in world: World) -> Bool {
-        enemy.invulnerability <= 0
+        enemy.invulnerability <= 0 && (!enemy.isHidden || nearEnoughToSpot(enemy, by: actor))
+    }
+
+    /// Whether this bot is close enough to an invisible enemy to notice it
+    /// anyway - right beside it. See Perks.spotRange.
+    private static func nearEnoughToSpot(_ enemy: Actor, by actor: Actor) -> Bool {
+        (enemy.position - actor.position).length <= GameConfig.Perks.spotRange
     }
 
     private static func nearestVisibleEnemy(to actor: Actor, in world: World) -> Actor? {

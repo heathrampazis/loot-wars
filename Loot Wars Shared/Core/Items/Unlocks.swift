@@ -25,6 +25,7 @@ enum Feature: String, CaseIterable {
     case stinkBombs
     case fullArcade
     case resistance
+    case invisibility
     case discoBall
     case cosmicHelmet
     case cosmicBlaster
@@ -40,6 +41,7 @@ enum Feature: String, CaseIterable {
         case .stinkBombs:    return .stink
         case .fullArcade:    return .arcade(.full)
         case .resistance:    return .perk(.resistance)
+        case .invisibility:  return .perk(.invisibility)
         case .discoBall:     return .perk(.overdrive)
         case .cosmicHelmet:  return .helmet(.cosmic)
         case .cosmicBlaster: return .blaster(.six)
@@ -74,7 +76,7 @@ struct Unlocks: Equatable {
 
     /// How many of the four single power-ups this match has.
     var singlePerkCount: Int {
-        [Feature.strength, .speed, .regeneration, .resistance].filter { has($0) }.count
+        [Feature.strength, .speed, .regeneration, .resistance, .invisibility].filter { has($0) }.count
     }
 
     func has(_ feature: Feature) -> Bool { features.contains(feature) }
@@ -86,6 +88,7 @@ struct Unlocks: Equatable {
         case .perk(.speed):        return has(.speed)
         case .perk(.regeneration): return has(.regeneration)
         case .perk(.resistance):   return has(.resistance)
+        case .perk(.invisibility): return has(.invisibility) || GameConfig.Loot.testingInvisibility
         case .perk(.overdrive):    return has(.discoBall)
         case .arcade(.mini):       return has(.miniArcade)
         case .arcade(.full):       return has(.fullArcade)
@@ -124,13 +127,16 @@ struct Unlocks: Equatable {
 enum Roadmap {
 
     static let milestones: [(level: Int, feature: Feature)] = [
+        // Twelve unlocks in 55 levels since Invisibility (Nov 2026): every four
+        // or five levels rather than every five, and still topping out at 55.
         (5, .strength),
         (10, .miniArcade),
-        (15, .speed),
-        (20, .stinkBombs),
-        (25, .regeneration),
-        (30, .fullArcade),
-        (35, .resistance),
+        (14, .speed),
+        (18, .stinkBombs),
+        (22, .regeneration),
+        (27, .fullArcade),
+        (31, .resistance),
+        (36, .invisibility),
         (40, .turrets),
         (45, .discoBall),
         (50, .cosmicHelmet),
