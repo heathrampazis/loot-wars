@@ -117,31 +117,46 @@ enum BaseLayoutFactory {
         return wall
     }
 
-    /// Breadth-first from one tile, so the wall grows outwards from a single point
-    /// in every available direction at once.
+    /// Round the wall from one tile, one way (Nov 2026), so whoever builds it
+    /// walks the perimeter laying as they go. It was breadth-first, growing two
+    /// arms at once, which had a bot pacing back and forth across an ever wider
+    /// gap. Heath: enemies "should still have to walk around the perimeter of
+    /// the base to build them".
+    ///
+    /// Each step takes a side neighbour if there is one (the wall is a ring of
+    /// side-touching tiles round a rectangle), a corner neighbour if not, and
+    /// jumps to the nearest tile left if neither - which a rectangle never needs
+    /// but costs nothing to have.
     private static func buildOrder(of wall: Set<GridPoint>, using rng: inout SeededRandom) -> [GridPoint] {
         // Sorted before choosing, because Set iteration order is not stable and the
         // starting tile has to come from the seed like everything else.
         let sorted = wall.sorted { ($0.row, $0.col) < ($1.row, $1.col) }
         guard let start = sorted.randomElement(using: &rng) else { return [] }
 
-        var ordered: [GridPoint] = []
+        // Fixed neighbour order, so the same seed always lays the same sequence.
+        let sides = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+        let corners = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
+
+        var ordered: [GridPoint] = [start]
         var seen: Set<GridPoint> = [start]
-        var frontier = [start]
+        var tile = start
 
-        while !frontier.isEmpty {
-            let tile = frontier.removeFirst()
-            ordered.append(tile)
-
-            // Fixed neighbour order, so the same seed always lays the same sequence.
-            for dCol in -1...1 {
-                for dRow in -1...1 where !(dCol == 0 && dRow == 0) {
-                    let neighbour = GridPoint(col: tile.col + dCol, row: tile.row + dRow)
-                    guard wall.contains(neighbour), !seen.contains(neighbour) else { continue }
-                    seen.insert(neighbour)
-                    frontier.append(neighbour)
-                }
+        while ordered.count < wall.count {
+            let unseen = { (step: (Int, Int)) -> GridPoint? in
+                let next = GridPoint(col: tile.col + step.0, row: tile.row + step.1)
+                return wall.contains(next) && !seen.contains(next) ? next : nil
             }
+            let next = sides.lazy.compactMap(unseen).first
+                ?? corners.lazy.compactMap(unseen).first
+                ?? sorted.filter { !seen.contains($0) }.min { a, b in
+                    let da = (a.col - tile.col) * (a.col - tile.col) + (a.row - tile.row) * (a.row - tile.row)
+                    let db = (b.col - tile.col) * (b.col - tile.col) + (b.row - tile.row) * (b.row - tile.row)
+                    return da < db
+                }
+            guard let step = next else { break }
+            ordered.append(step)
+            seen.insert(step)
+            tile = step
         }
 
         return ordered

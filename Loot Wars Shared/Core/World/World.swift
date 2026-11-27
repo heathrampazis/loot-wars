@@ -241,21 +241,6 @@ final class World {
         flags = [:]
     }
 
-    /// Builds a bot's whole base the moment the match starts (Nov 2026, flags):
-    /// the template's wall, sealed and furnished, so every flag starts behind a
-    /// wall. Heath: "Enemies should build their base faster, basically complete
-    /// build on spawn by creating the base shape". Skips any tile that is not
-    /// open floor or has something on it.
-    func buildBaseNow(for team: TeamID) {
-        guard let layout = baseLayouts[team] else { return }
-        for tile in layout.tiles {
-            guard map[tile] == .floor, !structureOccupies(tile),
-                  !actors.values.contains(where: { $0.overlaps(tile) }) else { continue }
-            setTile(.block(owner: team), at: tile)
-        }
-        recordSealIfNeeded(for: team)
-    }
-
     /// Who won, and by how much. Just the standings with a nicer name at the point
     /// where they stop changing.
     var winner: TeamID? { standings.first?.team }
@@ -727,6 +712,21 @@ final class World {
             BuildSystem.isBuildableTile($0, for: team, in: self)
                 && BuildSystem.keepsWallThin($0, for: team, in: self)
         }
+    }
+
+    /// The next few tiles nextBuildTile will hand out, in order - so a bot can
+    /// see where the wall goes after the tile it is laying and keep walking
+    /// (Nov 2026). The first is always nextBuildTile.
+    func upcomingBuildTiles(for team: TeamID, count: Int) -> [GridPoint] {
+        guard let plan = baseLayouts[team]?.tiles else { return [] }
+        var ahead: [GridPoint] = []
+        for tile in plan where ahead.count < count {
+            if BuildSystem.isBuildableTile(tile, for: team, in: self)
+                && BuildSystem.keepsWallThin(tile, for: team, in: self) {
+                ahead.append(tile)
+            }
+        }
+        return ahead
     }
 
     // MARK: - Loot

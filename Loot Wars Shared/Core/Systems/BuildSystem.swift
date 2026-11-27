@@ -84,9 +84,17 @@ enum BuildSystem {
         // One wall thick - see keepsWallThin.
         guard keepsWallThin(point, for: actor.team, in: world) else { return false }
 
-        // You build your base from inside it. Measured from the feet, so it is
-        // "standing on your own ground" rather than "leaning over it".
-        guard world.claim(for: actor.team)?.contains(GridPoint(containing: actor.feet)) == true else {
+        // You build your base from inside it - or from a step outside it (Nov
+        // 2026). Strictly inside, a corner on the edge of the claim with a
+        // turret or chest in the tile diagonally inside it could not be reached
+        // from anywhere, and stayed a hole for good. Heath: "sometimes the
+        // corner pieces get missed once a base is built and cant be fixed".
+        // Measured from the feet. The tile itself must still be in the claim
+        // (isBuildableTile).
+        guard let claim = world.claim(for: actor.team) else { return false }
+        let feet = GridPoint(containing: actor.feet)
+        guard feet.col >= claim.origin.col - 1, feet.col <= claim.origin.col + claim.size,
+              feet.row >= claim.origin.row - 1, feet.row <= claim.origin.row + claim.size else {
             return false
         }
 

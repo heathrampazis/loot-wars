@@ -189,11 +189,29 @@ enum AssistSystem {
         let base = world.enclosure(of: actor.team)
 
         guard world.canBuild(actor.team),
-              world.claim(for: actor.team)?.contains(feet) == true,
-              !base.isSealed else {
+              world.claim(for: actor.team)?.contains(feet) == true else {
             actor.assistOutsideTime = 0
             actor.assistFollowing = nil
             return nil
+        }
+
+        // Sealed, but not always whole (Nov 2026). A missing corner, or a hole
+        // with a turret or chest just inside it, leaves no way IN - so the base
+        // counts as closed, and auto building, which stopped the moment it did,
+        // never went back for it. Heath: corners "get missed once a base is
+        // built and cant be fixed... the same for when a turret is in the way".
+        // So a sealed base still gets its holes filled: gaps on the outline
+        // walled or plugged on two sides. Only filling - nothing is taken down
+        // (hasBox false keeps nextWallChange's removals out of it).
+        if base.isSealed {
+            actor.assistOutsideTime = 0
+            actor.assistFollowing = nil
+            guard let plan = world.basePlan(for: actor.team, walls: base.ownWalls,
+                                            towardsMiddle: true) else { return nil }
+            let holes = plan.gaps.filter { holeSides(of: $0, walls: base.ownWalls, in: world) >= 2 }
+            guard !holes.isEmpty else { return nil }
+            return World.BasePlan(lowCol: 0, highCol: 0, lowRow: 0, highRow: 0,
+                                  gaps: holes, hasBox: false)
         }
 
         // Sticking to the recommended square: nothing to follow.
@@ -273,6 +291,17 @@ enum AssistSystem {
             return .removeBlock(tile)
         }
         return nil
+    }
+
+    /// How many of a tile's four sides are your wall or a structure - a hole
+    /// in a sealed base, rather than open ground beside it, has at least two.
+    /// Structures count because a turret or chest just inside a hole is what
+    /// so often leaves the hole behind (Nov 2026).
+    private static func holeSides(of tile: GridPoint, walls: Set<GridPoint>, in world: World) -> Int {
+        [(0, 1), (0, -1), (1, 0), (-1, 0)].filter {
+            let side = GridPoint(col: tile.col + $0.0, row: tile.row + $0.1)
+            return walls.contains(side) || world.structureOccupies(side)
+        }.count
     }
 
     /// How many of a tile's four sides touch one of these walls.

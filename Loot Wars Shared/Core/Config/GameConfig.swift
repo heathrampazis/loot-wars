@@ -833,9 +833,9 @@ enum GameConfig {
         /// otherwise never building would mean never losing your respawns.
         static let placeBy: Double = 45
 
-        /// Seconds into a match before any flag can be taken. Bots' bases stand
-        /// finished from the start but yours builds as you walk it, so this is
-        /// your time to get a wall round your flag. "FLAGS CAN BE TAKEN" shows
+        /// Seconds into a match before any flag can be taken. Everybody's base
+        /// builds as they walk it (bots build theirs first thing), so this is
+        /// the time to get a wall round your flag. "FLAGS CAN BE TAKEN" shows
         /// when it ends.
         /// 45 -> 25 (Nov 2026): faster matches.
         /// 25 -> 15 (Nov 2026, "speed up the game by like 3x").
