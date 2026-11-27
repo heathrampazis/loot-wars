@@ -199,8 +199,11 @@ enum ChestSystem {
     /// Same grace period the crates observe: a chest full of bombs in the first two
     /// minutes would be a way round the one thing the grace period is for.
     private static func stockRows(in world: World) -> [(item: ItemType, weight: Int)] {
+        // Locked gear steps down a rung (Cosmic to Mythical) rather than
+        // vanishing, so a late chest stays a late chest before Cosmic is
+        // unlocked. Anything with no stand-in is left out.
         let rows = GameConfig.Chest.stockTable(at: world.matchProgress)
-            .filter { world.unlocks.allows($0.item) }
+            .compactMap { row in world.unlocks.clamp(row.item).map { (item: $0, weight: row.weight) } }
         return world.bombsAllowed ? rows : rows.filter { $0.item != .bomb }
     }
 
@@ -367,7 +370,8 @@ enum ChestSystem {
             return a == b ? left.slot < right.slot : a > b
         }
 
-        let spill = ranked.prefix(GameConfig.Chest.raidSpill).map { $0.stack }
+        let spill = ranked.prefix(GameConfig.Chest.raidSpill(at: world.matchProgress))
+            .map { $0.stack }
 
         for stack in spill {
             world.spawnGroundItem(.item(stack.type),
