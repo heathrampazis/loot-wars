@@ -34,6 +34,9 @@ enum WorldEvent {
     /// A confetti popper went off here (Nov 2026).
     case confetti(at: Vec2)
 
+    /// Fireworks went off here (Nov 2026).
+    case fireworks(at: Vec2)
+
     /// A spike trap bit somebody (Nov 2026): where, and whose base it is.
     case spiked(at: Vec2, by: TeamID)
 

@@ -43,7 +43,10 @@ enum SupplyDropSystem {
     /// Mythical rung below it.
     static func roll(unlocks: Unlocks = .all, using rng: inout SeededRandom) -> Pickup {
         let table = GameConfig.SupplyDrop.loot.compactMap { row -> (pickup: Pickup, weight: Int)? in
-            unlocks.clamp(row.pickup).map { (pickup: $0, weight: row.weight) }
+            // Commoner while testing - see Loot.fireworksTestWeight.
+            let testing = row.pickup == .item(.fireworks) && GameConfig.Loot.testingFireworks
+            let weight = testing ? row.weight + GameConfig.Loot.fireworksTestWeight * 2 : row.weight
+            return unlocks.clamp(row.pickup).map { (pickup: $0, weight: weight) }
         }
         let total = table.reduce(0) { $0 + $1.weight }
         var pick = Int.random(in: 0..<total, using: &rng)

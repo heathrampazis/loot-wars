@@ -202,9 +202,14 @@ enum ChestSystem {
         // Locked gear steps down a rung (Cosmic to Mythical) rather than
         // vanishing, so a late chest stays a late chest before Cosmic is
         // unlocked. Anything with no stand-in is left out.
-        let rows = GameConfig.Chest.stockTable(at: world.matchProgress)
+        var rows = GameConfig.Chest.stockTable(at: world.matchProgress)
             .compactMap { row in world.unlocks.clamp(row.item).map { (item: $0, weight: row.weight) } }
-        return world.bombsAllowed ? rows : rows.filter { $0.item != .bomb && $0.item != .popper }
+        // Fireworks in every band while testing - see Loot.fireworksTestWeight.
+        if GameConfig.Loot.testingFireworks, GameConfig.Loot.fireworksTestWeight > 0,
+           world.unlocks.allows(.fireworks) {
+            rows.append((item: .fireworks, weight: GameConfig.Loot.fireworksTestWeight / 3))
+        }
+        return world.bombsAllowed ? rows : rows.filter { $0.item != .bomb && $0.item != .popper && $0.item != .fireworks }
     }
 
     // MARK: - Keeping pace with the match

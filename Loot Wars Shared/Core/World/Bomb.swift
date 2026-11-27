@@ -35,6 +35,8 @@ struct Bomb {
         case foam
         /// A smaller, weaker blast, for fights (Nov 2026) - see GameConfig.Popper.
         case popper
+        /// A huge burst that opens any wall (Nov 2026) - see GameConfig.Fireworks.
+        case firework
     }
 
     let id: BombID

@@ -365,6 +365,14 @@ enum LootTable {
             return (pickup: Pickup.item(.perk(perk)), weight: boosted)
         }
 
+        // Fireworks in every crate's table while they are being tested (Nov
+        // 2026) - see Loot.fireworksTestWeight. Normally they are never in a
+        // crate at all, only raid chests and supply drops.
+        if GameConfig.Loot.testingFireworks, GameConfig.Loot.fireworksTestWeight > 0,
+           unlocks.allows(.fireworks) {
+            rows.append((pickup: .item(.fireworks), weight: GameConfig.Loot.fireworksTestWeight))
+        }
+
         // The mini machine, out of ANY crate.
         //
         // This is the whole difference between the two sizes as far as this file is

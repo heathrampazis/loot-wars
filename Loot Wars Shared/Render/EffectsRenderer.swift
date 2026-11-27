@@ -735,6 +735,260 @@ final class EffectsRenderer {
         }
     }
 
+    /// Fireworks going off (Nov 2026). An explosion first and a firework
+    /// show on top of it: a huge flat-art blast where it hit (the bomb's look,
+    /// bigger, in the rocket's lilac), two shockwave rings racing out, hot
+    /// streaks flung across the ground, smoke rolling up - then four bursts of
+    /// glowing streaks going off one after another all over the blast, shedding
+    /// glitter, and a long crackle of glints. GameScene shakes the screen.
+    /// Heath: "the firework should feel more spectacular and like an
+    /// explosion". Then (Nov 2026) "more colourful and playful": the bursts are two colours each and there are five, the
+    /// smoke is candy coloured, coloured stars tumble out and the crackle
+    /// twinkles in every colour.
+    func fireworks(at position: Vec2) {
+        let ground = GridGeometry.point(for: position)
+        let tile = GridGeometry.length(ofTiles: 1)
+        let reach = GridGeometry.length(ofTiles: GameConfig.Fireworks.peopleRadius)
+        let lilac = SKColor(red: 0.78, green: 0.66, blue: 1, alpha: 1)
+        let pink = SKColor(red: 1, green: 0.38, blue: 0.56, alpha: 1)
+        let pale = SKColor(red: 0.92, green: 0.9, blue: 1, alpha: 1)
+        let indigo = SKColor(red: 0.55, green: 0.6, blue: 1, alpha: 1)
+        let yellow = SKColor(red: 1, green: 0.88, blue: 0.3, alpha: 1)
+        let teal = SKColor(red: 0.25, green: 0.9, blue: 0.7, alpha: 1)
+        let sky = SKColor(red: 0.4, green: 0.75, blue: 1, alpha: 1)
+        let orange = SKColor(red: 1, green: 0.62, blue: 0.25, alpha: 1)
+        let green = SKColor(red: 0.45, green: 0.95, blue: 0.45, alpha: 1)
+        let rainbow = RenderPalette.confetti
+
+        // 1. The light: a huge additive flash.
+        let flash = glow(at: ground, size: reach * 3.2, colour: pale)
+        flash.run(.sequence([.group([.scale(to: 1.2, duration: 0.25), .fadeOut(withDuration: 0.35)]),
+                             .removeFromParent()]))
+
+        // 2. The blast itself, in the house style: a fat outlined ball of
+        // light that punches out and is gone. (A spiky starburst was tried
+        // and dropped, Nov 2026: Heath, "go back to what was had before".)
+        let core = SKShapeNode(circleOfRadius: reach * 0.8)
+        core.position = ground
+        core.fillColor = lilac
+        core.strokeColor = .black
+        core.lineWidth = GridGeometry.length(ofTiles: 0.16)
+        core.zPosition = 20
+        core.setScale(0.25)
+        let middle = SKShapeNode(circleOfRadius: reach * 0.55)
+        middle.fillColor = pink
+        middle.strokeColor = .clear
+        core.addChild(middle)
+        let hot = SKShapeNode(circleOfRadius: reach * 0.3)
+        hot.fillColor = .white
+        hot.strokeColor = .clear
+        core.addChild(hot)
+        node.addChild(core)
+        let punch = SKAction.scale(to: 1.3, duration: 0.2)
+        punch.timingMode = .easeOut
+        core.run(.sequence([.group([punch, .sequence([.wait(forDuration: 0.1), .fadeOut(withDuration: 0.22)])]),
+                            .removeFromParent()]))
+
+        // 3. Two shockwave rings racing out.
+        for (index, colour) in [SKColor.white, lilac].enumerated() {
+            let ring = SKShapeNode(circleOfRadius: reach * 0.5)
+            ring.position = ground
+            ring.fillColor = .clear
+            ring.strokeColor = colour
+            ring.lineWidth = tile * 0.28
+            ring.zPosition = 19
+            ring.setScale(0.3)
+            ring.alpha = 0
+            node.addChild(ring)
+            let grow = SKAction.scale(to: 2.6, duration: 0.42)
+            grow.timingMode = .easeOut
+            ring.run(.sequence([.wait(forDuration: Double(index) * 0.09),
+                                .fadeAlpha(to: 0.95, duration: 0.02),
+                                .group([grow, .fadeOut(withDuration: 0.42)]),
+                                .removeFromParent()]))
+        }
+
+        // 4. Hot streaks flung across the ground.
+        for index in 0..<30 {
+            let angle = CGFloat(index) / 30 * 2 * .pi + CGFloat.random(in: -0.1...0.1)
+            let colour = index % 4 == 0 ? pale : rainbow[index % rainbow.count]
+            let streak = streakNode(at: ground, angle: angle, length: tile * 1.4, colour: colour)
+            let out = reach * CGFloat.random(in: 1.1...1.6)
+            let fly = SKAction.moveBy(x: cos(angle) * out, y: sin(angle) * out, duration: 0.32)
+            fly.timingMode = .easeOut
+            streak.run(.sequence([.group([fly, .scaleX(to: 0.2, duration: 0.4),
+                                          .sequence([.wait(forDuration: 0.15), .fadeOut(withDuration: 0.25)])]),
+                                  .removeFromParent()]))
+        }
+
+        // 5. Smoke rolling up and away.
+        let candy = [SKColor(red: 0.62, green: 0.48, blue: 0.85, alpha: 1),
+                     SKColor(red: 0.85, green: 0.5, blue: 0.72, alpha: 1),
+                     SKColor(red: 0.45, green: 0.7, blue: 0.8, alpha: 1)]
+        for index in 0..<9 {
+            let puff = SKSpriteNode(texture: GlowArt.pool)
+            let side = reach * CGFloat.random(in: 0.7...1.1)
+            puff.size = CGSize(width: side, height: side)
+            puff.position = CGPoint(x: ground.x + CGFloat.random(in: -reach * 0.5...reach * 0.5),
+                                    y: ground.y + CGFloat.random(in: -reach * 0.3...reach * 0.3))
+            puff.color = candy[index % candy.count]
+            puff.colorBlendFactor = 1
+            puff.alpha = 0
+            puff.zPosition = 13
+            puff.setScale(0.5)
+            node.addChild(puff)
+            puff.run(.sequence([.wait(forDuration: 0.12),
+                                .fadeAlpha(to: 0.55, duration: 0.1),
+                                .group([.scale(to: 1.5, duration: 1.1),
+                                        .moveBy(x: CGFloat.random(in: -tile...tile), y: tile * 1.2, duration: 1.1),
+                                        .fadeOut(withDuration: 1.1)]),
+                                .removeFromParent()]))
+        }
+
+        // 6. The show: five bursts going off across the blast, one after
+        // another, each two colours.
+        let bursts: [(dx: CGFloat, dy: CGFloat, colour: SKColor, second: SKColor, delay: Double, size: CGFloat)] = [
+            (0, tile * 0.6, lilac, yellow, 0.12, 1.25),
+            (-reach * 0.65, tile * 1.2, pink, sky, 0.24, 0.85),
+            (reach * 0.65, tile * 1.0, teal, orange, 0.34, 0.85),
+            (0, tile * 2.4, indigo, pink, 0.46, 1.0),
+            (reach * 0.3, tile * 1.8, green, lilac, 0.6, 0.7)
+        ]
+        for burst in bursts {
+            let centre = CGPoint(x: ground.x + burst.dx, y: ground.y + burst.dy)
+            let size = reach * burst.size
+
+            let pop = glow(at: centre, size: tile * 2.6, colour: .white)
+            pop.alpha = 0
+            pop.run(.sequence([.wait(forDuration: burst.delay), .fadeAlpha(to: 1, duration: 0.03),
+                               .group([.scale(to: 1.4, duration: 0.2), .fadeOut(withDuration: 0.25)]),
+                               .removeFromParent()]))
+
+            let count = 36
+            for index in 0..<count {
+                let angle = CGFloat(index) / CGFloat(count) * 2 * .pi + CGFloat.random(in: -0.06...0.06)
+                let out = size * CGFloat.random(in: 0.85...1.05)
+                let colour = index % 2 == 0 ? burst.colour : burst.second
+                let streak = streakNode(at: centre, angle: angle, length: tile * 1.0, colour: colour)
+                streak.alpha = 0
+                let fling = SKAction.moveBy(x: cos(angle) * out, y: sin(angle) * out, duration: 0.5)
+                fling.timingMode = .easeOut
+                let fall = SKAction.moveBy(x: 0, y: -tile * 0.9, duration: 0.7)
+                fall.timingMode = .easeIn
+                streak.run(.sequence([
+                    .wait(forDuration: burst.delay),
+                    .fadeIn(withDuration: 0.03),
+                    .group([.sequence([fling, fall]),
+                            .sequence([.wait(forDuration: 0.35), .scaleX(to: 0.25, duration: 0.5)]),
+                            .sequence([.wait(forDuration: 0.6), .fadeOut(withDuration: 0.6)])]),
+                    .removeFromParent()
+                ]))
+
+                guard index % 3 == 0 else { continue }
+                for drop in 0..<4 {
+                    let along = CGFloat(drop + 1) / 5
+                    let at = CGPoint(x: centre.x + cos(angle) * out * along,
+                                     y: centre.y + sin(angle) * out * along)
+                    let bit = glow(at: at, size: tile * 0.15, colour: rainbow.randomElement() ?? colour)
+                    bit.alpha = 0
+                    bit.run(.sequence([
+                        .wait(forDuration: burst.delay + 0.5 * Double(along) + 0.1),
+                        .fadeAlpha(to: 1, duration: 0.02),
+                        .group([.moveBy(x: 0, y: -tile * 0.5, duration: 0.6),
+                                .sequence([.fadeAlpha(to: 0.3, duration: 0.1), .fadeAlpha(to: 0.9, duration: 0.1),
+                                           .fadeOut(withDuration: 0.4)])]),
+                        .removeFromParent()
+                    ]))
+                }
+            }
+        }
+
+        // 7. The fun bit: fat coloured stars tumbling out of the blast,
+        // bouncing up and dropping away, spinning as they go.
+        for index in 0..<12 {
+            let star = SKSpriteNode(texture: ImpactArt.star)
+            let side = tile * CGFloat.random(in: 0.38...0.55)
+            star.size = CGSize(width: side, height: side)
+            star.color = rainbow[(index * 3) % rainbow.count]
+            star.colorBlendFactor = 0.85
+            star.position = ground
+            star.zPosition = 21
+            star.setScale(0.2)
+            star.alpha = 0
+            node.addChild(star)
+            let angle = CGFloat(index) / 12 * 2 * .pi + CGFloat.random(in: -0.2...0.2)
+            let out = reach * CGFloat.random(in: 0.9...1.5)
+            let rise = SKAction.moveBy(x: cos(angle) * out * 0.6, y: sin(angle) * out * 0.6 + tile * 1.1, duration: 0.3)
+            rise.timingMode = .easeOut
+            let drop = SKAction.moveBy(x: cos(angle) * out * 0.4, y: -tile * 1.4, duration: 0.45)
+            drop.timingMode = .easeIn
+            let pop = SKAction.scale(to: 1.2, duration: 0.12)
+            pop.timingMode = .easeOut
+            star.run(.sequence([
+                .wait(forDuration: 0.06),
+                .fadeIn(withDuration: 0.02),
+                .group([.sequence([rise, drop]),
+                        .sequence([pop, .scale(to: 0.9, duration: 0.08), .wait(forDuration: 0.4),
+                                   .scale(to: 0.3, duration: 0.25)]),
+                        .rotate(byAngle: CGFloat(index % 2 == 0 ? 1 : -1) * .pi * 2.5, duration: 0.75),
+                        .sequence([.wait(forDuration: 0.5), .fadeOut(withDuration: 0.25)])]),
+                .removeFromParent()
+            ]))
+        }
+
+        // 8. The crackle: glints in every colour popping all over as it dies away.
+        for index in 0..<28 {
+            let angle = CGFloat.random(in: 0...(2 * .pi))
+            let away = reach * CGFloat.random(in: 0.3...1.3)
+            let glint = SKSpriteNode(texture: ImpactArt.star)
+            let side = GridGeometry.length(ofTiles: Double.random(in: 0.18...0.3))
+            glint.size = CGSize(width: side, height: side)
+            glint.position = CGPoint(x: ground.x + cos(angle) * away, y: ground.y + sin(angle) * away + tile * 0.6)
+            if index % 3 != 0 {
+                glint.color = rainbow[index % rainbow.count]
+                glint.colorBlendFactor = 0.7
+            }
+            glint.zPosition = 16
+            glint.alpha = 0
+            glint.setScale(0.3)
+            node.addChild(glint)
+            glint.run(.sequence([
+                .wait(forDuration: Double.random(in: 0.7...1.3)),
+                .group([.fadeIn(withDuration: 0.04), .scale(to: 1.15, duration: 0.07)]),
+                .group([.fadeOut(withDuration: 0.16), .scale(to: 0.4, duration: 0.16)]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
+    /// A glowing streak pointing along `angle`, for the firework.
+    private func streakNode(at point: CGPoint, angle: CGFloat, length: CGFloat,
+                            colour: SKColor) -> SKSpriteNode {
+        let streak = SKSpriteNode(texture: GlowArt.pool)
+        streak.size = CGSize(width: length, height: length * 0.18)
+        streak.zRotation = angle
+        streak.color = colour
+        streak.colorBlendFactor = 1
+        streak.blendMode = .add
+        streak.position = point
+        streak.zPosition = 15
+        node.addChild(streak)
+        return streak
+    }
+
+    /// A soft additive glow, for the firework.
+    private func glow(at point: CGPoint, size: CGFloat, colour: SKColor) -> SKSpriteNode {
+        let sprite = SKSpriteNode(texture: GlowArt.pool)
+        sprite.size = CGSize(width: size, height: size)
+        sprite.position = point
+        sprite.color = colour
+        sprite.colorBlendFactor = 1
+        sprite.blendMode = .add
+        sprite.zPosition = 15
+        node.addChild(sprite)
+        return sprite
+    }
+
     func jackpot(at position: Vec2) {
         let origin = GridGeometry.point(for: position)
 

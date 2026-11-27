@@ -101,6 +101,7 @@ enum ItemArt {
         case .foam:    return "Foam Bomb"
         case .popper:  return "Popper"
         case .spikes:  return "Spikes"
+        case .fireworks: return "Fireworks"
         case .chest:   return "Chest"
         case .arcade(let kind):
             return kind == .mini ? "Mini Arcade" : "Arcade"
@@ -136,6 +137,7 @@ enum ItemArt {
         case .item(.foam):       return "FoamBomb"
         case .item(.popper):     return "ConfettiPopper"
         case .item(.spikes):     return "Spikes"
+        case .item(.fireworks):  return "Fireworks"
         case .item(.chest):      return "Chest"
         case .item(.arcade(.full)): return "Arcade"
         case .item(.arcade(.mini)): return "Mini Arcade"

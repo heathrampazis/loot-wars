@@ -36,6 +36,7 @@ final class BombRenderer {
     private lazy var stinkTexture: SKTexture = Self.load("StinkBomb")
     private lazy var foamTexture: SKTexture = Self.load("FoamBomb")
     private lazy var popperTexture: SKTexture = Self.load("ConfettiPopper")
+    private lazy var fireworkTexture: SKTexture = Self.load("Fireworks")
 
     private static func load(_ name: String) -> SKTexture {
         let texture = SKTexture(imageNamed: name)
@@ -51,7 +52,11 @@ final class BombRenderer {
         for bomb in world.bombs {
             let sprite = nodesByBomb[bomb.id] ?? makeNode(for: bomb)
             sprite.position = GridGeometry.point(for: bomb.position)
-            trail(bomb)
+            if bomb.kind == .firework {
+                fly(sprite, firework: bomb)
+            } else {
+                trail(bomb)
+            }
         }
 
         let inFlight = Set(world.bombs.map(\.id))
@@ -59,6 +64,63 @@ final class BombRenderer {
             nodesByBomb[id] = nil
             lastSpark[id] = nil
             sprite.removeFromParent()
+        }
+    }
+
+    // MARK: - Fireworks in flight (Nov 2026)
+
+    /// Which way the rocket's nose points in its artwork: up and to the right,
+    /// 62 degrees round from pointing right.
+    private static let rocketArtAngle: CGFloat = 62 * .pi / 180
+
+    /// A firework darting at its target: nose first, with a little wiggle the
+    /// way a real rocket has, and a trail of coloured glitter and white
+    /// twinkles left hanging behind it. Heath: "the firework should dart at
+    /// the target like a real firework and have a sparkly trail".
+    private func fly(_ sprite: SKSpriteNode, firework bomb: Bomb) {
+        let heading = bomb.velocity.normalized()
+        guard heading.length > 0 else { return }
+
+        // The wiggle: a small side-to-side wave, keyed off how far it has to go.
+        let side = Vec2(x: -heading.y, y: heading.x)
+        let wave = sin(bomb.distanceRemaining * 7) * 0.08
+        sprite.position = GridGeometry.point(for: bomb.position + side * wave)
+        sprite.zRotation = CGFloat(heading.angle) - BombRenderer.rocketArtAngle
+            + CGFloat(cos(bomb.distanceRemaining * 7) * 0.12)
+
+        // The trail, out of the tail.
+        let tail = GridGeometry.point(for: bomb.position + side * wave - heading * 0.35)
+        let tile = GridGeometry.tileSize
+        for _ in 0..<2 {
+            let bit = SKSpriteNode(texture: GlowArt.pool)
+            let size = tile * CGFloat.random(in: 0.14...0.28)
+            bit.size = CGSize(width: size, height: size)
+            bit.color = RenderPalette.confetti.randomElement() ?? .white
+            bit.colorBlendFactor = 1
+            bit.blendMode = .add
+            bit.position = CGPoint(x: tail.x + CGFloat.random(in: -4...4), y: tail.y + CGFloat.random(in: -4...4))
+            bit.zPosition = 8.5
+            node.addChild(bit)
+            let drift = SKAction.moveBy(x: CGFloat(-heading.x) * tile * 0.5 + CGFloat.random(in: -6...6),
+                                        y: CGFloat(-heading.y) * tile * 0.5 - tile * 0.25,
+                                        duration: 0.45)
+            bit.run(.sequence([.group([drift, .scale(to: 0.2, duration: 0.45),
+                                       .sequence([.fadeAlpha(to: 0.5, duration: 0.08),
+                                                  .fadeAlpha(to: 1, duration: 0.08),
+                                                  .fadeOut(withDuration: 0.29)])]),
+                               .removeFromParent()]))
+        }
+        if Double.random(in: 0..<1) < 0.35 {
+            let twinkle = SKSpriteNode(texture: ImpactArt.star)
+            let size = tile * CGFloat.random(in: 0.16...0.24)
+            twinkle.size = CGSize(width: size, height: size)
+            twinkle.position = tail
+            twinkle.zPosition = 8.6
+            twinkle.setScale(0.4)
+            node.addChild(twinkle)
+            twinkle.run(.sequence([.group([.scale(to: 1, duration: 0.08), .rotate(byAngle: 1, duration: 0.3)]),
+                                   .group([.fadeOut(withDuration: 0.22), .scale(to: 0.3, duration: 0.22)]),
+                                   .removeFromParent()]))
         }
     }
 
@@ -144,6 +206,9 @@ final class BombRenderer {
         } else if kind == .foam {
             flare.color = RenderPalette.foam
             flare.colorBlendFactor = 0.85
+        } else if kind == .firework {
+            flare.color = SKColor(red: 0.8, green: 0.72, blue: 1, alpha: 1)
+            flare.colorBlendFactor = 0.9
         } else if kind == .popper {
             flare.color = RenderPalette.confetti.randomElement() ?? RenderPalette.foam
             flare.colorBlendFactor = 0.85
@@ -237,13 +302,19 @@ final class BombRenderer {
         let sprite = SKSpriteNode(
             texture: bomb.kind == .stink ? stinkTexture
                 : bomb.kind == .foam ? foamTexture
-                : bomb.kind == .popper ? popperTexture : blastTexture,
+                : bomb.kind == .popper ? popperTexture
+                : bomb.kind == .firework ? fireworkTexture : blastTexture,
             size: CGSize(width: side, height: side)
         )
         sprite.zPosition = 9    // over walls and shots, under actors
 
         // Tumbling reads as thrown rather than fired.
-        sprite.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 0.9)))
+        // A firework flies nose first instead (Nov 2026) - see fly.
+        if bomb.kind == .firework {
+            sprite.zRotation = CGFloat(bomb.velocity.angle) - BombRenderer.rocketArtAngle
+        } else {
+            sprite.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 0.9)))
+        }
 
         // A lit fuse: a spark fizzing on the end of the rope for as long as the
         // bomb is in the air. A child of the sprite, so it spins round with it

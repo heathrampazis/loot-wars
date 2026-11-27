@@ -219,7 +219,7 @@ enum LootSystem {
             switch type {
             case .helmet(let tier):  worn = tier > actor.helmet
             case .blaster(let tier): worn = tier > actor.blaster
-            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret, .perk:
+            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .fireworks, .spikes, .chest, .arcade, .turret, .perk:
                 worn = false
             }
 

@@ -22,6 +22,7 @@ enum Feature: String, CaseIterable {
     case miniArcade
     case speed
     case turrets
+    case fireworks
     case regeneration
     case stinkBombs
     case spikes
@@ -45,6 +46,7 @@ enum Feature: String, CaseIterable {
         case .foamBombs:     return .foam
         case .confettiPoppers: return .popper
         case .spikes:        return .spikes
+        case .fireworks:     return .fireworks
         case .fullArcade:    return .arcade(.full)
         case .resistance:    return .perk(.resistance)
         case .invisibility:  return .perk(.invisibility)
@@ -103,6 +105,7 @@ struct Unlocks: Equatable {
         case .foam:                return has(.foamBombs) || GameConfig.Loot.testingFoam
         case .popper:              return has(.confettiPoppers)
         case .spikes:              return has(.spikes) || GameConfig.Loot.testingSpikes
+        case .fireworks:           return has(.fireworks) || GameConfig.Loot.testingFireworks
         case .helmet(.cosmic):     return has(.cosmicHelmet)
         case .blaster(.six):       return has(.cosmicBlaster)
         case .bandage, .medkit, .bomb, .chest, .helmet, .blaster:
@@ -144,6 +147,8 @@ enum Roadmap {
         // Fifteen with Spikes (Nov 2026), still inside 55. Spikes moved to
         // level 3: Heath, "spikes should be unlocked very early". Nothing else
         // moved, so there is a longer gap between Stink Bombs and Regeneration.
+        // Sixteen with Fireworks (Nov 2026), a late unlock: 49, straight after
+        // the Disco Ball.
         (3, .spikes),
         (4, .strength),
         (7, .confettiPoppers),
@@ -157,6 +162,7 @@ enum Roadmap {
         (40, .invisibility),
         (43, .turrets),
         (47, .discoBall),
+        (49, .fireworks),
         (51, .cosmicHelmet),
         (55, .cosmicBlaster)
     ]

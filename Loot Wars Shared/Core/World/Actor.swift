@@ -218,7 +218,7 @@ struct Actor {
               let stack = inventory.slots[index] else { return false }
 
         switch stack.type {
-        case .bomb, .stink, .foam, .popper:
+        case .bomb, .stink, .foam, .popper, .fireworks:
             return true
         // A perk is switched on rather than aimed, so the button will do - but
         // only while one is not already running. Everything else about "one at a

@@ -421,6 +421,7 @@ enum GameConfig {
             .foam: 12,
             .popper: 5,
             .spikes: 8,
+            .fireworks: 30,
             // The starter blaster, in case one is ever in a bag rather than in a
             // hand. Half a Blaster 2.
             .blaster(.one): 6,
@@ -2566,6 +2567,35 @@ enum GameConfig {
     /// walks through casually and still short of ending your match on its own. What it is really for is
     /// making two tiles unusable: a doorway, the gap you were about to break
     /// through, or the ground under somebody who has nowhere good to go.
+    /// Fireworks (Nov 2026) - see ItemType.fireworks. The ultimate raiding
+    /// item: a bigger blast than a bomb all round, and enough wall damage to
+    /// open a level 3 wall (170 - see Upgrades.wallHealth) right out to the
+    /// edge of the blast. Only in raid chests (late) and supply drops.
+    enum Fireworks {
+        /// On a person: this, or damageShare of their health, falling to
+        /// rimShare of it at peopleRadius. A bomb is 90 / 0.5 / 1.8 / 0.4.
+        static let damage = 120
+        static let damageShare: Double = 0.65
+        static let peopleRadius: Double = 2.8
+        static let rimShare: Double = 0.45
+        /// Chests, turrets and machines; walls. A bomb's are 1.4 and 2.0.
+        static let blastRadius: Double = 2.2
+        static let wallRadius: Double = 3.0
+        /// Wall damage at the centre (a bomb's is 100): 65% of it at the
+        /// edge is still 182, over a level 3 wall's 170.
+        static let wallDamage = 280
+        /// A chest takes 120 from a bomb, a turret 150.
+        static let chestDamage = 220
+        static let turretDamage = 260
+        /// The chance a carried firework comes off a body.
+        static let dropChance = 0.8
+        /// It darts rather than lobs (Nov 2026): Heath, "the firework should
+        /// dart at the target like a real firework". Nearly twice a bomb's
+        /// speed (9), and a little further (a bomb's throw is 6).
+        static let speed: Double = 17
+        static let range: Double = 8
+    }
+
     /// Spike traps (Nov 2026) - see SpikeSystem and ItemType.spikes.
     enum Spikes {
         /// A bite: this, or damageShare of the victim's health, whichever is
@@ -3095,7 +3125,10 @@ enum GameConfig {
             (.item(.helmet(.mythical)), 35),
             (.item(.helmet(.cosmic)),   15),
             (.item(.blaster(.five)),    35),
-            (.item(.blaster(.six)),     15)
+            (.item(.blaster(.six)),     15),
+            // Fireworks (Nov 2026): one of the two places they come from -
+            // see GameConfig.Fireworks. About one drop in five.
+            (.item(.fireworks),         25)
         ]
 
         /// How far a bot will go to contest a LOCKED drop, in tiles. An open one
@@ -3147,6 +3180,18 @@ enum GameConfig {
         /// Spikes for everybody whatever their level, while they are being
         /// tried out (Nov 2026). Set false to put them behind level 3.
         static let testingSpikes = true
+
+        /// Fireworks for everybody whatever their level, while they are being
+        /// tried out (Nov 2026). Set false to put them behind level 49. Where
+        /// they come from is not changed: raid chests and supply drops only.
+        static let testingFireworks = true
+
+        /// While testing, fireworks also turn up in ordinary crates at this
+        /// weight, and raid chests and supply drops get it added on (Nov 2026):
+        /// Heath, "make them really common for testing". About one crate in
+        /// six. Set to 0 to leave them only where they normally are. Back to 0
+        /// (Nov 2026): Heath, "make the fireworks rare again".
+        static let fireworksTestWeight = 0
         /// How much commoner they are while testing. 4 -> 1 (Nov 2026): Heath,
         /// "make the foam bombs a regular rarity... a bit rarer than the stink
         /// bombs". Normal weights are in LootTable and Chest.stockTables.
@@ -3701,17 +3746,17 @@ enum GameConfig {
                 (.blaster(.three), 18), (.blaster(.four), 7)
             ] + perkRows(single: 3, disco: 2)),
             (0.50, [
-                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15), (.spikes, 7),
+                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15), (.spikes, 7), (.fireworks, 2),
                 (.helmet(.epic), 8), (.helmet(.legendary), 18), (.helmet(.mythical), 5),
                 (.blaster(.three), 8), (.blaster(.four), 18), (.blaster(.five), 5)
             ] + perkRows(single: 4, disco: 3)),
             (0.70, [
-                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15), (.spikes, 7),
+                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15), (.spikes, 7), (.fireworks, 3),
                 (.helmet(.legendary), 16), (.helmet(.mythical), 13),
                 (.blaster(.four), 16), (.blaster(.five), 13)
             ] + perkRows(single: 4, disco: 3)),
             (0.88, [
-                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15), (.spikes, 7),
+                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15), (.spikes, 7), (.fireworks, 4),
                 (.helmet(.legendary), 8), (.helmet(.mythical), 18), (.helmet(.cosmic), 6),
                 (.blaster(.four), 8), (.blaster(.five), 18), (.blaster(.six), 6)
             ] + perkRows(single: 5, disco: 4))

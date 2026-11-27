@@ -1267,13 +1267,32 @@ final class GameScene: SKScene {
         aimCamera(in: world)
     }
 
+    /// A short, hard screen shake for fireworks (Nov 2026), stronger the
+    /// closer you are. Moves the world layer, not the camera, so the HUD stays
+    /// still, and always settles back to exactly where it was.
+    private func shakeWorld(near position: Vec2) {
+        let away = (position - ears).length
+        let strength = CGFloat(max(0, 1 - away / 14))
+        guard strength > 0.05 else { return }
+        let amount = GridGeometry.length(ofTiles: 0.22) * strength
+        var steps: [SKAction] = []
+        for index in 0..<8 {
+            let fade = CGFloat(8 - index) / 8
+            steps.append(.move(to: CGPoint(x: CGFloat.random(in: -1...1) * amount * fade,
+                                           y: CGFloat.random(in: -1...1) * amount * fade),
+                               duration: 0.035))
+        }
+        steps.append(.move(to: .zero, duration: 0.04))
+        worldLayer.removeAction(forKey: "shake")
+        worldLayer.run(.sequence(steps), withKey: "shake")
+    }
+
     /// The base upgrade tag (Nov 2026) - see BaseUpgradeNode. It belongs to
-    /// the BASE, not to you: it stands over your flag and stays there as you
-    /// walk about, the way a shop sign stays on its shop. When you come close
-    /// enough to be standing under it, it slides out of your way - straight
-    /// out from you, the shortest move that clears you - and drifts home again
-    /// once you step off. Shown while you are inside your own base, it can
-    /// still go up a level, and you can pay for it.
+    /// the BASE, not to you: it stands just outside the top wall and stays
+    /// there as you walk about, the way a shop sign stays on its shop. When you
+    /// come close it slides out of your way and drifts home again once you
+    /// step off. Shown while you are inside your own base, it can still go up
+    /// a level, and you can pay for it.
     private func updateBaseUpgrade(with world: World) {
         let now = lastUpdateTime
         let dt = min(0.1, max(0, now - lastUpgradeTagTime))
@@ -1563,6 +1582,28 @@ final class GameScene: SKScene {
                 // A trap biting: a crunch and a shower of sparks where it is.
                 effectsRenderer.machineStruck(at: position)
                 SoundPlayer.shared.play(.objectHit, at: position, heardFrom: ears)
+
+            case .fireworks(let position):
+                // The big one: a boom, then the show going up, and a second
+                // burst of noise as it crackles. Not the bomb's flash, which
+                // throws confetti (Nov 2026).
+                effectsRenderer.fireworks(at: position)
+                SoundPlayer.shared.play(.bomb, at: position, heardFrom: ears)
+                // A second boom on top of the first, and the screen shaking -
+                // it should feel like the biggest thing in the game.
+                run(.sequence([.wait(forDuration: 0.12), .run { [weak self] in
+                    guard let self else { return }
+                    SoundPlayer.shared.play(.bomb, at: position, heardFrom: self.ears)
+                }]))
+                shakeWorld(near: position)
+                run(.sequence([.wait(forDuration: 0.35), .run { [weak self] in
+                    guard let self else { return }
+                    SoundPlayer.shared.play(.jackpot, at: position, heardFrom: self.ears)
+                }]))
+                let away = (position - ears).length
+                if away < GameScene.blastFeltWithin * 1.5 {
+                    Haptics.shared.play(.blast(near: min(1, 1.2 * (1 - away / (GameScene.blastFeltWithin * 1.5)))))
+                }
 
             case .confetti(let position):
                 // A popper: a pop and a burst of paper, felt lightly when close.
@@ -2188,10 +2229,17 @@ final class GameScene: SKScene {
         }
 
         // A bomb for a wall. Not a popper (Nov 2026): they barely scratch one,
-        // and offering it would make it look like the way in.
-        if onWall, let slot = BombSystem.loadedSlot(of: player),
-           BombSystem.canThrow(player, from: slot) {
-            return .throwBomb(slot: slot, onTarget: true)
+        // and offering it would make it look like the way in. Fireworks for an
+        // upgraded wall, or when there is no bomb (Nov 2026).
+        if onWall {
+            let upgraded = GameScene.enemyWallOwner(aimedAtBy: player, in: world)
+                .map { world.baseLevel(of: $0) > 0 } ?? false
+            let bomb = BombSystem.loadedSlot(of: player)
+            let firework = player.inventory.firstSlot(holding: .fireworks)
+            let pick = (upgraded ? firework ?? bomb : bomb ?? firework)
+            if let slot = pick, BombSystem.canThrow(player, from: slot) {
+                return .throwBomb(slot: slot, onTarget: true)
+            }
         }
 
         // In a fight and not in danger - danger was step 2 - the bomb comes up
@@ -2246,8 +2294,13 @@ final class GameScene: SKScene {
     }
 
     private static func aimingAtEnemyWall(_ player: Actor, in world: World) -> Bool {
+        enemyWallOwner(aimedAtBy: player, in: world) != nil
+    }
+
+    /// Whose wall your aim is on, if an enemy's and in throwing range.
+    private static func enemyWallOwner(aimedAtBy player: Actor, in world: World) -> TeamID? {
         let heading = player.aim.normalized()
-        guard heading.length > 0 else { return false }
+        guard heading.length > 0 else { return nil }
 
         let start = player.position + heading * GameConfig.Bomb.launchOffset
         let step = 0.2
@@ -2258,14 +2311,14 @@ final class GameScene: SKScene {
             let tile = GridPoint(containing: point)
 
             if let owner = world.map[tile].blockOwner {
-                return owner != player.team
+                return owner != player.team ? owner : nil
             }
             if world.map.isOccupied(tile) || world.treeTiles.contains(tile) {
-                return false
+                return nil
             }
             travelled += step
         }
-        return false
+        return nil
     }
 
     /// What the button is showing, held so a press does what it showed.
@@ -3005,7 +3058,7 @@ extension GameScene {
         case .blaster: return "Your blaster is better"
         case .perk:    return "One power-up at a time"
         case .bandage, .medkit: return "Already at full health"
-        case .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret: return "Not right now"
+        case .bomb, .stink, .foam, .popper, .fireworks, .spikes, .chest, .arcade, .turret: return "Not right now"
         }
     }
 

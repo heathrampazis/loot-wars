@@ -46,6 +46,7 @@ enum BombSystem {
         case .stink: return .stink
         case .foam:  return .foam
         case .popper: return .popper
+        case .fireworks: return .firework
         default:     return nil
         }
     }
@@ -68,11 +69,14 @@ enum BombSystem {
         _ = actor.inventory.consume(at: slot)
         world.actors[id] = actor
 
+        // Fireworks dart, faster and further (Nov 2026).
+        let firework = kind == .firework
         world.spawnBomb(kind,
                         owner: id,
                         team: actor.team,
                         position: actor.position + heading * GameConfig.Bomb.launchOffset,
-                        velocity: heading * GameConfig.Bomb.speed)
+                        velocity: heading * (firework ? GameConfig.Fireworks.speed : GameConfig.Bomb.speed),
+                        range: firework ? GameConfig.Fireworks.range : GameConfig.Bomb.throwRange)
     }
 
     // MARK: - Flight
@@ -100,7 +104,8 @@ enum BombSystem {
             // it flew straight through and landed behind them, and a blast this
             // small almost never caught anyone. Stink bombs still sail on: their
             // whole effect is the cloud where they land.
-            if bomb.kind == .blast || bomb.kind == .popper, hitsEnemy(bomb, in: world) {
+            if bomb.kind == .blast || bomb.kind == .popper || bomb.kind == .firework,
+               hitsEnemy(bomb, in: world) {
                 detonate(bomb, from: before, in: world)
                 continue
             }
@@ -170,7 +175,7 @@ enum BombSystem {
         // landing and kills nothing standing next to it - all of its effect is the
         // cloud it leaves behind, which is what makes it a way of taking GROUND
         // rather than a smaller way of taking health.
-        guard bomb.kind == .blast || bomb.kind == .popper else {
+        guard bomb.kind == .blast || bomb.kind == .popper || bomb.kind == .firework else {
             let cloud: GasCloud.Kind = bomb.kind == .foam ? .foam : .stink
             world.spawnGas(at: bomb.position, owner: bomb.owner, team: bomb.team, kind: cloud)
             world.record(.gas(at: bomb.position))
@@ -179,11 +184,16 @@ enum BombSystem {
 
         // A confetti popper is the same blast, smaller and softer all round
         // (Nov 2026) - see GameConfig.Popper.
+        // Fireworks the same, much bigger (Nov 2026) - see GameConfig.Fireworks.
         let popper = bomb.kind == .popper
-        let radius = popper ? GameConfig.Popper.blastRadius : GameConfig.Bomb.blastRadius
+        let firework = bomb.kind == .firework
+        let radius = firework ? GameConfig.Fireworks.blastRadius
+            : popper ? GameConfig.Popper.blastRadius : GameConfig.Bomb.blastRadius
         // Walls go further than anything else - see Bomb.wallRadius.
-        let wallRadius = max(radius, popper ? GameConfig.Popper.wallRadius : GameConfig.Bomb.wallRadius)
-        let peopleRadius = popper ? GameConfig.Popper.peopleRadius : GameConfig.Bomb.peopleRadius
+        let wallRadius = max(radius, firework ? GameConfig.Fireworks.wallRadius
+            : popper ? GameConfig.Popper.wallRadius : GameConfig.Bomb.wallRadius)
+        let peopleRadius = firework ? GameConfig.Fireworks.peopleRadius
+            : popper ? GameConfig.Popper.peopleRadius : GameConfig.Bomb.peopleRadius
         let reach = Int(max(wallRadius, peopleRadius).rounded(.up))
         let centre = GridPoint(containing: bomb.position)
 
@@ -216,7 +226,8 @@ enum BombSystem {
                 // A popper only chips at it - see Popper.wallDamage.
                 if owner != bomb.team {
                     let edge = GameConfig.Upgrades.bombWallEdgeShare
-                    let base = popper ? GameConfig.Popper.wallDamage : GameConfig.Upgrades.bombWallDamage
+                    let base = firework ? GameConfig.Fireworks.wallDamage
+                        : popper ? GameConfig.Popper.wallDamage : GameConfig.Upgrades.bombWallDamage
                     let hit = Double(base)
                         * (1 - (1 - edge) * distance / wallRadius)
                     let taken = (world.wallCracks[tile]?.taken ?? 0) + Int(hit.rounded())
@@ -267,7 +278,8 @@ enum BombSystem {
                   !isShielded(chest.position, from: origin, by: cover) else { continue }
 
             let share = 1 - (distance / radius)
-            let damage = popper ? GameConfig.Popper.chestDamage : GameConfig.Chest.bombDamage
+            let damage = firework ? GameConfig.Fireworks.chestDamage
+                : popper ? GameConfig.Popper.chestDamage : GameConfig.Chest.bombDamage
             let hurt = Int((Double(damage) * share).rounded())
             ChestSystem.hit(id, for: max(1, hurt),
                             by: bomb.owner, of: bomb.team, in: world)
@@ -291,7 +303,8 @@ enum BombSystem {
                               from: origin, by: cover) else { continue }
 
             let share = 1 - (distance / radius)
-            let damage = popper ? GameConfig.Popper.turretDamage : GameConfig.Turret.bombDamage
+            let damage = firework ? GameConfig.Fireworks.turretDamage
+                : popper ? GameConfig.Popper.turretDamage : GameConfig.Turret.bombDamage
             let hurt = Int((Double(damage) * share).rounded())
             TurretSystem.hit(id, for: max(1, hurt),
                              by: bomb.owner, of: bomb.team, in: world)
@@ -319,9 +332,13 @@ enum BombSystem {
 
             // Falls off towards the edge, so being caught at the rim is a warning
             // rather than a death sentence - but still hurts (Bomb.rimShare).
-            let rim = popper ? GameConfig.Popper.rimShare : GameConfig.Bomb.rimShare
+            let rim = firework ? GameConfig.Fireworks.rimShare
+                : popper ? GameConfig.Popper.rimShare : GameConfig.Bomb.rimShare
             let share = 1 - (1 - rim) * (distance / reachPeople)
-            let full = popper
+            let full = firework
+                ? max(Double(GameConfig.Fireworks.damage),
+                      Double(actor.maxHealth) * GameConfig.Fireworks.damageShare)
+                : popper
                 ? max(Double(GameConfig.Popper.damage),
                       Double(actor.maxHealth) * GameConfig.Popper.damageShare)
                 : max(Double(GameConfig.Bomb.damage),
@@ -333,7 +350,8 @@ enum BombSystem {
         // Traps in the blast are cleared (Nov 2026) - see SpikeSystem.clear.
         SpikeSystem.clear(around: bomb.position, radius: radius, in: world)
 
-        world.record(popper ? .confetti(at: bomb.position) : .blast(at: bomb.position))
+        world.record(firework ? .fireworks(at: bomb.position)
+                     : popper ? .confetti(at: bomb.position) : .blast(at: bomb.position))
     }
 
     /// Whether something solid stands between the blast and this point.

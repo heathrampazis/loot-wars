@@ -80,6 +80,10 @@ extension ItemType {
         // Green (Nov 2026): a cheap thing to make a raid hurt.
         case .spikes:  return .epic
 
+        // Gold - the top rung, .cosmic in code (Nov 2026): the best thing you
+        // can throw. Heath: "fireworks need to be mythical (gold) rarity".
+        case .fireworks: return .cosmic
+
         // The safest income on the map once it is standing behind a wall, and the
         // rung comes off the SIZE - Mythical for a cabinet, Legendary for a mini.
         // Asked of the kind rather than answered here for the same reason the perk
