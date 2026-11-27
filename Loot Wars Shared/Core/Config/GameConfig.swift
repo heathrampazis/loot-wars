@@ -420,6 +420,7 @@ enum GameConfig {
             .stink: 9,
             .foam: 12,
             .popper: 5,
+            .spikes: 8,
             // The starter blaster, in case one is ever in a bag rather than in a
             // hand. Half a Blaster 2.
             .blaster(.one): 6,
@@ -2565,6 +2566,26 @@ enum GameConfig {
     /// walks through casually and still short of ending your match on its own. What it is really for is
     /// making two tiles unusable: a doorway, the gap you were about to break
     /// through, or the ground under somebody who has nowhere good to go.
+    /// Spike traps (Nov 2026) - see SpikeSystem and ItemType.spikes.
+    enum Spikes {
+        /// A bite: this, or damageShare of the victim's health, whichever is
+        /// more. "A lot of damage" - most of a bomb, from something you only
+        /// see once it has got you.
+        static let damage = 60
+        static let damageShare: Double = 0.35
+        /// Seconds it shows for everybody after a bite, and before it can bite
+        /// again (standing on it keeps hurting).
+        static let revealTime: Double = 4
+        static let rearmTime: Double = 2
+        /// Most a base can hold.
+        static let maxPerBase = 6
+        /// How many come out of a crate.
+        static let perCrate = 2
+        /// How close to the base's walls a bot sets them - see
+        /// AIBrain.spikesToPlace. Raiders come in through the wall.
+        static let botWallBand = 2
+    }
+
     /// Confetti poppers (Nov 2026) - see ItemType.popper. A bomb for fights:
     /// about two fifths of a bomb on a person, a smaller blast, and next to
     /// nothing on a wall - two to crack open a plain wall, and an upgraded one
@@ -3122,6 +3143,10 @@ enum GameConfig {
         /// Foam bombs for everybody whatever their level, while they are being
         /// tried out (Nov 2026). Set false to put them behind level 25.
         static let testingFoam = true
+
+        /// Spikes for everybody whatever their level, while they are being
+        /// tried out (Nov 2026). Set false to put them behind level 3.
+        static let testingSpikes = true
         /// How much commoner they are while testing. 4 -> 1 (Nov 2026): Heath,
         /// "make the foam bombs a regular rarity... a bit rarer than the stink
         /// bombs". Normal weights are in LootTable and Chest.stockTables.
@@ -3666,27 +3691,27 @@ enum GameConfig {
         /// ChestSystem.stockRows). Healing thins out as gear takes over.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15),
+                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15), (.spikes, 7),
                 (.helmet(.common), 14), (.helmet(.epic), 12),
                 (.blaster(.two),   14), (.blaster(.three), 12)
             ] + perkRows(single: 1, disco: 1)),
             (0.25, [
-                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15),
+                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15), (.spikes, 7),
                 (.helmet(.epic), 18), (.helmet(.legendary), 7),
                 (.blaster(.three), 18), (.blaster(.four), 7)
             ] + perkRows(single: 3, disco: 2)),
             (0.50, [
-                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15),
+                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15), (.spikes, 7),
                 (.helmet(.epic), 8), (.helmet(.legendary), 18), (.helmet(.mythical), 5),
                 (.blaster(.three), 8), (.blaster(.four), 18), (.blaster(.five), 5)
             ] + perkRows(single: 4, disco: 3)),
             (0.70, [
-                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15),
+                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15), (.spikes, 7),
                 (.helmet(.legendary), 16), (.helmet(.mythical), 13),
                 (.blaster(.four), 16), (.blaster(.five), 13)
             ] + perkRows(single: 4, disco: 3)),
             (0.88, [
-                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15),
+                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15), (.spikes, 7),
                 (.helmet(.legendary), 8), (.helmet(.mythical), 18), (.helmet(.cosmic), 6),
                 (.blaster(.four), 8), (.blaster(.five), 18), (.blaster(.six), 6)
             ] + perkRows(single: 5, disco: 4))

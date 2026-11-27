@@ -104,6 +104,13 @@ final class PlacementGhost {
             sprite.anchorPoint = CGPoint(x: 0.5, y: 0.5)
             sprite.position = CGPoint(x: width / 2, y: height / 2)
 
+        case .spikes:
+            // How it will look set into the floor, across the whole two by two.
+            sprite.texture = SpikeRenderer.floorTexture
+            sprite.size = CGSize(width: width, height: height)
+            sprite.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            sprite.position = CGPoint(x: width / 2, y: height / 2)
+
         default:
             let texture = ItemArt.texture(for: type)
             sprite.texture = texture

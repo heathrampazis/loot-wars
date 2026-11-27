@@ -71,6 +71,7 @@ final class GameScene: SKScene {
     /// Drops already called out as open, so each one is only shouted about once.
     private var supplyDropsCalledOpen: Set<LootboxID> = []
     private let chestRenderer = ChestRenderer()
+    private let spikeRenderer = SpikeRenderer()
     private let flagRenderer = FlagRenderer()
 
     /// Whether the player can put walls up or take them down by hand. Off (Nov
@@ -652,6 +653,7 @@ final class GameScene: SKScene {
         }
         worldLayer.addChild(supplyRenderer.node)
         worldLayer.addChild(chestRenderer.node)
+        worldLayer.addChild(spikeRenderer.node)
         worldLayer.addChild(flagRenderer.node)
         worldLayer.addChild(groundItemRenderer.node)
         worldLayer.addChild(bombRenderer.node)
@@ -1202,6 +1204,7 @@ final class GameScene: SKScene {
         updateSupplyDrops()
         updateClock()
         chestRenderer.sync(with: world)
+        spikeRenderer.sync(with: world, dt: frameDelta)
         flagRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
         turretRenderer.sync(with: world)
@@ -1555,6 +1558,11 @@ final class GameScene: SKScene {
                 if away < GameScene.blastFeltWithin {
                     Haptics.shared.play(.blast(near: 1 - away / GameScene.blastFeltWithin))
                 }
+
+            case .spiked(let position, _):
+                // A trap biting: a crunch and a shower of sparks where it is.
+                effectsRenderer.machineStruck(at: position)
+                SoundPlayer.shared.play(.objectHit, at: position, heardFrom: ears)
 
             case .confetti(let position):
                 // A popper: a pop and a burst of paper, felt lightly when close.
@@ -2997,7 +3005,7 @@ extension GameScene {
         case .blaster: return "Your blaster is better"
         case .perk:    return "One power-up at a time"
         case .bandage, .medkit: return "Already at full health"
-        case .bomb, .stink, .foam, .popper, .chest, .arcade, .turret: return "Not right now"
+        case .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret: return "Not right now"
         }
     }
 

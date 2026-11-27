@@ -38,6 +38,10 @@ enum ItemType: Hashable {
     /// are more suited for PvP". See GameConfig.Popper.
     case popper
 
+    /// A spike trap (Nov 2026): set into your own base's floor, hidden from
+    /// enemies until one steps on it - see SpikeSystem.
+    case spikes
+
     case chest
 
     /// Gear you can carry rather than wear.
@@ -90,6 +94,7 @@ enum ItemType: Hashable {
         case .stink:   return 2
         case .foam:    return 2
         case .popper:  return 6
+        case .spikes:  return 4
         // One apiece. You can only have one running, so a second in the same slot
         // would be a queue - and a queue of power-ups is a different game.
         case .perk:    return 1
@@ -164,7 +169,7 @@ enum ItemType: Hashable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .stink, .foam, .popper, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
+        case .bomb, .stink, .foam, .popper, .spikes, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
         }
     }
 
@@ -199,7 +204,7 @@ enum ItemType: Hashable {
         case .bandage, .medkit, .helmet, .blaster, .perk: return .instant
         case .bomb, .stink, .foam, .popper: return .thrown
         // Both want you to say WHERE.
-        case .chest, .arcade, .turret: return .mapTap
+        case .chest, .arcade, .turret, .spikes: return .mapTap
         }
     }
 
@@ -207,7 +212,7 @@ enum ItemType: Hashable {
     var isGear: Bool {
         switch self {
         case .helmet, .blaster: return true
-        case .bandage, .medkit, .bomb, .stink, .foam, .popper, .chest, .arcade, .turret, .perk: return false
+        case .bandage, .medkit, .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret, .perk: return false
         }
     }
 

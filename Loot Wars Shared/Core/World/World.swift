@@ -333,6 +333,13 @@ final class World {
 
     private(set) var lootboxes: [LootboxID: Lootbox] = [:]
     var chests: [ChestID: Chest] = [:]
+
+    /// Spike traps set into bases' floors, by tile - see SpikeSystem.
+    var spikes: [GridPoint: SpikeTrap] = [:]
+
+    func spikeCount(ownedBy team: TeamID) -> Int {
+        spikes.values.filter { $0.owner == team }.count
+    }
     private(set) var groundItems: [GroundItemID: GroundItem] = [:]
 
     /// An opened crate, waiting to come back in the same spot.
@@ -2206,6 +2213,7 @@ final class World {
         applyMovementInput(everyone)
         BuildSystem.update(self, commands: everyone)
         ChestSystem.update(self, commands: everyone, dt: dt)
+        SpikeSystem.update(self, commands: everyone, dt: dt)
         // Before movement, so a wall that comes down this tick is a gap somebody
         // can already walk through.
         BombSystem.update(self, commands: everyone, dt: dt)
@@ -2267,7 +2275,7 @@ final class World {
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
                      .placeChest, .placeArcade, .placeTurret, .storeItem, .takeItem,
-                     .dropItem, .buyItem, .sellItem, .upgradeBase:
+                     .dropItem, .buyItem, .sellItem, .upgradeBase, .placeSpikes:
                     break   // other systems' business, not movement's
                 }
             }
