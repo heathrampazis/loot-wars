@@ -19,6 +19,7 @@
 enum GasSystem {
 
     static func update(_ world: World, dt: Double) {
+        linger(world, dt: dt)
         guard !world.gasClouds.isEmpty else { return }
 
         // Sorted rather than in dictionary order: this hands out damage, damage can
@@ -77,6 +78,40 @@ enum GasSystem {
                                 amount: max(1, Int(portion.rounded())),
                                 from: cloud.owner,
                                 in: world)
+
+            // And it stays on you - see Stink.linger. Restarted by every dose,
+            // with its tick pushed back so it never lands on top of one.
+            if world.actors[id]?.isAlive == true {
+                world.actors[id]?.gassedFor = GameConfig.Stink.linger
+                world.actors[id]?.gassedTick = GameConfig.Stink.lingerInterval
+                world.actors[id]?.gassedBy = cloud.owner
+            }
+        }
+    }
+
+    /// The gas still working on people who have walked out of it (Nov 2026) -
+    /// see Stink.linger. Actors in id order, so a seed replays the same.
+    private static func linger(_ world: World, dt: Double) {
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var actor = world.actors[id], actor.gassedFor > 0 else { continue }
+            guard actor.isAlive else {
+                actor.gassedFor = 0
+                actor.gassedBy = nil
+                world.actors[id] = actor
+                continue
+            }
+            actor.gassedFor -= dt
+            actor.gassedTick -= dt
+            let due = actor.gassedTick <= 0
+            if due { actor.gassedTick = GameConfig.Stink.lingerInterval }
+            let source = actor.gassedBy
+            if actor.gassedFor <= 0 { actor.gassedBy = nil }
+            world.actors[id] = actor
+
+            guard due else { continue }
+            let portion = Double(actor.maxHealth) * GameConfig.Stink.lingerShare
+            CombatSystem.damage(id, amount: max(1, Int(portion.rounded())),
+                                from: source, in: world)
         }
     }
 }

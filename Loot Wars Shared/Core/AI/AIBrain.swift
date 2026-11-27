@@ -1333,7 +1333,7 @@ enum AIBrain {
 
         // And only somewhere that is actually open. A bot that walks into a claim
         // whose wall is shut has not broken in, it is trespassing on the lawn.
-        guard world.baseIsBreached(team) else { return nil }
+        guard world.baseIsBreached(team), world.raidable(team) else { return nil }
 
         // Its turret, then the flag - see remaining(at:). The base is already
         // open here.
@@ -1549,7 +1549,7 @@ enum AIBrain {
         var bestScore = Double(GameConfig.AI.raidWorthOpening)
 
         for (team, claim) in world.claims.sorted(by: { $0.key.raw < $1.key.raw })
-        where team != actor.team {
+        where team != actor.team && world.raidable(team) {
             let distance = (claim.centreTile.center - actor.position).length
             guard distance < GameConfig.AI.robRange || team == runaway else { continue }
 
@@ -1593,6 +1593,7 @@ enum AIBrain {
             guard let machine = world.arcades[id],
                   let owner = machine.owner,
                   owner != actor.team,
+                  world.raidable(owner),
                   world.baseIsBreached(owner) else { continue }
 
             let distance = (machine.centre - actor.position).length
@@ -1626,7 +1627,8 @@ enum AIBrain {
         var bestScore = 0.0
 
         for chest in world.chests(notOwnedBy: actor.team) {
-            guard carryingAWayIn || world.baseIsBreached(chest.owner) else { continue }
+            guard world.raidable(chest.owner),
+                  carryingAWayIn || world.baseIsBreached(chest.owner) else { continue }
 
             let distance = (chest.position - actor.position).length
             guard distance < GameConfig.AI.robRange || chest.owner == runaway else { continue }
@@ -2021,7 +2023,7 @@ enum AIBrain {
         guard world.flagsCapturable else { return nil }
         var best: (team: TeamID, distance: Double)?
 
-        for team in TeamID.all where team != actor.team {
+        for team in TeamID.all where team != actor.team && world.raidable(team) {
             guard world.hasFlag(team), world.baseIsBreached(team),
                   let flag = world.flagPosition(of: team) else { continue }
             let distance = (flag - actor.position).length

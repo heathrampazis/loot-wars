@@ -708,7 +708,9 @@ enum GameConfig {
         /// 2.5-minute matches (Oct 2026): 12 -> 15.
         /// Match phases (Oct 2026): 15 -> 20, and tied to the opening - the
         /// opening IS the stretch with no bombs. See opening.
-        static var bombGrace: Double { opening }
+        /// Untied from the opening at 45s (Nov 2026): Heath, "enemies are
+        /// getting bombs way to early". Crates, chests and the shop alike.
+        static let bombGrace: Double = 45
 
         /// The opening phase: no bombs anywhere and no bots out hunting. Twenty
         /// seconds to loot, build and get a wall up before the raids start, so a
@@ -742,7 +744,9 @@ enum GameConfig {
         /// 2-minute matches (Oct 2026): 54 -> 36.
         /// 2.5-minute matches (Oct 2026): 36 -> 45.
         /// 45 -> 15 (Nov 2026, 3x faster).
-        static let bombRampEnd: Double = 15
+        /// 15 -> 75 (Nov 2026), with bombGrace at 45: a trickle for the first
+        /// half minute of bombs rather than full supply at once.
+        static let bombRampEnd: Double = 75
 
         /// How much of its weight the bomb row carries the moment bombs start.
         static let bombStartShare: Double = 0.35
@@ -1407,7 +1411,16 @@ enum GameConfig {
         static let bombSupplyInterval: Double = 20
 
         /// Seconds into a match before the bots' free bomb starts (Nov 2026).
-        static let bombSupplyFrom: Double = 40
+        /// 40 -> 90 (Nov 2026): bots were raiding before the player had a bomb.
+        static let bombSupplyFrom: Double = 90
+
+        /// Bots leave the PLAYER's base alone until the player has had a fair
+        /// chance to raid someone themselves (Nov 2026). Heath: "the player is
+        /// getting raided too early before they would even have the chance to
+        /// raid another player". Open once the player has carried a bomb for
+        /// playerRaidHeadStart seconds, or at playerRaidBy whatever happens.
+        static let playerRaidHeadStart: Double = 20
+        static let playerRaidBy: Double = 150
 
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
@@ -2484,6 +2497,16 @@ enum GameConfig {
         /// is what made this stop working on the people worth throwing one at.
         static let doseShare: Double = 0.11
         static let doseInterval: Double = 0.7
+
+        /// The gas lingers on you (Nov 2026): after a dose, lingerShare of max
+        /// health every lingerInterval for linger seconds, even once you are out
+        /// of the cloud. Topped up by every dose, so it keeps going while you stay
+        /// in, and never stacks on top of a dose (lingerInterval is longer than
+        /// doseInterval). Heath: "Stink Bombs should have a lingering damage
+        /// after entering the smoke to make the item better".
+        static let linger: Double = 3.0
+        static let lingerInterval: Double = 0.8
+        static let lingerShare: Double = 0.05
     }
 
     enum Bomb {
@@ -2519,8 +2542,15 @@ enum GameConfig {
         /// good helmet. Together: three quarters of a bare head, and about two
         /// fifths of anybody's later on. Two direct hits and a few shots is a kill;
         /// one is not.
-        static let damage = 75
-        static let damageShare: Double = 0.4
+        ///
+        /// Nov 2026, "bombs should also be more effective in battle for PvP":
+        /// 75 -> 90 and 0.4 -> 0.5, people caught out to peopleRadius rather
+        /// than blastRadius, and the falloff gentler - the rim still takes
+        /// rimShare of a direct hit rather than nothing.
+        static let damage = 90
+        static let damageShare: Double = 0.5
+        static let peopleRadius: Double = 1.8
+        static let rimShare: Double = 0.4
 
         /// How big the bomb is drawn, in tiles.
         static let spriteSize: Double = 0.55
@@ -2728,7 +2758,9 @@ enum GameConfig {
         /// and it now arrives alongside thicker skin, which is the same defence
         /// bought twice. Stacked at the old rate the two together simply refused to
         /// let a fight resolve.
-        static let healPortion: Double = 0.05
+        /// Nov 2026 power-up pass: Heath, "it should feel good to use a power
+        /// up... Don't make it too OP". Disco heal 0.05 -> 0.08 a second.
+        static let healPortion: Double = 0.08
 
         /// How much faster you move.
         ///
@@ -2736,7 +2768,9 @@ enum GameConfig {
         /// reach the wall first or break off a fight you are losing, and no longer
         /// enough to make everyone else look like they are standing still - which
         /// is what a third again looked like once it came free with the damage.
-        static let speedBoost: Double = 1.22
+        /// Nov 2026 power-up pass: Heath, "it should feel good to use a power
+        /// up... Don't make it too OP". Disco speed 1.22 -> 1.3.
+        static let speedBoost: Double = 1.3
 
         // MARK: - The three that each do one thing
         //
@@ -2759,17 +2793,23 @@ enum GameConfig {
         /// 1.45, up from 1.35: a third again was barely felt next to the disco
         /// ball's quarter. Now it is close to half again - over seven seconds,
         /// about one and a half extra hits landed in a close fight.
-        static let soloDamageBoost: Double = 1.45
+        /// Nov 2026 power-up pass: Heath, "it should feel good to use a power
+        /// up... Don't make it too OP". Strength 1.45 -> 1.6.
+        static let soloDamageBoost: Double = 1.6
 
         /// 9% a beat, up from 7%, so about 63% of a bar across the perk against
         /// the disco ball's 35%. Still short of the 78% the old regeneration paid,
         /// which arrived alongside thicker skin; this one does not.
-        static let soloHealPortion: Double = 0.09
+        /// Nov 2026 power-up pass: Heath, "it should feel good to use a power
+        /// up... Don't make it too OP". Regeneration 0.09 -> 0.13 a second.
+        static let soloHealPortion: Double = 0.13
 
         /// The share of each hit that still lands while resistance runs - four
         /// tenths shrugged off. Below the disco ball's 0.72, for the same reason
         /// every single beats it at its one job.
-        static let soloDamageTaken: Double = 0.6
+        /// Nov 2026 power-up pass: Heath, "it should feel good to use a power
+        /// up... Don't make it too OP". Resistance 0.6 -> 0.5 (half damage).
+        static let soloDamageTaken: Double = 0.5
 
         /// How much harder your shots hit.
         ///
@@ -2777,7 +2817,9 @@ enum GameConfig {
         /// shot fewer to a kill, which is the whole point of it, but it no longer
         /// combines with the resistance below to win a duel outright against
         /// somebody playing better than you.
-        static let damageBoost: Double = 1.25
+        /// Nov 2026 power-up pass: Heath, "it should feel good to use a power
+        /// up... Don't make it too OP". Disco damage 1.25 -> 1.4.
+        static let damageBoost: Double = 1.4
 
         /// The share of incoming damage you still take.
         ///
@@ -2791,7 +2833,9 @@ enum GameConfig {
         /// seconds. The rule of thumb across all four of these numbers is that
         /// every one of them had to become something you NOTICE rather than
         /// something you win with, because you get all four.
-        static let damageTaken: Double = 0.72
+        /// Nov 2026 power-up pass: Heath, "it should feel good to use a power
+        /// up... Don't make it too OP". Disco damage taken 0.72 -> 0.6.
+        static let damageTaken: Double = 0.6
     }
 
     enum SupplyDrop {

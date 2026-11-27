@@ -17,6 +17,12 @@ enum AISystem {
     static func contribute(to commands: inout [ActorID: [Command]], in world: World, dt: Double) {
         guard GameConfig.AI.enabled else { return }
 
+        // Note the player's first bomb - see World.raidable.
+        if world.playerFirstBombAt == nil,
+           (world.localPlayer?.inventory.count(of: .bomb) ?? 0) > 0 {
+            world.playerFirstBombAt = world.elapsed
+        }
+
         // Fixed order. Brains draw from world.rng, so the order they run in decides
         // which numbers each one gets - dictionary order would make the same seed
         // play out differently every run.

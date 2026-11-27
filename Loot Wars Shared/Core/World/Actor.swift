@@ -88,6 +88,11 @@ struct Actor {
     /// Perks.revealTime.
     var revealTimer: Double = 0
 
+    /// Stink gas still working on this actor after a dose - see Stink.linger.
+    var gassedFor: Double = 0
+    var gassedTick: Double = 0
+    var gassedBy: ActorID?
+
     /// Unseen by enemies right now: running Invisibility and not just hit. Bots
     /// and turrets do not aim at them (bots only from right beside them, see
     /// Perks.spotRange), and enemy screens draw only a glint now and then.
