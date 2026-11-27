@@ -44,6 +44,11 @@ enum Command {
     /// input never sends a price, or it could send the wrong one.
     case buyItem(ItemType)
 
+    /// Buy your base its next level (Nov 2026): arcades, turrets and walls all
+    /// go up together - see BaseUpgrade. The price is the simulation's
+    /// business, as for buyItem.
+    case upgradeBase
+
     /// Sell what is in this bag slot, at the shop.
     ///
     /// By SLOT rather than by item, unlike buying. Buying names a thing you want

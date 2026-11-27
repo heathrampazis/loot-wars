@@ -185,6 +185,9 @@ final class GameScene: SKScene {
     /// One offer, unprompted, for a few seconds - see QuickBuyNode.
     private let quickBuy = QuickBuyNode()
 
+    /// The base upgrade tag beside you - see BaseUpgradeNode.
+    private let baseUpgrade = BaseUpgradeNode()
+
     /// Teaches the one gesture nothing on screen suggests: hold a slot to drop it.
     private let hint = HintNode()
 
@@ -659,6 +662,7 @@ final class GameScene: SKScene {
         worldLayer.addChild(projectileRenderer.node)
         worldLayer.addChild(actorRenderer.node)
         worldLayer.addChild(gasRenderer.node)
+        worldLayer.addChild(baseUpgrade)
         worldLayer.addChild(effectsRenderer.node)
         worldLayer.addChild(placementGhost.node)
         addChild(worldLayer)
@@ -1252,12 +1256,85 @@ final class GameScene: SKScene {
         updateBaseCompass()
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
+        updateBaseUpgrade(with: world)
         updateHint(with: world)
         gasRenderer.sync(with: world, dt: frameDelta)
         effectsRenderer.sync(with: world)
         dispatch(world.takeEvents(), in: world)
         aimCamera(in: world)
     }
+
+    /// The base upgrade tag (Nov 2026) - see BaseUpgradeNode. It belongs to
+    /// the BASE, not to you: it stands over your flag and stays there as you
+    /// walk about, the way a shop sign stays on its shop. When you come close
+    /// enough to be standing under it, it slides out of your way - straight
+    /// out from you, the shortest move that clears you - and drifts home again
+    /// once you step off. Shown while you are inside your own base, it can
+    /// still go up a level, and you can pay for it.
+    private func updateBaseUpgrade(with world: World) {
+        let now = lastUpdateTime
+        let dt = min(0.1, max(0, now - lastUpgradeTagTime))
+        lastUpgradeTagTime = now
+
+        guard !world.isOver,
+              !shopPanel.isOpen,
+              chestPanel.openChest == nil,
+              let player = world.localPlayer, player.isAlive,
+              let claim = world.claim(for: player.team),
+              claim.contains(GridPoint(containing: player.feet)),
+              let price = ShopSystem.basePrice(for: player.team, in: world),
+              player.tokens >= price else {
+            baseUpgrade.hide()
+            return
+        }
+
+        // Home: just outside the base's top wall, over the middle of it.
+        let wall = world.enclosure(of: player.team).wall
+        let topRow = wall.map(\.row).max() ?? (claim.origin.row + claim.size - 1)
+        let home = Vec2(x: claim.centreTile.center.x,
+                        y: Double(topRow + 1) + GameScene.upgradeTagLift)
+        let body = player.feet + Vec2(x: 0, y: GameScene.upgradeTagBodyHeight)
+        var spot = home
+        let away = home - body
+        if away.length < GameScene.upgradeTagClearance {
+            let direction = away.length > 0.05 ? away.normalized() : Vec2(x: 0, y: 1)
+            spot = body + direction * GameScene.upgradeTagClearance
+        }
+
+        // And never off the screen: a big base's top wall can be further up
+        // than you can see from its bottom. Held inside the view, clear of the
+        // HUD along the top and the hotbar along the bottom.
+        let eye = GridGeometry.position(for: cameraController.node.position)
+        let half = world.visibleHalfExtent
+        let margin = GameScene.upgradeTagMargins
+        spot = Vec2(x: min(max(spot.x, eye.x - half.x + margin.x), eye.x + half.x - margin.x),
+                    y: min(max(spot.y, eye.y - half.y + margin.bottom), eye.y + half.y - margin.top))
+
+        let target = GridGeometry.point(for: spot)
+        if baseUpgrade.showing {
+            // Eased, frame-rate independent, so it glides rather than snaps.
+            let ease = CGFloat(1 - exp(-GameScene.upgradeTagEase * dt))
+            baseUpgrade.position = CGPoint(
+                x: baseUpgrade.position.x + (target.x - baseUpgrade.position.x) * ease,
+                y: baseUpgrade.position.y + (target.y - baseUpgrade.position.y) * ease)
+        } else {
+            baseUpgrade.position = target
+        }
+        baseUpgrade.update(price: price)
+    }
+
+    /// How far above the top wall the tag stands, in tiles.
+    private static let upgradeTagLift: Double = 1.0
+    /// How far in from the edges of the view it is held, in tiles: the sides,
+    /// the top (the match panel) and the bottom (the hotbar).
+    private static let upgradeTagMargins = (x: 1.6, top: 2.0, bottom: 2.6)
+    /// Where your middle is, up from your feet, in tiles.
+    private static let upgradeTagBodyHeight: Double = 1.0
+    /// How close the tag lets you come before it moves aside, in tiles.
+    private static let upgradeTagClearance: Double = 2.6
+    /// How quickly it glides to where it is going (higher is snappier).
+    private static let upgradeTagEase: Double = 10
+    private var lastUpgradeTagTime: TimeInterval = 0
 
     /// Offers the one thing worth offering, and waves at the shop button.
     ///
@@ -1660,6 +1737,13 @@ final class GameScene: SKScene {
                     flyingTo: shopPanel.convert(.zero, from: hotbar)
                 )
 
+            case .baseUpgraded(let level, let buyer):
+                guard buyer == world.localPlayerID else { break }
+                SoundPlayer.shared.play(.upgrade)
+                Haptics.shared.play(.success)
+                baseUpgrade.confirm()
+                hint.show("BASE LEVEL \(level)", seconds: 2.5)
+
             case .healed(let who):
                 guard who == world.localPlayerID else { break }
                 SoundPlayer.shared.play(.heal)
@@ -2061,6 +2145,8 @@ final class GameScene: SKScene {
     ///   2. A heal, once you are below Player.tapHealBelow - green.
     ///   3. A bomb in your bag, while your aim is on an enemy wall in range -
     ///      green. Nothing to pick out: line up on a wall and the button is there.
+    ///      Or while an enemy is within a throw of you (Nov 2026) - green when
+    ///      you are aiming at them.
     ///   4. A heal, if you are hurt at all.
     ///   5. Nothing: the button goes away.
     private func quickAction(for player: Actor, in world: World) -> QuickAction {
@@ -2089,6 +2175,15 @@ final class GameScene: SKScene {
             return .throwBomb(slot: slot, onTarget: true)
         }
 
+        // In a fight and not in danger - danger was step 2 - the bomb comes up
+        // on its own (Nov 2026): Heath, "bombs should auto equip in pvp if
+        // health is good". Green while your aim is on them.
+        if let slot = BombSystem.loadedSlot(of: player),
+           BombSystem.canThrow(player, from: slot),
+           let foe = GameScene.foeInBombReach(of: player, in: world) {
+            return .throwBomb(slot: slot, onTarget: GameScene.aiming(player, at: foe))
+        }
+
         if let slot = heal {
             return .heal(slot: slot, recommended: false)
         }
@@ -2102,6 +2197,32 @@ final class GameScene: SKScene {
     /// Walks the throw's path the way BombSystem flies it: the first solid thing
     /// it meets is what it hits, so a tree or your own wall in the way is a no.
     /// Out to the throw's full range, from where the bomb leaves the hand.
+    /// The nearest enemy you could land a bomb on: alive, not hidden, not
+    /// fresh off a respawn, and within a throw. See quickAction.
+    private static func foeInBombReach(of player: Actor, in world: World) -> Actor? {
+        var best: Actor?
+        var shortest = GameConfig.Bomb.throwRange
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let other = world.actors[id], other.isAlive,
+                  other.team != player.team,
+                  !other.isHidden,
+                  other.invulnerability <= 0 else { continue }
+            let distance = (other.position - player.position).length
+            guard distance <= shortest else { continue }
+            shortest = distance
+            best = other
+        }
+        return best
+    }
+
+    /// Whether your aim is within about twenty degrees of them.
+    private static func aiming(_ player: Actor, at foe: Actor) -> Bool {
+        let heading = player.aim.normalized()
+        let towards = (foe.position - player.position).normalized()
+        guard heading.length > 0, towards.length > 0 else { return false }
+        return heading.x * towards.x + heading.y * towards.y >= 0.94
+    }
+
     private static func aimingAtEnemyWall(_ player: Actor, in world: World) -> Bool {
         let heading = player.aim.normalized()
         guard heading.length > 0 else { return false }
@@ -2275,6 +2396,21 @@ extension GameScene {
             // makes against the aim stick - a small target that is only there for a
             // few seconds beats a large forgiving one that is always there, and the
             // stick loses nothing it needs.
+            // The base upgrade tag, ahead of the sticks: it sits on the map
+            // beside you, which can be inside a stick's grab circle.
+            if baseUpgrade.isPressed(atLocalPoint: touch.location(in: baseUpgrade)) {
+                guard let player = world.localPlayer,
+                      ShopSystem.canUpgradeBase(actor: player, in: world) else {
+                    baseUpgrade.refuse()
+                    SoundPlayer.shared.play(.error)
+                    Haptics.shared.play(.error)
+                    continue
+                }
+                queuedCommands.append(.upgradeBase)
+                baseUpgrade.arm()
+                continue
+            }
+
             if quickBuy.isPressed(atLocalPoint: touch.location(in: quickBuy)),
                let type = quickBuy.offer {
                 guard let player = world.localPlayer,

@@ -1012,8 +1012,10 @@ final class World {
         // A bot's turret is the stronger kind - see GameConfig.Turret.botHealth.
         if isBotTeam(owner), difficulty.fortifiesBotTurrets {
             turret.fortified = true
-            turret.health = turret.maxHealth
         }
+        // And at the owner's upgrade level - see BaseUpgrade.turrets.
+        turret.level = upgradeLevel(.turrets, of: owner)
+        turret.health = turret.maxHealth
 
         nextTurretID += 1
         turrets[turret.id] = turret
@@ -2135,10 +2137,52 @@ final class World {
 
         // Whatever stands here now has taken no shots - see WallSystem.
         wallDamage[point] = nil
+        wallCracks[point] = nil
     }
 
     /// Damage players have shot into their own walls, by tile - see WallSystem.
     var wallDamage: [GridPoint: WallDamage] = [:]
+
+    /// Bombing an upgraded wall has soaked up without coming down, by tile -
+    /// see Upgrades.wallHealth. Heal back after Upgrades.crackMendDelay.
+    var wallCracks: [GridPoint: WallDamage] = [:]
+
+    // MARK: - Base upgrades
+
+    /// Every team's base upgrades - see BaseUpgrade. Missing means level 0.
+    var baseUpgrades: [TeamID: [BaseUpgrade: Int]] = [:]
+
+    func upgradeLevel(_ upgrade: BaseUpgrade, of team: TeamID) -> Int {
+        baseUpgrades[team]?[upgrade] ?? 0
+    }
+
+    /// The base's level. Its upgrades are bought together (ShopSystem.upgradeBase),
+    /// so they all agree; the lowest is taken anyway.
+    func baseLevel(of team: TeamID) -> Int {
+        BaseUpgrade.allCases.map { upgradeLevel($0, of: team) }.min() ?? 0
+    }
+
+    /// How much bombing one of this team's wall tiles takes.
+    func wallHealth(of team: TeamID) -> Int {
+        let ladder = GameConfig.Upgrades.wallHealth
+        return ladder[min(ladder.count - 1, upgradeLevel(.walls, of: team))]
+    }
+
+    /// One level up, and turrets already standing take it at once - topped up
+    /// by the health they gained, not healed to full.
+    func raiseUpgrade(_ upgrade: BaseUpgrade, of team: TeamID) {
+        let level = min(GameConfig.Upgrades.maxLevel, upgradeLevel(upgrade, of: team) + 1)
+        baseUpgrades[team, default: [:]][upgrade] = level
+
+        guard upgrade == .turrets else { return }
+        for id in turrets.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var turret = turrets[id], turret.owner == team else { continue }
+            let before = turret.maxHealth
+            turret.level = level
+            turret.health = min(turret.maxHealth, turret.health + turret.maxHealth - before)
+            turrets[id] = turret
+        }
+    }
 
     /// Advances the whole game by exactly one fixed step.
     func step(commands: [ActorID: [Command]], dt: Double) {
@@ -2212,7 +2256,7 @@ final class World {
                     }
                 case .placeBlock, .removeBlock, .shoot, .openLootbox, .useItem,
                      .placeChest, .placeArcade, .placeTurret, .storeItem, .takeItem,
-                     .dropItem, .buyItem, .sellItem:
+                     .dropItem, .buyItem, .sellItem, .upgradeBase:
                     break   // other systems' business, not movement's
                 }
             }

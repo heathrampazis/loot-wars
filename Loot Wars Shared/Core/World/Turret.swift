@@ -47,9 +47,27 @@ struct Turret {
     /// see GameConfig.Turret.botHealth. Set once, when it is stood up.
     var fortified: Bool = false
 
-    var maxHealth: Int { fortified ? GameConfig.Turret.botHealth : GameConfig.Turret.health }
-    var shotDamage: Int { fortified ? GameConfig.Turret.botDamage : GameConfig.Turret.damage }
-    var fireRate: Double { fortified ? GameConfig.Turret.botFireRate : GameConfig.Turret.fireRate }
+    /// The owner's turret upgrade level (Nov 2026) - see BaseUpgrade.turrets.
+    /// Set by World when the turret goes down and when the upgrade is bought.
+    var level: Int = 0
+
+    var maxHealth: Int {
+        let base = fortified ? GameConfig.Turret.botHealth : GameConfig.Turret.health
+        return scaled(base, by: GameConfig.Upgrades.turretHealth)
+    }
+    var shotDamage: Int {
+        let base = fortified ? GameConfig.Turret.botDamage : GameConfig.Turret.damage
+        return scaled(base, by: GameConfig.Upgrades.turretDamage)
+    }
+    var fireRate: Double {
+        let base = fortified ? GameConfig.Turret.botFireRate : GameConfig.Turret.fireRate
+        return base * (1 + GameConfig.Upgrades.turretFireRate * Double(level))
+    }
+
+    /// A number grown by `share` for every upgrade level.
+    private func scaled(_ base: Int, by share: Double) -> Int {
+        Int((Double(base) * (1 + share * Double(level))).rounded())
+    }
 
     /// Which way the barrel is pointing, in radians, and where it is trying to
     /// point. The barrel TURNS rather than snapping, which is most of what makes

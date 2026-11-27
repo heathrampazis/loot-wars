@@ -677,7 +677,11 @@ enum GameConfig {
         /// the loot bands reached Legendary and Mythical inside the first
         /// minute. Matches stay fast (everything else runs on its own clock);
         /// only the gear ladder in the crates is slower.
-        static let duration: Double = 240
+        /// 240 -> 210 (Nov 2026): "the game also needs to speed up a bit".
+        /// Everything paced by the match - loot bands, bombs, raid chests, bot
+        /// upgrades, the late sharpening - arrives an eighth sooner.
+        /// 210 -> 190 (Nov 2026): "the game duration to be a bit faster".
+        static let duration: Double = 190
 
         /// How long into a match before bombs start turning up, in seconds.
         ///
@@ -710,7 +714,8 @@ enum GameConfig {
         /// opening IS the stretch with no bombs. See opening.
         /// Untied from the opening at 45s (Nov 2026): Heath, "enemies are
         /// getting bombs way to early". Crates, chests and the shop alike.
-        static let bombGrace: Double = 45
+        /// 45 -> 30 (Nov 2026): "the games are a bit slower now".
+        static let bombGrace: Double = 30
 
         /// The opening phase: no bombs anywhere and no bots out hunting. Twenty
         /// seconds to loot, build and get a wall up before the raids start, so a
@@ -746,7 +751,8 @@ enum GameConfig {
         /// 45 -> 15 (Nov 2026, 3x faster).
         /// 15 -> 75 (Nov 2026), with bombGrace at 45: a trickle for the first
         /// half minute of bombs rather than full supply at once.
-        static let bombRampEnd: Double = 75
+        /// 75 -> 55 (Nov 2026), with bombGrace.
+        static let bombRampEnd: Double = 55
 
         /// How much of its weight the bomb row carries the moment bombs start.
         static let bombStartShare: Double = 0.35
@@ -1277,7 +1283,7 @@ enum GameConfig {
         /// The furthest a bot will ever start a fight from - before the screen has
         /// its say. See AIBrain.fightRanges: the real limit is usually what the
         /// camera can show, and this is only the ceiling on top of that.
-        static let engageRange: Double = 12
+        static let engageRange: Double = 14   // 12 -> 14 (Nov 2026), more pvp
 
         /// How much of the visible half-height a bot may fight across.
         ///
@@ -1356,7 +1362,9 @@ enum GameConfig {
         /// start, part of letting them keep pace with the player.
         /// 0.05 -> 0.4 (Nov 2026): gear came too fast; with Match.duration 240
         /// that is about 95 seconds in.
-        static let buysAnythingAfter: Double = 0.4
+        /// 0.4 -> 0.55 (Nov 2026): bots hold off on cheap gear rungs longer,
+        /// so their kit climbs more slowly.
+        static let buysAnythingAfter: Double = 0.55
 
         /// How little healing a bot has to be carrying before it buys some.
         ///
@@ -1408,19 +1416,33 @@ enum GameConfig {
         /// 8 -> 5 (Nov 2026, flags) -> 20 (Nov 2026): Heath, bots "dont just
         /// instantly get bombs, the player takes a while to even start getting
         /// these". Starts at bombSupplyFrom.
-        static let bombSupplyInterval: Double = 20
+        /// 20 -> 15 (Nov 2026): raids landing more often moves a match on.
+        static let bombSupplyInterval: Double = 15
 
         /// Seconds into a match before the bots' free bomb starts (Nov 2026).
         /// 40 -> 90 (Nov 2026): bots were raiding before the player had a bomb.
-        static let bombSupplyFrom: Double = 90
+        /// 90 -> 60 (Nov 2026): games had slowed down.
+        /// 60 -> 45 (Nov 2026), the same.
+        static let bombSupplyFrom: Double = 45
+
+        /// How many bombs the free top-up fills a bot to (Nov 2026): one, and
+        /// two once the match is bombSupplyCapLateFrom along, because an
+        /// upgraded wall takes two bombs (Upgrades.wallHealth) and a raid
+        /// that stalls for a bomb mid-breach is no raid.
+        static let bombSupplyCap = 1
+        static let bombSupplyCapLate = 2
+        /// 0.4 -> 0.3 -> 0.15 (Nov 2026): bots upgrade from Upgrades.botsFrom,
+        /// so a bot needs its second bomb from about then too.
+        static let bombSupplyCapLateFrom: Double = 0.15
 
         /// Bots leave the PLAYER's base alone until the player has had a fair
         /// chance to raid someone themselves (Nov 2026). Heath: "the player is
         /// getting raided too early before they would even have the chance to
         /// raid another player". Open once the player has carried a bomb for
         /// playerRaidHeadStart seconds, or at playerRaidBy whatever happens.
-        static let playerRaidHeadStart: Double = 20
-        static let playerRaidBy: Double = 150
+        /// 20 / 150 -> 15 / 110 -> 10 / 90 (Nov 2026): games had slowed down.
+        static let playerRaidHeadStart: Double = 10
+        static let playerRaidBy: Double = 90
 
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
@@ -1678,7 +1700,10 @@ enum GameConfig {
         /// bot's crate from about one in eleven being a power-up to about one in
         /// five early, and one in seven to one in three late. The player's crates
         /// are untouched.
-        static let cratePerkBoost: Double = 2.5
+        /// 2.5 -> 1.8 (Nov 2026): the crates' own power-up rows went up by
+        /// about 1.6x, so this came down to keep bots only a little ahead of
+        /// where they were.
+        static let cratePerkBoost: Double = 1.8
 
         /// Gear from crates a bot opens (Nov 2026): helmets and blasters this
         /// many times as likely, and crateRungUpChance of being a rung better.
@@ -1687,8 +1712,10 @@ enum GameConfig {
         /// 1.5 and 0.25 at first; 2 and 0.4 (Nov 2026) - Heath: "it would be
         /// nice to see some slightly stronger players too, i feel like the
         /// player always upgrades before the others".
-        static let crateGearBoost: Double = 1.25
-        static let crateRungUpChance: Double = 0.1
+        /// 1.25 -> 1.0 and 0.1 -> 0.04 (Nov 2026): Heath, "enemies
+        /// shouldnt be getting tier 2 loot as fast as they are".
+        static let crateGearBoost: Double = 1.0
+        static let crateRungUpChance: Double = 0.04
 
         /// How far a bot will go for a rare crate (Nov 2026). Inside this many
         /// tiles it drops what it is doing and goes - just under defending its
@@ -1722,6 +1749,22 @@ enum GameConfig {
         /// party, or a new raid on an open base, is skipped once it has this
         /// many. The raid already under way carries on regardless.
         static let maxRaidersPerBase = 2
+
+        /// How near a defender has to be for a raiding bot to turn its gun on
+        /// them while it carries on with the raid - taking the flag, bombing
+        /// the wall, cracking the chest (Nov 2026). Heath: "enemies arent
+        /// shooting the player when trying to capture flag, they should do
+        /// both".
+        static let raidShootRange: Double = 7
+
+        /// How much nearer a cracked wall tile counts when a bot picks where
+        /// to bomb (Nov 2026) - see Upgrades.wallHealth.
+        static let crackedWallPull: Double = 6
+
+        /// How much less a base is worth raiding per upgrade level (Nov 2026)
+        /// - see AIBrain.raidGoal. Enough to pick a soft base over a hard one
+        /// at the same distance, not enough to leave hard ones alone.
+        static let raidLevelCost: Double = 8
 
         /// And even once the shooting stops, a beat before patching up. Winding a
         /// bandage on the same frame the last bullet lands is a tell that nobody is
@@ -2010,7 +2053,8 @@ enum GameConfig {
         /// 10...20 -> 5...10 (Nov 2026, one life): bots go looking for people
         /// twice as often.
         /// 5...10 -> 4...7 (Nov 2026, flags): faster matches.
-        static let huntUrgeInterval: ClosedRange<Double> = 4...7
+        /// 4...7 -> 3...5 (Nov 2026): "it should feel a bit more pvp".
+        static let huntUrgeInterval: ClosedRange<Double> = 3...5
 
         /// How long a bot will keep looking before giving up and going back to its
         /// own match.
@@ -2020,12 +2064,18 @@ enum GameConfig {
         /// errand with no payoff. It gives up, takes a fresh urge, and gets on.
         /// 3-minute matches (Oct 2026): 30 -> 18.
         /// 2-minute matches (Oct 2026): 18 -> 12.
-        static let huntPatience: Double = 12
+        static let huntPatience: Double = 16   // 12 -> 16 (Nov 2026), more pvp
 
         /// A bounty this size is worth a detour: a bot with its hunt urge ready
         /// goes after anybody carrying one within bountyHuntRange tiles, on any
         /// difficulty. A streak should make you a target.
         static let bountyHuntsAt = 50
+
+        /// Hunting whoever is near (Nov 2026) - see AIBrain.nearbyWorthHunting.
+        /// Within this many tiles, and only while fewer than nearbyHuntGang
+        /// other bots are already after them, so the player is not swarmed.
+        static let nearbyHuntRange: Double = 13
+        static let nearbyHuntGang = 2
         static let bountyHuntRange: Double = 24
 
         /// How far off a bot can pick a hunt's trail up from.
@@ -2034,7 +2084,7 @@ enum GameConfig {
         /// where somebody WAS rather than where they are. Wider than the twelve a
         /// fight is acquired at, because noticing somebody across a clearing and
         /// being close enough to shoot at them are different things.
-        static let huntSight: Double = 16
+        static let huntSight: Double = 18   // 16 -> 18 (Nov 2026), more pvp
 
         /// How close counts as having reached the mark.
         ///
@@ -2281,6 +2331,78 @@ enum GameConfig {
         static let showDebugLabels = false
     }
 
+    /// Base upgrades, bought with the UPGRADE BASE button in your base
+    /// (Nov 2026) - see
+    /// BaseUpgrade. Bots buy them too (AIBrain.wantsBaseUpgrade).
+    enum Upgrades {
+        /// Levels per upgrade.
+        static let maxLevel = 3
+
+        /// What the NEXT base level costs: to reach level 1, 2 and 3. Each
+        /// buys all three upgrades at once, so dearer than one used to be
+        /// (20 / 40 / 65 each) and cheaper than three.
+        static let prices: [Int] = [35, 65, 100]
+
+        /// Arcades: this much faster per level, and the pile they build up
+        /// to grows by the same share, so it really is more tokens.
+        /// +25% / +50% / +75%.
+        static let arcadeRate: Double = 0.25
+
+        /// Turrets, per level: damage, health and fire rate.
+        /// Level 3 is +45% damage, +60% health and +24% fire rate.
+        static let turretDamage: Double = 0.15
+        static let turretHealth: Double = 0.20
+        static let turretFireRate: Double = 0.08
+
+        /// How much bombing an enemy wall tile takes, by level. A bomb does
+        /// bombWallDamage to a tile it lands on, falling to bombWallEdgeShare
+        /// of that at Bomb.wallRadius (65 at the edge), and it adds up.
+        ///
+        /// Any upgrade means ONE BOMB NEVER BREAKS IT (Nov 2026). Heath:
+        /// "bombs shouldnt be able to 1 tap walls when they are upgraded
+        /// thats the whole point". Every level is two bombs; the level is how
+        /// much of a hole the second one leaves:
+        ///   0: 60   one bomb, the whole blast comes down, as before
+        ///   1: 110  two bombs, the whole blast
+        ///   2: 140  two bombs, most of it (out to about 1.7 tiles)
+        ///   3: 170  two bombs, only the tile hit; a third for the rest
+        /// Your own bombs still open your own walls at once.
+        static let wallHealth: [Int] = [60, 110, 140, 170]
+        static let bombWallDamage = 100
+        static let bombWallEdgeShare: Double = 0.65
+        /// A wall a bomb cracked but did not bring down heals itself (Nov
+        /// 2026): after crackMendDelay without another bomb, crackMendShare of
+        /// its health back every crackMendTick - a level 1 wall is whole again
+        /// about 13 seconds after the bomb. Heath: "walls should auto heal if
+        /// they didnt get destroyed by bomb". The second bomb has to follow
+        /// the first.
+        static let crackMendDelay: Double = 8
+        static let crackMendTick: Double = 0.5
+        static let crackMendShare: Double = 0.06
+
+        /// How far into a match before bots start buying upgrades. 0.2 ->
+        /// 0.35 (Nov 2026), and the level they will go to climbs with the
+        /// match (botLevelCap), so bot bases toughen up as the game goes on
+        /// rather than all turning into two-bomb walls in the first minute -
+        /// Heath: "the game should still flow well".
+        /// 0.35 -> 0.15 (Nov 2026): "maybe enemies should get those base
+        /// upgrades faster".
+        static let botsFrom: Double = 0.15
+
+        static func botLevelCap(at progress: Double) -> Int {
+            switch progress {
+            // 0.6 / 0.85 -> 0.35 / 0.6 (Nov 2026): bots upgrade sooner.
+            case ..<0.35: return 1
+            case ..<0.6:  return 2
+            default:      return maxLevel
+            }
+        }
+
+        /// Tokens a bot keeps back after buying one, so it can still pay
+        /// for healing.
+        static let botReserve = 10
+    }
+
     enum Build {
         /// How much blaster damage a player's own wall takes before it breaks
         /// when they shoot it - see WallSystem. Sixty: five shots from a starter
@@ -2383,7 +2505,9 @@ enum GameConfig {
         /// 2-minute matches (Oct 2026): 8 -> 5.
         /// 5 -> 12 (Nov 2026, flags): a raider needs time to get through the
         /// hole and two seconds at the flag before the owner can wall it shut.
-        static let raidGrace: Double = 12
+        /// 12 -> 15 (Nov 2026): a raid gets a little longer before the hole
+        /// can be walled up, so more of them finish.
+        static let raidGrace: Double = 15
 
         /// Walls laid per trip while patching a breach.
         ///
@@ -2996,7 +3120,7 @@ enum GameConfig {
         /// How much likelier a power-up is in a purple crate than its band says.
         /// Three times: about one purple crate in six is a power-up.
         /// 3.0 -> 2.0 (Nov 2026): power-ups move towards raid chests.
-        static let rarePerkBoost: Double = 2.0
+        static let rarePerkBoost: Double = 2.0   // with the crates' perk rows up 1.6x (Nov 2026)
 
         /// And gear (which a purple crate then bumps a rung - see
         /// LootTable.upgraded). One and a half: about a third of purple crates.
@@ -3186,10 +3310,15 @@ enum GameConfig {
             // Tried at 7 / 10 / 12 (Oct 2026) and they were everywhere. Bots get
             // their extra power-ups from AI.cratePerkBoost instead, so the
             // player's crates stay as they were.
+            //
+            // 5 / 7 / 9 -> 9 / 11 / 13 (Nov 2026), with the disco ball below:
+            // Heath, "power ups need to be more common because they make
+            // gameplay interesting". About one crate in seven early and one in
+            // five late, from one in eleven and one in seven.
             switch progress {
-            case ..<0.35: return 5
-            case ..<0.70: return 7
-            default:      return 9
+            case ..<0.35: return 9
+            case ..<0.70: return 11
+            default:      return 13
             }
         }
 
@@ -3210,9 +3339,10 @@ enum GameConfig {
         /// turns up a little more often without becoming the usual find.
         static func overdriveWeight(at progress: Double) -> Int {
             switch progress {
-            case ..<0.35: return 5
-            case ..<0.70: return 5
-            default:      return 6
+            // 5 / 5 / 6 -> 7 / 8 / 9 (Nov 2026) - see singlePerkWeight.
+            case ..<0.35: return 7
+            case ..<0.70: return 8
+            default:      return 9
             }
         }
 
@@ -3454,10 +3584,12 @@ enum GameConfig {
         /// same point, and the top two reach past anything a crate gives
         /// (rare crates stop at Legendary - Loot.rareGearCap):
         ///   0.00  Common / Epic, Blaster 2 / 3 - about what a crate gives
-        ///   0.25  Epic / Legendary, Blaster 3 / 4, power-ups start
+        ///   0.25  Epic / Legendary, Blaster 3 / 4, more power-ups
         ///   0.50  Legendary, some Mythical, Blaster 4, some 5
         ///   0.70  Legendary / Mythical, Blaster 4 / 5
         ///   0.88  Mythical, some Cosmic, Blaster 5, some 6
+        /// Power-ups in every band, rising (Nov 2026, "power ups need to be
+        /// more common").
         /// Cosmic and Blaster 6 step down to Mythical and 5 until unlocked (see
         /// ChestSystem.stockRows). Healing thins out as gear takes over.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
@@ -3465,27 +3597,27 @@ enum GameConfig {
                 (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10),
                 (.helmet(.common), 14), (.helmet(.epic), 12),
                 (.blaster(.two),   14), (.blaster(.three), 12)
-            ]),
+            ] + perkRows(single: 1, disco: 1)),
             (0.25, [
                 (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10),
                 (.helmet(.epic), 18), (.helmet(.legendary), 7),
                 (.blaster(.three), 18), (.blaster(.four), 7)
-            ] + perkRows(single: 2, disco: 1)),
+            ] + perkRows(single: 3, disco: 2)),
             (0.50, [
                 (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10),
                 (.helmet(.epic), 8), (.helmet(.legendary), 18), (.helmet(.mythical), 5),
                 (.blaster(.three), 8), (.blaster(.four), 18), (.blaster(.five), 5)
-            ] + perkRows(single: 3, disco: 2)),
+            ] + perkRows(single: 4, disco: 3)),
             (0.70, [
                 (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8),
                 (.helmet(.legendary), 16), (.helmet(.mythical), 13),
                 (.blaster(.four), 16), (.blaster(.five), 13)
-            ] + perkRows(single: 3, disco: 2)),
+            ] + perkRows(single: 4, disco: 3)),
             (0.88, [
                 (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8),
                 (.helmet(.legendary), 8), (.helmet(.mythical), 18), (.helmet(.cosmic), 6),
                 (.blaster(.four), 8), (.blaster(.five), 18), (.blaster(.six), 6)
-            ] + perkRows(single: 4, disco: 3))
+            ] + perkRows(single: 5, disco: 4))
         ]
 
         /// Every power-up at the same weight, the disco ball at its own. Locked

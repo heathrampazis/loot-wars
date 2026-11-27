@@ -24,6 +24,7 @@ enum ShopSystem {
                 switch command {
                 case .buyItem(let type): buy(type, by: id, in: world)
                 case .sellItem(let slot): sell(from: slot, by: id, in: world)
+                case .upgradeBase: upgradeBase(by: id, in: world)
                 default: break
                 }
             }
@@ -280,5 +281,32 @@ enum ShopSystem {
         _ = actor.acquire(type)
         world.actors[id] = actor
         world.record(.purchase(type, by: id))
+    }
+
+    // MARK: - Base upgrades (Nov 2026)
+
+    /// What this team's base costs to take up a level, or nil once it is at
+    /// the top. One purchase raises arcades, turrets and walls together - see
+    /// BaseUpgrade and GameConfig.Upgrades.prices.
+    static func basePrice(for team: TeamID, in world: World) -> Int? {
+        let level = world.baseLevel(of: team)
+        let prices = GameConfig.Upgrades.prices
+        guard level < GameConfig.Upgrades.maxLevel, prices.indices.contains(level) else { return nil }
+        return prices[level]
+    }
+
+    static func canUpgradeBase(actor: Actor, in world: World) -> Bool {
+        guard actor.isAlive, let price = basePrice(for: actor.team, in: world) else { return false }
+        return actor.tokens >= price
+    }
+
+    private static func upgradeBase(by id: ActorID, in world: World) {
+        guard var actor = world.actors[id],
+              canUpgradeBase(actor: actor, in: world),
+              let price = basePrice(for: actor.team, in: world) else { return }
+        actor.tokens -= price
+        world.actors[id] = actor
+        for upgrade in BaseUpgrade.allCases { world.raiseUpgrade(upgrade, of: actor.team) }
+        world.record(.baseUpgraded(level: world.baseLevel(of: actor.team), by: id))
     }
 }

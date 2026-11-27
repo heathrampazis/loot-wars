@@ -156,6 +156,8 @@ enum AIBrain {
 
         if let purchase = purchaseToMake(actor: actor, in: world) {
             commands.append(.buyItem(purchase))
+        } else if wantsBaseUpgrade(actor: actor, in: world) {
+            commands.append(.upgradeBase)
         }
 
         // Anything in the bag that beats what it is wearing goes on at once. This
@@ -1105,7 +1107,7 @@ enum AIBrain {
         var bestScore = Double(GameConfig.AI.raidWorthOpening)
 
         for (team, claim) in world.claims.sorted(by: { $0.key.raw < $1.key.raw })
-        where team != actor.team {
+        where team != actor.team && world.raidable(team) {
             // The whole price, standing and neglect included - see World.raidWorth.
             // This used to ask lootValue, which is only what is in the chests, and
             // then refuse outright on a base worth nothing. That is the line that
@@ -1114,9 +1116,11 @@ enum AIBrain {
             // before any of the reasons to go there were even considered.
             let toBase = (claim.centreTile.center - actor.position).length
             let score = world.raidWorth(of: team) - toBase * GameConfig.AI.raidDistanceCost
+                - Double(world.baseLevel(of: team)) * GameConfig.AI.raidLevelCost
             guard score > bestScore else { continue }
 
-            guard let tile = breachTile(into: team, for: actor, in: world) else { continue }
+            guard let tile = breachTile(into: team, for: actor, in: world),
+                  actor.inventory.count(of: .bomb) >= bombsToBreach(tile, in: world) else { continue }
             bestScore = score
             bestTile = tile
         }
@@ -1146,6 +1150,7 @@ enum AIBrain {
 
         guard world.difficulty.pressesTheLeader else {
             return bountyWorthHunting(for: actor, in: world)
+                ?? nearbyWorthHunting(for: actor, in: world)
         }
 
         var best: Actor?
@@ -1164,6 +1169,32 @@ enum AIBrain {
         }
 
         return best ?? bountyWorthHunting(for: actor, in: world)
+            ?? nearbyWorthHunting(for: actor, in: world)
+    }
+
+    /// Anybody close by who is a fair fight (Nov 2026): the nearest enemy
+    /// within AI.nearbyHuntRange who does not outgear this bot and is not
+    /// already being chased by AI.nearbyHuntGang others. What makes a match
+    /// feel like PvP rather than everybody minding their own base - Heath,
+    /// "it should feel a bit more pvp". In id order on a tie.
+    private static func nearbyWorthHunting(for actor: Actor, in world: World) -> Actor? {
+        var best: Actor?
+        var shortest = GameConfig.AI.nearbyHuntRange
+
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let candidate = world.actors[id],
+                  candidate.isAlive, !candidate.isHidden,
+                  candidate.team != actor.team,
+                  !outgeared(actor, by: candidate) else { continue }
+            let distance = (candidate.position - actor.position).length
+            guard distance < shortest else { continue }
+            let chasing = gang(on: candidate, except: actor.id, in: world)
+            guard chasing.fighting + chasing.coming < GameConfig.AI.nearbyHuntGang else { continue }
+            shortest = distance
+            best = candidate
+        }
+
+        return best
     }
 
     /// Somebody nearby on a streak, with a bounty worth the walk.
@@ -1553,7 +1584,10 @@ enum AIBrain {
             let distance = (claim.centreTile.center - actor.position).length
             guard distance < GameConfig.AI.robRange || team == runaway else { continue }
 
+            // An upgraded base is a harder nut (Nov 2026): priced down by its
+            // level, so a soft base nearby is the better raid.
             let score = world.raidWorth(of: team) - distance * GameConfig.AI.raidDistanceCost
+                - Double(world.baseLevel(of: team)) * GameConfig.AI.raidLevelCost
             guard score > bestScore else { continue }
 
             // Already open: straight to its turret, chests or machines. Shut: bomb the wall.
@@ -1565,7 +1599,11 @@ enum AIBrain {
                 goal = nil
             } else if world.baseIsBreached(team) {
                 goal = remaining(at: team, for: actor, in: world)
-            } else if hasBomb, let wall = breachTile(into: team, for: actor, in: world) {
+            } else if hasBomb, let wall = breachTile(into: team, for: actor, in: world),
+                      actor.inventory.count(of: .bomb) >= bombsToBreach(wall, in: world) {
+                // Only with enough bombs to get through (Nov 2026): an upgraded
+                // wall takes two, and one bomb into it is a bomb wasted - see
+                // bombsToBreach. Short, and the bot goes and finds more.
                 goal = .raid(wall)
             } else {
                 goal = nil
@@ -1615,7 +1653,7 @@ enum AIBrain {
         guard actor.inventory.totalHealing(of: actor.maxHealth)
                 >= GameConfig.AI.emergencyHealingStock else { return nil }
 
-        let carryingAWayIn = actor.inventory.count(of: .bomb) > 0
+        let bombs = actor.inventory.count(of: .bomb)
 
         // A runaway's base is worth any walk. robRange keeps an ordinary raid
         // local; somebody doubling the field's score is not an ordinary target, and
@@ -1628,7 +1666,8 @@ enum AIBrain {
 
         for chest in world.chests(notOwnedBy: actor.team) {
             guard world.raidable(chest.owner),
-                  carryingAWayIn || world.baseIsBreached(chest.owner) else { continue }
+                  world.baseIsBreached(chest.owner)
+                    || bombs >= bombsToBreach(team: chest.owner, in: world) else { continue }
 
             let distance = (chest.position - actor.position).length
             guard distance < GameConfig.AI.robRange || chest.owner == runaway else { continue }
@@ -2589,6 +2628,20 @@ enum AIBrain {
             .type
     }
 
+    /// Whether to take the base up a level, once there is nothing in the bag
+    /// to buy first (Nov 2026) - see BaseUpgrade. Never past
+    /// Difficulty.botUpgradeCap, and always leaving Upgrades.botReserve
+    /// tokens for healing.
+    private static func wantsBaseUpgrade(actor: Actor, in world: World) -> Bool {
+        guard world.matchProgress >= GameConfig.Upgrades.botsFrom,
+              world.claim(for: actor.team) != nil,
+              world.baseLevel(of: actor.team) < min(world.difficulty.botUpgradeCap,
+                                                    GameConfig.Upgrades.botLevelCap(at: world.matchProgress)),
+              ShopSystem.canUpgradeBase(actor: actor, in: world),
+              let price = ShopSystem.basePrice(for: actor.team, in: world) else { return false }
+        return actor.tokens - price >= GameConfig.Upgrades.botReserve
+    }
+
     private static func upgradeToBuy(actor: Actor, in world: World) -> ItemType? {
         ShopSystem.upgradeOffers(for: actor, unlocks: world.unlocks)
             .filter { worthBuying($0.type, for: actor, in: world)
@@ -2841,6 +2894,29 @@ enum AIBrain {
     // MARK: - Raiding
 
     // The wall tile whose removal opens the way to this base's loot, as the wall is actually built.
+    /// How many bombs it takes to open this wall tile (Nov 2026): its owner's
+    /// wall health (Upgrades.wallHealth), less any crack already in it, over
+    /// what a bomb landing against it does. One for a plain wall, two for an
+    /// upgraded one, one again for an upgraded one already cracked.
+    private static func bombsToBreach(_ tile: GridPoint, in world: World) -> Int {
+        guard let owner = world.map[tile].blockOwner else { return 1 }
+        let left = world.wallHealth(of: owner) - (world.wallCracks[tile]?.taken ?? 0)
+        return max(1, Int((Double(left) / AIBrain.bombHitOnWall).rounded(.up)))
+    }
+
+    /// The same for a base as a whole, when the exact tile is not known yet.
+    private static func bombsToBreach(team: TeamID, in world: World) -> Int {
+        max(1, Int((Double(world.wallHealth(of: team)) / AIBrain.bombHitOnWall).rounded(.up)))
+    }
+
+    /// What a bomb does to the wall tile it goes off against - half a tile
+    /// from its middle - see Upgrades.bombWallDamage.
+    private static var bombHitOnWall: Double {
+        let edge = GameConfig.Upgrades.bombWallEdgeShare
+        let radius = max(GameConfig.Bomb.blastRadius, GameConfig.Bomb.wallRadius)
+        return Double(GameConfig.Upgrades.bombWallDamage) * (1 - (1 - edge) * 0.5 / radius)
+    }
+
     private static func breachTile(into team: TeamID, for actor: Actor, in world: World) -> GridPoint? {
         // The flag first (Nov 2026): it is what a raid is for now. The loot only
         // once it has gone.
@@ -2933,7 +3009,10 @@ enum AIBrain {
             let toBot = (candidate.center - actor.position).length
 
             // A short clear walk to the target, and near the bot.
-            let placement = toTarget * 1.5 + toBot * 0.5
+            // A wall already cracked by an earlier bomb is half open - see
+            // Upgrades.wallHealth - so finish that one (Nov 2026).
+            let cracked = world.wallCracks[candidate] != nil ? GameConfig.AI.crackedWallPull : 0
+            let placement = toTarget * 1.5 + toBot * 0.5 - cracked
             guard placement < closest else { continue }
             closest = placement
             tile = candidate
@@ -2951,7 +3030,10 @@ enum AIBrain {
         var closest: GridPoint?
         var shortest = GameConfig.AI.raidRange
 
-        for (team, claim) in world.claims where team != actor.team {
+        // Raidable bases only, and only a wall this bot has the bombs to get
+        // through (Nov 2026) - see bombsToBreach.
+        let bombs = actor.inventory.count(of: .bomb)
+        for (team, claim) in world.claims where team != actor.team && world.raidable(team) {
             // Cheap test first: the claim's middle is a good enough stand-in for
             // whether it is worth looking at every tile in it.
             guard (claim.centreTile.center - actor.position).length
@@ -2960,7 +3042,8 @@ enum AIBrain {
             for col in claim.origin.col..<(claim.origin.col + claim.size) {
                 for row in claim.origin.row..<(claim.origin.row + claim.size) {
                     let tile = GridPoint(col: col, row: row)
-                    guard world.map[tile].blockOwner != nil else { continue }
+                    guard world.map[tile].blockOwner != nil,
+                          bombs >= bombsToBreach(tile, in: world) else { continue }
 
                     let distance = (tile.center - actor.position).length
                     guard distance < shortest else { continue }
@@ -3404,20 +3487,52 @@ enum AIBrain {
     /// Note this fires while RETREATING as well as while fighting. Running away
     /// with the blaster holstered is exactly what made bots look terrified; now a
     /// withdrawal is a fighting withdrawal.
+    /// The nearest enemy this bot could shoot at right now, within `range`:
+    /// one it can target and see. In id order on a tie, so a seed replays
+    /// the same. See AI.raidShootRange.
+    private static func nearestFoe(of actor: Actor, within range: Double,
+                                   in world: World) -> ActorID? {
+        var best: ActorID?
+        var shortest = range
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard let other = world.actors[id], other.isAlive,
+                  other.team != actor.team,
+                  canTarget(other, by: actor, in: world) else { continue }
+            let distance = (other.position - actor.position).length
+            guard distance <= shortest,
+                  hasLineOfSight(from: actor.position, to: other.position, in: world) else { continue }
+            shortest = distance
+            best = id
+        }
+        return best
+    }
+
     private static func shotToTake(state: AIState, actor: Actor, in world: World) -> Vec2? {
         guard state.reactionTimer <= 0, actor.ammo > 0 else { return nil }
+
+        // A raiding bot fights back WHILE it raids (Nov 2026): somebody close
+        // enough to matter gets shot at, and the raid goes on - the bot keeps
+        // walking to the flag or the chest, only the gun turns. See
+        // AI.raidShootRange.
+        let raiding: Bool
+        switch state.goal {
+        case .capture, .raid, .robChest, .wreck, .silence: raiding = true
+        default: raiding = false
+        }
+        let defender = raiding ? nearestFoe(of: actor, within: GameConfig.AI.raidShootRange,
+                                            in: world) : nil
 
         // A machine is shot at exactly the way a person is, and this is the only
         // branch that leaves before the lead calculation below - because furniture
         // does not move, so aiming ahead of it would miss on purpose.
-        if case .wreck(let id) = state.goal, let machine = world.arcade(id) {
+        if defender == nil, case .wreck(let id) = state.goal, let machine = world.arcade(id) {
             return aimAtTarget(machine.centre, halfSpan: AIBrain.machineFaceInset,
                                from: actor, in: world)
         }
 
         // A turret is furniture that shoots back, and aimed at the same way: at
         // the box, with no lead, because it does not move.
-        if case .silence(let id) = state.goal, let turret = world.turrets[id] {
+        if defender == nil, case .silence(let id) = state.goal, let turret = world.turrets[id] {
             return aimAtTarget(turret.centre, halfSpan: AIBrain.turretFaceInset,
                                from: actor, in: world)
         }
@@ -3425,7 +3540,7 @@ enum AIBrain {
         // A chest is shot open, so robbing one is the same act as wrecking a
         // machine and goes through the same door. Its half-span is small - a chest
         // is under a tile across - so the aim is at very nearly its centre.
-        if case .robChest(let id) = state.goal, let chest = world.chests[id],
+        if defender == nil, case .robChest(let id) = state.goal, let chest = world.chests[id],
            chest.owner != actor.team {
             return aimAtTarget(chest.position, halfSpan: AIBrain.chestFaceInset,
                                from: actor, in: world)
@@ -3446,7 +3561,7 @@ enum AIBrain {
             targetID = nil
         }
 
-        guard let id = targetID,
+        guard let id = targetID ?? defender,
               let enemy = world.actors[id],
               enemy.isAlive,
               canTarget(enemy, by: actor, in: world) else { return nil }

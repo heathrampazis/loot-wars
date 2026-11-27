@@ -25,12 +25,15 @@ import Foundation
 struct WallDamage {
     var taken: Int
     var sinceHit: Double
+    /// Counts down to the next heal of a bomb crack - see WallSystem.mendCracks.
+    var mendTimer: Double = 0
 }
 
 enum WallSystem {
 
     /// Mends walls nobody has shot for a while.
     static func update(_ world: World, dt: Double) {
+        mendCracks(world, dt: dt)
         guard !world.wallDamage.isEmpty else { return }
 
         for tile in world.wallDamage.keys.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
@@ -64,5 +67,30 @@ enum WallSystem {
 
         world.wallDamage[tile] = damage
         world.record(.wallHit(tile, at: tile.center))
+    }
+
+    /// Bomb cracks in upgraded walls heal back (Nov 2026) - see
+    /// Upgrades.crackMendDelay. In tile order, so a seed replays the same.
+    private static func mendCracks(_ world: World, dt: Double) {
+        guard !world.wallCracks.isEmpty else { return }
+        for tile in world.wallCracks.keys.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
+            guard var crack = world.wallCracks[tile] else { continue }
+            guard let owner = world.map[tile].blockOwner else {
+                world.wallCracks[tile] = nil
+                continue
+            }
+            crack.sinceHit += dt
+            guard crack.sinceHit >= GameConfig.Upgrades.crackMendDelay else {
+                world.wallCracks[tile] = crack
+                continue
+            }
+            crack.mendTimer -= dt
+            if crack.mendTimer <= 0 {
+                crack.mendTimer = GameConfig.Upgrades.crackMendTick
+                let portion = Double(world.wallHealth(of: owner)) * GameConfig.Upgrades.crackMendShare
+                crack.taken -= max(1, Int(portion.rounded()))
+            }
+            world.wallCracks[tile] = crack.taken > 0 ? crack : nil
+        }
     }
 }

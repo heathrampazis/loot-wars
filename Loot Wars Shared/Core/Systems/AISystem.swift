@@ -67,7 +67,10 @@ enum AISystem {
             state.bombSupplyTimer = GameConfig.AI.bombSupplyInterval
                 * world.difficulty.bombSupplyScale
 
-            if actor.inventory.count(of: .bomb) == 0 {
+            // Up to one, or two later on - see AI.bombSupplyCapLate.
+            let cap = world.matchProgress >= GameConfig.AI.bombSupplyCapLateFrom
+                ? GameConfig.AI.bombSupplyCapLate : GameConfig.AI.bombSupplyCap
+            if actor.inventory.count(of: .bomb) < cap {
                 _ = actor.inventory.add(.bomb)
             }
         }

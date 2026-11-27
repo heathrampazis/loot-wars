@@ -177,19 +177,22 @@ enum Difficulty: Int, CaseIterable {
     var botPerkBoost: Double {
         switch self {
         case .easy:     return 1
-        case .medium:   return 1.75
+        // Medium 1.75 -> 1.4, Hardcore 3.5 -> 2.5 (Nov 2026), with
+        // AI.cratePerkBoost.
+        case .medium:   return 1.4
         case .hard:     return GameConfig.AI.cratePerkBoost
-        case .hardcore: return 3.5
+        case .hardcore: return 2.5
         }
     }
 
     /// How far into a match before a bot buys whatever gear it can afford.
     var buysAnythingAfter: Double {
         switch self {
-        case .easy:     return 0.6
-        case .medium:   return 0.35
+        // Up by 0.15 across the board (Nov 2026) - see AI.buysAnythingAfter.
+        case .easy:     return 0.75
+        case .medium:   return 0.5
         case .hard:     return GameConfig.AI.buysAnythingAfter
-        case .hardcore: return 0.3
+        case .hardcore: return 0.45
         }
     }
 
@@ -210,4 +213,14 @@ enum Difficulty: Int, CaseIterable {
 
     /// Whether bot bases get the toughened turret - see Turret.fortified.
     var fortifiesBotTurrets: Bool { self == .hard || self == .hardcore }
+
+    /// The highest level a bot will buy each base upgrade to (Nov 2026) -
+    /// see BaseUpgrade.
+    var botUpgradeCap: Int {
+        switch self {
+        case .easy:     return 1
+        case .medium:   return 2
+        case .hard, .hardcore: return GameConfig.Upgrades.maxLevel
+        }
+    }
 }

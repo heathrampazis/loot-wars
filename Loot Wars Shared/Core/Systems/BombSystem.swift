@@ -200,7 +200,24 @@ enum BombSystem {
             for dRow in -reach...reach {
                 let tile = GridPoint(col: centre.col + dCol, row: centre.row + dRow)
                 guard let owner = world.map[tile].blockOwner else { continue }
-                guard (tile.center - bomb.position).length <= wallRadius else { continue }
+                let distance = (tile.center - bomb.position).length
+                guard distance <= wallRadius else { continue }
+
+                // Somebody else's wall takes its owner's wall upgrade into
+                // account (Nov 2026) - see Upgrades.wallHealth. Not enough yet
+                // and it cracks instead, and the next bomb finishes it.
+                if owner != bomb.team {
+                    let edge = GameConfig.Upgrades.bombWallEdgeShare
+                    let hit = Double(GameConfig.Upgrades.bombWallDamage)
+                        * (1 - (1 - edge) * distance / wallRadius)
+                    let taken = (world.wallCracks[tile]?.taken ?? 0) + Int(hit.rounded())
+                    if taken < world.wallHealth(of: owner) {
+                        world.wallCracks[tile] = WallDamage(taken: taken, sinceHit: 0)
+                        world.record(.wallHit(tile, at: tile.center))
+                        continue
+                    }
+                }
+
                 world.setTile(.floor, at: tile)
 
                 // Only for somebody else's. Blowing up your own wall is a way of
