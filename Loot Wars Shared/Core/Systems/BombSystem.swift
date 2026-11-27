@@ -45,6 +45,7 @@ enum BombSystem {
         case .bomb:  return .blast
         case .stink: return .stink
         case .foam:  return .foam
+        case .popper: return .popper
         default:     return nil
         }
     }
@@ -99,7 +100,7 @@ enum BombSystem {
             // it flew straight through and landed behind them, and a blast this
             // small almost never caught anyone. Stink bombs still sail on: their
             // whole effect is the cloud where they land.
-            if case .blast = bomb.kind, hitsEnemy(bomb, in: world) {
+            if bomb.kind == .blast || bomb.kind == .popper, hitsEnemy(bomb, in: world) {
                 detonate(bomb, from: before, in: world)
                 continue
             }
@@ -169,17 +170,21 @@ enum BombSystem {
         // landing and kills nothing standing next to it - all of its effect is the
         // cloud it leaves behind, which is what makes it a way of taking GROUND
         // rather than a smaller way of taking health.
-        guard case .blast = bomb.kind else {
+        guard bomb.kind == .blast || bomb.kind == .popper else {
             let cloud: GasCloud.Kind = bomb.kind == .foam ? .foam : .stink
             world.spawnGas(at: bomb.position, owner: bomb.owner, team: bomb.team, kind: cloud)
             world.record(.gas(at: bomb.position))
             return
         }
 
-        let radius = GameConfig.Bomb.blastRadius
+        // A confetti popper is the same blast, smaller and softer all round
+        // (Nov 2026) - see GameConfig.Popper.
+        let popper = bomb.kind == .popper
+        let radius = popper ? GameConfig.Popper.blastRadius : GameConfig.Bomb.blastRadius
         // Walls go further than anything else - see Bomb.wallRadius.
-        let wallRadius = max(radius, GameConfig.Bomb.wallRadius)
-        let reach = Int(max(wallRadius, GameConfig.Bomb.peopleRadius).rounded(.up))
+        let wallRadius = max(radius, popper ? GameConfig.Popper.wallRadius : GameConfig.Bomb.wallRadius)
+        let peopleRadius = popper ? GameConfig.Popper.peopleRadius : GameConfig.Bomb.peopleRadius
+        let reach = Int(max(wallRadius, peopleRadius).rounded(.up))
         let centre = GridPoint(containing: bomb.position)
 
         // What stood in the way BEFORE anything came down. Read first, because
@@ -208,9 +213,11 @@ enum BombSystem {
                 // Somebody else's wall takes its owner's wall upgrade into
                 // account (Nov 2026) - see Upgrades.wallHealth. Not enough yet
                 // and it cracks instead, and the next bomb finishes it.
+                // A popper only chips at it - see Popper.wallDamage.
                 if owner != bomb.team {
                     let edge = GameConfig.Upgrades.bombWallEdgeShare
-                    let hit = Double(GameConfig.Upgrades.bombWallDamage)
+                    let base = popper ? GameConfig.Popper.wallDamage : GameConfig.Upgrades.bombWallDamage
+                    let hit = Double(base)
                         * (1 - (1 - edge) * distance / wallRadius)
                     let taken = (world.wallCracks[tile]?.taken ?? 0) + Int(hit.rounded())
                     if taken < world.wallHealth(of: owner) {
@@ -237,7 +244,8 @@ enum BombSystem {
         // Machines somebody put down. The map's own are scenery and survive - a
         // bomb that could clear those would strip the board of its economy.
         for machineID in world.arcades.keys.sorted(by: { $0.raw < $1.raw }) {
-            guard let machine = world.arcades[machineID],
+            guard !popper,
+                  let machine = world.arcades[machineID],
                   let owner = machine.owner,
                   owner != bomb.team,
                   machine.hitbox.expanded(by: radius).contains(bomb.position),
@@ -259,7 +267,8 @@ enum BombSystem {
                   !isShielded(chest.position, from: origin, by: cover) else { continue }
 
             let share = 1 - (distance / radius)
-            let hurt = Int((Double(GameConfig.Chest.bombDamage) * share).rounded())
+            let damage = popper ? GameConfig.Popper.chestDamage : GameConfig.Chest.bombDamage
+            let hurt = Int((Double(damage) * share).rounded())
             ChestSystem.hit(id, for: max(1, hurt),
                             by: bomb.owner, of: bomb.team, in: world)
         }
@@ -282,7 +291,8 @@ enum BombSystem {
                               from: origin, by: cover) else { continue }
 
             let share = 1 - (distance / radius)
-            let hurt = Int((Double(GameConfig.Turret.bombDamage) * share).rounded())
+            let damage = popper ? GameConfig.Popper.turretDamage : GameConfig.Turret.bombDamage
+            let hurt = Int((Double(damage) * share).rounded())
             TurretSystem.hit(id, for: max(1, hurt),
                              by: bomb.owner, of: bomb.team, in: world)
         }
@@ -303,21 +313,24 @@ enum BombSystem {
             let distance = (nearest - bomb.position).length
             // People are caught further out than walls and machines (Nov 2026,
             // see Bomb.peopleRadius).
-            let reachPeople = GameConfig.Bomb.peopleRadius
+            let reachPeople = peopleRadius
             guard distance <= reachPeople,
                   !isShielded(nearest, from: origin, by: cover) else { continue }
 
             // Falls off towards the edge, so being caught at the rim is a warning
             // rather than a death sentence - but still hurts (Bomb.rimShare).
-            let rim = GameConfig.Bomb.rimShare
+            let rim = popper ? GameConfig.Popper.rimShare : GameConfig.Bomb.rimShare
             let share = 1 - (1 - rim) * (distance / reachPeople)
-            let full = max(Double(GameConfig.Bomb.damage),
-                           Double(actor.maxHealth) * GameConfig.Bomb.damageShare)
+            let full = popper
+                ? max(Double(GameConfig.Popper.damage),
+                      Double(actor.maxHealth) * GameConfig.Popper.damageShare)
+                : max(Double(GameConfig.Bomb.damage),
+                      Double(actor.maxHealth) * GameConfig.Bomb.damageShare)
             let hurt = Int((full * share).rounded())
             CombatSystem.damage(id, amount: max(1, hurt), from: bomb.owner, in: world)
         }
 
-        world.record(.blast(at: bomb.position))
+        world.record(popper ? .confetti(at: bomb.position) : .blast(at: bomb.position))
     }
 
     /// Whether something solid stands between the blast and this point.

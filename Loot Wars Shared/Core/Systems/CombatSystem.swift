@@ -341,7 +341,7 @@ enum CombatSystem {
                 drop(.item(stack.type), chance: GameConfig.Drops.bombDropChance,
                      at: actor.position, in: world)
 
-            case .stink, .foam:
+            case .stink, .foam, .popper:
                 drop(.item(stack.type), chance: GameConfig.Drops.suppliesChance,
                      at: actor.position, in: world)
 

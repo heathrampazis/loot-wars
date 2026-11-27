@@ -18,6 +18,7 @@
 /// One thing that can be unlocked.
 enum Feature: String, CaseIterable {
     case strength
+    case confettiPoppers
     case miniArcade
     case speed
     case turrets
@@ -41,6 +42,7 @@ enum Feature: String, CaseIterable {
         case .regeneration:  return .perk(.regeneration)
         case .stinkBombs:    return .stink
         case .foamBombs:     return .foam
+        case .confettiPoppers: return .popper
         case .fullArcade:    return .arcade(.full)
         case .resistance:    return .perk(.resistance)
         case .invisibility:  return .perk(.invisibility)
@@ -97,6 +99,7 @@ struct Unlocks: Equatable {
         case .turret:              return has(.turrets)
         case .stink:               return has(.stinkBombs)
         case .foam:                return has(.foamBombs) || GameConfig.Loot.testingFoam
+        case .popper:              return has(.confettiPoppers)
         case .helmet(.cosmic):     return has(.cosmicHelmet)
         case .blaster(.six):       return has(.cosmicBlaster)
         case .bandage, .medkit, .bomb, .chest, .helmet, .blaster:
@@ -133,18 +136,21 @@ enum Roadmap {
         // Twelve unlocks in 55 levels since Invisibility (Nov 2026): every four
         // or five levels rather than every five, and still topping out at 55.
         // Thirteen with Foam Bombs (Nov 2026), still inside 55.
-        (5, .strength),
-        (9, .miniArcade),
-        (13, .speed),
-        (17, .stinkBombs),
-        (21, .regeneration),
-        (25, .foamBombs),
-        (29, .fullArcade),
-        (33, .resistance),
-        (37, .invisibility),
-        (41, .turrets),
-        (46, .discoBall),
-        (50, .cosmicHelmet),
+        // Fourteen with Confetti Poppers (Nov 2026), early because they are a
+        // fighting basic, and still inside 55.
+        (4, .strength),
+        (7, .confettiPoppers),
+        (11, .miniArcade),
+        (15, .speed),
+        (19, .stinkBombs),
+        (23, .regeneration),
+        (27, .foamBombs),
+        (31, .fullArcade),
+        (35, .resistance),
+        (39, .invisibility),
+        (43, .turrets),
+        (47, .discoBall),
+        (51, .cosmicHelmet),
         (55, .cosmicBlaster)
     ]
 

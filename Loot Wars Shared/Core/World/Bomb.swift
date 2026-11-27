@@ -33,6 +33,8 @@ struct Bomb {
         case stink
         /// Leaves a cloud of pink foam that hides people (Nov 2026).
         case foam
+        /// A smaller, weaker blast, for fights (Nov 2026) - see GameConfig.Popper.
+        case popper
     }
 
     let id: BombID

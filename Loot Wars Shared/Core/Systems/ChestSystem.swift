@@ -204,7 +204,7 @@ enum ChestSystem {
         // unlocked. Anything with no stand-in is left out.
         let rows = GameConfig.Chest.stockTable(at: world.matchProgress)
             .compactMap { row in world.unlocks.clamp(row.item).map { (item: $0, weight: row.weight) } }
-        return world.bombsAllowed ? rows : rows.filter { $0.item != .bomb }
+        return world.bombsAllowed ? rows : rows.filter { $0.item != .bomb && $0.item != .popper }
     }
 
     // MARK: - Keeping pace with the match

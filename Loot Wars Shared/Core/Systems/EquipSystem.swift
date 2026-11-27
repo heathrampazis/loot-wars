@@ -47,7 +47,7 @@ enum EquipSystem {
         case .blaster(let tier):
             actor.blaster = tier
 
-        case .bandage, .medkit, .bomb, .stink, .foam, .chest, .arcade, .turret, .perk:
+        case .bandage, .medkit, .bomb, .stink, .foam, .popper, .chest, .arcade, .turret, .perk:
             return   // somebody else's business; canEquip already refused these
         }
 

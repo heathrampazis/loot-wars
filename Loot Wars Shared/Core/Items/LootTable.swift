@@ -100,6 +100,7 @@ enum LootTable {
             (.item(.bomb),    52),
             (.item(.stink),   18),
             (.item(.foam),    9),
+            (.item(.popper),  40),
 
             // Three helmet rows became two, at the same total weight, so gear is
             // exactly as likely to come out of an early crate as it was - there is
@@ -115,6 +116,7 @@ enum LootTable {
             (.item(.bomb),    50),
             (.item(.stink),   16),
             (.item(.foam),    8),
+            (.item(.popper),  40),
 
             // The Blaster 2 is gone: by now everybody has better, so that row was a
             // roll that produced nothing.
@@ -135,6 +137,7 @@ enum LootTable {
             (.item(.bomb),    44),
             (.item(.stink),   14),
             (.item(.foam),    7),
+            (.item(.popper),  37),
 
             // Legendary is where the crates stop, and everything above it is bought.
             //
@@ -160,6 +163,7 @@ enum LootTable {
             (.item(.bomb),    40),
             (.item(.stink),   12),
             (.item(.foam),    6),
+            (.item(.popper),  34),
 
             // Gear is commoner here than in any other band, and a rung up: the
             // point of this band is that everybody finishes the match kitted out.
@@ -287,6 +291,12 @@ enum LootTable {
         var rows = table.compactMap { row -> (pickup: Pickup, weight: Int)? in
             // Foam bombs everywhere while they are being tested - see
             // Loot.testingFoam.
+            // Poppers wait out the bomb grace like bombs do (Nov 2026): they
+            // can chip a wall, so the opening stays a time to build.
+            if row.pickup == .item(.popper) {
+                let grace = GameConfig.Match.bombGrace / GameConfig.Match.duration
+                return progress >= grace ? row : nil
+            }
             if row.pickup == .item(.foam), GameConfig.Loot.testingFoam {
                 return (pickup: row.pickup, weight: row.weight * GameConfig.Loot.foamTestBoost)
             }

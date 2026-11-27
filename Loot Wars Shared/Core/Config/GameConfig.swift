@@ -419,6 +419,7 @@ enum GameConfig {
             // take - see ShopSystem.sellPrice, which no longer lets that happen.
             .stink: 9,
             .foam: 12,
+            .popper: 5,
             // The starter blaster, in case one is ever in a bag rather than in a
             // hand. Half a Blaster 2.
             .blaster(.one): 6,
@@ -1766,6 +1767,10 @@ enum GameConfig {
         /// share of its health (Nov 2026) - see AIBrain.foamToThrow.
         static let foamBelow: Double = 0.45
 
+        /// Seconds between a bot's confetti poppers in a fight (Nov 2026) -
+        /// see AIBrain.fightPopper. Shares the bomb's timer.
+        static let popperInterval: Double = 2.5
+
         /// How much less a base is worth raiding per upgrade level (Nov 2026)
         /// - see AIBrain.raidGoal. Enough to pick a soft base over a hard one
         /// at the same distance, not enough to leave hard ones alone.
@@ -2560,6 +2565,40 @@ enum GameConfig {
     /// walks through casually and still short of ending your match on its own. What it is really for is
     /// making two tiles unusable: a doorway, the gap you were about to break
     /// through, or the ground under somebody who has nowhere good to go.
+    /// Confetti poppers (Nov 2026) - see ItemType.popper. A bomb for fights:
+    /// about two fifths of a bomb on a person, a smaller blast, and next to
+    /// nothing on a wall - two to crack open a plain wall, and an upgraded one
+    /// shrugs them off. Commoner, two or three a crate, six to a slot.
+    enum Popper {
+        /// On a person: this, or damageShare of their health, whichever is
+        /// more, falling to rimShare of it at peopleRadius. A bomb is 90 /
+        /// 0.5 / 1.8.
+        /// 34 / 0.2 / 1.5 -> 38 / 0.22 / 1.8 (Nov 2026): Heath, "just a tad
+        /// more effective in pvp, maybe have a greater reach to players... a
+        /// tad bit more damage". The reach now matches a bomb's.
+        static let damage = 38
+        static let damageShare: Double = 0.22
+        static let peopleRadius: Double = 1.8
+        static let rimShare: Double = 0.45
+        /// What it does to everything else. A bomb's are 1.4 and 2.0.
+        /// wallRadius 1.4 -> 0.9 (Nov 2026): only the tile it hits.
+        static let blastRadius: Double = 1.1
+        static let wallRadius: Double = 0.9
+        /// Wall damage to the tile it lands on (a bomb's is 100) - see
+        /// Upgrades.wallHealth. 40 -> 16 (Nov 2026): Heath, "poppers are making
+        /// raids too common and easy, they should not be as effective on walls
+        /// and more used in pvp". About 13 lands on the tile hit, so a plain
+        /// wall (60) takes five on the same tile, each within eight seconds of
+        /// the last; an upgraded one, nine or more. Bombs are for walls.
+        static let wallDamage = 16
+        /// A chest takes 120 from a bomb, a turret 150. Machines are left
+        /// standing. 40 / 45 -> 25 / 30 (Nov 2026), the same reason.
+        static let chestDamage = 25
+        static let turretDamage = 30
+        /// How many come out of a crate.
+        static let perCrate: ClosedRange<Int> = 2...3
+    }
+
     /// Foam bombs (Nov 2026) - see ItemType.foam. A smoke screen: anybody
     /// standing in the cloud is hidden from everybody else - not drawn, not
     /// targeted by bots, turrets or aim help - and it hurts nobody.
@@ -3011,7 +3050,9 @@ enum GameConfig {
         /// 2-minute matches (Oct 2026): 12 -> 8.
         /// 2.5-minute matches (Oct 2026): 8 -> 10.
         /// 10 -> 6 (Nov 2026, 3x faster).
-        static let unlockTime: Double = 6
+        /// 6 -> 9 (Nov 2026): at six seconds only a bot already close could
+        /// get there in time, so drops were often "basically free".
+        static let unlockTime: Double = 9
 
         /// Where they may land: within this share of the map's half-width of the
         /// middle, which is the contested ground, and at least this many tiles
@@ -3625,27 +3666,27 @@ enum GameConfig {
         /// ChestSystem.stockRows). Healing thins out as gear takes over.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10), (.foam, 5),
+                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15),
                 (.helmet(.common), 14), (.helmet(.epic), 12),
                 (.blaster(.two),   14), (.blaster(.three), 12)
             ] + perkRows(single: 1, disco: 1)),
             (0.25, [
-                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10), (.foam, 5),
+                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15),
                 (.helmet(.epic), 18), (.helmet(.legendary), 7),
                 (.blaster(.three), 18), (.blaster(.four), 7)
             ] + perkRows(single: 3, disco: 2)),
             (0.50, [
-                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10), (.foam, 5),
+                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10), (.foam, 5), (.popper, 15),
                 (.helmet(.epic), 8), (.helmet(.legendary), 18), (.helmet(.mythical), 5),
                 (.blaster(.three), 8), (.blaster(.four), 18), (.blaster(.five), 5)
             ] + perkRows(single: 4, disco: 3)),
             (0.70, [
-                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4),
+                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15),
                 (.helmet(.legendary), 16), (.helmet(.mythical), 13),
                 (.blaster(.four), 16), (.blaster(.five), 13)
             ] + perkRows(single: 4, disco: 3)),
             (0.88, [
-                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4),
+                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4), (.popper, 15),
                 (.helmet(.legendary), 8), (.helmet(.mythical), 18), (.helmet(.cosmic), 6),
                 (.blaster(.four), 8), (.blaster(.five), 18), (.blaster(.six), 6)
             ] + perkRows(single: 5, disco: 4))

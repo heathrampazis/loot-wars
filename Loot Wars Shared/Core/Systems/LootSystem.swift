@@ -87,6 +87,14 @@ enum LootSystem {
                 // The one exception: a stink bomb comes as a pair. The second is
                 // flung just clear so both can be seen, and walking over the crate
                 // spot picks them both up.
+                // Poppers come two or three at a time (Nov 2026).
+                if pickup == .item(.popper) {
+                    let count = Int.random(in: GameConfig.Popper.perCrate, using: &world.rng)
+                    for _ in 1..<max(1, count) {
+                        world.spawnGroundItem(pickup,
+                                              at: world.scatteredSpot(near: box.position))
+                    }
+                }
                 if pickup == .item(.stink) || pickup == .item(.foam) {
                     let pair = pickup == .item(.foam)
                         ? GameConfig.Foam.perCrate : GameConfig.Loot.stinkBombsPerCrate
@@ -204,7 +212,7 @@ enum LootSystem {
             switch type {
             case .helmet(let tier):  worn = tier > actor.helmet
             case .blaster(let tier): worn = tier > actor.blaster
-            case .bandage, .medkit, .bomb, .stink, .foam, .chest, .arcade, .turret, .perk:
+            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .chest, .arcade, .turret, .perk:
                 worn = false
             }
 
