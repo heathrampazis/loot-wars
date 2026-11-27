@@ -36,19 +36,31 @@ final class WallDamageRenderer {
     func sync(with world: World) {
         let full = GridGeometry.length(ofTiles: WallDamageRenderer.widthInTiles)
 
+        // What is left of each damaged wall, nought to one: walls being shot
+        // down by their owner, and (Nov 2026) upgraded walls a bomb has
+        // cracked, which keep their bar until the crack is forgotten.
+        var left: [GridPoint: Double] = [:]
         for (tile, damage) in world.wallDamage where damage.sinceHit < WallDamageRenderer.linger {
+            left[tile] = 1 - Double(damage.taken) / Double(GameConfig.Build.wallShotHealth)
+        }
+        for (tile, crack) in world.wallCracks {
+            guard let owner = world.map[tile].blockOwner else { continue }
+            let share = 1 - Double(crack.taken) / Double(world.wallHealth(of: owner))
+            left[tile] = min(left[tile] ?? 1, share)
+        }
+
+        for (tile, share) in left {
             guard let owner = world.map[tile].blockOwner else { continue }
             let fill = fills[tile] ?? make(at: tile, owner: owner, full: full)
 
-            guard drawn[tile] != damage.taken else { continue }
-            drawn[tile] = damage.taken
+            let permille = Int((share * 1000).rounded())
+            guard drawn[tile] != permille else { continue }
+            drawn[tile] = permille
 
-            let share = max(0, 1 - Double(damage.taken) / Double(GameConfig.Build.wallShotHealth))
-            fill.path = BarArt.path(full: full, filled: max(BarArt.height, full * CGFloat(share)))
+            fill.path = BarArt.path(full: full, filled: max(BarArt.height, full * CGFloat(max(0, share))))
         }
 
-        for (tile, fill) in fills
-        where (world.wallDamage[tile]?.sinceHit ?? .infinity) >= WallDamageRenderer.linger {
+        for (tile, fill) in fills where left[tile] == nil {
             fills[tile] = nil
             drawn[tile] = nil
             fill.parent?.run(.sequence([.fadeOut(withDuration: 0.1), .removeFromParent()]))

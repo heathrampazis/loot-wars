@@ -104,6 +104,9 @@ enum WorldEvent {
     /// Somebody bought something.
     case purchase(ItemType, by: ActorID)
 
+    /// Somebody upgraded their base, and the level it is now at.
+    case baseUpgraded(level: Int, by: ActorID)
+
     /// Somebody patched themselves up with a supply.
     ///
     /// The twin of perkStarted, and it clears the same bar for the same reason.

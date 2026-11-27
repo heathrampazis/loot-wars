@@ -258,7 +258,16 @@ enum ArcadeSystem {
         for machine in world.arcades.values where machine.owner == team {
             total += machine.kind.sealedBank
         }
-        return min(GameConfig.Arcade.basePileCeiling, total)
+        // Bigger with the arcade upgrade, or a faster machine would just fill
+        // the same pile sooner - see Upgrades.arcadeRate.
+        let boost = upgradeBoost(for: team, in: world)
+        let ceiling = Double(GameConfig.Arcade.basePileCeiling) * boost
+        return Int(min(ceiling, Double(total) * boost).rounded())
+    }
+
+    /// 1, or more with the owner's arcade upgrade (Nov 2026) - see BaseUpgrade.
+    private static func upgradeBoost(for team: TeamID, in world: World) -> Double {
+        1 + GameConfig.Upgrades.arcadeRate * Double(world.upgradeLevel(.arcades, of: team))
     }
 
     /// How much is already lying about, as far as THIS machine is concerned.
@@ -316,8 +325,10 @@ enum ArcadeSystem {
         // A mini is slower wherever it stands - see ArcadeKind.rate.
         let base = GameConfig.Arcade.emitInterval * arcade.kind.rate
 
-        guard let owner = arcade.owner, !world.baseIsBreached(owner) else {
-            return base
+        guard let owner = arcade.owner else { return base }
+        // Faster with the owner's arcade upgrade, open base or not.
+        guard !world.baseIsBreached(owner) else {
+            return base / upgradeBoost(for: owner, in: world)
         }
 
         // CROWDING. Every other machine in the same base slows this one down, as
@@ -333,6 +344,7 @@ enum ArcadeSystem {
         let crowded = 1 + GameConfig.Arcade.crowding * Double(others)
 
         return base * GameConfig.Arcade.sealedInterval * crowded
+            / upgradeBoost(for: owner, in: world)
     }
 
     /// Starts and ends jackpots on the map's own machines.
