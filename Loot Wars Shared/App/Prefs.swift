@@ -29,6 +29,7 @@ enum Prefs {
         static let matchesStarted = "matchesStarted"
         static let matchesFinished = "matchesFinished"
         static let bestScore = "bestScore"
+        static let wins = "wins"
         static let taughtSelling  = "taughtSelling"
         static let taughtHolding  = "taughtHolding"
         static let lessonsVersion = "lessonsVersion"
@@ -118,11 +119,18 @@ enum Prefs {
         set { store.set(newValue, forKey: Key.bestScore) }
     }
 
-    /// Records the end of a match. Everything here is a high-water mark or a count,
-    /// so finishing badly can never take anything away from you.
-    static func finishedMatch(scoring score: Int) {
+    /// Matches won - last one standing. What the menu shows since flags (Nov
+    /// 2026), in place of the best score. bestScore is kept but no longer shown.
+    static var wins: Int {
+        get { store.integer(forKey: Key.wins) }
+        set { store.set(newValue, forKey: Key.wins) }
+    }
+
+    /// Records the end of a match. Everything here is a count, so finishing
+    /// badly can never take anything away from you.
+    static func finishedMatch(won: Bool) {
         matchesFinished += 1
-        bestScore = max(bestScore, score)
+        if won { wins += 1 }
     }
 
     // MARK: - Settings

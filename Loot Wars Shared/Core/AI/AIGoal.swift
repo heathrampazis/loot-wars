@@ -54,6 +54,9 @@ enum AIGoal: Equatable {
     /// Hurt and short of heals: home, and staying there while the base heals it
     /// - see GameConfig.AI.mendBelow.
     case mend
+    /// Standing by an enemy flag until it is taken - see GameConfig.Flag.
+    /// Only ever chosen from inside a base that is already open.
+    case capture(TeamID)
 
     var isBuild: Bool {
         if case .build = self { return true }
@@ -78,7 +81,7 @@ enum AIGoal: Equatable {
     /// so the urge is spent once per break-in rather than once per thing broken.
     var isRaiding: Bool {
         switch self {
-        case .robChest, .wreck, .silence, .raid: return true
+        case .robChest, .wreck, .silence, .raid, .capture: return true
         default: return false
         }
     }
@@ -117,6 +120,7 @@ enum AIGoal: Equatable {
         case .stash: return "stash"
         case .hunt: return "hunt"
         case .mend: return "mend"
+        case .capture: return "flag"
         }
     }
 }

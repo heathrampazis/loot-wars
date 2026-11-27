@@ -35,6 +35,38 @@ enum Glyphs {
     /// A head and shoulders - the profile corner on the title screen.
     static let profile: SKTexture = makeProfile()
 
+    /// A small flag on a pole, white so it can be tinted - the leaderboard's
+    /// "flag still standing" mark (Nov 2026).
+    static let flag: SKTexture = makeFlag()
+
+    private static func makeFlag() -> SKTexture {
+        let side: CGFloat = 128
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side),
+            format: format
+        ).image { _ in
+            SKColor.white.setFill()
+            // Pole. Images run top-down.
+            UIBezierPath(roundedRect: CGRect(x: side * 0.22, y: side * 0.08,
+                                             width: side * 0.1, height: side * 0.84),
+                         cornerRadius: side * 0.04).fill()
+            // Pennant, with a notch in its tail.
+            let pennant = UIBezierPath()
+            pennant.move(to: CGPoint(x: side * 0.3, y: side * 0.1))
+            pennant.addLine(to: CGPoint(x: side * 0.86, y: side * 0.18))
+            pennant.addLine(to: CGPoint(x: side * 0.7, y: side * 0.34))
+            pennant.addLine(to: CGPoint(x: side * 0.86, y: side * 0.5))
+            pennant.addLine(to: CGPoint(x: side * 0.3, y: side * 0.56))
+            pennant.close()
+            pennant.fill()
+        }
+
+        return SKTexture(image: image)
+    }
+
     /// The shop's bag, traced off the reference: a body that flares outwards
     /// towards the bottom, and a handle looping up out of the top edge.
     ///

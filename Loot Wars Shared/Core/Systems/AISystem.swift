@@ -50,7 +50,9 @@ enum AISystem {
         // Bots wait out the grace period like everybody else. A floor under the
         // bomb supply that ignored it would simply move the raiding it was meant to
         // hold back onto the bots.
-        guard world.bombsAtFullSupply else { return }
+        // From the end of the opening since Nov 2026 (flags): raids are the
+        // game now, and waiting for full supply held them back for most of it.
+        guard world.bombsAllowed, world.elapsed >= GameConfig.AI.bombSupplyFrom else { return }
         guard var state = actor.ai else { return }
 
         state.bombSupplyTimer -= dt

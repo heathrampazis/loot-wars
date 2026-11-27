@@ -151,14 +151,14 @@ final class PauseMenuNode: SKNode {
         card.setScale(min(1, screen.height / (PauseMenuNode.cardSize.height + 24)))
     }
 
-    /// Up, with where the match stands: "2:14 LEFT · 2ND PLACE".
-    func show(timeLeft: Double, place: Int?) {
+    /// Up, with where the match stands: "5 PLAYERS LEFT · FLAG SAFE". No clock
+    /// or place since flags (Nov 2026) - a match runs until one is left.
+    func show(playersLeft: Int, flagStanding: Bool) {
         chosen = false
         isHidden = false
 
-        let seconds = max(0, Int(timeLeft.rounded(.up)))
-        var line = String(format: "%d:%02d LEFT", seconds / 60, seconds % 60)
-        if let place { line += " \u{00B7} \(PauseMenuNode.ordinal(place + 1)) PLACE" }
+        let line = "\(playersLeft) PLAYER\(playersLeft == 1 ? "" : "S") LEFT \u{00B7} "
+            + (flagStanding ? "FLAG SAFE" : "FLAG TAKEN")
         detail.attributedText = PauseMenuNode.ink(line, size: 12, weight: .bold, faint: true)
 
         removeAllActions()

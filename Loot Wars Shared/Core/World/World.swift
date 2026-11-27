@@ -60,7 +60,7 @@ final class World {
 
     var phase: Phase {
         if elapsed < GameConfig.Match.opening { return .opening }
-        if timeRemaining <= GameConfig.Match.finalStretch { return .finale }
+        if GameConfig.Match.timed, timeRemaining <= GameConfig.Match.finalStretch { return .finale }
         return .raiding
     }
 
@@ -104,7 +104,72 @@ final class World {
     /// advance" is a question about the app rather than about the world, and a
     /// networked host would answer it somewhere else again.
     var isOver: Bool {
-        timeRemaining <= 0 || lastOneStanding || localOutLongEnough
+        (GameConfig.Match.timed && timeRemaining <= 0) || lastOneStanding || localOutLongEnough
+    }
+
+    // MARK: - Flags
+
+    /// One flag per base, in the middle of it. See GameConfig.Flag.
+    struct FlagState {
+        /// Whether it has gone up yet. A flag goes up the first time its base
+        /// is sealed (Nov 2026) - or at Flag.placeBy if the base never is - and
+        /// only that once: rebuilding after it is taken does not bring it back.
+        var placed = false
+        var standing = true
+        /// Seconds of capture built up, nought to Flag.captureTime.
+        var progress: Double = 0
+        /// Whose capture that is - the ring is drawn in their colour.
+        var capturer: TeamID?
+    }
+
+    /// Every base's flag. Empty in How to Play and on the title screen - see
+    /// removeLifeLimit.
+    var flags: [TeamID: FlagState] = [:]
+
+    /// Whether flags can be taken yet - see Flag.safeFor.
+    var flagsCapturable: Bool { elapsed >= GameConfig.Flag.safeFor }
+
+    /// Whether this team has a flag up that can be taken.
+    func hasFlag(_ team: TeamID) -> Bool {
+        guard let flag = flags[team] else { return false }
+        return flag.placed && flag.standing
+    }
+
+    /// Whether this team's flag has been taken - so their next death is their
+    /// last. False before it has gone up: a team still building has not lost it.
+    func flagLost(_ team: TeamID) -> Bool {
+        guard let flag = flags[team] else { return false }
+        return flag.placed && !flag.standing
+    }
+
+    /// Puts a team's flag up, once - see FlagState.placed.
+    func placeFlag(for team: TeamID) {
+        guard flags[team]?.placed == false else { return }
+        flags[team]?.placed = true
+        record(.flagPlaced(team))
+    }
+
+    /// Where a team's flag stands: the middle of its base.
+    func flagPosition(of team: TeamID) -> Vec2? { claims[team]?.centreTile.center }
+
+    /// Takes a team's flag. From now on their next death is their last.
+    /// Called once, by FlagSystem.
+    func captureFlag(of team: TeamID, by capturer: ActorID) {
+        guard hasFlag(team) else { return }
+        flags[team]?.standing = false
+        flags[team]?.progress = 0
+
+        for id in actors.keys where actors[id]?.team == team {
+            if actors[id]?.livesLeft == nil {
+                actors[id]?.livesLeft = GameConfig.Lives.perPlayer
+            }
+        }
+
+        if let taker = actors[capturer] {
+            award(GameConfig.Score.flagCaptured, to: taker.team)
+            awardTokens(GameConfig.Flag.capturedTokens, to: capturer)
+        }
+        record(.flagCaptured(team, by: capturer))
     }
 
     // MARK: - Lives
@@ -156,9 +221,26 @@ final class World {
         return start + (full - start) * t
     }
 
-    /// No limit on lives - How to Play and the title screen's wandering crowd.
+    /// No limit on lives and no flags - How to Play and the title screen's
+    /// wandering crowd.
     func removeLifeLimit() {
         for id in actors.keys { actors[id]?.livesLeft = nil }
+        flags = [:]
+    }
+
+    /// Builds a bot's whole base the moment the match starts (Nov 2026, flags):
+    /// the template's wall, sealed and furnished, so every flag starts behind a
+    /// wall. Heath: "Enemies should build their base faster, basically complete
+    /// build on spawn by creating the base shape". Skips any tile that is not
+    /// open floor or has something on it.
+    func buildBaseNow(for team: TeamID) {
+        guard let layout = baseLayouts[team] else { return }
+        for tile in layout.tiles {
+            guard map[tile] == .floor, !structureOccupies(tile),
+                  !actors.values.contains(where: { $0.overlaps(tile) }) else { continue }
+            setTile(.block(owner: team), at: tile)
+        }
+        recordSealIfNeeded(for: team)
     }
 
     /// Who won, and by how much. Just the standings with a nicer name at the point
@@ -422,7 +504,11 @@ final class World {
         let rows = TeamID.all.map { (team: $0, score: score(for: $0)) }
         guard GameConfig.Lives.survivorsRankFirst else { return rows.sorted(by: byPoints) }
 
-        let inRows = rows.filter { !isKnockedOut($0.team) }.sorted(by: byPoints)
+        // Still in: flag standing first, then on points.
+        let inRows = rows.filter { !isKnockedOut($0.team) }.sorted {
+            let a = !flagLost($0.team), b = !flagLost($1.team)
+            return a != b ? a : byPoints($0, $1)
+        }
         let outRows = knockedOut.reversed().map { (team: $0, score: score(for: $0)) }
         return inRows + outRows
     }
@@ -483,6 +569,8 @@ final class World {
         self.nextLootboxID = generated.lootboxes.count
         // The first rare crates come in one site at a time, a few seconds
         // apart, so the machines do not all light up at once.
+        // A flag in the middle of every base - see GameConfig.Flag.
+        self.flags = Dictionary(uniqueKeysWithValues: generated.claims.keys.map { ($0, FlagState()) })
         self.rareSites = generated.rareSites
         self.rareSiteTimers = generated.rareSites.indices.map {
             GameConfig.Loot.rareSiteFirst + Double($0) * GameConfig.Loot.rareSiteStagger
@@ -727,6 +815,14 @@ final class World {
 
             let tile = rareSites[index]
             let crate = Lootbox(id: LootboxID(nextLootboxID), tile: tile, rare: true)
+            // Never past Loot.rareSiteCap standing at once: that site goes back
+            // to the start of its clock rather than waiting to pounce the
+            // moment the standing one is opened.
+            let standing = lootboxes.values.filter { $0.rare && !$0.supply }.count
+            if standing >= GameConfig.Loot.rareSiteCap {
+                rareSiteTimers[index] = Double.random(in: GameConfig.Loot.rareSiteRespawn, using: &rng)
+                continue
+            }
             // Not under somebody, and not on top of something already there.
             if actors.values.contains(where: { $0.isAlive && $0.hitbox.intersects(crate.hitbox) })
                 || lootboxes.values.contains(where: { $0.tile == tile }) {
@@ -1043,6 +1139,9 @@ final class World {
         // Sealed only. A base already standing open does not need a bomb, and its
         // hole has been paid for.
         if !baseIsBreached(team) { worth += GameConfig.AI.breachWorth }
+
+        // And the flag, above all of it (Nov 2026) - see GameConfig.Flag.
+        if flagsCapturable, hasFlag(team) { worth += GameConfig.AI.flagWorth }
 
         // And winning. Whoever is out in front is worth breaking into whoever they
         // are - see World.lead, which says the same of all eight teams.
@@ -1474,7 +1573,25 @@ final class World {
         // base being worth visiting at all, and the cabinet is the thing that
         // should be worth going out of your way for - handing every bot the good
         // one for nothing would make finding one yourself mean nothing.
-        if ownedByABot, !hasArcade(team) {
+        if ownedByABot { addBotDefences(team, near: centre, machine: true, turret: true) }
+
+        return placed
+    }
+
+    /// Whether each bot base has had its one roll for a turret - see
+    /// Turret.botShare. Rolled once, when Base.botTurretAt comes round.
+    private var botTurretDecided: Set<TeamID> = []
+
+    /// Bot bases furnishBotsOverTime has already tried to give a machine, so a
+    /// base with no room (or no machine unlocked) is not searched every step.
+    private var botMachineTried: Set<TeamID> = []
+
+    /// A bot base's machine and turret, once the match has run long enough
+    /// for each (Nov 2026, flags) - see Base.botMachineAt and botTurretAt. From
+    /// the seal, from a reseal, and from furnishBotsOverTime as the clock
+    /// passes each mark.
+    private func addBotDefences(_ team: TeamID, near centre: Vec2, machine: Bool, turret: Bool) {
+        if machine, elapsed >= GameConfig.Base.botMachineAt, !hasArcade(team) {
             var kind: ArcadeKind =
                 Double.random(in: 0..<1, using: &rng) < GameConfig.Arcade.botMiniShare
                 ? .mini : .full
@@ -1500,13 +1617,33 @@ final class World {
         // Placed AFTER the machine rather than before, so that in a cramped base the
         // thing that earns gets the floor space and the thing that guards it takes
         // what is left.
-        if ownedByABot, !hasTurret(team), unlocks.allows(.turret),
+        if turret, elapsed >= GameConfig.Base.botTurretAt, !hasTurret(team),
+           !botTurretDecided.contains(team),
+           botTurretDecided.insert(team).inserted,
+           unlocks.allows(.turret),
            Double.random(in: 0..<1, using: &rng) < GameConfig.Turret.botShare,
            let origin = nextTurretOrigin(for: team, near: centre) {
             spawnTurret(at: origin, owner: team)
         }
 
-        return placed
+    }
+
+    /// Adds bots' machines and turrets as the match goes on (Nov 2026, flags).
+    /// Only to bases that are standing shut and still in the match - an open
+    /// base gets them on its reseal instead. Called every step; does nothing
+    /// before Base.botMachineAt.
+    func furnishBotsOverTime() {
+        guard elapsed >= GameConfig.Base.botMachineAt else { return }
+        for team in TeamID.all {
+            guard haveSealed.contains(team), !baseIsBreached(team), !isKnockedOut(team),
+                  actors.values.contains(where: { $0.team == team && $0.ai != nil }),
+                  let centre = claims[team]?.centreTile.center else { continue }
+            let wantsMachine = !hasArcade(team) && !botMachineTried.contains(team)
+            let wantsTurret = elapsed >= GameConfig.Base.botTurretAt && !botTurretDecided.contains(team)
+            guard wantsMachine || wantsTurret else { continue }
+            if wantsMachine { botMachineTried.insert(team) }
+            addBotDefences(team, near: centre, machine: wantsMachine, turret: wantsTurret)
+        }
     }
 
     func recordSealIfNeeded(for team: TeamID) {
@@ -1532,6 +1669,8 @@ final class World {
             haveSealed.insert(team)
             award(GameConfig.Base.sealed, to: team)
             record(.sealed(team, chests: furnish(team)))
+            // The first seal raises the flag - see FlagState.placed.
+            placeFlag(for: team)
 
             // Paid to whoever is standing in it, which for a bot's base is the bot
             // that built it and for yours is you.
@@ -2022,7 +2161,9 @@ final class World {
         CombatSystem.update(self, dt: dt)
         PerkSystem.update(self, dt: dt)
         RespawnSystem.update(self, dt: dt)
+        FlagSystem.update(self, dt: dt)
         VaultSystem.update(self, dt: dt)
+        furnishBotsOverTime()
         tick += 1
         elapsed += dt
 

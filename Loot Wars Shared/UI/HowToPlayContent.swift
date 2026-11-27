@@ -31,7 +31,7 @@ final class HowToPlayContent: MenuSheetContent {
         let (move, aim) = Prefs.leftHanded ? ("right", "left") : ("left", "right")
         return [
             Page(title: "Win the match",
-                 body: "You have \(GameConfig.Lives.perPlayer == 1 ? "1 life" : "\(GameConfig.Lives.perPlayer) lives"). Last one standing wins. If time runs out, most points wins. The last 30 seconds count double.",
+                 body: "Build your base to raise your flag. While it stands you respawn. Lose it and your next death is your last.",
                  scene: .win),
             Page(title: "Move and shoot",
                  body: "The \(move) stick moves you. Hold the \(aim) stick to aim and fire.",
@@ -55,7 +55,7 @@ final class HowToPlayContent: MenuSheetContent {
                  body: "Arcades pay out tokens. Collect them and spend them in the shop.",
                  scene: .earn),
             Page(title: "Raid other bases",
-                 body: "Bomb a hole in an enemy wall and shoot their chest open. Stop raiders at home for a bonus.",
+                 body: "Bomb a hole in an enemy wall and stand at their flag for a second to take it. Stand at yours to stop a steal.",
                  scene: .raid),
             Page(title: "Turrets and supply drops",
                  body: "Take out turrets before you raid. Golden supply drops land late with the best gear.",

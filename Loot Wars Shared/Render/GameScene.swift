@@ -71,6 +71,19 @@ final class GameScene: SKScene {
     /// Drops already called out as open, so each one is only shouted about once.
     private var supplyDropsCalledOpen: Set<LootboxID> = []
     private let chestRenderer = ChestRenderer()
+    private let flagRenderer = FlagRenderer()
+
+    /// Whether the player can put walls up or take them down by hand. Off (Nov
+    /// 2026): your base builds itself as you walk its outline, and that is the
+    /// only way. Heath: "the player should only be able to build walls on the
+    /// base automatically by walking around". See AssistSystem.
+    private static let manualBuilding = false
+
+    /// Whether the leaderboard is on screen at all. Off (Nov 2026).
+    private static let showsLeaderboard = true
+
+    /// Whether "FLAGS CAN BE TAKEN" has been said this match - see Flag.safeFor.
+    private var announcedFlags = false
     private let groundItemRenderer = GroundItemRenderer()
     private let bombRenderer = BombRenderer()
     private let projectileRenderer = ProjectileRenderer()
@@ -253,7 +266,8 @@ final class GameScene: SKScene {
     private static let tickFastFrom: Double = 5
 
     private func updateClock() {
-        guard world != nil, !world.isOver else { return }
+        // No clock since flags (Nov 2026) - see Match.timed.
+        guard GameConfig.Match.timed, world != nil, !world.isOver else { return }
         let left = world.timeRemaining
         guard left > 0 else { return }
         if left > GameScene.tickFrom {
@@ -540,6 +554,14 @@ final class GameScene: SKScene {
         // colour from the first frame - see ItemArt.viewer.
         ItemArt.viewer = world.localPlayer?.team
 
+        // Every bot's base stands finished from the first second, so every flag
+        // starts behind a wall - see World.buildBaseNow. Yours builds as you
+        // walk it, as always. After the unlocks, which decide what furnishes it.
+        for team in world.actors.values.filter({ $0.ai != nil }).map(\.team)
+            .sorted(by: { $0.raw < $1.raw }) {
+            world.buildBaseNow(for: team)
+        }
+
         // Before the first frame rather than on whichever frame first needs it -
         // see ArtFit.warm.
         ArtFit.warm(["Chest", "Arcade", "Mini Arcade"])
@@ -627,6 +649,7 @@ final class GameScene: SKScene {
         }
         worldLayer.addChild(supplyRenderer.node)
         worldLayer.addChild(chestRenderer.node)
+        worldLayer.addChild(flagRenderer.node)
         worldLayer.addChild(groundItemRenderer.node)
         worldLayer.addChild(bombRenderer.node)
         bombRenderer.onFuseLit = { [weak self] position in
@@ -653,7 +676,11 @@ final class GameScene: SKScene {
         hud.addChild(healButton)
         healButton.isHidden = true
 
-        hud.addChild(leaderboard)
+        // No leaderboard since Nov 2026 (flags): the top panel's players-left
+        // count is all the standings the screen shows. Heath: "remove the
+        // leaderboard entirely, i just want the player count remaining". Kept
+        // in code, just never put on screen - see showsLeaderboard.
+        if GameScene.showsLeaderboard { hud.addChild(leaderboard) }
         hud.addChild(matchPanel)
         hud.addChild(shopButton)
         hud.addChild(shopPanel)
@@ -708,8 +735,8 @@ final class GameScene: SKScene {
         if let held = hudFrameCache, held.time == lastUpdateTime { return held.rects }
 
         let parts: [SKNode] = [hotbar, moveStick, aimStick, healButton, throwButton,
-                               openButton, shopButton, quickBuy, leaderboard,
-                               matchPanel, pauseButton]
+                               openButton, shopButton, quickBuy, matchPanel, pauseButton]
+            + (GameScene.showsLeaderboard ? [leaderboard as SKNode] : [])
         let rects = parts.filter { !$0.isHidden && $0.alpha > 0.01 }
             .map { $0.calculateAccumulatedFrame() }
         hudFrameCache = (lastUpdateTime, rects)
@@ -736,7 +763,9 @@ final class GameScene: SKScene {
         let place = world.localPlayer.flatMap { player in
             world.standings.firstIndex { $0.team == player.team }
         }
-        pauseMenu.show(timeLeft: world.timeRemaining, place: place)
+        _ = place
+        pauseMenu.show(playersLeft: world.stillIn,
+                       flagStanding: world.localPlayer.map { !world.flagLost($0.team) } ?? true)
     }
 
     private func resumeMatch() {
@@ -1169,6 +1198,7 @@ final class GameScene: SKScene {
         updateSupplyDrops()
         updateClock()
         chestRenderer.sync(with: world)
+        flagRenderer.sync(with: world)
         arcadeRenderer.sync(with: world)
         turretRenderer.sync(with: world)
         groundItemRenderer.sync(with: world)
@@ -1177,6 +1207,13 @@ final class GameScene: SKScene {
         actorRenderer.sync(with: world, dt: frameDelta, heardFrom: ears)
         feelHits(in: world)
         matchPanel.update(with: world)
+
+        // The end of the flags' safe start, said once.
+        if !announcedFlags, world.flagsCapturable, !world.flags.isEmpty, !world.isOver {
+            announcedFlags = true
+            hint.show("FLAGS CAN BE TAKEN", seconds: 2.4)
+            Haptics.shared.play(.warning)
+        }
 
         // A bounty landing on you is worth one line: you are a target now.
         let bounty = world.localPlayer?.bounty ?? 0
@@ -1189,7 +1226,7 @@ final class GameScene: SKScene {
         pauseButton.position.x = matchPanel.position.x - matchPanel.width / 2
             - 10 - PauseButtonNode.side / 2
         repositionForSafeAreaIfNeeded()
-        leaderboard.update(with: world)
+        if GameScene.showsLeaderboard { leaderboard.update(with: world) }
         
         shopPanel.update(with: world)
         hotbar.update(with: world)
@@ -1573,13 +1610,9 @@ final class GameScene: SKScene {
             case .vault(_, let team, _):
                 // No number any more (Oct 2026): floating points over the base were
                 // noise. The score on the leaderboard still goes up.
-                guard team == world.localPlayer?.team else { break }
-
-                // And once, ever, the sentence that explains what the number is.
-                if tipsOn, !Prefs.taughtHolding {
-                    Prefs.taughtHolding = true
-                    hint.show("YOUR BASE EARNS WHILE IT HOLDS", seconds: 2.0)
-                }
+                // Nothing to say since flags (Nov 2026): points are not shown,
+                // so "your base earns" would be about a number nobody sees.
+                _ = team
 
             case .sold(let slot, let tokens, let seller):
                 guard seller == world.localPlayerID else { break }
@@ -1646,6 +1679,28 @@ final class GameScene: SKScene {
                 guard who == world.localPlayerID else { break }
                 SoundPlayer.shared.play(.token)
 
+            case .flagPlaced(let team):
+                // Yours going up is worth a line; everybody else's is not news.
+                if team == world.localPlayer?.team, world.elapsed > 0.5 {
+                    hint.show("YOUR FLAG IS UP: PROTECT IT", seconds: 2.4)
+                }
+
+            case .flagCaptured(let team, let taker):
+                // The biggest moment in a match after the last elimination.
+                if team == world.localPlayer?.team {
+                    hint.show("YOUR FLAG WAS TAKEN: NO MORE RESPAWNS", seconds: 3.0)
+                    Haptics.shared.play(.warning)
+                } else if taker == world.localPlayerID {
+                    hint.hide()
+                    killBanner.confirm(title: "FLAG CAPTURED")
+                    SoundPlayer.shared.play(.elimination)
+                    Haptics.shared.play(.kill)
+                } else {
+                    // By colour, in its colour (Nov 2026).
+                    hint.show("\(RenderPalette.colourName(for: team)) LOST THEIR FLAG",
+                              seconds: 2.2, tint: RenderPalette.vibrantColour(for: team))
+                }
+
             case .knockedOut(let victim, let killer, let left):
                 // Somebody used their last life. Yours is on the respawn banner;
                 // one you did keeps the usual ELIMINATION banner; anybody
@@ -1654,8 +1709,10 @@ final class GameScene: SKScene {
                     hint.hide()
                 } else if killer == world.localPlayerID {
                     break
-                } else if let name = world.actors[victim]?.name, !name.isEmpty {
-                    hint.show("\(name.uppercased()) IS OUT, \(left) LEFT", seconds: 2.2)
+                } else if let team = world.actors[victim]?.team {
+                    // By colour, in its colour (Nov 2026).
+                    hint.show("\(RenderPalette.colourName(for: team)) IS OUT, \(left) LEFT",
+                              seconds: 2.2, tint: RenderPalette.vibrantColour(for: team))
                 } else {
                     hint.show("\(left) LEFT", seconds: 2.0)
                 }
@@ -1711,7 +1768,9 @@ final class GameScene: SKScene {
             case .bounty(let points, _, let hunter):
                 // The kill that follows says so. A bounty beats a defence, being
                 // the rarer of the two.
-                if hunter == world.localPlayerID { killTitle = "BOUNTY +\(points)" }
+                // No number: points are not shown since flags (Nov 2026).
+                _ = points
+                if hunter == world.localPlayerID { killTitle = "BOUNTY" }
 
             case .defended(let defender, _):
                 if defender == world.localPlayerID, killTitle == nil {
@@ -1879,7 +1938,7 @@ final class GameScene: SKScene {
         // A high-water mark and a count, so a bad match can never take anything
         // away - see Prefs, and the menu, which reads both.
         if let team = world.localPlayer?.team {
-            Prefs.finishedMatch(scoring: world.score(for: team))
+            Prefs.finishedMatch(won: world.standings.first?.team == team)
         }
 
         // A podium finish is the moment to ask for a rating - see RatePrompt.
@@ -2510,7 +2569,7 @@ extension GameScene {
     /// refuses. A hold on grass, on somebody else's wall, or from outside your own
     /// claim shows nothing and does nothing, and those are the same sentence.
     private func beginPrising(at pointInWorld: CGPoint) {
-        guard let player = world.localPlayer, player.isAlive else { return }
+        guard GameScene.manualBuilding, let player = world.localPlayer, player.isAlive else { return }
 
         let tile = GridGeometry.gridPoint(for: pointInWorld)
         guard BuildSystem.canRemove(at: tile, by: player, in: world) else { return }
@@ -2555,6 +2614,8 @@ extension GameScene {
 
         switch press.target {
         case .map:
+            // Walls are not taken down by hand since Nov 2026 - see manualBuilding.
+            guard GameScene.manualBuilding else { break }
             let tile = GridGeometry.gridPoint(for: press.worldOrigin)
             queuedCommands.append(.removeBlock(tile))
 
@@ -3032,7 +3093,7 @@ extension GameScene {
 
     /// Starts a run of wall from the tile the press landed on.
     private func beginPainting(from press: PendingPress) {
-        guard touchable(at: press.worldOrigin) == nil else { return }
+        guard GameScene.manualBuilding, touchable(at: press.worldOrigin) == nil else { return }
 
         paintTouch = press.touch
         paintedFrom = nil
@@ -3121,6 +3182,7 @@ extension GameScene {
     ///   tiles the player was only passing over.
     @discardableResult
     private func build(at tile: GridPoint, explainRefusals: Bool) -> Bool {
+        guard GameScene.manualBuilding else { return false }
         queuedCommands.append(.placeBlock(tile))
 
         // And then say what will happen to it, which the map never used to. The

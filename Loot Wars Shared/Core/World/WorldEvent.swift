@@ -174,4 +174,10 @@ enum WorldEvent {
     /// before the kill that did it, so the kill can be called a knockout.
     /// `left` is how many are still in.
     case knockedOut(ActorID, by: ActorID?, left: Int)
+
+    /// A team's flag was taken - they respawn no more. See GameConfig.Flag.
+    case flagCaptured(TeamID, by: ActorID)
+
+    /// A team's flag went up - their base was sealed for the first time.
+    case flagPlaced(TeamID)
 }

@@ -56,7 +56,9 @@ struct Actor {
 
     /// Lives left this match, counting the one being played. nil means no limit,
     /// which is how How to Play and the title screen run. See GameConfig.Lives.
-    var livesLeft: Int? = GameConfig.Lives.perPlayer
+    /// Unlimited (nil) while your flag stands - see GameConfig.Flag. Set to
+    /// Lives.perPlayer the moment it is captured.
+    var livesLeft: Int? = nil
 
     /// Out of the match for good: died with no lives left. Never respawns, and
     /// its respawnTimer stays at infinity so everything that skips the dead

@@ -536,7 +536,9 @@ final class MenuScene: SKScene {
         record.zPosition = 10
 
         let best = SKLabelNode()
-        best.attributedText = MenuButtonNode.text("BEST \(Prefs.bestScore)",
+        // Wins, not the best score, since flags (Nov 2026): no points on screen.
+        let wins = Prefs.wins
+        best.attributedText = MenuButtonNode.text("\(wins) WIN\(wins == 1 ? "" : "S")",
                                                   size: 15, weight: .bold,
                                                   colour: SKColor(white: 0, alpha: 0.62))
         best.horizontalAlignmentMode = .right

@@ -124,8 +124,9 @@ enum Difficulty: Int, CaseIterable {
     /// match progress stretches to fit, so a longer match is more of the middle.
     var matchLength: Double {
         switch self {
-        case .easy, .medium: return GameConfig.Match.duration   // 2:30
-        case .hard, .hardcore: return 180                        // 3:00
+        // The same pace on every setting since there is no clock (Nov 2026,
+        // flags) - this only paces the match's ramps. Was 2:30 / 3:00.
+        case .easy, .medium, .hard, .hardcore: return GameConfig.Match.duration
         }
     }
 
@@ -188,7 +189,7 @@ enum Difficulty: Int, CaseIterable {
         case .easy:     return 0.6
         case .medium:   return 0.35
         case .hard:     return GameConfig.AI.buysAnythingAfter
-        case .hardcore: return 0
+        case .hardcore: return 0.3
         }
     }
 
