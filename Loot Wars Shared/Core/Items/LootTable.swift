@@ -159,10 +159,13 @@ enum LootTable {
 
             // Gear is commoner here than in any other band, and a rung up: the
             // point of this band is that everybody finishes the match kitted out.
-            (.item(.helmet(.legendary)), 24),
-            (.item(.helmet(.mythical)),   8),
-            (.item(.blaster(.four)),     20),
-            (.item(.blaster(.five)),      8)
+            // No Mythical or Blaster 5 from an ordinary crate (Nov 2026): the
+            // top of the ladder comes from purple crates and supply drops, so
+            // it feels rare. Was Legendary 24, Mythical 8, B4 20, B5 8.
+            (.item(.helmet(.epic)),      12),
+            (.item(.helmet(.legendary)), 20),
+            (.item(.blaster(.three)),    12),
+            (.item(.blaster(.four)),     16)
         ])
     ]
 
@@ -285,9 +288,15 @@ enum LootTable {
             // them something you picked up on the way past rather than a find. The
             // bands keep their bomb weights so a rare crate - which rolls the same
             // band - still knows how likely one is at this point in the match.
-            guard rare else { return nil }
+            //
+            // Back in ordinary crates, at a fraction that grows through the
+            // match (Nov 2026, flags): raiding is the game now, and a bomb only
+            // from a purple crate or the shop meant the player hardly ever had
+            // one. See Loot.ordinaryBombShare.
+            let scale = rare ? 1 : GameConfig.Loot.ordinaryBombShare(at: progress)
+            guard scale > 0 else { return nil }
 
-            let weight = Int((Double(row.weight) * share).rounded())
+            let weight = Int((Double(row.weight) * share * scale).rounded())
             return weight > 0 ? (pickup: row.pickup, weight: weight) : nil
         }
 

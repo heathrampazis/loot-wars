@@ -56,7 +56,9 @@ final class MatchPanelNode: SKNode {
 
     private let panel = SKShapeNode()
     private var glass: GlassNode?
-    private let clockIcon = SKSpriteNode(texture: Glyphs.clock)
+    /// The clock, or since flags (Nov 2026, Match.timed off) a head and the
+    /// number of players still in - red once your own flag is gone.
+    private let clockIcon = SKSpriteNode(texture: GameConfig.Match.timed ? Glyphs.clock : Glyphs.profile)
     private let label = GameLabel(fontNamed: "AvenirNext-Bold")
     private let purse = StatCounterNode(iconNamed: "Token")
 
@@ -180,6 +182,20 @@ final class MatchPanelNode: SKNode {
         let pursing = MatchPanelNode.ease(&purseRoom, to: purse.reservedWidth)
         let killing = MatchPanelNode.ease(&killsRoom, to: kills.reservedWidth)
         if pursing || killing { layOut() }
+
+        // No clock: players left, red once your flag is gone.
+        guard GameConfig.Match.timed else {
+            let exposed = world.localPlayer.map { world.flagLost($0.team) } ?? false
+            if exposed != lastUrgent {
+                lastUrgent = exposed
+                label.fontColor = exposed ? RenderPalette.healthBar : .white
+            }
+            let left = world.stillIn
+            guard left != lastShown else { return }
+            lastShown = left
+            label.text = "\(left)"
+            return
+        }
 
         // Rounded UP, so the clock reads 5:00 for the whole first second and only
         // shows 0:00 when the time is actually gone. Rounding down would start the

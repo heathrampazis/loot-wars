@@ -70,14 +70,14 @@ final class HintNode: SKNode {
                 hide()
             } else if let waiting = pending, CACurrentMediaTime() - waiting.at < 3 {
                 pending = nil
-                show(waiting.text, seconds: waiting.seconds)
+                show(waiting.text, seconds: waiting.seconds, tint: waiting.tint)
             } else {
                 pending = nil
             }
         }
     }
 
-    private var pending: (text: String, seconds: TimeInterval, at: CFTimeInterval)?
+    private var pending: (text: String, seconds: TimeInterval, tint: SKColor?, at: CFTimeInterval)?
 
 
     override init() {
@@ -107,9 +107,11 @@ final class HintNode: SKNode {
     /// Up for a second and a half by default, which is twice as long as it takes
     /// to read five words and no longer. A hint that outstays that is not being
     /// more helpful, it is being furniture.
-    func show(_ text: String, seconds: TimeInterval = 1.5) {
+    /// - Parameter tint: the text's colour, for news about one team - their
+    ///   team colour (Nov 2026). Plain white otherwise.
+    func show(_ text: String, seconds: TimeInterval = 1.5, tint: SKColor? = nil) {
         guard !isSuppressed else {
-            pending = (text, seconds, CACurrentMediaTime())
+            pending = (text, seconds, tint, CACurrentMediaTime())
             return
         }
         guard showing != text || isHidden else { return }
@@ -123,6 +125,7 @@ final class HintNode: SKNode {
         // your own base.
         SoundPlayer.shared.play(.notification)
 
+        label.fontColor = tint ?? SKColor(white: 1, alpha: 0.92)
         label.text = text
 
         // The plate is cut to the words rather than to a guessed width, so a longer

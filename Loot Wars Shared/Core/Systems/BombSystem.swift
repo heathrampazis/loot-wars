@@ -175,7 +175,9 @@ enum BombSystem {
         }
 
         let radius = GameConfig.Bomb.blastRadius
-        let reach = Int(radius.rounded(.up))
+        // Walls go further than anything else - see Bomb.wallRadius.
+        let wallRadius = max(radius, GameConfig.Bomb.wallRadius)
+        let reach = Int(wallRadius.rounded(.up))
         let centre = GridPoint(containing: bomb.position)
 
         // What stood in the way BEFORE anything came down. Read first, because
@@ -198,7 +200,7 @@ enum BombSystem {
             for dRow in -reach...reach {
                 let tile = GridPoint(col: centre.col + dCol, row: centre.row + dRow)
                 guard let owner = world.map[tile].blockOwner else { continue }
-                guard (tile.center - bomb.position).length <= radius else { continue }
+                guard (tile.center - bomb.position).length <= wallRadius else { continue }
                 world.setTile(.floor, at: tile)
 
                 // Only for somebody else's. Blowing up your own wall is a way of

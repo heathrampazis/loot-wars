@@ -71,7 +71,7 @@ final class RespawnBanner: SKNode {
 
         // Coming back for the last time. Said here, while there is time to
         // read it, rather than once you are back and busy.
-        title.text = player.onLastLife ? "1 LIFE LEFT" : "RESPAWNING"
+        title.text = player.onLastLife ? "NO FLAG: LAST LIFE" : "RESPAWNING"
         countdown.text = "\(max(1, Int(remaining.rounded(.up))))"
     }
 }

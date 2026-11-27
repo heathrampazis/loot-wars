@@ -317,11 +317,12 @@ final class ResultsNode: SKNode {
         let standings = world.standings
         let you = world.localPlayer?.team
         let place = standings.firstIndex { $0.team == you }
-        let yourScore = place.map { standings[$0].score } ?? 0
         let podium = place.map { $0 < 3 } ?? false
 
-        // Read before Prefs records this match, so "better than ever before".
-        let newBest = place != nil && yourScore > Prefs.bestScore && yourScore > 0
+        // Wins, not points, since flags (Nov 2026). Read before Prefs records
+        // this match, so this one is added here. It counts up like the score did.
+        let yourScore = Prefs.wins + (place == 0 ? 1 : 0)
+        let newBest = false
 
         arrange(podium: podium)
 
@@ -567,7 +568,7 @@ final class ResultsNode: SKNode {
     // MARK: - Pieces
 
     private func setPoints(_ value: Int) {
-        points.attributedText = ResultsNode.ink("\(ResultsNode.grouped(value)) POINTS", size: 15,
+        points.attributedText = ResultsNode.ink("\(ResultsNode.grouped(value)) WIN\(value == 1 ? "" : "S")", size: 15,
                                                 weight: .bold, faint: true)
         best.position = CGPoint(x: points.frame.maxX + 46, y: points.position.y)
     }

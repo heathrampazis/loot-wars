@@ -164,6 +164,15 @@ enum RenderPalette {
         rgb(0x2F, 0xD4, 0xF0)    // 7 cyan
     ]
 
+    /// What each team is called on screen, by its colour (Nov 2026): the
+    /// teams panel and the alerts say "RED", not a player's name.
+    private static let colourNames = ["GREEN", "RED", "BLUE", "PURPLE",
+                                      "ORANGE", "PINK", "YELLOW", "CYAN"]
+
+    static func colourName(for team: TeamID) -> String {
+        colourNames[team.raw % colourNames.count]
+    }
+
     static func vibrantColour(for team: TeamID) -> SKColor {
         vibrantTeams[team.raw % vibrantTeams.count]
     }

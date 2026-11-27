@@ -28,6 +28,12 @@ enum GameConfig {
     /// least per action because you do it forty times, at home, in safety - it
     /// should add up to something without making patience a way to win.
     enum Score {
+        /// Points are not shown anywhere since flags (Nov 2026) - no timer, no
+        /// score on screen, last one standing wins. They are still kept, out of
+        /// sight, because XP and the bots' idea of "who is winning" read them.
+        /// Taking a flag is the biggest thing you can do.
+        static let flagCaptured = 150
+
         static let kill = 50
 
         /// Added per tier the victim was carrying - helmet rung plus blaster rung
@@ -565,6 +571,20 @@ enum GameConfig {
     /// a base a thing you do rather than a thing you give up on - and it is capped
     /// by the fact that somebody has to breach you first for it to be available.
     enum Base {
+        /// Bots' bases fill up as the match goes on rather than all at once
+        /// (Nov 2026, flags). At the start a bot base is a wall, a flag and its
+        /// chests; its money machine arrives at botMachineAt seconds and its
+        /// turret (for Turret.botShare of bases) at botTurretAt. Heath: "enemy
+        /// bases shouldnt spawn in with a heap of turrets and arcades too, it
+        /// should progressively get added as the game progresses".
+        static let botMachineAt: Double = 45
+
+        /// How many sizes a base outline rolls for each side, keeping the
+        /// biggest - see BaseLayoutFactory.rectangle. 1 = every size equally
+        /// likely; more = bigger bases.
+        static let layoutRolls = 2
+        static let botTurretAt: Double = 90
+
         /// The most of each piece of furniture one base may hold.
         ///
         /// Caps rather than costs. Uncapped, a well-run base filled up with
@@ -645,7 +665,18 @@ enum GameConfig {
         /// busy clocks above stayed at their 2-minute pace, so the extra half
         /// minute is more of the same action; only the clocks that shape the
         /// match's arc moved back out to fit (each marked "2.5-minute matches").
-        static let duration: Double = 150
+        /// 150 -> 120 (Nov 2026, flags). There is no clock now (see timed);
+        /// this only paces the ramps - loot bands, bombs, supply drops, the
+        /// bots' late sharpening - so a shorter one gets a match to its
+        /// late-game gear and pressure sooner.
+        /// 120 -> 60 (Nov 2026, 3x faster): late-match gear and pressure
+        /// inside the first minute.
+        /// 60 -> 240 (Nov 2026): Heath, gear was coming "way too quickly, it
+        /// should feel more progressive so that good gear feels rare". At 60
+        /// the loot bands reached Legendary and Mythical inside the first
+        /// minute. Matches stay fast (everything else runs on its own clock);
+        /// only the gear ladder in the crates is slower.
+        static let duration: Double = 240
 
         /// How long into a match before bombs start turning up, in seconds.
         ///
@@ -683,11 +714,21 @@ enum GameConfig {
         /// match has a beginning instead of starting at full volume.
         /// 20 -> 8 (Nov 2026, one life): Heath wants it action packed from the
         /// moment the match starts. Bombs, raids and hunts from eight seconds.
-        static let opening: Double = 8
+        /// 8 -> 5 (Nov 2026, 3x faster).
+        static let opening: Double = 5
 
         /// The final stretch: every point earned is multiplied, so the last half
         /// minute can still turn the board over and nobody coasts to the whistle.
         static let finalStretch: Double = 30
+
+        /// Whether a match has a clock at all. Off (Nov 2026, flags): a match
+        /// runs until one player is left - see Flag. With it off there is no
+        /// clock on screen, no final stretch and no ticking; `duration` is kept
+        /// only to pace things that ramp through a match (loot bands, bombs,
+        /// supply drops, the bots' late sharpening), and they hold at their
+        /// late values once it has run. Heath: "There shouldnt be a timer
+        /// anymore in the game".
+        static let timed = false
         static let finalMultiplier = 2
 
         /// When the bomb supply reaches full strength, in seconds.
@@ -699,7 +740,8 @@ enum GameConfig {
         /// 3-minute matches (Oct 2026): 90 -> 54.
         /// 2-minute matches (Oct 2026): 54 -> 36.
         /// 2.5-minute matches (Oct 2026): 36 -> 45.
-        static let bombRampEnd: Double = 45
+        /// 45 -> 15 (Nov 2026, 3x faster).
+        static let bombRampEnd: Double = 15
 
         /// How much of its weight the bomb row carries the moment bombs start.
         static let bombStartShare: Double = 0.35
@@ -709,6 +751,9 @@ enum GameConfig {
     /// game". Die twice and you are out for the rest of the match. The last
     /// player standing wins; if the clock runs out first, the most points wins.
     enum Lives {
+        /// Lives per player once their FLAG has been captured (Nov 2026, flags):
+        /// with the flag standing, respawns are unlimited. Before flags this was
+        /// lives for the whole match.
         /// Lives per player. Die this many times and you never respawn.
         /// 2, then 1 (Nov 2026): one life tried and kept. One death and you are
         /// out, so every bot plays its "last life" from the start - see the
@@ -736,6 +781,50 @@ enum GameConfig {
         static let lastLifeOutgearedBy = 2
         static let lastLifeRetreatAt: Double = 0.42
         static let lastLifeMendBelow: Double = 0.7
+    }
+
+    /// Bed Wars style flags (Nov 2026). Every base has a flag in its middle.
+    /// While it stands, you respawn. Once an enemy captures it, your next
+    /// death is your last. Last one standing wins. This IS the game, not a
+    /// mode. Heath: "players have a flag in the center of their base that
+    /// allows them to respawn... once it is captured by an enemy/player, they
+    /// can no longer respawn".
+    enum Flag {
+        /// Seconds an enemy has to stand by your flag to take it. Long enough
+        /// for a defender to get back and stop it, short enough that a raider
+        /// who got in unchallenged gets it.
+        /// 3 at first; 0 (Nov 2026) - instant, the moment an enemy touches it.
+        /// Heath: "flag steals should happen instantly". Contesting it no
+        /// longer matters at 0; it only would if this went back above 0.
+        /// 0 (instant) for a while; 2 (Nov 2026): Heath, "flag steals should
+        /// take like 2 seconds". Contested again: the owner standing by it
+        /// holds the capture.
+        /// Then instant again, then 1 (Nov 2026): "it takes 1 second to raid a
+        /// flag". The owner standing by it holds the capture again.
+        static let captureTime: Double = 1
+
+        /// How close, in tiles from the flag, counts as standing by it.
+        static let captureRadius: Double = 1.4
+
+        /// How fast an abandoned capture unwinds, as a share of captureTime a
+        /// second. Leave and come back quickly and you keep most of it.
+        static let decayRate: Double = 0.5
+
+        /// Tokens to whoever takes it.
+        static let capturedTokens = 20
+
+        /// A flag goes up when its base is first sealed (Nov 2026). A base still
+        /// not sealed this many seconds in gets its flag anyway, in the open -
+        /// otherwise never building would mean never losing your respawns.
+        static let placeBy: Double = 45
+
+        /// Seconds into a match before any flag can be taken. Bots' bases stand
+        /// finished from the start but yours builds as you walk it, so this is
+        /// your time to get a wall round your flag. "FLAGS CAN BE TAKEN" shows
+        /// when it ends.
+        /// 45 -> 25 (Nov 2026): faster matches.
+        /// 25 -> 15 (Nov 2026, "speed up the game by like 3x").
+        static let safeFor: Double = 15
     }
 
     enum Map {
@@ -904,7 +993,8 @@ enum GameConfig {
         /// that turns it back into a race is Arcade.tokenLifetime, not this one.
         /// 3-minute matches (Oct 2026): 10.0 -> 7.0.
         /// 2-minute matches (Oct 2026): 7.0 -> 5.0.
-        static let respawnDelay: Double = 5.0
+        /// 5 -> 3 (Nov 2026, flags): faster matches.
+        static let respawnDelay: Double = 3.0
 
         /// The kit you come back in, by how far the match has run.
         ///
@@ -1259,7 +1349,9 @@ enum GameConfig {
         /// earlier is most of what makes a bot a fight in the first half.
         /// 0.15 -> 0.05 (Nov 2026): bots buy gear from the shop from almost the
         /// start, part of letting them keep pace with the player.
-        static let buysAnythingAfter: Double = 0.05
+        /// 0.05 -> 0.4 (Nov 2026): gear came too fast; with Match.duration 240
+        /// that is about 95 seconds in.
+        static let buysAnythingAfter: Double = 0.4
 
         /// How little healing a bot has to be carrying before it buys some.
         ///
@@ -1308,7 +1400,13 @@ enum GameConfig {
         /// more, and an urge with no bomb behind it buys nothing.
         /// 3-minute matches (Oct 2026): 20 -> 12.
         /// 2-minute matches (Oct 2026): 12 -> 8.
-        static let bombSupplyInterval: Double = 8
+        /// 8 -> 5 (Nov 2026, flags) -> 20 (Nov 2026): Heath, bots "dont just
+        /// instantly get bombs, the player takes a while to even start getting
+        /// these". Starts at bombSupplyFrom.
+        static let bombSupplyInterval: Double = 20
+
+        /// Seconds into a match before the bots' free bomb starts (Nov 2026).
+        static let bombSupplyFrom: Double = 40
 
         /// Where a fight sits inside whatever range is available, as fractions of
         /// it. Fractions rather than tile counts so they can never again drift out
@@ -1575,8 +1673,8 @@ enum GameConfig {
         /// 1.5 and 0.25 at first; 2 and 0.4 (Nov 2026) - Heath: "it would be
         /// nice to see some slightly stronger players too, i feel like the
         /// player always upgrades before the others".
-        static let crateGearBoost: Double = 2
-        static let crateRungUpChance: Double = 0.4
+        static let crateGearBoost: Double = 1.25
+        static let crateRungUpChance: Double = 0.1
 
         /// How far a bot will go for a rare crate (Nov 2026). Inside this many
         /// tiles it drops what it is doing and goes - just under defending its
@@ -1584,6 +1682,24 @@ enum GameConfig {
         /// these rare lootboxes where possible". Several bots wanting the same
         /// crate is the point: it is where the fights should be.
         static let rareCrateRange: Double = 40
+
+        /// What a standing flag adds to a base's raid worth (Nov 2026, flags).
+        /// More than anything in it: taking a flag is how you win.
+        static let flagWorth: Double = 120
+
+        /// Whether a bot needs emergencyHealingStock to set out on a raid.
+        /// Off (Nov 2026, flags): raids are the game now.
+        static let raidNeedsHeals = false
+
+        /// A raid that has got through (wall open, flag still up) only bails
+        /// out below this share of health (Nov 2026, flags). Otherwise the
+        /// usual retreat line.
+        static let raidBailAt: Double = 0.15
+
+        /// How close an open enemy base with its flag up has to be for a bot
+        /// to join in - take the flag itself and fight whoever is there (Nov
+        /// 2026, flags). See AIBrain.thirdParty.
+        static let thirdPartyRange: Double = 26
 
         /// And even once the shooting stops, a beat before patching up. Winding a
         /// bandage on the same frame the last bullet lands is a tell that nobody is
@@ -1609,6 +1725,13 @@ enum GameConfig {
         /// radians. Generous - a bomb goes off on whatever it hits, so it does not
         /// need the precision a shot does.
         static let throwTolerance: Double = 0.45
+
+        /// Raids throw closer and straighter than fights (Nov 2026, flags): a
+        /// bomb at a wall is only thrown within raidThrowRange tiles and with
+        /// the aim within raidThrowTolerance of the wall. At throwRange and
+        /// throwTolerance a bomb could sail past the corner it was meant for.
+        static let raidThrowRange: Double = 3.5
+        static let raidThrowTolerance: Double = 0.22
 
         /// Bombs in a fight. A bot throws one at the person it is fighting, but
         /// never at the cost of a raid: it always keeps one back to open a wall
@@ -1727,7 +1850,8 @@ enum GameConfig {
         /// 3-minute matches (Oct 2026): 14...26 -> 8...16.
         /// 2-minute matches (Oct 2026): 8...16 -> 5...11.
         /// 5...11 -> 4...8 (Nov 2026, one life): Heath wants bots to raid more.
-        static let raidUrgeInterval: ClosedRange<Double> = 4...8
+        /// 4...8 -> 3...5 (Nov 2026, flags): faster matches.
+        static let raidUrgeInterval: ClosedRange<Double> = 3...5
 
         /// How far a bot will travel for an enemy chest it could get at.
         ///
@@ -1750,7 +1874,9 @@ enum GameConfig {
         /// interrupted by a long scrap is not quietly timed out by it.
         /// 3-minute matches (Oct 2026): 30 -> 18.
         /// 2-minute matches (Oct 2026): 18 -> 12.
-        static let raidHold: Double = 12
+        /// 12 -> 25 (Nov 2026, flags): long enough to cross the map, blow the
+        /// wall and still remember to go in for the flag.
+        static let raidHold: Double = 25
 
         /// How far outside a base a bot will still consider itself mid-raid.
         ///
@@ -1765,7 +1891,9 @@ enum GameConfig {
 
         // Extra worth on a base a person owns, so bots raid the player for points even when
         // there is nothing in their chests.
-        static let playerBaseWorth: Double = 20
+        /// 20 -> 80 (Nov 2026): Heath, "the player should be getting
+        /// targetted/raided a bit more, even if the player is in the base".
+        static let playerBaseWorth: Double = 80
 
         /// And what a mini adds. Counted per machine rather than once for the base
         /// now that a base can hold several - see World.lootValue, where a room
@@ -1859,7 +1987,8 @@ enum GameConfig {
         /// 2-minute matches (Oct 2026): 15...30 -> 10...20.
         /// 10...20 -> 5...10 (Nov 2026, one life): bots go looking for people
         /// twice as often.
-        static let huntUrgeInterval: ClosedRange<Double> = 5...10
+        /// 5...10 -> 4...7 (Nov 2026, flags): faster matches.
+        static let huntUrgeInterval: ClosedRange<Double> = 4...7
 
         /// How long a bot will keep looking before giving up and going back to its
         /// own match.
@@ -2230,7 +2359,9 @@ enum GameConfig {
         /// defending - only from answering a raid with masonry.
         /// 3-minute matches (Oct 2026): 12 -> 8.
         /// 2-minute matches (Oct 2026): 8 -> 5.
-        static let raidGrace: Double = 5
+        /// 5 -> 12 (Nov 2026, flags): a raider needs time to get through the
+        /// hole and two seconds at the flag before the owner can wall it shut.
+        static let raidGrace: Double = 12
 
         /// Walls laid per trip while patching a breach.
         ///
@@ -2362,6 +2493,12 @@ enum GameConfig {
 
         /// Everything within this of the blast loses its walls, in tiles.
         static let blastRadius: Double = 1.4
+
+        /// How far a blast takes WALLS, in tiles (Nov 2026, flags) - wider than
+        /// blastRadius, which still governs people, chests, machines and
+        /// turrets. Heath: bots "need to be getting through"; a hole two or three
+        /// tiles wide is one a raider can actually walk into.
+        static let wallRadius: Double = 2.0
 
         /// Damage to a person caught right in the blast, falling to nothing at
         /// the edge. Terrain and trees are untouched - only walls come down.
@@ -2642,14 +2779,19 @@ enum GameConfig {
         /// When the first one lands, as a share of the match. Past half way, so
         /// it lands on a map where everybody has gear worth fighting with and a
         /// base worth leaving for a minute.
-        static let firstAt: Double = 0.55
+        /// 0.55 -> 0.2 (Nov 2026) with Match.duration 240 -> 0.25: the first
+        /// drop lands a minute in, then every `interval`.
+        static let firstAt: Double = 0.25
 
         /// Seconds between drops after the first, and how many a match gets.
         /// Three over the back 45%: one every forty-five seconds or so, so there
         /// is nearly always one to go and fight over in the closing minutes.
         /// 3-minute matches (Oct 2026): 45 -> 27.
         /// 2-minute matches (Oct 2026): 27 -> 18.
-        static let interval: Double = 18
+        /// 18 -> 10 (Nov 2026, 3x faster) -> 75 (Nov 2026): "there are too many
+        /// supply drops" - three landed ten seconds apart. Now one about every
+        /// minute and a quarter.
+        static let interval: Double = 75
         static let maxDrops = 3
 
         /// Seconds a drop is locked after it lands. Long enough for everybody who
@@ -2658,7 +2800,8 @@ enum GameConfig {
         /// 3-minute matches (Oct 2026): 20 -> 12.
         /// 2-minute matches (Oct 2026): 12 -> 8.
         /// 2.5-minute matches (Oct 2026): 8 -> 10.
-        static let unlockTime: Double = 10
+        /// 10 -> 6 (Nov 2026, 3x faster).
+        static let unlockTime: Double = 6
 
         /// Where they may land: within this share of the map's half-width of the
         /// middle, which is the contested ground, and at least this many tiles
@@ -2718,6 +2861,25 @@ enum GameConfig {
         /// AI.crateGearBoost for the bots' side.
         static let playerGearShare: Double = 0.8
 
+        /// How much of its band's bomb weight an ORDINARY crate keeps (Nov 2026,
+        /// flags), climbing through the match: roughly 1 crate in 30 is a bomb
+        /// early and 1 in 15 late (a guess from the band weights). Purple crates keep it all. Heath: "bombs
+        /// should be slightly more common for the player... especially as the
+        /// game progresses. dont just happy trigger bombs everywhere".
+        ///
+        /// Then "bombs are way too common now, especially early game": none at
+        /// all from ordinary crates before ordinaryBombFrom of the match (60s
+        /// of the 240s pacing), then climbing from ordinaryBombEarly to
+        /// ordinaryBombLate by the end of it. Was 0.15 -> 0.5 from the start.
+        static func ordinaryBombShare(at progress: Double) -> Double {
+            guard progress >= ordinaryBombFrom else { return 0 }
+            let along = min(1, (progress - ordinaryBombFrom) / max(0.01, 1 - ordinaryBombFrom))
+            return ordinaryBombEarly + (ordinaryBombLate - ordinaryBombEarly) * along
+        }
+        static let ordinaryBombFrom: Double = 0.25
+        static let ordinaryBombEarly: Double = 0.05
+        static let ordinaryBombLate: Double = 0.25
+
         /// Rare crates (Nov 2026): Heath, "rare lootboxes should also only spawn
         /// on arcade sites and be more rare... I want rarer loot to feel rare
         /// and meaningful". One spot by each map arcade (GeneratedMap.rareSites).
@@ -2727,9 +2889,13 @@ enum GameConfig {
         /// match, against twenty-odd before, and always in a known, contested
         /// place. Ordinary crates are never rare now, so rareChance, rareCap and
         /// startingRareShare are no longer used.
-        static let rareSiteFirst: Double = 20
-        static let rareSiteStagger: Double = 10
-        static let rareSiteRespawn: ClosedRange<Double> = 45...65
+        /// 20 / 10 / 45...65 -> 10 / 5 / 25...35 (Nov 2026, 3x faster) ->
+        /// 30 / 15 / 60...90 (Nov 2026): "rare lootboxes are spawning too
+        /// often". And never more than rareSiteCap standing at once.
+        static let rareSiteFirst: Double = 30
+        static let rareSiteStagger: Double = 15
+        static let rareSiteRespawn: ClosedRange<Double> = 60...90
+        static let rareSiteCap = 1
 
         /// How many rungs a rare crate lifts the gear it rolls (Nov 2026). Was
         /// one; two makes a rare crate the best thing on the map rather than a
@@ -3012,7 +3178,8 @@ enum GameConfig {
         /// this the map is stripped bare a minute into a match.
         /// 3-minute matches (Oct 2026): 45 -> 27.
         /// 2-minute matches (Oct 2026): 27 -> 18.
-        static let respawnDelay: Double = 18
+        /// 18 -> 10 (Nov 2026, 3x faster).
+        static let respawnDelay: Double = 10
     }
 
     enum Chest {

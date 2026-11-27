@@ -328,7 +328,7 @@ enum AIBrain {
                     * world.difficulty.urgeScale
                 state.huntMark = nil
             }
-        case .wander, .fight, .retreat, .raid, .mend:
+        case .wander, .fight, .retreat, .raid, .mend, .capture:
             // Raiding needs no patience of its own: it ends the moment the wall
             // falls or the last bomb is spent, and raidTarget stops offering it.
             break
@@ -501,7 +501,13 @@ enum AIBrain {
             guard contestedDrop(near: actor, in: world) != nil
                     || actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
 
-        case .raid, .robChest, .wreck, .silence:
+        case .raid, .capture:
+            // Committed (Nov 2026, flags): at the wall or going for the flag,
+            // nothing turns it round - not even being shot. Heath: raiders
+            // "need to try finish it... FOCUS on taking the flag".
+            return
+
+        case .robChest, .wreck, .silence:
             // Mid-raid, and this is the one thing worth NOT reacting to.
             //
             // A raider has spent a bomb, crossed the map and is standing in
@@ -570,6 +576,22 @@ enum AIBrain {
             }
         }
 
+        // A raid that has got through - the wall is open and the flag still
+        // stands - is not given up for a fight or a scare (Nov 2026, flags). It
+        // only bails out at AI.raidBailAt health.
+        //
+        // So is a bot at somebody's wall with a bomb (Nov 2026): the owner
+        // shooting at it from inside is exactly what it came to get past, and
+        // stopping to trade shots with somebody behind a wall is how raids on a
+        // player who was at home used to fizzle out.
+        var committed = state.raidingBase.map {
+            $0 != actor.team && world.baseIsBreached($0) && world.hasFlag($0)
+        } ?? false
+        if case .raid(let wall) = state.goal, world.map[wall].blockOwner != nil,
+           actor.inventory.count(of: .bomb) > 0 {
+            committed = true
+        }
+
         if state.fightCooldown <= 0, let enemy = nearestVisibleEnemy(to: actor, in: world) {
             let healthLeft = Double(actor.health) / Double(actor.maxHealth)
 
@@ -581,7 +603,9 @@ enum AIBrain {
             // Running is judged on seeing ANYBODY, unlike fighting. You flee from
             // whoever is there; you do not pick who to flee from.
             // Earlier against somebody much better kitted - see retreatLine.
-            if healthLeft < retreatLine(for: actor, against: enemy, state: state) {
+            let bailAt = committed ? GameConfig.AI.raidBailAt
+                : retreatLine(for: actor, against: enemy, state: state)
+            if healthLeft < bailAt {
                 return .retreat(from: enemy.id)
             }
 
@@ -603,7 +627,7 @@ enum AIBrain {
             let underFire = actor.secondsSinceHit < GameConfig.AI.combatRecency
             let rival = isRivalForDrop(enemy, actor: actor, in: world)
 
-            if !(raiding && !underFire),
+            if !(raiding && !underFire), !committed,
                rival || shouldEngage(enemy, actor: actor, in: world) {
                 return .fight(enemy.id)
             }
@@ -635,6 +659,45 @@ enum AIBrain {
         // of health with nothing in the bag is just handing somebody a kill.
         if needsToMend(actor, state: state, in: world) {
             return .mend
+        }
+
+        // RAIDING, high up (Nov 2026, flags). Heath: "raiding should be a very
+        // high priority". Under fleeing, fighting what it sees, defending its
+        // own base and mending; over everything else, so a raid in progress is
+        // not hijacked by a crate or a hunt halfway through - which is how
+        // raids kept failing: the bot blew the wall, its urge timer had just
+        // reset, and it wandered off to something else instead of going in.
+        //
+        // Its own wall open comes first even so: a flag behind a hole is a flag
+        // about to be taken.
+        if state.baseWasComplete, world.baseIsBreached(actor.team),
+           let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
+        }
+        // Mid-breach: keep at the wall while it stands and there is a bomb.
+        if case .raid(let wall) = state.goal, world.map[wall].blockOwner != nil,
+           actor.inventory.count(of: .bomb) > 0 {
+            return .raid(wall)
+        }
+        // Through the hole: the flag, then whatever is left.
+        if let unfinished = unfinishedRaid(for: actor, state: state, in: world) {
+            return unfinished
+        }
+        if let next = unfinishedBusiness(for: actor, in: world) {
+            return next
+        }
+        // Somebody else's raid nearby: a base standing open with its flag up.
+        // Get in on it - take the flag yourself, and fight whoever is there
+        // (Nov 2026, flags). Heath: "nearby players should notice raids and
+        // try and 3rd party the raid". See AI.thirdPartyRange.
+        if !world.isOpening, let joined = thirdParty(for: actor, in: world) {
+            return joined
+        }
+        // And a new raid whenever the urge is up.
+        if state.raidUrgeTimer <= 0, !world.isOpening, fitForRisk(actor),
+           world.matchProgress >= world.difficulty.raidsFrom,
+           let raid = raidGoal(for: actor, in: world) {
+            return raid
         }
 
         // Ganging up on whoever is running away with the match: joining a fight
@@ -1272,10 +1335,13 @@ enum AIBrain {
         // whose wall is shut has not broken in, it is trespassing on the lawn.
         guard world.baseIsBreached(team) else { return nil }
 
-        // Its turret first - see remaining(at:).
+        // Its turret, then the flag - see remaining(at:). The base is already
+        // open here.
         if let turret = turretStanding(at: team, nearest: actor.position, in: world) {
             return .silence(turret.id)
         }
+
+        if world.flagsCapturable, world.hasFlag(team) { return .capture(team) }
 
         if let chest = chestToBreak(at: team, for: actor, in: world) {
             return .robChest(chest.id)
@@ -1316,6 +1382,8 @@ enum AIBrain {
             return world.turrets[id]?.owner
         case .raid(let tile):
             return world.map[tile].blockOwner
+        case .capture(let team):
+            return team
         case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
              .rearm, .defend, .hunt, .mend:
             return nil
@@ -1342,8 +1410,9 @@ enum AIBrain {
         // The same supply floor the ordinary search uses. A bot on its last legs
         // should be patching up rather than going back in, and this branch sits
         // ABOVE the emergency supply run exactly as that one does.
-        guard actor.inventory.totalHealing(of: actor.maxHealth)
-                >= GameConfig.AI.emergencyHealingStock else { return nil }
+        guard !GameConfig.AI.raidNeedsHeals
+                || actor.inventory.totalHealing(of: actor.maxHealth)
+                    >= GameConfig.AI.emergencyHealingStock else { return nil }
 
         return remaining(at: victim, for: actor, in: world)
     }
@@ -1372,6 +1441,18 @@ enum AIBrain {
         // The turret before anything else. Every second spent at a chest or a
         // machine with one still standing is a second spent being shot, and a
         // raid that ignores it ends with the raider carried out.
+        // With the flag up for grabs, nothing here until the wall is open -
+        // raidGoal picks the wall. Then its turret, then the flag (Nov 2026,
+        // flags). Heath: "infiltrate the base, take out turrets and FOCUS on
+        // taking the flag".
+        if world.flagsCapturable, world.hasFlag(victim) {
+            guard world.baseIsBreached(victim) else { return nil }
+            if let turret = turretStanding(at: victim, nearest: actor.position, in: world) {
+                return .silence(turret.id)
+            }
+            return .capture(victim)
+        }
+
         if let turret = turretStanding(at: victim, nearest: actor.position, in: world) {
             return .silence(turret.id)
         }
@@ -1455,8 +1536,11 @@ enum AIBrain {
     // The best enemy base to raid right now, priced by World.raidWorth (machines, an intact wall,
     // neglect, the lead, and whether a person owns it), and the first job there.
     private static func raidGoal(for actor: Actor, in world: World) -> AIGoal? {
-        guard actor.inventory.totalHealing(of: actor.maxHealth)
-                >= GameConfig.AI.emergencyHealingStock else { return nil }
+        // Heals are no longer needed to set out on a raid (Nov 2026, flags):
+        // with fewer crates most bots carried none, so almost nobody raided.
+        guard !GameConfig.AI.raidNeedsHeals
+                || actor.inventory.totalHealing(of: actor.maxHealth)
+                    >= GameConfig.AI.emergencyHealingStock else { return nil }
 
         let hasBomb = actor.inventory.count(of: .bomb) > 0
         let runaway = world.runaway(against: actor.team)?.team
@@ -1925,6 +2009,26 @@ enum AIBrain {
         return world.lootboxes[id]?.supply == true
     }
 
+    /// An open enemy base nearby with its flag still up - somebody's raid in
+    /// progress, or a base left open - and what to do there. Nearest first,
+    /// then by team, so a seed replays the same.
+    private static func thirdParty(for actor: Actor, in world: World) -> AIGoal? {
+        guard world.flagsCapturable else { return nil }
+        var best: (team: TeamID, distance: Double)?
+
+        for team in TeamID.all where team != actor.team {
+            guard world.hasFlag(team), world.baseIsBreached(team),
+                  let flag = world.flagPosition(of: team) else { continue }
+            let distance = (flag - actor.position).length
+            guard distance <= GameConfig.AI.thirdPartyRange,
+                  distance < (best?.distance ?? .greatestFiniteMagnitude) else { continue }
+            best = (team, distance)
+        }
+
+        guard let team = best?.team else { return nil }
+        return remaining(at: team, for: actor, in: world)
+    }
+
     /// The nearest rare crate within AI.rareCrateRange. In id order on a tie,
     /// so a seed replays the same.
     private static func rareCrateWorthTheTrip(for actor: Actor, in world: World) -> Lootbox? {
@@ -2001,6 +2105,27 @@ enum AIBrain {
         case .farm(let id):
             steer(&state, actor: actor,
                   to: world.arcade(id).map { approachSpot(for: $0, from: actor, in: world) })
+
+        case .capture(let team):
+            // Taken, or never there: re-decide straight away.
+            guard world.hasFlag(team), let flag = world.flagPosition(of: team) else {
+                state.goal = .wander
+                state.goalAge = 0
+                state.decisionTimer = 0
+                return
+            }
+            // Walk to it, then circle tight round it - a bot cannot stand
+            // still (see .stash), and circling inside the capture radius keeps
+            // the capture going.
+            let fromFlag = actor.position - flag
+            if fromFlag.length > GameConfig.Flag.captureRadius * 0.5 {
+                steer(&state, actor: actor, to: flag)
+            } else if fromFlag.length < 0.01 {
+                state.desiredHeading = Vec2(x: state.strafeDirection, y: 0)
+            } else {
+                let outward = fromFlag.normalized()
+                state.desiredHeading = Vec2(x: -outward.y, y: outward.x) * state.strafeDirection
+            }
 
         case .robChest(let id):
             // Emptied, or gone. Re-decide on the very next tick rather than waiting
@@ -2093,11 +2218,23 @@ enum AIBrain {
             // Walk at the wall until close enough to throw, then stop closing -
             // standing on top of a bomb you threw is a poor raid.
             guard world.map[tile].blockOwner != nil else {
+                // The wall is down: decide again THIS tick - go in - rather than
+                // wandering for a second first, which looked like throwing the
+                // bomb and running away.
                 state.goal = .wander
                 state.goalAge = 0
+                state.decisionTimer = 0
                 return
             }
-            steer(&state, actor: actor, to: tile.center)
+            // Close in, face the wall square on, and throw - see
+            // AI.raidThrowRange. Straight at it rather than along a path: in
+            // range there is nothing between the bot and the wall to path round.
+            let towards = tile.center - actor.position
+            if towards.length <= GameConfig.AI.raidThrowRange + 0.5, towards.length > 0.01 {
+                state.desiredHeading = towards.normalized()
+            } else {
+                steer(&state, actor: actor, to: tile.center)
+            }
 
         case .retreat(let id):
             steer(&state, actor: actor,
@@ -2686,8 +2823,45 @@ enum AIBrain {
 
     // The wall tile whose removal opens the way to this base's loot, as the wall is actually built.
     private static func breachTile(into team: TeamID, for actor: Actor, in world: World) -> GridPoint? {
-        let spots = world.lootSpots(of: team)
+        // The flag first (Nov 2026): it is what a raid is for now. The loot only
+        // once it has gone.
+        let spots: [Vec2]
+        if world.hasFlag(team), let flag = world.flagPosition(of: team) {
+            spots = [flag]
+        } else {
+            spots = world.lootSpots(of: team)
+        }
         guard !spots.isEmpty else { return nil }
+        let enclosure = world.enclosure(of: team)
+
+        // How many steps from the flag every tile inside is, for a raider - a
+        // flood out from the flag through the room, round anything solid
+        // (Nov 2026, flags). The best hole is the one with the shortest CLEAR
+        // walk to the flag behind it, not merely the nearest wall: a hole with
+        // a machine or a chest between it and the flag is a hole the raider
+        // has to walk round inside, under fire. Heath: "raid at an optimal spot
+        // where they have a clear path to the flag".
+        func neighbours(_ tile: GridPoint) -> [GridPoint] {
+            [GridPoint(col: tile.col + 1, row: tile.row), GridPoint(col: tile.col - 1, row: tile.row),
+             GridPoint(col: tile.col, row: tile.row + 1), GridPoint(col: tile.col, row: tile.row - 1)]
+        }
+        var steps: [GridPoint: Int] = [:]
+        if world.hasFlag(team), let flag = world.flagPosition(of: team) {
+            let start = GridPoint(containing: flag)
+            steps[start] = 0
+            var queue = [start]
+            var head = 0
+            while head < queue.count {
+                let here = queue[head]
+                head += 1
+                let next = (steps[here] ?? 0) + 1
+                for tile in neighbours(here) where steps[tile] == nil
+                    && enclosure.room.contains(tile) && world.isPassable(tile, for: actor.team) {
+                    steps[tile] = next
+                    queue.append(tile)
+                }
+            }
+        }
 
         var tile: GridPoint?
         var closest = Double.greatestFiniteMagnitude
@@ -2707,18 +2881,40 @@ enum AIBrain {
         //
         // Sorted, because a Set has no order and the minimum below would
         // otherwise resolve differently between two runs of the same seed.
-        for candidate in world.enclosure(of: team).wall
+        for candidate in enclosure.wall
             .sorted(by: { ($0.col, $0.row) < ($1.col, $1.row) }) {
             guard world.map[candidate].blockOwner != nil else { continue }
 
-            let toLoot = spots
-                .map { (candidate.center - $0).length }
-                .min() ?? Double.greatestFiniteMagnitude
+            // A hole is only a way in if there is open ground on BOTH sides of
+            // it (Nov 2026). Bots kept blowing walls with a machine, a chest or a
+            // tree right behind them - or in front - and standing at a hole they
+            // could not walk through.
+            let around = neighbours(candidate)
+            let insideOpen = around.contains {
+                enclosure.room.contains($0) && world.isPassable($0, for: team)
+            }
+            let outsideOpen = around.contains {
+                !enclosure.room.contains($0) && !enclosure.wall.contains($0)
+                    && world.isPassable($0, for: actor.team)
+            }
+            guard insideOpen, outsideOpen else { continue }
+
+            // With a flag: the clear walk from this hole to it, and no hole at
+            // all where there is no clear walk. Without one: straight-line
+            // distance to the loot, as before.
+            let toTarget: Double
+            if steps.isEmpty {
+                toTarget = spots
+                    .map { (candidate.center - $0).length }
+                    .min() ?? Double.greatestFiniteMagnitude
+            } else {
+                guard let walk = around.compactMap({ steps[$0] }).min() else { continue }
+                toTarget = Double(walk + 1)
+            }
             let toBot = (candidate.center - actor.position).length
 
-            // Near the loot, and near the bot: the tile whose removal actually
-            // opens a way through to it.
-            let placement = toLoot + toBot * 0.5
+            // A short clear walk to the target, and near the bot.
+            let placement = toTarget * 1.5 + toBot * 0.5
             guard placement < closest else { continue }
             closest = placement
             tile = candidate
@@ -2834,7 +3030,7 @@ enum AIBrain {
         case .robChest(let id):
             target = wallInTheWay(of: id, for: actor, in: world)
         case .wander, .loot, .collect, .fight, .retreat, .build, .farm, .stash,
-             .rearm, .wreck, .silence, .defend, .hunt, .mend:
+             .rearm, .wreck, .silence, .defend, .hunt, .mend, .capture:
             target = nil
         }
 
@@ -2845,9 +3041,9 @@ enum AIBrain {
               BombSystem.canThrow(actor, from: slot) else { return nil }
 
         let towards = tile.center - actor.position
-        guard towards.length <= GameConfig.Bomb.throwRange else { return nil }
+        guard towards.length <= GameConfig.AI.raidThrowRange else { return nil }
         guard abs(shortestAngle(from: actor.aim.angle, to: towards.angle))
-                <= GameConfig.AI.throwTolerance else { return nil }
+                <= GameConfig.AI.raidThrowTolerance else { return nil }
 
         return slot
     }
@@ -3218,7 +3414,7 @@ enum AIBrain {
         // .defend used to appear here as well as three lines up, where it binds.
         // The second one was unreachable and the compiler said so on every build.
         case .wander, .loot, .collect, .build, .raid, .farm, .robChest, .stash,
-             .rearm, .wreck, .silence, .hunt, .mend:
+             .rearm, .wreck, .silence, .hunt, .mend, .capture:
             targetID = nil
         }
 

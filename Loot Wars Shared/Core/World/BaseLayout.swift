@@ -71,8 +71,18 @@ enum BaseLayoutFactory {
         // tiles per base, which the bots absorb in one extra trip home.
         let smallest = max(3, span - 2)
 
-        let width = Int.random(in: smallest...span, using: &rng)
-        let height = Int.random(in: smallest...span, using: &rng)
+        // Favouring the bigger sizes (Nov 2026): the larger of
+        // Base.layoutRolls rolls, so a full-size base is the most likely and
+        // the smallest the rarest. Heath: "favour making bigger bases over
+        // smaller ones". With 2 rolls on a span of 5...7: 7 about 56%, 6 about
+        // 33%, 5 about 11% (it was a third each).
+        func roll() -> Int {
+            (0..<max(1, GameConfig.Base.layoutRolls))
+                .map { _ in Int.random(in: smallest...span, using: &rng) }
+                .max() ?? span
+        }
+        let width = roll()
+        let height = roll()
         let col = Int.random(in: 1...(size - 1 - width), using: &rng)
         let row = Int.random(in: 1...(size - 1 - height), using: &rng)
 
