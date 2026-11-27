@@ -17,6 +17,7 @@ extension Feature {
         case .regeneration:  return "Regeneration"
         case .stinkBombs:    return "Stink Bombs"
         case .foamBombs:     return "Foam Bombs"
+        case .confettiPoppers: return "Confetti Poppers"
         case .fullArcade:    return "Arcade"
         case .resistance:    return "Resistance"
         case .invisibility:  return "Invisibility"
@@ -35,6 +36,7 @@ extension Feature {
         case .regeneration:  return "Heal over time"
         case .stinkBombs:    return "Gas them out"
         case .foamBombs:     return "Hide in the foam"
+        case .confettiPoppers: return "Small bombs for fights"
         case .fullArcade:    return "Earns tickets"
         case .resistance:    return "Take less damage"
         case .invisibility:  return "Vanish from view"
@@ -57,6 +59,8 @@ extension Feature {
             return "Throw it to leave a cloud of gas. Anyone inside takes damage."
         case .foamBombs:
             return "Throw it to leave a cloud of pink foam. Anyone inside can't be seen."
+        case .confettiPoppers:
+            return "Like a small bomb. Less damage, but you get two or three at a time. Weak against walls."
         case .regeneration:
             return "Heal a little every second for a while. Works mid-fight."
         case .fullArcade:

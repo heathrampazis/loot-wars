@@ -74,6 +74,9 @@ extension ItemType {
         // should be purple rarity".
         case .foam:    return .mythical
 
+        // Blue (Nov 2026): a weaker, commoner bomb.
+        case .popper:  return .legendary
+
         // The safest income on the map once it is standing behind a wall, and the
         // rung comes off the SIZE - Mythical for a cabinet, Legendary for a mini.
         // Asked of the kind rather than answered here for the same reason the perk

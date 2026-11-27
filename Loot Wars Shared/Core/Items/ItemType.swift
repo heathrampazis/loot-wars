@@ -31,6 +31,13 @@ enum ItemType: Hashable {
     /// smoke. Enemies will also not be able to see you." See GameConfig.Foam.
     case foam
 
+    /// A confetti popper (Nov 2026): a small bomb built for fights. Less
+    /// damage than a bomb, a smaller blast, barely scratches a wall - but
+    /// they come two or three at a time and stack six to a slot. Heath:
+    /// "like bombs but you can get more of them, they do less damage, and
+    /// are more suited for PvP". See GameConfig.Popper.
+    case popper
+
     case chest
 
     /// Gear you can carry rather than wear.
@@ -82,6 +89,7 @@ enum ItemType: Hashable {
         // so one crate fills one slot exactly.
         case .stink:   return 2
         case .foam:    return 2
+        case .popper:  return 6
         // One apiece. You can only have one running, so a second in the same slot
         // would be a queue - and a queue of power-ups is a different game.
         case .perk:    return 1
@@ -146,6 +154,7 @@ enum ItemType: Hashable {
         if case .bomb = self { return true }
         if case .stink = self { return true }
         if case .foam = self { return true }
+        if case .popper = self { return true }
 
         return rarity >= .mythical
     }
@@ -155,7 +164,7 @@ enum ItemType: Hashable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .stink, .foam, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
+        case .bomb, .stink, .foam, .popper, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
         }
     }
 
@@ -188,7 +197,7 @@ enum ItemType: Hashable {
     var use: Use {
         switch self {
         case .bandage, .medkit, .helmet, .blaster, .perk: return .instant
-        case .bomb, .stink, .foam: return .thrown
+        case .bomb, .stink, .foam, .popper: return .thrown
         // Both want you to say WHERE.
         case .chest, .arcade, .turret: return .mapTap
         }
@@ -198,7 +207,7 @@ enum ItemType: Hashable {
     var isGear: Bool {
         switch self {
         case .helmet, .blaster: return true
-        case .bandage, .medkit, .bomb, .stink, .foam, .chest, .arcade, .turret, .perk: return false
+        case .bandage, .medkit, .bomb, .stink, .foam, .popper, .chest, .arcade, .turret, .perk: return false
         }
     }
 

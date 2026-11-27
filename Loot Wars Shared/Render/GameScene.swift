@@ -1556,6 +1556,15 @@ final class GameScene: SKScene {
                     Haptics.shared.play(.blast(near: 1 - away / GameScene.blastFeltWithin))
                 }
 
+            case .confetti(let position):
+                // A popper: a pop and a burst of paper, felt lightly when close.
+                effectsRenderer.confetti(at: position)
+                SoundPlayer.shared.play(.lootbox, at: position, heardFrom: ears)
+                let away = (position - ears).length
+                if away < GameScene.blastFeltWithin {
+                    Haptics.shared.play(.blast(near: 0.5 * (1 - away / GameScene.blastFeltWithin)))
+                }
+
             case .jackpot(let position):
                 effectsRenderer.jackpot(at: position)
                 SoundPlayer.shared.play(.jackpot, at: position, heardFrom: ears)
@@ -2170,6 +2179,8 @@ final class GameScene: SKScene {
             return .heal(slot: slot, recommended: true)
         }
 
+        // A bomb for a wall. Not a popper (Nov 2026): they barely scratch one,
+        // and offering it would make it look like the way in.
         if onWall, let slot = BombSystem.loadedSlot(of: player),
            BombSystem.canThrow(player, from: slot) {
             return .throwBomb(slot: slot, onTarget: true)
@@ -2178,7 +2189,10 @@ final class GameScene: SKScene {
         // In a fight and not in danger - danger was step 2 - the bomb comes up
         // on its own (Nov 2026): Heath, "bombs should auto equip in pvp if
         // health is good". Green while your aim is on them.
-        if let slot = BombSystem.loadedSlot(of: player),
+        // A popper first in a fight - it is what they are for - and a bomb
+        // only when there are none (Nov 2026).
+        if let slot = player.inventory.firstSlot(holding: .popper)
+                ?? BombSystem.loadedSlot(of: player),
            BombSystem.canThrow(player, from: slot),
            let foe = GameScene.foeInBombReach(of: player, in: world) {
             return .throwBomb(slot: slot, onTarget: GameScene.aiming(player, at: foe))
@@ -2983,7 +2997,7 @@ extension GameScene {
         case .blaster: return "Your blaster is better"
         case .perk:    return "One power-up at a time"
         case .bandage, .medkit: return "Already at full health"
-        case .bomb, .stink, .foam, .chest, .arcade, .turret: return "Not right now"
+        case .bomb, .stink, .foam, .popper, .chest, .arcade, .turret: return "Not right now"
         }
     }
 

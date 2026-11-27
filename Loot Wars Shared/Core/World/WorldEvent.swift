@@ -31,6 +31,9 @@ enum WorldEvent {
     /// A bomb went off here.
     case blast(at: Vec2)
 
+    /// A confetti popper went off here (Nov 2026).
+    case confetti(at: Vec2)
+
     /// A stink bomb went off here, and there is now gas standing in it.
     ///
     /// Announced rather than noticed, unlike the cloud itself: the cloud IS state

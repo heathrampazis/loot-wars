@@ -701,6 +701,40 @@ final class EffectsRenderer {
     /// It rises rather than scattering. Sparks fly out and settle; a fountain goes
     /// up and keeps going, which is the shape of a thing that is still happening
     /// rather than a thing that happened.
+    /// A confetti popper going off (Nov 2026): a burst of little coloured
+    /// papers flung out, tumbling and falling as they fade.
+    func confetti(at position: Vec2) {
+        let origin = GridGeometry.point(for: position)
+        let reach = GridGeometry.length(ofTiles: GameConfig.Popper.peopleRadius)
+
+        for _ in 0..<26 {
+            let side = GridGeometry.length(ofTiles: Double.random(in: 0.12...0.2))
+            let bit = SKSpriteNode(color: RenderPalette.confetti.randomElement() ?? .white,
+                                   size: CGSize(width: side, height: side * 0.55))
+            bit.zPosition = 14
+            bit.position = origin
+            bit.zRotation = CGFloat.random(in: 0...(2 * .pi))
+            node.addChild(bit)
+
+            let angle = CGFloat.random(in: 0...(2 * .pi))
+            let out = reach * CGFloat.random(in: 0.5...1.1)
+            let burst = SKAction.moveBy(x: cos(angle) * out, y: sin(angle) * out + reach * 0.35,
+                                        duration: 0.22)
+            burst.timingMode = .easeOut
+            let fall = SKAction.moveBy(x: CGFloat.random(in: -8...8), y: -reach * 0.6, duration: 0.6)
+            fall.timingMode = .easeIn
+
+            bit.run(.sequence([
+                .group([
+                    .sequence([burst, fall]),
+                    .rotate(byAngle: CGFloat.random(in: -8...8), duration: 0.82),
+                    .sequence([.wait(forDuration: 0.45), .fadeOut(withDuration: 0.37)])
+                ]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     func jackpot(at position: Vec2) {
         let origin = GridGeometry.point(for: position)
 

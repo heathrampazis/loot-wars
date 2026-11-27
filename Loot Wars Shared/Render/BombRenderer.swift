@@ -35,6 +35,7 @@ final class BombRenderer {
     private lazy var blastTexture: SKTexture = Self.load("Bomb")
     private lazy var stinkTexture: SKTexture = Self.load("StinkBomb")
     private lazy var foamTexture: SKTexture = Self.load("FoamBomb")
+    private lazy var popperTexture: SKTexture = Self.load("ConfettiPopper")
 
     private static func load(_ name: String) -> SKTexture {
         let texture = SKTexture(imageNamed: name)
@@ -143,6 +144,9 @@ final class BombRenderer {
         } else if kind == .foam {
             flare.color = RenderPalette.foam
             flare.colorBlendFactor = 0.85
+        } else if kind == .popper {
+            flare.color = RenderPalette.confetti.randomElement() ?? RenderPalette.foam
+            flare.colorBlendFactor = 0.85
         }
 
         node.addChild(flare)
@@ -232,7 +236,8 @@ final class BombRenderer {
 
         let sprite = SKSpriteNode(
             texture: bomb.kind == .stink ? stinkTexture
-                : bomb.kind == .foam ? foamTexture : blastTexture,
+                : bomb.kind == .foam ? foamTexture
+                : bomb.kind == .popper ? popperTexture : blastTexture,
             size: CGSize(width: side, height: side)
         )
         sprite.zPosition = 9    // over walls and shots, under actors

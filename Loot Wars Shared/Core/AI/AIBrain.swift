@@ -145,6 +145,9 @@ enum AIBrain {
 
         if let slot = bombToThrow(state: state, actor: actor, in: world) {
             commands.append(.useItem(slot: slot))
+        } else if let slot = fightPopper(&state, actor: actor, in: world) {
+            commands.append(.useItem(slot: slot))
+            actor.ai = state
         } else if let slot = fightBomb(&state, actor: actor, in: world) {
             commands.append(.useItem(slot: slot))
             actor.ai = state
@@ -690,6 +693,17 @@ enum AIBrain {
         if let next = unfinishedBusiness(for: actor, in: world) {
             return next
         }
+        // A supply drop within reach. This high on purpose: it is the one thing
+        // on the map built to start a fight, and bots that let it go would simply
+        // hand the best gear in the game to whoever turned up - see
+        // SupplyDropSystem. Below defending, because your own base comes first.
+        // Above starting a new raid since Nov 2026: Heath, "enemies should be
+        // going for supply drops too, it feels like sometimes these are
+        // basically free, they should feel contested". A raid already under
+        // way is finished first (just above).
+        if let drop = supplyWorthContesting(for: actor, in: world) {
+            return .loot(drop.id)
+        }
         // Somebody else's raid nearby: a base standing open with its flag up.
         // Get in on it - take the flag yourself, and fight whoever is there
         // (Nov 2026, flags). Heath: "nearby players should notice raids and
@@ -714,14 +728,6 @@ enum AIBrain {
 
         if let joined = raidParty(for: actor, in: world) {
             return joined
-        }
-
-        // A supply drop within reach. This high on purpose: it is the one thing
-        // on the map built to start a fight, and bots that let it go would simply
-        // hand the best gear in the game to whoever turned up - see
-        // SupplyDropSystem. Below defending, because your own base comes first.
-        if let drop = supplyWorthContesting(for: actor, in: world) {
-            return .loot(drop.id)
         }
 
         // A rare crate on a machine's spot (Nov 2026). Right under a supply
@@ -1035,7 +1041,7 @@ enum AIBrain {
             case .blaster(let tier): return tier > actor.blaster
             // Always worth the walk: one perk is one perk whatever you are wearing.
             case .perk:              return true
-            case .bandage, .medkit, .bomb, .stink, .foam, .chest, .arcade, .turret: return false
+            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .chest, .arcade, .turret: return false
             }
         })
 
@@ -1977,19 +1983,18 @@ enum AIBrain {
     ///
     /// A hot commodity: an OPEN one pulls every bot on the map whatever it is
     /// carrying, because it will not be there for long. A locked one pulls any bot
-    /// within GameConfig.SupplyDrop.botInterest, and those need something to heal
-    /// with - they are walking into the fight the countdown was built to start.
+    /// within GameConfig.SupplyDrop.botInterest - they are walking into the fight
+    /// the countdown was built to start.
     private static func supplyWorthContesting(for actor: Actor, in world: World) -> Lootbox? {
-        let supplied = actor.inventory.totalHealing(of: actor.maxHealth)
-            >= GameConfig.AI.emergencyHealingStock
-
+        // Healing no longer required to go (Nov 2026): most bots carry little,
+        // so most stayed home and the drop went to whoever wandered over.
         var best: Lootbox?
         var shortest = Double.greatestFiniteMagnitude
 
         for drop in world.supplyDrops {
             let distance = (drop.position - actor.position).length
             if drop.isLocked {
-                guard supplied, distance < GameConfig.SupplyDrop.botInterest else { continue }
+                guard distance < GameConfig.SupplyDrop.botInterest else { continue }
             }
             guard distance < shortest else { continue }
             shortest = distance
@@ -2682,7 +2687,7 @@ enum AIBrain {
         case .bandage, .medkit:
             return actor.inventory.totalHealing(of: actor.maxHealth)
                  < GameConfig.AI.buysHealingBelow
-        case .bomb, .stink, .foam, .chest, .arcade, .turret, .perk:
+        case .bomb, .stink, .foam, .popper, .chest, .arcade, .turret, .perk:
             return false
         }
     }
@@ -3164,6 +3169,32 @@ enum AIBrain {
     /// Not at somebody stood by the bot's own wall: the blast takes walls with it,
     /// and a bot blowing a hole in its own base to hit a raider is a bot helping
     /// the raid.
+    /// A confetti popper at whoever this bot is fighting (Nov 2026) - see
+    /// ItemType.popper. Freely, unlike a bomb, which is kept for walls: one
+    /// every AI.popperInterval while the enemy is in throwing range and the
+    /// aim is on them.
+    private static func fightPopper(_ state: inout AIState, actor: Actor, in world: World) -> Int? {
+        let enemyID: ActorID
+        switch state.goal {
+        case .fight(let id), .defend(let id), .retreat(let id): enemyID = id
+        default: return nil
+        }
+
+        guard state.fightBombTimer <= 0,
+              let enemy = world.actors[enemyID], enemy.isAlive,
+              canTarget(enemy, by: actor, in: world),
+              let slot = actor.inventory.firstSlot(holding: .popper),
+              BombSystem.canThrow(actor, from: slot) else { return nil }
+
+        let towards = enemy.position - actor.position
+        guard towards.length <= GameConfig.Bomb.throwRange,
+              abs(shortestAngle(from: actor.aim.angle, to: towards.angle))
+                <= GameConfig.AI.throwTolerance else { return nil }
+
+        state.fightBombTimer = GameConfig.AI.popperInterval
+        return slot
+    }
+
     private static func fightBomb(_ state: inout AIState, actor: Actor, in world: World) -> Int? {
         let enemyID: ActorID
         switch state.goal {
