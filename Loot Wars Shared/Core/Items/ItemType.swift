@@ -38,6 +38,14 @@ enum ItemType: Hashable {
     /// are more suited for PvP". See GameConfig.Popper.
     case popper
 
+    /// Fireworks (Nov 2026): the ultimate raiding item. Thrown like a bomb, it
+    /// goes off in a huge burst that opens any wall at any upgrade level and
+    /// hurts a lot. Rare, and only ever found in raid chests and supply drops.
+    /// Heath: "like the ultimate raiding item. They break through any wall
+    /// level, deal a lot of damage and have a big radius." See
+    /// GameConfig.Fireworks.
+    case fireworks
+
     /// A spike trap (Nov 2026): set into your own base's floor, hidden from
     /// enemies until one steps on it - see SpikeSystem.
     case spikes
@@ -95,6 +103,7 @@ enum ItemType: Hashable {
         case .foam:    return 2
         case .popper:  return 6
         case .spikes:  return 4
+        case .fireworks: return 2
         // One apiece. You can only have one running, so a second in the same slot
         // would be a queue - and a queue of power-ups is a different game.
         case .perk:    return 1
@@ -169,7 +178,7 @@ enum ItemType: Hashable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .stink, .foam, .popper, .spikes, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
+        case .bomb, .stink, .foam, .popper, .fireworks, .spikes, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
         }
     }
 
@@ -202,7 +211,7 @@ enum ItemType: Hashable {
     var use: Use {
         switch self {
         case .bandage, .medkit, .helmet, .blaster, .perk: return .instant
-        case .bomb, .stink, .foam, .popper: return .thrown
+        case .bomb, .stink, .foam, .popper, .fireworks: return .thrown
         // Both want you to say WHERE.
         case .chest, .arcade, .turret, .spikes: return .mapTap
         }
@@ -212,7 +221,7 @@ enum ItemType: Hashable {
     var isGear: Bool {
         switch self {
         case .helmet, .blaster: return true
-        case .bandage, .medkit, .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret, .perk: return false
+        case .bandage, .medkit, .bomb, .stink, .foam, .popper, .fireworks, .spikes, .chest, .arcade, .turret, .perk: return false
         }
     }
 

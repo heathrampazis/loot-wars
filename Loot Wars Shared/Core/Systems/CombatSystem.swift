@@ -336,6 +336,11 @@ enum CombatSystem {
             // A bomb also waits for room on the ground - see Loot.maxLooseBombs.
             // Late fights are where most deaths happen, and without the cap they
             // were where most bombs came from.
+            // Always worth fighting over (Nov 2026).
+            case .fireworks:
+                drop(.item(stack.type), chance: GameConfig.Fireworks.dropChance,
+                     at: actor.position, in: world)
+
             case .bomb:
                 guard world.roomForLooseBomb else { break }
                 drop(.item(stack.type), chance: GameConfig.Drops.bombDropChance,

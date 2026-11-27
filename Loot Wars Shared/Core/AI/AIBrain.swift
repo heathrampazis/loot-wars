@@ -599,7 +599,7 @@ enum AIBrain {
             $0 != actor.team && world.baseIsBreached($0) && world.hasFlag($0)
         } ?? false
         if case .raid(let wall) = state.goal, world.map[wall].blockOwner != nil,
-           actor.inventory.count(of: .bomb) > 0 {
+           canBreach(wall, actor: actor, in: world) {
             committed = true
         }
 
@@ -687,7 +687,7 @@ enum AIBrain {
         }
         // Mid-breach: keep at the wall while it stands and there is a bomb.
         if case .raid(let wall) = state.goal, world.map[wall].blockOwner != nil,
-           actor.inventory.count(of: .bomb) > 0 {
+           canBreach(wall, actor: actor, in: world) {
             return .raid(wall)
         }
         // Through the hole: the flag, then whatever is left.
@@ -1045,7 +1045,7 @@ enum AIBrain {
             case .blaster(let tier): return tier > actor.blaster
             // Always worth the walk: one perk is one perk whatever you are wearing.
             case .perk:              return true
-            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret: return false
+            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .fireworks, .spikes, .chest, .arcade, .turret: return false
             }
         })
 
@@ -1132,7 +1132,7 @@ enum AIBrain {
             guard score > bestScore else { continue }
 
             guard let tile = breachTile(into: team, for: actor, in: world),
-                  actor.inventory.count(of: .bomb) >= bombsToBreach(tile, in: world) else { continue }
+                  canBreach(tile, actor: actor, in: world) else { continue }
             bestScore = score
             bestTile = tile
         }
@@ -1331,8 +1331,8 @@ enum AIBrain {
             return remaining(at: runaway, for: actor, in: world)
         }
 
-        if actor.inventory.count(of: .bomb) > 0,
-           let wall = breachTile(into: runaway, for: actor, in: world) {
+        if let wall = breachTile(into: runaway, for: actor, in: world),
+           canBreach(wall, actor: actor, in: world) {
             return .raid(wall)
         }
 
@@ -1586,6 +1586,7 @@ enum AIBrain {
                     >= GameConfig.AI.emergencyHealingStock else { return nil }
 
         let hasBomb = actor.inventory.count(of: .bomb) > 0
+            || actor.inventory.count(of: .fireworks) > 0
         let runaway = world.runaway(against: actor.team)?.team
 
         var best: AIGoal?
@@ -1612,7 +1613,7 @@ enum AIBrain {
             } else if world.baseIsBreached(team) {
                 goal = remaining(at: team, for: actor, in: world)
             } else if hasBomb, let wall = breachTile(into: team, for: actor, in: world),
-                      actor.inventory.count(of: .bomb) >= bombsToBreach(wall, in: world) {
+                      canBreach(wall, actor: actor, in: world) {
                 // Only with enough bombs to get through (Nov 2026): an upgraded
                 // wall takes two, and one bomb into it is a bomb wasted - see
                 // bombsToBreach. Short, and the bot goes and finds more.
@@ -1679,7 +1680,8 @@ enum AIBrain {
         for chest in world.chests(notOwnedBy: actor.team) {
             guard world.raidable(chest.owner),
                   world.baseIsBreached(chest.owner)
-                    || bombs >= bombsToBreach(team: chest.owner, in: world) else { continue }
+                    || bombs >= bombsToBreach(team: chest.owner, in: world)
+                    || actor.inventory.count(of: .fireworks) > 0 else { continue }
 
             let distance = (chest.position - actor.position).length
             guard distance < GameConfig.AI.robRange || chest.owner == runaway else { continue }
@@ -2691,7 +2693,7 @@ enum AIBrain {
         case .bandage, .medkit:
             return actor.inventory.totalHealing(of: actor.maxHealth)
                  < GameConfig.AI.buysHealingBelow
-        case .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret, .perk:
+        case .bomb, .stink, .foam, .popper, .fireworks, .spikes, .chest, .arcade, .turret, .perk:
             return false
         }
     }
@@ -2940,6 +2942,24 @@ enum AIBrain {
     /// wall health (Upgrades.wallHealth), less any crack already in it, over
     /// what a bomb landing against it does. One for a plain wall, two for an
     /// upgraded one, one again for an upgraded one already cracked.
+    /// Whether this bot carries enough to open this wall tile (Nov 2026):
+    /// enough bombs (bombsToBreach), or any fireworks, which open anything.
+    private static func canBreach(_ tile: GridPoint, actor: Actor, in world: World) -> Bool {
+        actor.inventory.count(of: .bomb) >= bombsToBreach(tile, in: world)
+            || actor.inventory.count(of: .fireworks) > 0
+    }
+
+    /// What to throw at this wall: a bomb when there are enough of them,
+    /// fireworks when there are not - they are saved for the walls bombs
+    /// cannot do (Nov 2026).
+    private static func breachSlot(for tile: GridPoint, actor: Actor, in world: World) -> Int? {
+        if actor.inventory.count(of: .bomb) >= bombsToBreach(tile, in: world),
+           let slot = BombSystem.loadedSlot(of: actor) {
+            return slot
+        }
+        return actor.inventory.firstSlot(holding: .fireworks) ?? BombSystem.loadedSlot(of: actor)
+    }
+
     private static func bombsToBreach(_ tile: GridPoint, in world: World) -> Int {
         guard let owner = world.map[tile].blockOwner else { return 1 }
         let left = world.wallHealth(of: owner) - (world.wallCracks[tile]?.taken ?? 0)
@@ -3065,7 +3085,8 @@ enum AIBrain {
 
     // A wall worth bombing when carrying a bomb: the best-priced base first, else the nearest wall.
     private static func raidTarget(for actor: Actor, in world: World) -> GridPoint? {
-        guard actor.inventory.count(of: .bomb) > 0 else { return nil }
+        guard actor.inventory.count(of: .bomb) > 0
+                || actor.inventory.count(of: .fireworks) > 0 else { return nil }
 
         if let worthwhile = wallGuarding(theLootOf: actor, in: world) { return worthwhile }
 
@@ -3073,8 +3094,7 @@ enum AIBrain {
         var shortest = GameConfig.AI.raidRange
 
         // Raidable bases only, and only a wall this bot has the bombs to get
-        // through (Nov 2026) - see bombsToBreach.
-        let bombs = actor.inventory.count(of: .bomb)
+        // through (Nov 2026) - see canBreach.
         for (team, claim) in world.claims where team != actor.team && world.raidable(team) {
             // Cheap test first: the claim's middle is a good enough stand-in for
             // whether it is worth looking at every tile in it.
@@ -3085,7 +3105,7 @@ enum AIBrain {
                 for row in claim.origin.row..<(claim.origin.row + claim.size) {
                     let tile = GridPoint(col: col, row: row)
                     guard world.map[tile].blockOwner != nil,
-                          bombs >= bombsToBreach(tile, in: world) else { continue }
+                          canBreach(tile, actor: actor, in: world) else { continue }
 
                     let distance = (tile.center - actor.position).length
                     guard distance < shortest else { continue }
@@ -3181,7 +3201,7 @@ enum AIBrain {
         guard let tile = target else { return nil }
         guard world.map[tile].blockOwner != nil else { return nil }
 
-        guard let slot = BombSystem.loadedSlot(of: actor),
+        guard let slot = breachSlot(for: tile, actor: actor, in: world),
               BombSystem.canThrow(actor, from: slot) else { return nil }
 
         let towards = tile.center - actor.position
