@@ -468,6 +468,10 @@ enum RenderPalette {
     /// Strength's second colour: the spectrum's red, darker.
     static let strengthDeep = rgb(0xB8, 0x00, 0x18)
 
+    /// Invisibility's slate (Nov 2026), the same two the candy is drawn in.
+    static let invisibleLight = rgb(0xB4, 0xBE, 0xCC)
+    static let invisibleDeep = rgb(0x55, 0x61, 0x73)
+
     static func colours(for perk: Perk, at step: Int) -> (bright: SKColor, deep: SKColor) {
         switch perk {
         case .overdrive:    return perkColours(at: step)
@@ -478,6 +482,8 @@ enum RenderPalette {
         case .regeneration: return (hue(at: 6), hue(at: 7))
         // Gold and orange: a warm yellow, kept clear of strength's red.
         case .resistance:   return (hue(at: 2), hue(at: 1))
+        // Slate, like its candy: a pale grey-blue glint over a deeper one.
+        case .invisibility: return (invisibleLight, invisibleDeep)
         }
     }
 

@@ -18,6 +18,7 @@ extension Feature {
         case .stinkBombs:    return "Stink Bombs"
         case .fullArcade:    return "Arcade"
         case .resistance:    return "Resistance"
+        case .invisibility:  return "Invisibility"
         case .discoBall:     return "Disco Ball"
         case .cosmicHelmet:  return "Cosmic Helmet"
         case .cosmicBlaster: return "Cosmic Blaster"
@@ -34,6 +35,7 @@ extension Feature {
         case .stinkBombs:    return "Gas them out"
         case .fullArcade:    return "Earns tickets"
         case .resistance:    return "Take less damage"
+        case .invisibility:  return "Vanish from view"
         case .discoBall:     return "Every power-up"
         case .cosmicHelmet:  return "The best helmet"
         case .cosmicBlaster: return "The best blaster"
@@ -57,6 +59,8 @@ extension Feature {
             return "The big machine. It pays out far more, so raiders will come for it."
         case .resistance:
             return "Take much less damage for a few seconds. Good for pushing into a base."
+        case .invisibility:
+            return "Enemies can't see you for a few seconds. Getting hit shows your outline."
         case .turrets:
             return "Place it in your base. It shoots any enemy who walks in."
         case .discoBall:

@@ -446,7 +446,8 @@ enum GameConfig {
             .perk(.strength): 14,
             .perk(.speed): 14,
             .perk(.regeneration): 14,
-            .perk(.resistance): 14
+            .perk(.resistance): 14,
+            .perk(.invisibility): 14
         ]
 
         /// What the shop pays for something you sell back, as a share of its price.
@@ -1699,7 +1700,15 @@ enum GameConfig {
         /// How close an open enemy base with its flag up has to be for a bot
         /// to join in - take the flag itself and fight whoever is there (Nov
         /// 2026, flags). See AIBrain.thirdParty.
-        static let thirdPartyRange: Double = 26
+        /// 26 -> 12 (Nov 2026): "third party raids need to chill, it should
+        /// only be if a player is in the area" - about the distance a bot
+        /// would actually see or hear it.
+        static let thirdPartyRange: Double = 12
+
+        /// At most this many bots raiding one base at once (Nov 2026). A third
+        /// party, or a new raid on an open base, is skipped once it has this
+        /// many. The raid already under way carries on regardless.
+        static let maxRaidersPerBase = 2
 
         /// And even once the shooting stops, a beat before patching up. Winding a
         /// bandage on the same frame the last bullet lands is a tell that nobody is
@@ -2669,6 +2678,16 @@ enum GameConfig {
     }
 
     enum Perks {
+        /// Invisibility (Nov 2026): how long a hit shows an invisible player's
+        /// outline to everybody, how close a bot has to be to notice one
+        /// anyway, and how often an unseen player gives off a glint. Heath:
+        /// "invisible from enemy players except for a slight sparkle
+        /// occasionally... When hitting an invisible player their silhouette
+        /// should appear temporarily (just while they are hit)".
+        static let revealTime: Double = 0.6
+        static let spotRange: Double = 1.5
+        static let sparkleInterval: Double = 1.1
+
         /// How long a perk runs.
         ///
         /// Nine seconds, down from twelve and fifteen, and the cut is the price of
@@ -2860,6 +2879,13 @@ enum GameConfig {
         /// faster than the bots. 0.8 is a fifth less gear. Not on Easy. See
         /// AI.crateGearBoost for the bots' side.
         static let playerGearShare: Double = 0.8
+
+        /// TESTING ONLY (Nov 2026) - set back to false before release. While
+        /// true, Invisibility is in every match whatever your level, and turns
+        /// up in crates invisibilityTestBoost times as often as a normal single
+        /// power-up. Heath: "for testing, make invisibility perks common".
+        static let testingInvisibility = false
+        static let invisibilityTestBoost = 6
 
         /// How much of its band's bomb weight an ORDINARY crate keeps (Nov 2026,
         /// flags), climbing through the match: roughly 1 crate in 30 is a bomb

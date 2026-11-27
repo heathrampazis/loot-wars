@@ -201,7 +201,8 @@ enum TurretSystem {
         guard let actor = world.actors[id],
               actor.isAlive,
               actor.team != turret.owner,
-              actor.invulnerability <= 0 else { return false }
+              actor.invulnerability <= 0,
+              !actor.isHidden else { return false }
 
         let towards = actor.position - turret.centre
         let distance = towards.length

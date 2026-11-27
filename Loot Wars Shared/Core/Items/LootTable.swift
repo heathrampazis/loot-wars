@@ -323,7 +323,11 @@ enum LootTable {
         rows += Perk.obtainable.map { perk in
             let weight = perk.lootWeight(at: progress)
             let pooled = perk == .overdrive ? weight : weight * 4 / singles
-            let boosted = Int((Double(pooled) * perkBoost).rounded())
+            var boosted = Int((Double(pooled) * perkBoost).rounded())
+            // TESTING ONLY - see Loot.testingInvisibility.
+            if perk == .invisibility, GameConfig.Loot.testingInvisibility {
+                boosted *= GameConfig.Loot.invisibilityTestBoost
+            }
             return (pickup: Pickup.item(.perk(perk)), weight: boosted)
         }
 

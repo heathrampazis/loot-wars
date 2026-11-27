@@ -269,7 +269,18 @@ final class ActorRenderer {
 
             // Spawn protection reads as a ghost, so it is obvious why shots are
             // passing straight through someone.
-            nodes.root.alpha = actor.invulnerability > 0 ? 0.55 : 1.0
+            // Invisibility (Nov 2026): an enemy running it is not drawn at all -
+            // see EffectsRenderer for the glint it gives off - except for the
+            // moment after a hit, when its outline shows faintly. Your own is
+            // drawn as a ghost, so you know it is working.
+            let yours = id == world.localPlayerID
+            if actor.perk == .invisibility, !yours {
+                nodes.root.alpha = actor.isHidden ? 0 : 0.45
+            } else if actor.perk == .invisibility {
+                nodes.root.alpha = 0.4
+            } else {
+                nodes.root.alpha = actor.invulnerability > 0 ? 0.55 : 1.0
+            }
 
             nodes.ring.position = nodes.root.position
             nodes.ring.isHidden = nodes.root.isHidden

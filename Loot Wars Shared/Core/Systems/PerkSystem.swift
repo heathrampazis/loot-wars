@@ -20,6 +20,11 @@ enum PerkSystem {
 
     static func update(_ world: World, dt: Double) {
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            // The moment of being seen after a hit runs down whatever else is
+            // going on - see Actor.revealTimer.
+            if let reveal = world.actors[id]?.revealTimer, reveal > 0 {
+                world.actors[id]?.revealTimer = max(0, reveal - dt)
+            }
             guard var actor = world.actors[id], actor.perk != nil else { continue }
 
             // Dying ends it. A perk is a thing that is true of you, and you have
