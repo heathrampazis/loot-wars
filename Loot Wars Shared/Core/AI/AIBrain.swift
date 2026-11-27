@@ -539,6 +539,11 @@ enum AIBrain {
             // or runs on the health it has, like anybody would.
             guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
 
+        case .build where !state.baseWasComplete:
+            // Laying its first wall (Nov 2026): somebody merely in sight is no
+            // reason to stop. Being hit is - see the opening build in chooseGoal.
+            guard actor.secondsSinceHit < GameConfig.AI.combatRecency else { return }
+
         case .wander, .loot, .collect, .build, .farm, .stash, .rearm, .defend, .hunt:
             // All interruptible, and the hunt MOST of all: getting close enough to
             // be interrupted is the entire job it was given. This is the line
@@ -571,6 +576,20 @@ enum AIBrain {
 
     /// Priority order: staying alive, then fighting, then loot, then roaming.
     private static func chooseGoal(for actor: Actor, state: AIState, in world: World) -> AIGoal {
+        // The base first, from the moment it spawns (Nov 2026). Bots' bases
+        // used to stand finished from the first second; Heath: "enemies should
+        // still have to walk around the perimeter of the base to build them,
+        // but they should prioritise doing this when spawning". So until its
+        // base has closed once, a bot builds ahead of everything - crates,
+        // supply drops, raids, picking fights - with no urge-timer breaks
+        // between armfuls. Only being shot stops it; then the fight and flee
+        // branches below take over, and it comes back once that is over.
+        if !state.baseWasComplete,
+           actor.secondsSinceHit >= GameConfig.AI.combatRecency,
+           let wall = world.nextBuildTile(for: actor.team) {
+            return .build(wall)
+        }
+
         // An OPEN supply drop close by beats everything, fighting included. It is
         // the hottest thing on the map, it goes to whoever touches it first, and a
         // bot trading shots beside an open one is handing it to the player.
@@ -769,7 +788,12 @@ enum AIBrain {
         // Still on the urge timer, so a bot lays an armful, goes and does
         // something else for three or four seconds, and comes back. It builds fast
         // without going deaf to the rest of the match.
-        if !state.baseWasComplete, state.buildUrgeTimer <= 0,
+        //
+        // And after it has closed too (Nov 2026): a missing corner, or a hole
+        // with a turret just inside it, leaves no way in, so the base counts as
+        // sealed and nothing above sends anybody to fix it. Heath: corners
+        // "get missed once a base is built and cant be fixed".
+        if state.buildUrgeTimer <= 0,
            let wall = world.nextBuildTile(for: actor.team) {
             return .build(wall)
         }
@@ -2282,8 +2306,31 @@ enum AIBrain {
             steer(&state, actor: actor, to: chest.position)
 
         case .build(let tile):
+            // Walk the wall rather than stand at it (Nov 2026). Heath: "they
+            // should walk around their base perimeter not dance around it in
+            // circles". A bot cannot stand still, so heading for one tile's
+            // spot and laying it had it jiggling on that spot every block.
+            // Once the tile it is laying is in reach it heads on for the spot
+            // a couple of tiles further round instead, and lays as it passes.
+            let ahead = world.upcomingBuildTiles(for: actor.team, count: 3)
+            let next = ahead.first ?? tile
+
+            // Patching a base that has been finished: straight to the hole,
+            // over its own wall if need be (you walk through your own walls).
+            // A turret or chest inside can leave the wall itself as the only
+            // way to a corner (Nov 2026).
+            if state.baseWasComplete {
+                steer(&state, actor: actor, to: next.center)
+                break
+            }
+
+            var aimAt = next
+            if ahead.count > 1,
+               (next.center - actor.position).length <= GameConfig.Build.reach * 0.8 {
+                aimAt = ahead[ahead.count - 1]
+            }
             steer(&state, actor: actor,
-                  to: standingSpot(for: tile, team: actor.team, in: world))
+                  to: standingSpot(for: aimAt, team: actor.team, in: world))
 
         case .raid(let tile):
             // Walk at the wall until close enough to throw, then stop closing -
@@ -2924,7 +2971,12 @@ enum AIBrain {
             : GameConfig.Build.placeInterval
         state.blocksLeftToLay -= 1
 
-        if state.blocksLeftToLay <= 0 {
+        if state.blocksLeftToLay <= 0, !state.baseWasComplete {
+            // The first build is one trip (Nov 2026): no stopping between
+            // armfuls to wander about - see the opening build in chooseGoal.
+            state.blocksLeftToLay = Int.random(in: GameConfig.Build.blocksWhenUnsealed,
+                                               using: &world.rng)
+        } else if state.blocksLeftToLay <= 0 {
             // Done for now. Back to the match.
             state.buildUrgeTimer = Double.random(in: GameConfig.Build.urgeInterval,
                                                  using: &world.rng)

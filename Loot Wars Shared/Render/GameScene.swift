@@ -558,13 +558,9 @@ final class GameScene: SKScene {
         // colour from the first frame - see ItemArt.viewer.
         ItemArt.viewer = world.localPlayer?.team
 
-        // Every bot's base stands finished from the first second, so every flag
-        // starts behind a wall - see World.buildBaseNow. Yours builds as you
-        // walk it, as always. After the unlocks, which decide what furnishes it.
-        for team in world.actors.values.filter({ $0.ai != nil }).map(\.team)
-            .sorted(by: { $0.raw < $1.raw }) {
-            world.buildBaseNow(for: team)
-        }
+        // Bots' bases are no longer built for them on the first frame (Nov
+        // 2026): they walk the wall and lay it like you do, and it is the first
+        // thing they do - see the opening build in AIBrain.chooseGoal.
 
         // Before the first frame rather than on whichever frame first needs it -
         // see ArtFit.warm.
