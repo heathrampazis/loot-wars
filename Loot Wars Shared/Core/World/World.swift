@@ -129,6 +129,19 @@ final class World {
     /// Whether flags can be taken yet - see Flag.safeFor.
     var flagsCapturable: Bool { elapsed >= GameConfig.Flag.safeFor }
 
+    /// When the player first had a bomb in their pocket - see
+    /// AI.playerRaidHeadStart. Noted by AISystem each frame.
+    var playerFirstBombAt: Double?
+
+    /// Whether bots may raid this base yet. Every base but the player's is
+    /// fair game from the start; the player's waits - see AI.playerRaidBy.
+    func raidable(_ team: TeamID) -> Bool {
+        guard team == localPlayer?.team else { return true }
+        if elapsed >= GameConfig.AI.playerRaidBy { return true }
+        guard let at = playerFirstBombAt else { return false }
+        return elapsed >= at + GameConfig.AI.playerRaidHeadStart
+    }
+
     /// Whether this team has a flag up that can be taken.
     func hasFlag(_ team: TeamID) -> Bool {
         guard let flag = flags[team] else { return false }

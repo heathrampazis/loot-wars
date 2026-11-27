@@ -177,7 +177,7 @@ enum BombSystem {
         let radius = GameConfig.Bomb.blastRadius
         // Walls go further than anything else - see Bomb.wallRadius.
         let wallRadius = max(radius, GameConfig.Bomb.wallRadius)
-        let reach = Int(wallRadius.rounded(.up))
+        let reach = Int(max(wallRadius, GameConfig.Bomb.peopleRadius).rounded(.up))
         let centre = GridPoint(containing: bomb.position)
 
         // What stood in the way BEFORE anything came down. Read first, because
@@ -282,12 +282,16 @@ enum BombSystem {
             // fraction of its damage on what was plainly a direct hit.
             let nearest = actor.hitbox.closestPoint(to: bomb.position)
             let distance = (nearest - bomb.position).length
-            guard distance <= radius,
+            // People are caught further out than walls and machines (Nov 2026,
+            // see Bomb.peopleRadius).
+            let reachPeople = GameConfig.Bomb.peopleRadius
+            guard distance <= reachPeople,
                   !isShielded(nearest, from: origin, by: cover) else { continue }
 
             // Falls off towards the edge, so being caught at the rim is a warning
-            // rather than a death sentence.
-            let share = 1 - (distance / radius)
+            // rather than a death sentence - but still hurts (Bomb.rimShare).
+            let rim = GameConfig.Bomb.rimShare
+            let share = 1 - (1 - rim) * (distance / reachPeople)
             let full = max(Double(GameConfig.Bomb.damage),
                            Double(actor.maxHealth) * GameConfig.Bomb.damageShare)
             let hurt = Int((full * share).rounded())

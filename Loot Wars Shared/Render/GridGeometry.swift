@@ -65,8 +65,15 @@ enum GridGeometry {
         let wanted = referenceWindow.width * referenceWindow.height * tileSize * tileSize
         let have = screen.width * screen.height
 
-        return min(1, (wanted / have).squareRoot())
+        // Pulled back by zoomOut - see there.
+        return min(1, (wanted / have).squareRoot()) * zoomOut
     }
+
+    /// How far the camera is pulled back from the view the game was first
+    /// tuned for (Nov 2026): 1.15x, picked by Heath after trying a zoom setting.
+    /// Shows more map, and the bots read the same rectangle (visibleHalfExtent),
+    /// so they see and shoot that much further too.
+    static let zoomOut: CGFloat = 1.15
 
     static func point(for position: Vec2) -> CGPoint {
         CGPoint(x: CGFloat(position.x) * tileSize,
