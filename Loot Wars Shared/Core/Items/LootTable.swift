@@ -145,9 +145,9 @@ enum LootTable {
             // up the ladder, and a rare crate's upgrade reaches one rung past it -
             // so Cosmic remains the one rung nobody finds.
             (.item(.helmet(.epic)),      20),
-            (.item(.helmet(.legendary)), 10),
+            (.item(.helmet(.legendary)),  8),
             (.item(.blaster(.three)),    16),
-            (.item(.blaster(.four)),      6)
+            (.item(.blaster(.four)),      5)
         ]),
         (0.75, [
             // Healing up hard - medkits most of all - so a late fight is two
@@ -162,10 +162,12 @@ enum LootTable {
             // No Mythical or Blaster 5 from an ordinary crate (Nov 2026): the
             // top of the ladder comes from purple crates and supply drops, so
             // it feels rare. Was Legendary 24, Mythical 8, B4 20, B5 8.
-            (.item(.helmet(.epic)),      12),
-            (.item(.helmet(.legendary)), 20),
-            (.item(.blaster(.three)),    12),
-            (.item(.blaster(.four)),     16)
+            // Legendary 20 -> 14 and Blaster 4 16 -> 11 (Nov 2026): the best
+            // late gear is for raid chests now - see Chest.stockTables.
+            (.item(.helmet(.epic)),      16),
+            (.item(.helmet(.legendary)), 14),
+            (.item(.blaster(.three)),    15),
+            (.item(.blaster(.four)),     11)
         ])
     ]
 
@@ -190,10 +192,11 @@ enum LootTable {
     /// the band already offers an Epic, a rare crate is where a Legendary comes
     /// from, and that is the only place one is ever found.
     private static func upgraded(_ pickup: Pickup, unlocks: Unlocks) -> Pickup {
-        // Loot.rareRungs up, not one (Nov 2026).
+        // Loot.rareRungs up (Nov 2026), and never past Loot.rareGearCap -
+        // the best gear is for raiding chests.
         var result = pickup
         for _ in 0..<max(1, GameConfig.Loot.rareRungs) {
-            result = oneRungUp(result, unlocks: unlocks)
+            result = cappedRungUp(result, unlocks: unlocks)
         }
 
         // And never green or grey out of a purple crate (Oct 2026). One rung up
@@ -202,12 +205,20 @@ enum LootTable {
         // same colour as the medkits on the grass is a let-down. Climb until the
         // gear is at least blue, or the ladder (or this match's unlocks) stops.
         while case .item(let type) = result, type.isGear, type.rarity <= .epic {
-            let next = oneRungUp(result, unlocks: unlocks)
+            let next = cappedRungUp(result, unlocks: unlocks)
             guard next != result else { break }
             result = next
         }
 
         return result
+    }
+
+    /// One rung up, unless that would pass Loot.rareGearCap.
+    private static func cappedRungUp(_ pickup: Pickup, unlocks: Unlocks) -> Pickup {
+        let next = oneRungUp(pickup, unlocks: unlocks)
+        guard case .item(let type) = next,
+              type.rarity > GameConfig.Loot.rareGearCap else { return next }
+        return pickup
     }
 
     private static func oneRungUp(_ pickup: Pickup, unlocks: Unlocks) -> Pickup {

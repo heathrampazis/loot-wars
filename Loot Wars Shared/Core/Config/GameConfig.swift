@@ -2970,7 +2970,15 @@ enum GameConfig {
         /// How many rungs a rare crate lifts the gear it rolls (Nov 2026). Was
         /// one; two makes a rare crate the best thing on the map rather than a
         /// slightly better crate. Still at least blue either way.
-        static let rareRungs = 2
+        /// 2 -> 1 (Nov 2026), with rareGearCap: two rungs and a blue floor made
+        /// a rare crate hand out Legendary and Mythical from the first minute,
+        /// better than any raid. Heath: "the lootboxes / rare lootboxes
+        /// shouldnt feel as rewarding as raids".
+        static let rareRungs = 1
+
+        /// The best gear a rare crate can give (Nov 2026). Mythical and Cosmic
+        /// come from raiding chests - see Chest.stockTables.
+        static let rareGearCap: Rarity = .legendary
 
         /// Lootboxes scattered across the map.
         /// The share of purple crates that are a bomb - the ONLY crates that hold
@@ -2987,11 +2995,13 @@ enum GameConfig {
 
         /// How much likelier a power-up is in a purple crate than its band says.
         /// Three times: about one purple crate in six is a power-up.
-        static let rarePerkBoost: Double = 3.0
+        /// 3.0 -> 2.0 (Nov 2026): power-ups move towards raid chests.
+        static let rarePerkBoost: Double = 2.0
 
         /// And gear (which a purple crate then bumps a rung - see
         /// LootTable.upgraded). One and a half: about a third of purple crates.
-        static let rareGearBoost: Double = 1.5
+        /// 1.5 -> 1.25 (Nov 2026), with rareGearCap.
+        static let rareGearBoost: Double = 1.25
 
         /// The most bombs that may be lying on the ground at once.
         ///
@@ -3275,7 +3285,16 @@ enum GameConfig {
         /// Still short of what a fresh chest holds, so the victim loses more than
         /// the raider gains - which is what makes a raid an attack rather than a
         /// transfer, and is the reason defending one is worth doing.
+        ///
+        /// Grows with the match (Nov 2026): 3, then 4 from raidSpillGrowsAt, so a
+        /// late raid pays out more as well as better. See raidSpill(at:).
         static let raidSpill = 3
+        static let raidSpillLate = 4
+        static let raidSpillGrowsAt: Double = 0.5
+
+        static func raidSpill(at progress: Double) -> Int {
+            progress >= raidSpillGrowsAt ? raidSpillLate : raidSpill
+        }
 
         /// How much punishment a chest takes before it bursts.
         ///
@@ -3348,7 +3367,8 @@ enum GameConfig {
         /// Three or four, up from two or three. A chest is the reason to cross the
         /// map and break a wall, and two items was a thin return on a bomb, a
         /// breach and a walk under fire.
-        static let stockCount: ClosedRange<Int> = 3...4
+        /// 3...4 -> 4...5 (Nov 2026): raid chests are where the good loot is.
+        static let stockCount: ClosedRange<Int> = 4...5
 
         /// The wait after a raid, specifically.
         ///
@@ -3387,7 +3407,8 @@ enum GameConfig {
 
         /// The most a chest will refill itself to. Still under what a fresh one
         /// holds, so the first raid on a base is always the best one.
-        static let restockCeiling = 3
+        /// 3 -> 4 (Nov 2026), so a late chest has four to give - see raidSpill.
+        static let restockCeiling = 4
 
         /// What a chest holds, and it MOVES with the match.
         ///
@@ -3425,28 +3446,55 @@ enum GameConfig {
         /// 73% of chests hand over a piece of gear, against 43% before - modelled
         /// over 200,000 chests rather than guessed at. The rest still pay in
         /// healing and bombs, which is what lets you keep raiding.
+        ///
+        /// Raid chests are THE place for good loot now (Nov 2026). Heath: chests
+        /// "should be where the player gets better loot... not the best loot in
+        /// raid chests at the start of the game, but towards the end it gets
+        /// better". Five bands, each a rung or so ahead of the crates at the
+        /// same point, and the top two reach past anything a crate gives
+        /// (rare crates stop at Legendary - Loot.rareGearCap):
+        ///   0.00  Common / Epic, Blaster 2 / 3 - about what a crate gives
+        ///   0.25  Epic / Legendary, Blaster 3 / 4, power-ups start
+        ///   0.50  Legendary, some Mythical, Blaster 4, some 5
+        ///   0.70  Legendary / Mythical, Blaster 4 / 5
+        ///   0.88  Mythical, some Cosmic, Blaster 5, some 6
+        /// Cosmic and Blaster 6 step down to Mythical and 5 until unlocked (see
+        /// ChestSystem.stockRows). Healing thins out as gear takes over.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 3), (.stink, 12),
-                (.helmet(.common), 15), (.helmet(.epic), 8),
-                (.blaster(.two),   15), (.blaster(.three), 8)
+                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10),
+                (.helmet(.common), 14), (.helmet(.epic), 12),
+                (.blaster(.two),   14), (.blaster(.three), 12)
             ]),
-            (0.35, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 3), (.stink, 12),
-                (.helmet(.common), 8), (.helmet(.epic), 15),
-                (.blaster(.two),   15), (.blaster(.three), 8)
-            ]),
-            (0.65, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 3), (.stink, 12),
-                (.helmet(.epic), 15), (.helmet(.legendary), 8),
-                (.blaster(.three), 15), (.blaster(.four), 8)
-            ]),
-            (0.85, [
-                (.bandage, 42), (.medkit, 20), (.bomb, 3), (.stink, 12),
-                (.helmet(.legendary), 15), (.helmet(.mythical), 8),
-                (.blaster(.four), 15), (.blaster(.five), 8)
-            ])
+            (0.25, [
+                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10),
+                (.helmet(.epic), 18), (.helmet(.legendary), 7),
+                (.blaster(.three), 18), (.blaster(.four), 7)
+            ] + perkRows(single: 2, disco: 1)),
+            (0.50, [
+                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10),
+                (.helmet(.epic), 8), (.helmet(.legendary), 18), (.helmet(.mythical), 5),
+                (.blaster(.three), 8), (.blaster(.four), 18), (.blaster(.five), 5)
+            ] + perkRows(single: 3, disco: 2)),
+            (0.70, [
+                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8),
+                (.helmet(.legendary), 16), (.helmet(.mythical), 13),
+                (.blaster(.four), 16), (.blaster(.five), 13)
+            ] + perkRows(single: 3, disco: 2)),
+            (0.88, [
+                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8),
+                (.helmet(.legendary), 8), (.helmet(.mythical), 18), (.helmet(.cosmic), 6),
+                (.blaster(.four), 8), (.blaster(.five), 18), (.blaster(.six), 6)
+            ] + perkRows(single: 4, disco: 3))
         ]
+
+        /// Every power-up at the same weight, the disco ball at its own. Locked
+        /// ones are dropped by ChestSystem.stockRows.
+        private static func perkRows(single: Int, disco: Int) -> [(item: ItemType, weight: Int)] {
+            [(.perk(.strength), single), (.perk(.speed), single),
+             (.perk(.regeneration), single), (.perk(.resistance), single),
+             (.perk(.invisibility), single), (.perk(.overdrive), disco)]
+        }
 
         /// The band the match is currently in.
         static func stockTable(at progress: Double) -> [(item: ItemType, weight: Int)] {
