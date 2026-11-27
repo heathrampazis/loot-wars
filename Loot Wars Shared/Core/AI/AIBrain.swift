@@ -143,6 +143,10 @@ enum AIBrain {
             commands.append(.placeChest(tile))
         }
 
+        if let tile = spikesToPlace(actor: actor, in: world) {
+            commands.append(.placeSpikes(tile))
+        }
+
         if let slot = bombToThrow(state: state, actor: actor, in: world) {
             commands.append(.useItem(slot: slot))
         } else if let slot = fightPopper(&state, actor: actor, in: world) {
@@ -1041,7 +1045,7 @@ enum AIBrain {
             case .blaster(let tier): return tier > actor.blaster
             // Always worth the walk: one perk is one perk whatever you are wearing.
             case .perk:              return true
-            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .chest, .arcade, .turret: return false
+            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret: return false
             }
         })
 
@@ -2687,7 +2691,7 @@ enum AIBrain {
         case .bandage, .medkit:
             return actor.inventory.totalHealing(of: actor.maxHealth)
                  < GameConfig.AI.buysHealingBelow
-        case .bomb, .stink, .foam, .popper, .chest, .arcade, .turret, .perk:
+        case .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret, .perk:
             return false
         }
     }
@@ -2734,6 +2738,37 @@ enum AIBrain {
     }
 
     /// A tile to stand a carried chest on, right now, from where the bot stands.
+    /// Where to set a carried spike trap (Nov 2026) - see SpikeSystem. Just
+    /// inside the bot's own wall, within Spikes.botWallBand of it, where a
+    /// raider coming through a hole will step; not beside another trap; the
+    /// nearest such tile within reach. Tile order on a tie.
+    private static func spikesToPlace(actor: Actor, in world: World) -> GridPoint? {
+        guard actor.inventory.firstSlot(holding: .spikes) != nil,
+              world.spikeCount(ownedBy: actor.team) < GameConfig.Spikes.maxPerBase else { return nil }
+        let enclosure = world.enclosure(of: actor.team)
+        guard !enclosure.wall.isEmpty else { return nil }
+
+        let band = GameConfig.Spikes.botWallBand
+        var best: GridPoint?
+        var shortest = GameConfig.Build.reach
+        for tile in enclosure.room.sorted(by: { ($0.row, $0.col) < ($1.row, $1.col) }) {
+            let nearWall = enclosure.wall.contains {
+                abs($0.col - tile.col) <= band && abs($0.row - tile.row) <= band
+            }
+            guard nearWall else { continue }
+            let crowded = world.spikes.keys.contains {
+                abs($0.col - tile.col) <= SpikeTrap.size && abs($0.row - tile.row) <= SpikeTrap.size
+            }
+            guard !crowded else { continue }
+            let distance = (SpikeTrap(tile: tile, owner: actor.team).centre - actor.position).length
+            guard distance < shortest,
+                  SpikeSystem.canPlace(at: tile, by: actor, in: world) else { continue }
+            shortest = distance
+            best = tile
+        }
+        return best
+    }
+
     private static func chestToPlace(actor: Actor, in world: World) -> GridPoint? {
         // Not until the wall is shut, and this is now the ONLY place that rule
         // lives. ChestSystem will happily stand a chest up in an open base - it is

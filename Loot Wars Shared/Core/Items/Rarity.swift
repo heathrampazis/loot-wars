@@ -77,6 +77,9 @@ extension ItemType {
         // Blue (Nov 2026): a weaker, commoner bomb.
         case .popper:  return .legendary
 
+        // Green (Nov 2026): a cheap thing to make a raid hurt.
+        case .spikes:  return .epic
+
         // The safest income on the map once it is standing behind a wall, and the
         // rung comes off the SIZE - Mythical for a cabinet, Legendary for a mini.
         // Asked of the kind rather than answered here for the same reason the perk

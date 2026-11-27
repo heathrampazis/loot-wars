@@ -330,6 +330,9 @@ enum BombSystem {
             CombatSystem.damage(id, amount: max(1, hurt), from: bomb.owner, in: world)
         }
 
+        // Traps in the blast are cleared (Nov 2026) - see SpikeSystem.clear.
+        SpikeSystem.clear(around: bomb.position, radius: radius, in: world)
+
         world.record(popper ? .confetti(at: bomb.position) : .blast(at: bomb.position))
     }
 

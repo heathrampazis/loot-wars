@@ -95,6 +95,13 @@ enum LootSystem {
                                               at: world.scatteredSpot(near: box.position))
                     }
                 }
+                // Spikes come as a pair (Nov 2026).
+                if pickup == .item(.spikes) {
+                    for _ in 1..<max(1, GameConfig.Spikes.perCrate) {
+                        world.spawnGroundItem(pickup,
+                                              at: world.scatteredSpot(near: box.position))
+                    }
+                }
                 if pickup == .item(.stink) || pickup == .item(.foam) {
                     let pair = pickup == .item(.foam)
                         ? GameConfig.Foam.perCrate : GameConfig.Loot.stinkBombsPerCrate
@@ -212,7 +219,7 @@ enum LootSystem {
             switch type {
             case .helmet(let tier):  worn = tier > actor.helmet
             case .blaster(let tier): worn = tier > actor.blaster
-            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .chest, .arcade, .turret, .perk:
+            case .bandage, .medkit, .bomb, .stink, .foam, .popper, .spikes, .chest, .arcade, .turret, .perk:
                 worn = false
             }
 

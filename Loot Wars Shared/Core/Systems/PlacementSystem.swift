@@ -33,6 +33,8 @@ enum PlacementSystem {
             return Footprint(width: Turret.width, height: Turret.height)
         case .chest:
             return Footprint(width: 1, height: 1)
+        case .spikes:
+            return Footprint(width: SpikeTrap.size, height: SpikeTrap.size)
         default:
             return nil
         }
@@ -68,6 +70,7 @@ enum PlacementSystem {
             return ArcadeSystem.canPlace(at: origin, kind: kind, by: actor, in: world)
         case .turret: return TurretSystem.canPlace(at: origin, by: actor, in: world)
         case .chest:  return ChestSystem.canPlace(at: origin, by: actor, in: world)
+        case .spikes: return SpikeSystem.canPlace(at: origin, by: actor, in: world)
         default:      return false
         }
     }
@@ -85,6 +88,7 @@ enum PlacementSystem {
         case .arcade: return world.arcadeCount(ownedBy: team) >= cap
         case .turret: return world.turretCount(ownedBy: team) >= cap
         case .chest:  return world.chestCount(ownedBy: team) >= cap
+        case .spikes: return world.spikeCount(ownedBy: team) >= cap
         default:      return false
         }
     }
@@ -95,6 +99,7 @@ enum PlacementSystem {
         case .arcade: return GameConfig.Base.maxArcades
         case .turret: return GameConfig.Base.maxTurrets
         case .chest:  return GameConfig.Base.maxChests
+        case .spikes: return GameConfig.Spikes.maxPerBase
         default:      return nil
         }
     }
@@ -104,6 +109,7 @@ enum PlacementSystem {
         case .arcade(let kind): return .placeArcade(origin, kind)
         case .turret: return .placeTurret(origin)
         case .chest:  return .placeChest(origin)
+        case .spikes: return .placeSpikes(origin)
         default:      return nil
         }
     }
@@ -128,6 +134,7 @@ enum PlacementSystem {
         case .turret:
             start = world.nextTurretOrigin(for: actor.team, near: actor.position)
         case .chest:  start = world.nextChestTile(for: actor.team, near: actor.position)
+        case .spikes: start = GridPoint(containing: actor.feet + actor.aim.normalized() * 2)
         default:      return nil
         }
 

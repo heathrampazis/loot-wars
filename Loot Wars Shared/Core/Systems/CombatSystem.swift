@@ -349,7 +349,7 @@ enum CombatSystem {
             // bag is the most valuable object on the map - but never is worse than
             // rare: killing somebody carrying one and watching it evaporate is the
             // game deleting the best thing anybody has found all match.
-            case .chest, .arcade, .turret:
+            case .chest, .arcade, .turret, .spikes:
                 drop(.item(stack.type),
                      chance: GameConfig.Drops.carriedStructureChance,
                      at: actor.position, in: world)

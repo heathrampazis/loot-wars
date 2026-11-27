@@ -24,6 +24,7 @@ enum Feature: String, CaseIterable {
     case turrets
     case regeneration
     case stinkBombs
+    case spikes
     case foamBombs
     case fullArcade
     case resistance
@@ -43,6 +44,7 @@ enum Feature: String, CaseIterable {
         case .stinkBombs:    return .stink
         case .foamBombs:     return .foam
         case .confettiPoppers: return .popper
+        case .spikes:        return .spikes
         case .fullArcade:    return .arcade(.full)
         case .resistance:    return .perk(.resistance)
         case .invisibility:  return .perk(.invisibility)
@@ -100,6 +102,7 @@ struct Unlocks: Equatable {
         case .stink:               return has(.stinkBombs)
         case .foam:                return has(.foamBombs) || GameConfig.Loot.testingFoam
         case .popper:              return has(.confettiPoppers)
+        case .spikes:              return has(.spikes) || GameConfig.Loot.testingSpikes
         case .helmet(.cosmic):     return has(.cosmicHelmet)
         case .blaster(.six):       return has(.cosmicBlaster)
         case .bandage, .medkit, .bomb, .chest, .helmet, .blaster:
@@ -138,16 +141,20 @@ enum Roadmap {
         // Thirteen with Foam Bombs (Nov 2026), still inside 55.
         // Fourteen with Confetti Poppers (Nov 2026), early because they are a
         // fighting basic, and still inside 55.
+        // Fifteen with Spikes (Nov 2026), still inside 55. Spikes moved to
+        // level 3: Heath, "spikes should be unlocked very early". Nothing else
+        // moved, so there is a longer gap between Stink Bombs and Regeneration.
+        (3, .spikes),
         (4, .strength),
         (7, .confettiPoppers),
-        (11, .miniArcade),
-        (15, .speed),
-        (19, .stinkBombs),
-        (23, .regeneration),
-        (27, .foamBombs),
-        (31, .fullArcade),
-        (35, .resistance),
-        (39, .invisibility),
+        (10, .miniArcade),
+        (14, .speed),
+        (17, .stinkBombs),
+        (24, .regeneration),
+        (28, .foamBombs),
+        (32, .fullArcade),
+        (36, .resistance),
+        (40, .invisibility),
         (43, .turrets),
         (47, .discoBall),
         (51, .cosmicHelmet),
