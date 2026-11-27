@@ -31,6 +31,8 @@ struct Bomb {
         case blast
         /// Leaves a cloud of gas standing where it landed.
         case stink
+        /// Leaves a cloud of pink foam that hides people (Nov 2026).
+        case foam
     }
 
     let id: BombID

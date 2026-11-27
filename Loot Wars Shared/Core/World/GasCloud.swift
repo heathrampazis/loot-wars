@@ -38,12 +38,16 @@ struct GasCloud {
 
     var timeRemaining: Double
 
+    /// Stink gas hurts; foam hides (Nov 2026) - see GameConfig.Foam.
+    enum Kind { case stink, foam }
+    var kind: Kind = .stink
+
     /// Counts down to the next dose. Damage arrives in portions rather than as a
     /// trickle for the same reason healing does: the screen reacts to every point
     /// of damage, and sixty reactions a second is not a fog, it is a fault.
     var doseTimer: Double = 0
 
-    var radius: Double { GameConfig.Stink.radius }
+    var radius: Double { kind == .foam ? GameConfig.Foam.radius : GameConfig.Stink.radius }
 
     /// How thick it is right now, nought to one.
     ///
@@ -52,14 +56,16 @@ struct GasCloud {
     /// the same number, which means gas you can barely see cannot still be taking
     /// half your health.
     var density: Double {
-        let life = GameConfig.Stink.duration
+        let foam = kind == .foam
+        let life = foam ? GameConfig.Foam.duration : GameConfig.Stink.duration
+        let spread = foam ? GameConfig.Foam.spread : GameConfig.Stink.spread
         let spent = life - timeRemaining
 
-        if spent < GameConfig.Stink.spread {
-            return max(0, spent / GameConfig.Stink.spread)
+        if spent < spread {
+            return max(0, spent / spread)
         }
 
-        let fade = GameConfig.Stink.fade
+        let fade = foam ? GameConfig.Foam.fade : GameConfig.Stink.fade
         guard timeRemaining < fade else { return 1 }
         return max(0, timeRemaining / fade)
     }

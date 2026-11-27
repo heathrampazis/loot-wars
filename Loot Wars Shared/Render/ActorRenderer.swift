@@ -33,6 +33,14 @@ final class ActorRenderer {
     private static let barOutlineInTiles = BarArt.outlineInTiles
     private static let barGapInTiles: Double = 0.08
 
+    /// How quickly somebody fades into or out of foam (Nov 2026): most of the
+    /// way in about half a second.
+    private static let foamFadeRate: Double = 5
+
+    /// Where your own figure is lifted to while you stand in foam: above the
+    /// cloud (GasRenderer.foamZ), so you can still see yourself.
+    static let aboveFoamZ: CGFloat = 15
+
     // Seconds an enemy's bar stays up after they were last hit; yours never hides.
     private static let enemyBarLingers: Double = 3
     // Seconds an enemy's bar takes to fade out once it has lingered.
@@ -181,6 +189,8 @@ final class ActorRenderer {
         let nameTag = SKNode()
         var lastName: String?
         /// Where the tag sits over a showing bar, and where it drops to without one.
+        /// Fading into or out of foam - see sync.
+        var foamFade = false
         var nameHighY: CGFloat = 0
         var nameLowY: CGFloat = 0
 
@@ -274,12 +284,32 @@ final class ActorRenderer {
             // moment after a hit, when its outline shows faintly. Your own is
             // drawn as a ghost, so you know it is working.
             let yours = id == world.localPlayerID
-            if actor.perk == .invisibility, !yours {
-                nodes.root.alpha = actor.isHidden ? 0 : 0.45
+            let wanted: CGFloat
+            if actor.inFoam {
+                // In foam (Nov 2026): an enemy sinks out of sight into it,
+                // under the cloud, which is drawn over everybody (GasRenderer).
+                // You are lifted above the cloud as a ghost, so you never lose
+                // yourself in your own smoke.
+                wanted = yours ? 0.55 : 0
+                if yours { nodes.root.zPosition = ActorRenderer.aboveFoamZ }
+            } else if actor.perk == .invisibility, !yours {
+                wanted = actor.isHidden ? 0 : 0.45
             } else if actor.perk == .invisibility {
-                nodes.root.alpha = 0.4
+                wanted = 0.4
             } else {
-                nodes.root.alpha = actor.invulnerability > 0 ? 0.55 : 1.0
+                wanted = actor.invulnerability > 0 ? 0.55 : 1.0
+            }
+
+            // Into and out of foam is a fade, not a cut (Nov 2026): Heath, "the
+            // enemies shouldnt instantly disappear... like disappear into it".
+            // Everything else stays immediate, as it always was.
+            let fading = actor.inFoam || nodes.foamFade
+            nodes.foamFade = actor.inFoam || (fading && abs(nodes.root.alpha - wanted) > 0.02)
+            if fading, !nodes.root.isHidden {
+                let ease = CGFloat(1 - exp(-dt * ActorRenderer.foamFadeRate))
+                nodes.root.alpha += (wanted - nodes.root.alpha) * ease
+            } else {
+                nodes.root.alpha = wanted
             }
 
             nodes.ring.position = nodes.root.position

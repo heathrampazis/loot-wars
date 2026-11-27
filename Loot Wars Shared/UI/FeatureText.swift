@@ -16,6 +16,7 @@ extension Feature {
         case .turrets:       return "Turrets"
         case .regeneration:  return "Regeneration"
         case .stinkBombs:    return "Stink Bombs"
+        case .foamBombs:     return "Foam Bombs"
         case .fullArcade:    return "Arcade"
         case .resistance:    return "Resistance"
         case .invisibility:  return "Invisibility"
@@ -33,6 +34,7 @@ extension Feature {
         case .turrets:       return "Bases fight back"
         case .regeneration:  return "Heal over time"
         case .stinkBombs:    return "Gas them out"
+        case .foamBombs:     return "Hide in the foam"
         case .fullArcade:    return "Earns tickets"
         case .resistance:    return "Take less damage"
         case .invisibility:  return "Vanish from view"
@@ -53,6 +55,8 @@ extension Feature {
             return "Run faster for a few seconds. Good for reaching a supply drop first."
         case .stinkBombs:
             return "Throw it to leave a cloud of gas. Anyone inside takes damage."
+        case .foamBombs:
+            return "Throw it to leave a cloud of pink foam. Anyone inside can't be seen."
         case .regeneration:
             return "Heal a little every second for a while. Works mid-fight."
         case .fullArcade:

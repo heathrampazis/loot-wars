@@ -152,6 +152,8 @@ enum AIBrain {
 
         if let slot = stinkToThrow(state: state, actor: actor, in: world) {
             commands.append(.useItem(slot: slot))
+        } else if let slot = foamToThrow(state: state, actor: actor, in: world) {
+            commands.append(.useItem(slot: slot))
         }
 
         if let purchase = purchaseToMake(actor: actor, in: world) {
@@ -1033,7 +1035,7 @@ enum AIBrain {
             case .blaster(let tier): return tier > actor.blaster
             // Always worth the walk: one perk is one perk whatever you are wearing.
             case .perk:              return true
-            case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .turret: return false
+            case .bandage, .medkit, .bomb, .stink, .foam, .chest, .arcade, .turret: return false
             }
         })
 
@@ -2680,7 +2682,7 @@ enum AIBrain {
         case .bandage, .medkit:
             return actor.inventory.totalHealing(of: actor.maxHealth)
                  < GameConfig.AI.buysHealingBelow
-        case .bomb, .stink, .chest, .arcade, .turret, .perk:
+        case .bomb, .stink, .foam, .chest, .arcade, .turret, .perk:
             return false
         }
     }
@@ -3076,7 +3078,7 @@ enum AIBrain {
         let ahead = actor.feet + state.desiredHeading * GameConfig.AI.gasLookAhead
 
         for id in world.gasClouds.keys.sorted(by: { $0.raw < $1.raw }) {
-            guard let cloud = world.gasClouds[id],
+            guard let cloud = world.gasClouds[id], cloud.kind == .stink,
                   cloud.density >= GameConfig.Stink.bitingDensity else { continue }
 
             let inIt = cloud.contains(actor.feet)
@@ -3223,6 +3225,36 @@ enum AIBrain {
     /// It will not throw one into gas that is already there. Two clouds on the same
     /// spot are one cloud that cost twice as much, and a bot that cannot see that
     /// looks like a bot.
+    /// A foam bomb to cover a getaway (Nov 2026) - see ItemType.foam. Thrown at
+    /// whoever this bot is running from, or fighting while badly hurt, so the
+    /// screen lands between them and the bot slips out of sight.
+    private static func foamToThrow(state: AIState, actor: Actor, in world: World) -> Int? {
+        let enemyID: ActorID
+        switch state.goal {
+        case .retreat(let id):
+            enemyID = id
+        case .fight(let id), .defend(let id):
+            guard Double(actor.health) < Double(actor.maxHealth) * GameConfig.AI.foamBelow else {
+                return nil
+            }
+            enemyID = id
+        default:
+            return nil
+        }
+
+        guard let enemy = world.actors[enemyID], enemy.isAlive,
+              let slot = actor.inventory.firstSlot(holding: .foam),
+              BombSystem.canThrow(actor, from: slot),
+              !world.foamAt(actor.feet), !world.foamAt(enemy.feet) else { return nil }
+
+        let towards = enemy.position - actor.position
+        guard towards.length <= GameConfig.Bomb.throwRange,
+              abs(shortestAngle(from: actor.aim.angle, to: towards.angle))
+                <= GameConfig.AI.throwTolerance else { return nil }
+
+        return slot
+    }
+
     private static func stinkToThrow(state: AIState, actor: Actor, in world: World) -> Int? {
         guard case .fight(let id) = state.goal,
               let enemy = world.actors[id], enemy.isAlive else { return nil }

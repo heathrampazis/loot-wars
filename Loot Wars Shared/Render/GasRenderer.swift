@@ -41,6 +41,10 @@ final class GasRenderer {
     /// moving this slowly - where it certainly can tell the difference between a
     /// shape that moves and one that does not.
     private static let rebuildInterval: Double = 0.08
+
+    /// Over every actor (about 10 to 12, names included), under the floating
+    /// tags and your own figure while you stand in it (ActorRenderer.aboveFoamZ).
+    static let foamZ: CGFloat = 14
     private static let churn: Double = 0.55
 
     private final class CloudNodes {
@@ -135,12 +139,19 @@ final class GasRenderer {
         // core lies over it. Solid was the last version's mistake in the other
         // direction - it hid the map, and a hazard you cannot see the floor through
         // stops being a place and becomes an obstacle.
-        nodes.shape.fillColor = RenderPalette.gas.withAlphaComponent(0.42)
+        // Foam is thicker than gas - it is a screen, so it should look like one
+        // (Nov 2026): pink, with a purple heart.
+        let foam = cloud.kind == .foam
+        nodes.shape.fillColor = foam
+            ? RenderPalette.foam.withAlphaComponent(0.78)
+            : RenderPalette.gas.withAlphaComponent(0.42)
         nodes.shape.strokeColor = .clear
         nodes.shape.isAntialiased = true
 
         nodes.core.path = GasRenderer.outline(of: cloud, phase: nodes.phase, scale: 0.62)
-        nodes.core.fillColor = RenderPalette.gas.withAlphaComponent(0.30)
+        nodes.core.fillColor = foam
+            ? RenderPalette.foamCore.withAlphaComponent(0.55)
+            : RenderPalette.gas.withAlphaComponent(0.30)
         nodes.core.strokeColor = .clear
         nodes.core.isAntialiased = true
         nodes.core.zPosition = 1
@@ -148,7 +159,9 @@ final class GasRenderer {
 
         // Above the ground and the loot, below the actors - somebody standing in
         // gas is standing IN it rather than behind it.
-        nodes.shape.zPosition = 6
+        // Stink gas lies on the ground, under people. Foam is a screen, drawn
+        // OVER everybody, so the people in it disappear into it (Nov 2026).
+        nodes.shape.zPosition = cloud.kind == .foam ? GasRenderer.foamZ : 6
         nodes.shape.alpha = 0
 
         node.addChild(nodes.shape)

@@ -89,6 +89,12 @@ final class EffectsRenderer {
 
             // Unseen (Nov 2026): no footprints and no aura to give them away,
             // just a slate glint now and then - see Perks.sparkleInterval.
+            // In foam (Nov 2026): nothing at all - no steps, no glint.
+            if actor.inFoam, id != world.localPlayerID {
+                lastFeet[id] = actor.feet
+                continue
+            }
+
             if actor.isHidden, id != world.localPlayerID {
                 let beat = Int(actor.perkRemaining / GameConfig.Perks.sparkleInterval)
                 let previous = lastPerk[id] ?? actor.perkRemaining

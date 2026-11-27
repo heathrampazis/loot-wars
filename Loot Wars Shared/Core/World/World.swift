@@ -2072,12 +2072,15 @@ final class World {
     private var nextGasID = 0
 
     @discardableResult
-    func spawnGas(at centre: Vec2, owner: ActorID, team: TeamID) -> GasCloudID {
+    func spawnGas(at centre: Vec2, owner: ActorID, team: TeamID,
+                  kind: GasCloud.Kind = .stink) -> GasCloudID {
         let cloud = GasCloud(id: GasCloudID(nextGasID),
                              centre: centre,
                              owner: owner,
                              team: team,
-                             timeRemaining: GameConfig.Stink.duration)
+                             timeRemaining: kind == .foam
+                                 ? GameConfig.Foam.duration : GameConfig.Stink.duration,
+                             kind: kind)
         nextGasID += 1
         gasClouds[cloud.id] = cloud
         return cloud.id
@@ -2093,7 +2096,15 @@ final class World {
     /// round a cloud for exactly as long as the cloud is worth routing round.
     func gasAt(_ point: Vec2) -> Bool {
         gasClouds.values.contains {
-            $0.density >= GameConfig.Stink.bitingDensity && $0.contains(point)
+            $0.kind == .stink && $0.density >= GameConfig.Stink.bitingDensity && $0.contains(point)
+        }
+    }
+
+    /// Whether this point is inside foam thick enough to hide in (Nov 2026) -
+    /// see GameConfig.Foam.
+    func foamAt(_ point: Vec2) -> Bool {
+        gasClouds.values.contains {
+            $0.kind == .foam && $0.density >= GameConfig.Foam.hidesAtDensity && $0.contains(point)
         }
     }
 

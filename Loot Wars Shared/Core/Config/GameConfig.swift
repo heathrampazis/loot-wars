@@ -418,6 +418,7 @@ enum GameConfig {
             // this list, so a stink bomb was the one thing the shop would not
             // take - see ShopSystem.sellPrice, which no longer lets that happen.
             .stink: 9,
+            .foam: 12,
             // The starter blaster, in case one is ever in a bag rather than in a
             // hand. Half a Blaster 2.
             .blaster(.one): 6,
@@ -1761,6 +1762,10 @@ enum GameConfig {
         /// to bomb (Nov 2026) - see Upgrades.wallHealth.
         static let crackedWallPull: Double = 6
 
+        /// A bot in a fight throws a foam bomb to get away once below this
+        /// share of its health (Nov 2026) - see AIBrain.foamToThrow.
+        static let foamBelow: Double = 0.45
+
         /// How much less a base is worth raiding per upgrade level (Nov 2026)
         /// - see AIBrain.raidGoal. Enough to pick a soft base over a hard one
         /// at the same distance, not enough to leave hard ones alone.
@@ -2555,6 +2560,24 @@ enum GameConfig {
     /// walks through casually and still short of ending your match on its own. What it is really for is
     /// making two tiles unusable: a doorway, the gap you were about to break
     /// through, or the ground under somebody who has nowhere good to go.
+    /// Foam bombs (Nov 2026) - see ItemType.foam. A smoke screen: anybody
+    /// standing in the cloud is hidden from everybody else - not drawn, not
+    /// targeted by bots, turrets or aim help - and it hurts nobody.
+    enum Foam {
+        /// How far the cloud reaches, in tiles - eight across, a bit bigger
+        /// than a stink cloud, so a fight can disappear into it.
+        static let radius: Double = 4.0
+        /// How long it stands, in seconds.
+        static let duration: Double = 9
+        /// Seconds to billow out to full, and to thin away at the end.
+        static let spread: Double = 0.5
+        static let fade: Double = 1.4
+        /// How thick it has to be to hide somebody.
+        static let hidesAtDensity: Double = 0.5
+        /// Comes out of a crate as a pair, like stink bombs.
+        static let perCrate = 2
+    }
+
     enum Stink {
         /// How far the cloud reaches, in tiles.
         ///
@@ -3054,6 +3077,14 @@ enum GameConfig {
         /// power-up. Heath: "for testing, make invisibility perks common".
         static let testingInvisibility = false
         static let invisibilityTestBoost = 6
+
+        /// Foam bombs for everybody whatever their level, while they are being
+        /// tried out (Nov 2026). Set false to put them behind level 25.
+        static let testingFoam = true
+        /// How much commoner they are while testing. 4 -> 1 (Nov 2026): Heath,
+        /// "make the foam bombs a regular rarity... a bit rarer than the stink
+        /// bombs". Normal weights are in LootTable and Chest.stockTables.
+        static let foamTestBoost = 1
 
         /// How much of its band's bomb weight an ORDINARY crate keeps (Nov 2026,
         /// flags), climbing through the match: roughly 1 crate in 30 is a bomb
@@ -3594,27 +3625,27 @@ enum GameConfig {
         /// ChestSystem.stockRows). Healing thins out as gear takes over.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10),
+                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10), (.foam, 5),
                 (.helmet(.common), 14), (.helmet(.epic), 12),
                 (.blaster(.two),   14), (.blaster(.three), 12)
             ] + perkRows(single: 1, disco: 1)),
             (0.25, [
-                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10),
+                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10), (.foam, 5),
                 (.helmet(.epic), 18), (.helmet(.legendary), 7),
                 (.blaster(.three), 18), (.blaster(.four), 7)
             ] + perkRows(single: 3, disco: 2)),
             (0.50, [
-                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10),
+                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10), (.foam, 5),
                 (.helmet(.epic), 8), (.helmet(.legendary), 18), (.helmet(.mythical), 5),
                 (.blaster(.three), 8), (.blaster(.four), 18), (.blaster(.five), 5)
             ] + perkRows(single: 4, disco: 3)),
             (0.70, [
-                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8),
+                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4),
                 (.helmet(.legendary), 16), (.helmet(.mythical), 13),
                 (.blaster(.four), 16), (.blaster(.five), 13)
             ] + perkRows(single: 4, disco: 3)),
             (0.88, [
-                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8),
+                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4),
                 (.helmet(.legendary), 8), (.helmet(.mythical), 18), (.helmet(.cosmic), 6),
                 (.blaster(.four), 8), (.blaster(.five), 18), (.blaster(.six), 6)
             ] + perkRows(single: 5, disco: 4))
