@@ -23,6 +23,7 @@ enum Feature: String, CaseIterable {
     case turrets
     case regeneration
     case stinkBombs
+    case foamBombs
     case fullArcade
     case resistance
     case invisibility
@@ -39,6 +40,7 @@ enum Feature: String, CaseIterable {
         case .turrets:       return .turret
         case .regeneration:  return .perk(.regeneration)
         case .stinkBombs:    return .stink
+        case .foamBombs:     return .foam
         case .fullArcade:    return .arcade(.full)
         case .resistance:    return .perk(.resistance)
         case .invisibility:  return .perk(.invisibility)
@@ -94,6 +96,7 @@ struct Unlocks: Equatable {
         case .arcade(.full):       return has(.fullArcade)
         case .turret:              return has(.turrets)
         case .stink:               return has(.stinkBombs)
+        case .foam:                return has(.foamBombs) || GameConfig.Loot.testingFoam
         case .helmet(.cosmic):     return has(.cosmicHelmet)
         case .blaster(.six):       return has(.cosmicBlaster)
         case .bandage, .medkit, .bomb, .chest, .helmet, .blaster:
@@ -129,16 +132,18 @@ enum Roadmap {
     static let milestones: [(level: Int, feature: Feature)] = [
         // Twelve unlocks in 55 levels since Invisibility (Nov 2026): every four
         // or five levels rather than every five, and still topping out at 55.
+        // Thirteen with Foam Bombs (Nov 2026), still inside 55.
         (5, .strength),
-        (10, .miniArcade),
-        (14, .speed),
-        (18, .stinkBombs),
-        (22, .regeneration),
-        (27, .fullArcade),
-        (31, .resistance),
-        (36, .invisibility),
-        (40, .turrets),
-        (45, .discoBall),
+        (9, .miniArcade),
+        (13, .speed),
+        (17, .stinkBombs),
+        (21, .regeneration),
+        (25, .foamBombs),
+        (29, .fullArcade),
+        (33, .resistance),
+        (37, .invisibility),
+        (41, .turrets),
+        (46, .discoBall),
         (50, .cosmicHelmet),
         (55, .cosmicBlaster)
     ]

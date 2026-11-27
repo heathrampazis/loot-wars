@@ -24,6 +24,13 @@ enum ItemType: Hashable {
     /// is why they are two items rather than one with a switch.
     case stink
 
+    /// A smoke screen (Nov 2026): thrown like a stink bomb, it leaves a cloud of
+    /// pink foam that hides anybody standing in it - from you, from the bots,
+    /// from turrets - and hurts nobody. Heath: "This will act like a smoke
+    /// screen and you will not be able to see players when they enter the pink
+    /// smoke. Enemies will also not be able to see you." See GameConfig.Foam.
+    case foam
+
     case chest
 
     /// Gear you can carry rather than wear.
@@ -74,6 +81,7 @@ enum ItemType: Hashable {
         // Two: they come out of a crate as a pair (see Loot.stinkBombsPerCrate),
         // so one crate fills one slot exactly.
         case .stink:   return 2
+        case .foam:    return 2
         // One apiece. You can only have one running, so a second in the same slot
         // would be a queue - and a queue of power-ups is a different game.
         case .perk:    return 1
@@ -137,6 +145,7 @@ enum ItemType: Hashable {
         // to walk past without knowing what they were.
         if case .bomb = self { return true }
         if case .stink = self { return true }
+        if case .foam = self { return true }
 
         return rarity >= .mythical
     }
@@ -146,7 +155,7 @@ enum ItemType: Hashable {
         switch self {
         case .bandage: return 0.50
         case .medkit:  return 1.00
-        case .bomb, .stink, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
+        case .bomb, .stink, .foam, .chest, .helmet, .blaster, .arcade, .turret, .perk: return 0
         }
     }
 
@@ -179,7 +188,7 @@ enum ItemType: Hashable {
     var use: Use {
         switch self {
         case .bandage, .medkit, .helmet, .blaster, .perk: return .instant
-        case .bomb, .stink: return .thrown
+        case .bomb, .stink, .foam: return .thrown
         // Both want you to say WHERE.
         case .chest, .arcade, .turret: return .mapTap
         }
@@ -189,7 +198,7 @@ enum ItemType: Hashable {
     var isGear: Bool {
         switch self {
         case .helmet, .blaster: return true
-        case .bandage, .medkit, .bomb, .stink, .chest, .arcade, .turret, .perk: return false
+        case .bandage, .medkit, .bomb, .stink, .foam, .chest, .arcade, .turret, .perk: return false
         }
     }
 

@@ -96,7 +96,11 @@ struct Actor {
     /// Unseen by enemies right now: running Invisibility and not just hit. Bots
     /// and turrets do not aim at them (bots only from right beside them, see
     /// Perks.spotRange), and enemy screens draw only a glint now and then.
-    var isHidden: Bool { perk == .invisibility && revealTimer <= 0 }
+    var isHidden: Bool { (perk == .invisibility && revealTimer <= 0) || inFoam }
+
+    /// Standing in foam thick enough to hide in (Nov 2026) - see
+    /// GameConfig.Foam. Set every tick by GasSystem.
+    var inFoam: Bool = false
 
     /// Counts down to the next thing a running perk does.
     var perkTick: Double = 0
@@ -214,7 +218,7 @@ struct Actor {
               let stack = inventory.slots[index] else { return false }
 
         switch stack.type {
-        case .bomb, .stink:
+        case .bomb, .stink, .foam:
             return true
         // A perk is switched on rather than aimed, so the button will do - but
         // only while one is not already running. Everything else about "one at a

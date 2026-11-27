@@ -342,6 +342,11 @@ enum RenderPalette {
     /// itself.
     static let gas = rgb(0xB4, 0xE3, 0x92)
 
+    /// Foam (Nov 2026): a pink cloud with a purple heart, thick enough to read
+    /// as something you cannot see through - see GasRenderer and ItemType.foam.
+    static let foam = rgb(0xFF, 0x8C, 0xD2)
+    static let foamCore = rgb(0xA8, 0x55, 0xD6)
+
     /// Money: a loose golden token, a machine paying out, the fountain of a
     /// jackpot.
     ///

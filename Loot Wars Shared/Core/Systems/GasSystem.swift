@@ -20,6 +20,7 @@ enum GasSystem {
 
     static func update(_ world: World, dt: Double) {
         linger(world, dt: dt)
+        hideInFoam(world)
         guard !world.gasClouds.isEmpty else { return }
 
         // Sorted rather than in dictionary order: this hands out damage, damage can
@@ -52,7 +53,9 @@ enum GasSystem {
     /// drawn are the same thing: gas you can barely make out cannot still be taking
     /// health off you, which is the one way an area effect really does feel unfair.
     private static func dose(from cloud: GasCloud, in world: World) {
-        guard cloud.density >= GameConfig.Stink.bitingDensity else { return }
+        // Foam hides, it does not hurt - see hideInFoam.
+        guard cloud.kind == .stink,
+              cloud.density >= GameConfig.Stink.bitingDensity else { return }
 
         for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
             guard let actor = world.actors[id], actor.isAlive else { continue }
@@ -112,6 +115,19 @@ enum GasSystem {
             let portion = Double(actor.maxHealth) * GameConfig.Stink.lingerShare
             CombatSystem.damage(id, amount: max(1, Int(portion.rounded())),
                                 from: source, in: world)
+        }
+    }
+
+    /// Who is standing in foam right now (Nov 2026) - see Actor.inFoam. Read
+    /// before the clouds tick, so it matches what was drawn last frame.
+    private static func hideInFoam(_ world: World) {
+        let anyFoam = world.gasClouds.values.contains { $0.kind == .foam }
+        for id in world.actors.keys.sorted(by: { $0.raw < $1.raw }) {
+            guard var actor = world.actors[id] else { continue }
+            let hidden = anyFoam && actor.isAlive && world.foamAt(actor.feet)
+            guard hidden != actor.inFoam else { continue }
+            actor.inFoam = hidden
+            world.actors[id] = actor
         }
     }
 }

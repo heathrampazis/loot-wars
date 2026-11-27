@@ -418,6 +418,7 @@ enum GameConfig {
             // this list, so a stink bomb was the one thing the shop would not
             // take - see ShopSystem.sellPrice, which no longer lets that happen.
             .stink: 9,
+            .foam: 9,
             // The starter blaster, in case one is ever in a bag rather than in a
             // hand. Half a Blaster 2.
             .blaster(.one): 6,
@@ -1761,6 +1762,10 @@ enum GameConfig {
         /// to bomb (Nov 2026) - see Upgrades.wallHealth.
         static let crackedWallPull: Double = 6
 
+        /// A bot in a fight throws a foam bomb to get away once below this
+        /// share of its health (Nov 2026) - see AIBrain.foamToThrow.
+        static let foamBelow: Double = 0.45
+
         /// How much less a base is worth raiding per upgrade level (Nov 2026)
         /// - see AIBrain.raidGoal. Enough to pick a soft base over a hard one
         /// at the same distance, not enough to leave hard ones alone.
@@ -2555,6 +2560,24 @@ enum GameConfig {
     /// walks through casually and still short of ending your match on its own. What it is really for is
     /// making two tiles unusable: a doorway, the gap you were about to break
     /// through, or the ground under somebody who has nowhere good to go.
+    /// Foam bombs (Nov 2026) - see ItemType.foam. A smoke screen: anybody
+    /// standing in the cloud is hidden from everybody else - not drawn, not
+    /// targeted by bots, turrets or aim help - and it hurts nobody.
+    enum Foam {
+        /// How far the cloud reaches, in tiles - eight across, a bit bigger
+        /// than a stink cloud, so a fight can disappear into it.
+        static let radius: Double = 4.0
+        /// How long it stands, in seconds.
+        static let duration: Double = 9
+        /// Seconds to billow out to full, and to thin away at the end.
+        static let spread: Double = 0.5
+        static let fade: Double = 1.4
+        /// How thick it has to be to hide somebody.
+        static let hidesAtDensity: Double = 0.5
+        /// Comes out of a crate as a pair, like stink bombs.
+        static let perCrate = 2
+    }
+
     enum Stink {
         /// How far the cloud reaches, in tiles.
         ///
@@ -3054,6 +3077,12 @@ enum GameConfig {
         /// power-up. Heath: "for testing, make invisibility perks common".
         static let testingInvisibility = false
         static let invisibilityTestBoost = 6
+
+        /// Foam bombs on for everybody and common, for testing (Nov 2026).
+        /// Heath: "make them common for testing atm". Set false to put them
+        /// back behind their level and at their normal rarity.
+        static let testingFoam = true
+        static let foamTestBoost = 4
 
         /// How much of its band's bomb weight an ORDINARY crate keeps (Nov 2026,
         /// flags), climbing through the match: roughly 1 crate in 30 is a bomb

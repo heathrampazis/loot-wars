@@ -2983,7 +2983,7 @@ extension GameScene {
         case .blaster: return "Your blaster is better"
         case .perk:    return "One power-up at a time"
         case .bandage, .medkit: return "Already at full health"
-        case .bomb, .stink, .chest, .arcade, .turret: return "Not right now"
+        case .bomb, .stink, .foam, .chest, .arcade, .turret: return "Not right now"
         }
     }
 

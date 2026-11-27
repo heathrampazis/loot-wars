@@ -99,6 +99,7 @@ enum LootTable {
             (.item(.medkit),  22),
             (.item(.bomb),    52),
             (.item(.stink),   18),
+            (.item(.foam),    12),
 
             // Three helmet rows became two, at the same total weight, so gear is
             // exactly as likely to come out of an early crate as it was - there is
@@ -113,6 +114,7 @@ enum LootTable {
             (.item(.medkit),  24),
             (.item(.bomb),    50),
             (.item(.stink),   16),
+            (.item(.foam),    11),
 
             // The Blaster 2 is gone: by now everybody has better, so that row was a
             // roll that produced nothing.
@@ -132,6 +134,7 @@ enum LootTable {
             (.item(.medkit),  34),
             (.item(.bomb),    44),
             (.item(.stink),   14),
+            (.item(.foam),    10),
 
             // Legendary is where the crates stop, and everything above it is bought.
             //
@@ -156,6 +159,7 @@ enum LootTable {
             (.item(.medkit),  58),
             (.item(.bomb),    40),
             (.item(.stink),   12),
+            (.item(.foam),    9),
 
             // Gear is commoner here than in any other band, and a rung up: the
             // point of this band is that everybody finishes the match kitted out.
@@ -281,6 +285,11 @@ enum LootTable {
         let table = table(at: progress)
         let share = min(1, max(0, bombShare))
         var rows = table.compactMap { row -> (pickup: Pickup, weight: Int)? in
+            // Foam bombs everywhere while they are being tested - see
+            // Loot.testingFoam.
+            if row.pickup == .item(.foam), GameConfig.Loot.testingFoam {
+                return (pickup: row.pickup, weight: row.weight * GameConfig.Loot.foamTestBoost)
+            }
             // More heals, on the settings that want them (Oct 2026).
             if case .item(let type) = row.pickup, type.isHealing {
                 return (pickup: row.pickup,

@@ -44,6 +44,7 @@ enum BombSystem {
         switch type {
         case .bomb:  return .blast
         case .stink: return .stink
+        case .foam:  return .foam
         default:     return nil
         }
     }
@@ -169,7 +170,8 @@ enum BombSystem {
         // cloud it leaves behind, which is what makes it a way of taking GROUND
         // rather than a smaller way of taking health.
         guard case .blast = bomb.kind else {
-            world.spawnGas(at: bomb.position, owner: bomb.owner, team: bomb.team)
+            let cloud: GasCloud.Kind = bomb.kind == .foam ? .foam : .stink
+            world.spawnGas(at: bomb.position, owner: bomb.owner, team: bomb.team, kind: cloud)
             world.record(.gas(at: bomb.position))
             return
         }
