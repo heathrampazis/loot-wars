@@ -2589,6 +2589,11 @@ enum GameConfig {
         static let turretDamage = 260
         /// The chance a carried firework comes off a body.
         static let dropChance = 0.8
+        /// It darts rather than lobs (Nov 2026): Heath, "the firework should
+        /// dart at the target like a real firework". Nearly twice a bomb's
+        /// speed (9), and a little further (a bomb's throw is 6).
+        static let speed: Double = 17
+        static let range: Double = 8
     }
 
     /// Spike traps (Nov 2026) - see SpikeSystem and ItemType.spikes.
@@ -3184,8 +3189,9 @@ enum GameConfig {
         /// While testing, fireworks also turn up in ordinary crates at this
         /// weight, and raid chests and supply drops get it added on (Nov 2026):
         /// Heath, "make them really common for testing". About one crate in
-        /// six. Set to 0 to leave them only where they normally are.
-        static let fireworksTestWeight = 60
+        /// six. Set to 0 to leave them only where they normally are. Back to 0
+        /// (Nov 2026): Heath, "make the fireworks rare again".
+        static let fireworksTestWeight = 0
         /// How much commoner they are while testing. 4 -> 1 (Nov 2026): Heath,
         /// "make the foam bombs a regular rarity... a bit rarer than the stink
         /// bombs". Normal weights are in LootTable and Chest.stockTables.

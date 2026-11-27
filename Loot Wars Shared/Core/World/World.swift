@@ -2119,14 +2119,15 @@ final class World {
                    owner: ActorID,
                    team: TeamID,
                    position: Vec2,
-                   velocity: Vec2) {
+                   velocity: Vec2,
+                   range: Double = GameConfig.Bomb.throwRange) {
         let bomb = Bomb(id: BombID(nextBombID),
                         kind: kind,
                         owner: owner,
                         team: team,
                         position: position,
                         velocity: velocity,
-                        distanceRemaining: GameConfig.Bomb.throwRange)
+                        distanceRemaining: range)
         nextBombID += 1
         bombs.append(bomb)
     }

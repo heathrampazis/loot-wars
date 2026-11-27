@@ -69,11 +69,14 @@ enum BombSystem {
         _ = actor.inventory.consume(at: slot)
         world.actors[id] = actor
 
+        // Fireworks dart, faster and further (Nov 2026).
+        let firework = kind == .firework
         world.spawnBomb(kind,
                         owner: id,
                         team: actor.team,
                         position: actor.position + heading * GameConfig.Bomb.launchOffset,
-                        velocity: heading * GameConfig.Bomb.speed)
+                        velocity: heading * (firework ? GameConfig.Fireworks.speed : GameConfig.Bomb.speed),
+                        range: firework ? GameConfig.Fireworks.range : GameConfig.Bomb.throwRange)
     }
 
     // MARK: - Flight
