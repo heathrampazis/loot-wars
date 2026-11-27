@@ -418,7 +418,7 @@ enum GameConfig {
             // this list, so a stink bomb was the one thing the shop would not
             // take - see ShopSystem.sellPrice, which no longer lets that happen.
             .stink: 9,
-            .foam: 9,
+            .foam: 12,
             // The starter blaster, in case one is ever in a bag rather than in a
             // hand. Half a Blaster 2.
             .blaster(.one): 6,
@@ -3078,11 +3078,13 @@ enum GameConfig {
         static let testingInvisibility = false
         static let invisibilityTestBoost = 6
 
-        /// Foam bombs on for everybody and common, for testing (Nov 2026).
-        /// Heath: "make them common for testing atm". Set false to put them
-        /// back behind their level and at their normal rarity.
+        /// Foam bombs for everybody whatever their level, while they are being
+        /// tried out (Nov 2026). Set false to put them behind level 25.
         static let testingFoam = true
-        static let foamTestBoost = 4
+        /// How much commoner they are while testing. 4 -> 1 (Nov 2026): Heath,
+        /// "make the foam bombs a regular rarity... a bit rarer than the stink
+        /// bombs". Normal weights are in LootTable and Chest.stockTables.
+        static let foamTestBoost = 1
 
         /// How much of its band's bomb weight an ORDINARY crate keeps (Nov 2026,
         /// flags), climbing through the match: roughly 1 crate in 30 is a bomb
@@ -3623,27 +3625,27 @@ enum GameConfig {
         /// ChestSystem.stockRows). Healing thins out as gear takes over.
         static let stockTables: [(from: Double, rows: [(item: ItemType, weight: Int)])] = [
             (0.00, [
-                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10),
+                (.bandage, 34), (.medkit, 18), (.bomb, 3), (.stink, 10), (.foam, 5),
                 (.helmet(.common), 14), (.helmet(.epic), 12),
                 (.blaster(.two),   14), (.blaster(.three), 12)
             ] + perkRows(single: 1, disco: 1)),
             (0.25, [
-                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10),
+                (.bandage, 28), (.medkit, 20), (.bomb, 3), (.stink, 10), (.foam, 5),
                 (.helmet(.epic), 18), (.helmet(.legendary), 7),
                 (.blaster(.three), 18), (.blaster(.four), 7)
             ] + perkRows(single: 3, disco: 2)),
             (0.50, [
-                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10),
+                (.bandage, 22), (.medkit, 22), (.bomb, 3), (.stink, 10), (.foam, 5),
                 (.helmet(.epic), 8), (.helmet(.legendary), 18), (.helmet(.mythical), 5),
                 (.blaster(.three), 8), (.blaster(.four), 18), (.blaster(.five), 5)
             ] + perkRows(single: 4, disco: 3)),
             (0.70, [
-                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8),
+                (.bandage, 18), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4),
                 (.helmet(.legendary), 16), (.helmet(.mythical), 13),
                 (.blaster(.four), 16), (.blaster(.five), 13)
             ] + perkRows(single: 4, disco: 3)),
             (0.88, [
-                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8),
+                (.bandage, 16), (.medkit, 24), (.bomb, 3), (.stink, 8), (.foam, 4),
                 (.helmet(.legendary), 8), (.helmet(.mythical), 18), (.helmet(.cosmic), 6),
                 (.blaster(.four), 8), (.blaster(.five), 18), (.blaster(.six), 6)
             ] + perkRows(single: 5, disco: 4))

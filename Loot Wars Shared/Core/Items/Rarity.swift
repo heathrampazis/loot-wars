@@ -70,9 +70,9 @@ extension ItemType {
         // it cannot open a base, and opening a base is what the colour is about.
         case .stink:   return .legendary
 
-        // Blue, with the stink bomb (Nov 2026): it changes a fight, it does not
-        // open a base.
-        case .foam:    return .legendary
+        // Purple (Nov 2026): a rarer find than the stink bomb. Heath: "they
+        // should be purple rarity".
+        case .foam:    return .mythical
 
         // The safest income on the map once it is standing behind a wall, and the
         // rung comes off the SIZE - Mythical for a cabinet, Legendary for a mini.

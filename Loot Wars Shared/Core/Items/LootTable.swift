@@ -99,7 +99,7 @@ enum LootTable {
             (.item(.medkit),  22),
             (.item(.bomb),    52),
             (.item(.stink),   18),
-            (.item(.foam),    12),
+            (.item(.foam),    9),
 
             // Three helmet rows became two, at the same total weight, so gear is
             // exactly as likely to come out of an early crate as it was - there is
@@ -114,7 +114,7 @@ enum LootTable {
             (.item(.medkit),  24),
             (.item(.bomb),    50),
             (.item(.stink),   16),
-            (.item(.foam),    11),
+            (.item(.foam),    8),
 
             // The Blaster 2 is gone: by now everybody has better, so that row was a
             // roll that produced nothing.
@@ -134,7 +134,7 @@ enum LootTable {
             (.item(.medkit),  34),
             (.item(.bomb),    44),
             (.item(.stink),   14),
-            (.item(.foam),    10),
+            (.item(.foam),    7),
 
             // Legendary is where the crates stop, and everything above it is bought.
             //
@@ -159,7 +159,7 @@ enum LootTable {
             (.item(.medkit),  58),
             (.item(.bomb),    40),
             (.item(.stink),   12),
-            (.item(.foam),    9),
+            (.item(.foam),    6),
 
             // Gear is commoner here than in any other band, and a rung up: the
             // point of this band is that everybody finishes the match kitted out.
