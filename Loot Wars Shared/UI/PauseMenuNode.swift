@@ -75,7 +75,8 @@ final class PauseButtonNode: SKNode {
 /// PAUSED, where the match stands, Resume and Quit match.
 final class PauseMenuNode: SKNode {
 
-    private static let cardSize = CGSize(width: 300, height: 252)
+    private static let cardSize = CGSize(width: 300, height: 266)
+    private static let bandHeight: CGFloat = 54
 
     private let scrim = SKShapeNode()
     private let card = SKShapeNode()
@@ -89,6 +90,10 @@ final class PauseMenuNode: SKNode {
 
     var isShowing: Bool { !isHidden }
 
+    /// The card's scale for this screen, so a show mid-animation settles on
+    /// the right size.
+    private var layOutScale: CGFloat = 1
+
     override init() {
         resume = MenuButtonNode(label: "RESUME", width: 232, height: 52,
                                 tone: RenderPalette.menuPlay)
@@ -100,34 +105,38 @@ final class PauseMenuNode: SKNode {
 
         scrim.fillColor = SKColor(white: 0, alpha: 0.45)
         scrim.strokeColor = .clear
+        scrim.zPosition = -0.5   // under the card's shadow - see PanelArt.dress
         addChild(scrim)
 
         let size = PauseMenuNode.cardSize
         card.path = CGPath(roundedRect: CGRect(x: -size.width / 2, y: -size.height / 2,
                                                width: size.width, height: size.height),
                            cornerWidth: 22, cornerHeight: 22, transform: nil)
-        card.fillColor = SKColor(white: 0.99, alpha: 1)
-        card.strokeColor = SKColor(white: 0.78, alpha: 1)
-        card.lineWidth = 3
+        // A game card with a header band (Nov 2026 polish pass) - see PanelArt.
+        card.zPosition = 1
+        PanelArt.dress(card, size: size, corner: 22, band: PauseMenuNode.bandHeight)
         addChild(card)
 
         let top = size.height / 2
 
         let title = SKLabelNode()
-        title.attributedText = PauseMenuNode.ink("PAUSED", size: 24, weight: .heavy)
+        let words = MenuButtonNode.text("PAUSED", size: 24, weight: .heavy, colour: PanelArt.title)
+        title.attributedText = words
         title.verticalAlignmentMode = .center
-        title.position = CGPoint(x: 0, y: top - 34)
+        title.position = CGPoint(x: 0, y: top - PauseMenuNode.bandHeight / 2)
+        title.zPosition = 2
         card.addChild(title)
 
         detail.verticalAlignmentMode = .center
-        detail.position = CGPoint(x: 0, y: top - 60)
+        detail.position = CGPoint(x: 0, y: top - 76)
+        detail.zPosition = 2
         card.addChild(detail)
 
-        resume.position = CGPoint(x: 0, y: top - 112)
+        resume.position = CGPoint(x: 0, y: top - 126)
         resume.zPosition = 2
         card.addChild(resume)
 
-        quit.position = CGPoint(x: 0, y: top - 174)
+        quit.position = CGPoint(x: 0, y: top - 188)
         quit.zPosition = 2
         card.addChild(quit)
 
@@ -135,7 +144,8 @@ final class PauseMenuNode: SKNode {
         warning.attributedText = PauseMenuNode.ink("Quitting ends the match with no XP",
                                                    size: 11, weight: .semibold, faint: true)
         warning.verticalAlignmentMode = .center
-        warning.position = CGPoint(x: 0, y: top - 216)
+        warning.position = CGPoint(x: 0, y: top - 234)
+        warning.zPosition = 2
         card.addChild(warning)
     }
 
@@ -148,26 +158,27 @@ final class PauseMenuNode: SKNode {
         scrim.path = CGPath(rect: CGRect(x: -screen.width / 2, y: -screen.height / 2,
                                          width: screen.width, height: screen.height),
                             transform: nil)
-        card.setScale(min(1, screen.height / (PauseMenuNode.cardSize.height + 24)))
+        layOutScale = min(1, screen.height / (PauseMenuNode.cardSize.height + 24))
+        card.setScale(layOutScale)
     }
 
     /// Up, with where the match stands: "5 PLAYERS LEFT · FLAG SAFE". No clock
     /// or place since flags (Nov 2026) - a match runs until one is left.
-    func show(playersLeft: Int, flagStanding: Bool) {
+    func show(flagStanding: Bool) {
         chosen = false
         isHidden = false
 
-        let line = "\(playersLeft) PLAYER\(playersLeft == 1 ? "" : "S") LEFT \u{00B7} "
-            + (flagStanding ? "FLAG SAFE" : "FLAG TAKEN")
+        // No player count (Nov 2026) - the leaderboard already shows who is in.
+        let line = flagStanding ? "YOUR FLAG IS SAFE" : "YOUR FLAG WAS TAKEN"
         detail.attributedText = PauseMenuNode.ink(line, size: 12, weight: .bold, faint: true)
 
         removeAllActions()
         alpha = 0
         run(.fadeIn(withDuration: 0.12))
         card.removeAllActions()
-        let rest = card.xScale
-        card.setScale(rest * 0.94)
-        card.run(.scale(to: rest, duration: 0.14))
+        let rest = layOutScale
+        card.setScale(rest * 0.88)
+        card.run(Motion.pop(to: rest, duration: 0.3, overshoot: 1.6))
     }
 
     func hide() {

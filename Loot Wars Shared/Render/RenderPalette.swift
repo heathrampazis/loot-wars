@@ -473,6 +473,17 @@ enum RenderPalette {
     /// Strength's second colour: the spectrum's red, darker.
     static let strengthDeep = rgb(0xB8, 0x00, 0x18)
 
+    /// The candies' own colours (Nov 2026), off StrengthPerk, SpeedPerk,
+    /// RegenerationPerk and ResistancePerk.
+    static let strengthPink = rgb(0xFF, 0x3D, 0x82)
+    static let strengthPinkDeep = rgb(0xC9, 0x1F, 0x5E)
+    static let speedBlue = rgb(0x66, 0xC2, 0xFF)
+    static let speedBlueDeep = rgb(0x2F, 0x8C, 0xD6)
+    static let regenPurple = rgb(0xB2, 0x80, 0xFF)
+    static let regenPurpleDeep = rgb(0x7D, 0x4F, 0xD6)
+    static let resistOrange = rgb(0xFF, 0x91, 0x42)
+    static let resistOrangeDeep = rgb(0xD6, 0x63, 0x1C)
+
     /// Invisibility's slate (Nov 2026), the same two the candy is drawn in.
     static let invisibleLight = rgb(0xB4, 0xBE, 0xCC)
     static let invisibleDeep = rgb(0x55, 0x61, 0x73)
@@ -480,13 +491,14 @@ enum RenderPalette {
     static func colours(for perk: Perk, at step: Int) -> (bright: SKColor, deep: SKColor) {
         switch perk {
         case .overdrive:    return perkColours(at: step)
-        // Red and a deeper red, rather than red and orange: the orange was what
-        // made it read as orange from across the map.
-        case .strength:     return (hue(at: 0), strengthDeep)
-        case .speed:        return (hue(at: 4), hue(at: 5))
-        case .regeneration: return (hue(at: 6), hue(at: 7))
-        // Gold and orange: a warm yellow, kept clear of strength's red.
-        case .resistance:   return (hue(at: 2), hue(at: 1))
+        // Each one in its candy's own colours (Nov 2026): Heath, "the power ups
+        // need to fit more of the actual colours of the power ups". The bright
+        // one is the candy's main colour, measured off its artwork; the deep
+        // one a darker shade of it, so the trail still carries a shade.
+        case .strength:     return (strengthPink, strengthPinkDeep)
+        case .speed:        return (speedBlue, speedBlueDeep)
+        case .regeneration: return (regenPurple, regenPurpleDeep)
+        case .resistance:   return (resistOrange, resistOrangeDeep)
         // Slate, like its candy: a pale grey-blue glint over a deeper one.
         case .invisibility: return (invisibleLight, invisibleDeep)
         }

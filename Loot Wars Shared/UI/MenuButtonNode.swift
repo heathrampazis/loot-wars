@@ -57,6 +57,12 @@ final class MenuButtonNode: SKNode {
     /// How far the face sinks when pressed.
     private let sink: CGFloat
 
+    /// The slab's corner radius, for the shine's mask.
+    private var corner: CGFloat = 0
+
+    /// Held down by a finger right now - see pressDown.
+    private(set) var isHeld = false
+
     /// Accessibility takes a touch that starts near a button and is heading for it.
     private static let slop: CGFloat = 12
 
@@ -76,20 +82,22 @@ final class MenuButtonNode: SKNode {
     init(play width: CGFloat, height: CGFloat, tone: RenderPalette.MenuTone) {
         self.weight = .primary
         self.box = CGSize(width: width, height: height)
-        self.sink = max(3, height * 0.04)
+        self.sink = ButtonArt.depth(for: height)
         self.shadow = MenuButtonNode.dropShadow(width: width, height: height,
                                                 corner: height * MenuButtonNode.primaryCorner)
         super.init()
 
-        addChild(shadow)
-        addChild(face)
+        corner = height * MenuButtonNode.primaryCorner
+        raise(size: box, edge: height * MenuButtonNode.primaryEdge, tone: tone)
 
-        face.addChild(MenuButtonNode.slab(width: width, height: height,
-                                          edge: height * MenuButtonNode.primaryEdge,
-                                          corner: height * MenuButtonNode.primaryCorner,
-                                          tone: tone))
-
+        let under = MenuButtonNode.play(side: height * 0.36)
+        under.fillColor = tone.edge
+        under.strokeColor = tone.edge
+        under.position = CGPoint(x: 0, y: -MenuButtonNode.markDrop(height))
+        under.zPosition = 0.1
+        face.addChild(under)
         let mark = MenuButtonNode.play(side: height * 0.36)
+        mark.zPosition = 0.2
         face.addChild(mark)
     }
 
@@ -97,26 +105,29 @@ final class MenuButtonNode: SKNode {
     init(glyph: SKTexture, side: CGFloat, tone: RenderPalette.MenuTone) {
         self.weight = .secondary
         self.box = CGSize(width: side, height: side)
-        self.sink = max(2.5, side * 0.05)
+        self.sink = ButtonArt.depth(for: side)
         self.shadow = MenuButtonNode.dropShadow(width: side, height: side,
                                                 corner: side * MenuButtonNode.secondaryCorner)
         super.init()
 
-        addChild(shadow)
-        addChild(face)
-
-        face.addChild(MenuButtonNode.slab(width: side, height: side,
-                                          edge: side * MenuButtonNode.secondaryEdge,
-                                          corner: side * MenuButtonNode.secondaryCorner,
-                                          tone: tone))
+        corner = side * MenuButtonNode.secondaryCorner
+        raise(size: box, edge: side * MenuButtonNode.secondaryEdge, tone: tone)
 
         let iconSide = side * 0.46
+        let under = SKSpriteNode(texture: glyph, size: CGSize(width: iconSide, height: iconSide))
+        under.color = tone.edge
+        under.colorBlendFactor = 1
+        under.position = CGPoint(x: 0, y: -MenuButtonNode.markDrop(side))
+        under.zPosition = 0.1
+        face.addChild(under)
+
         let mark = SKSpriteNode(texture: glyph, size: CGSize(width: iconSide, height: iconSide))
 
         // The glyphs are drawn white in Glyphs.swift. Tinted white anyway, so a
         // change of texture cannot quietly change the colour.
         mark.color = .white
         mark.colorBlendFactor = 1
+        mark.zPosition = 0.2
         face.addChild(mark)
     }
 
@@ -125,26 +136,46 @@ final class MenuButtonNode: SKNode {
     init(label: String, width: CGFloat, height: CGFloat, tone: RenderPalette.MenuTone) {
         self.weight = .primary
         self.box = CGSize(width: width, height: height)
-        self.sink = max(3, height * 0.04)
+        self.sink = ButtonArt.depth(for: height)
         self.shadow = MenuButtonNode.dropShadow(width: width, height: height,
                                                 corner: height * MenuButtonNode.primaryCorner)
         super.init()
 
-        addChild(shadow)
-        addChild(face)
+        corner = height * MenuButtonNode.primaryCorner
+        raise(size: box, edge: max(3, height * MenuButtonNode.primaryEdge), tone: tone)
 
-        face.addChild(MenuButtonNode.slab(width: width, height: height,
-                                          edge: max(3, height * MenuButtonNode.primaryEdge),
-                                          corner: height * MenuButtonNode.primaryCorner,
-                                          tone: tone))
+        let size = (height * 0.36).rounded()
+        let under = SKLabelNode()
+        under.attributedText = MenuButtonNode.text(label, size: size, weight: .heavy, colour: tone.edge)
+        under.verticalAlignmentMode = .center
+        under.horizontalAlignmentMode = .center
+        under.position = CGPoint(x: 0, y: -MenuButtonNode.markDrop(height))
+        under.zPosition = 0.9
+        face.addChild(under)
 
         let word = SKLabelNode()
-        word.attributedText = MenuButtonNode.text(label, size: (height * 0.36).rounded(),
-                                                  weight: .heavy, colour: .white)
+        word.attributedText = MenuButtonNode.text(label, size: size, weight: .heavy, colour: .white)
         word.verticalAlignmentMode = .center
         word.horizontalAlignmentMode = .center
         word.zPosition = 1
         face.addChild(word)
+    }
+
+    /// The raised look (Nov 2026) - see ButtonArt. The face (and everything
+    /// on it) moves; the lip and the shadow under it stay put, so pressing
+    /// pushes the face down onto its lip.
+    private func raise(size: CGSize, edge: CGFloat, tone: RenderPalette.MenuTone) {
+        let parts = ButtonArt.parts(size: size, corner: corner, tone: tone, edge: edge)
+        shadow.position = CGPoint(x: 0, y: -parts.depth)
+        addChild(shadow)
+        addChild(parts.lip)
+        addChild(face)
+        face.addChild(parts.face)
+    }
+
+    /// How far below an icon or word its darker copy sits - a little depth.
+    private static func markDrop(_ height: CGFloat) -> CGFloat {
+        max(1.5, (height * 0.035).rounded())
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -260,23 +291,20 @@ final class MenuButtonNode: SKNode {
 
     // MARK: - Idle
 
-    /// A slow bob on the primary, and nothing on the secondaries.
-    ///
-    /// It RISES off its shadow rather than growing: a button that swells reads as
-    /// a thing being zoomed; one that lifts and settles reads as a thing that
-    /// weighs something. On a screen with three controls, the one that moves is
-    /// the one you press.
+    /// The primary's idle (Nov 2026 polish pass): still, with a gleam running
+    /// across it every few seconds. It used to bob up and down forever, and a
+    /// screen where something is always gently moving is one of the things that
+    /// makes UI feel generated rather than made. A shine says "press me" the way
+    /// a real game's main button does, and is still the rest of the time.
+    /// Secondaries keep still.
     func breathe(after delay: TimeInterval) {
         guard weight == .primary else { return }
-
-        let rise = SKAction.sequence([
-            .moveTo(y: sink * 0.8, duration: 1.15),
-            .moveTo(y: 0, duration: 1.15)
-        ])
-        rise.timingMode = .easeInEaseOut
-
-        face.run(.sequence([.wait(forDuration: delay), .repeatForever(rise)]),
-                 withKey: "breathe")
+        let mask = SKShapeNode(rect: CGRect(x: -box.width / 2, y: -box.height / 2,
+                                            width: box.width, height: box.height),
+                               cornerRadius: corner)
+        mask.fillColor = .white
+        mask.strokeColor = .clear
+        Motion.shine(on: face, mask: mask, size: box, every: 3.2, after: delay + 0.4, strength: 0.32)
     }
 
     // MARK: - Pressing
@@ -287,33 +315,59 @@ final class MenuButtonNode: SKNode {
             && abs(point.y) <= box.height / 2 + slop
     }
 
-    /// Down towards its shadow with a squash, then back up past where it started,
-    /// then settle. The shadow tightens as the face comes down to meet it.
-    ///
-    /// Takes a completion rather than the caller acting on the next line:
-    /// presenting a scene on the same frame plays the animation on a node already
-    /// being torn down, and the screen simply changes.
-    func press(then done: @escaping () -> Void) {
-        face.removeAllActions()
+    /// Whether a finger that went down on this button is still near enough to
+    /// count when it lets go - more forgiving than the press itself, so a thumb
+    /// that rolls a little does not lose the tap.
+    func stillOver(localPoint point: CGPoint) -> Bool {
+        let slop = MenuButtonNode.slop * 2.5
+        return abs(point.x) <= box.width / 2 + slop
+            && abs(point.y) <= box.height / 2 + slop
+    }
+
+    /// Finger down: the face sinks onto its shadow, squashed, and STAYS there
+    /// until the finger lifts (Nov 2026). Real buttons do something when you
+    /// let go, not when you touch - and a button that is visibly held down is
+    /// most of what makes it feel physical.
+    func pressDown() {
+        isHeld = true
+        face.removeAction(forKey: "press")
         shadow.removeAllActions()
+        face.run(.group([
+            Motion.eased(.moveTo(y: -sink, duration: Motion.Time.tap), Motion.cubicOut),
+            Motion.eased(.scaleX(to: 1.03, y: 0.93, duration: Motion.Time.tap), Motion.cubicOut)
+        ]), withKey: "press")
+        shadow.run(Motion.eased(.scale(to: 0.93, duration: Motion.Time.tap), Motion.cubicOut))
+    }
 
-        let push = SKAction.sequence([
-            .group([.moveTo(y: -sink, duration: 0.05),
-                    .scaleX(to: 1.03, y: 0.94, duration: 0.05)]),
-            .group([.moveTo(y: sink * 0.5, duration: 0.10),
-                    .scaleX(to: 0.98, y: 1.03, duration: 0.10)]),
-            .group([.moveTo(y: 0, duration: 0.08),
-                    .scale(to: 1, duration: 0.08)])
-        ])
-        push.timingMode = .easeOut
+    /// Finger up on the button: springs back past where it rests and settles,
+    /// and `done` runs a beat in, while it is still springing.
+    func release(then done: @escaping () -> Void) {
+        springBack()
+        run(.sequence([.wait(forDuration: 0.1), .run(done)]), withKey: "release")
+    }
 
-        // The shadow pulls in as the face comes down to meet it.
-        shadow.run(.sequence([
-            .scale(to: 0.93, duration: 0.05),
-            .scale(to: 1, duration: 0.18)
-        ]))
+    /// The finger slid off before letting go: back up, nothing happens.
+    func cancelPress() {
+        guard isHeld else { return }
+        springBack()
+    }
 
-        face.run(.sequence([push, .run(done)]))
+    private func springBack() {
+        isHeld = false
+        face.removeAction(forKey: "press")
+        face.run(.group([
+            Motion.eased(.moveTo(y: 0, duration: 0.32)) { Motion.backOut($0, overshoot: 3) },
+            Motion.eased(.scale(to: 1, duration: 0.32)) { Motion.backOut($0, overshoot: 3) }
+        ]), withKey: "press")
+        shadow.run(Motion.pop(to: 1, duration: 0.3))
+    }
+
+    /// Down and straight back up, for a button pressed in one go (the results
+    /// and pause screens, which act on the touch).
+    func press(then done: @escaping () -> Void) {
+        pressDown()
+        run(.sequence([.wait(forDuration: Motion.Time.tap + 0.02),
+                       .run { [weak self] in self?.release(then: done) }]), withKey: "tap")
     }
 
     /// Type, which SKLabelNode can only style through an attributed string.

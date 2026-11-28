@@ -106,9 +106,8 @@ final class BaseUpgradeNode: SKNode {
         isHidden = false
         alpha = 0
         setScale(0.7)
-        let pop = SKAction.scale(to: 1, duration: 0.18)
-        pop.timingMode = .easeOut
-        run(.group([.fadeIn(withDuration: 0.15), pop]), withKey: "life")
+        run(.group([.fadeIn(withDuration: 0.12), Motion.pop(to: 1, duration: 0.32, overshoot: 2)]),
+            withKey: "life")
     }
 
     func hide() {

@@ -28,7 +28,11 @@ final class HealButtonNode: SKNode {
     private let button = ActionButtonNode(glyph: SKTexture(imageNamed: "Bandage"),
                                           radius: HealButtonNode.radius,
                                           grabRadius: HealButtonNode.grabRadius,
-                                          fill: RenderPalette.stickBackground,
+                                          // The HUD's black, like every in-game
+                                          // button (Nov 2026): Heath, "all buttons
+                                          // should be black on the game for using
+                                          // an item".
+                                          fill: RenderPalette.hudPanel,
                                           glass: true, shadow: true)
     private var shownType: ItemType?
 

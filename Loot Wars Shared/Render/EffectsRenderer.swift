@@ -178,7 +178,10 @@ final class EffectsRenderer {
         // On the ground, under the figure's feet, walking the ring as it spreads.
         let disc = SKShapeNode(ellipseOf: CGSize(width: tile * 1.7, height: tile * 0.8))
         disc.position = CGPoint(x: origin.x, y: origin.y - tile * 0.42)
-        disc.fillColor = RenderPalette.hue(at: 0)
+        // In the power-up's own colours now (Nov 2026 polish): the same
+        // rainbow for every one of them said "a power-up" but never which.
+        // The Disco Ball's own colours are still the rainbow.
+        disc.fillColor = RenderPalette.colours(for: perk, at: 0).bright
         disc.strokeColor = RenderPalette.perkSpark
         disc.lineWidth = 2
         disc.alpha = 0.55
@@ -187,9 +190,9 @@ final class EffectsRenderer {
         node.addChild(disc)
 
         disc.run(.sequence([
-            .group([.scale(to: 1.5, duration: 0.45),
+            .group([Motion.eased(.scale(to: 1.5, duration: 0.45), Motion.cubicOut),
                     .sequence([.fadeAlpha(to: 0.55, duration: 0.1),
-                               .fadeOut(withDuration: 0.35)])]),
+                               Motion.eased(.fadeOut(withDuration: 0.35), Motion.cubicIn)])]),
             .removeFromParent()
         ]))
 
@@ -206,7 +209,8 @@ final class EffectsRenderer {
 
             ring.position = origin
             ring.fillColor = .clear
-            ring.strokeColor = RenderPalette.hue(at: index * 2)
+            let pair = RenderPalette.colours(for: perk, at: index * 2)
+            ring.strokeColor = index % 2 == 0 ? pair.bright : pair.deep
             ring.lineWidth = 4
             ring.alpha = 0
             ring.zPosition = 11
@@ -216,8 +220,9 @@ final class EffectsRenderer {
                 .wait(forDuration: Double(index) * 0.075),
                 .group([
                     .sequence([.fadeAlpha(to: 0.95, duration: 0.1),
-                               .fadeOut(withDuration: 0.3)]),
-                    .scale(to: 0.12, duration: 0.4)
+                               Motion.eased(.fadeOut(withDuration: 0.3), Motion.cubicIn)]),
+                    // Gathering in: slow, then snapping shut.
+                    Motion.eased(.scale(to: 0.12, duration: 0.4), Motion.cubicIn)
                 ]),
                 .removeFromParent()
             ]))
@@ -226,7 +231,7 @@ final class EffectsRenderer {
         // And a column of it going up through them, changing colour on the way.
         let column = SKSpriteNode(texture: GlowArt.pool)
         column.size = CGSize(width: tile * 0.9, height: tile * 1.2)
-        column.color = RenderPalette.hue(at: 0)
+        column.color = RenderPalette.colours(for: perk, at: 0).bright
         column.colorBlendFactor = 1
         column.anchorPoint = CGPoint(x: 0.5, y: 0.1)
         column.position = CGPoint(x: origin.x, y: origin.y - tile * 0.45)
@@ -236,12 +241,13 @@ final class EffectsRenderer {
 
         column.run(.sequence([
             .group([
-                .scaleX(to: 0.75, y: 2.4, duration: 0.4),
+                Motion.eased(.scaleX(to: 0.75, y: 2.4, duration: 0.4), Motion.cubicOut),
                 .sequence([.fadeAlpha(to: 0.75, duration: 0.12),
                            .fadeOut(withDuration: 0.34)]),
                 .sequence((0..<5).map { index -> SKAction in
-                    .colorize(with: RenderPalette.hue(at: index * 2),
-                              colorBlendFactor: 1, duration: 0.1)
+                    let pair = RenderPalette.colours(for: perk, at: index * 2)
+                    return .colorize(with: index % 2 == 0 ? pair.bright : pair.deep,
+                                     colorBlendFactor: 1, duration: 0.1)
                 })
             ]),
             .removeFromParent()
@@ -260,6 +266,99 @@ final class EffectsRenderer {
             node.run(.sequence([
                 .wait(forDuration: Double(index) * 0.07),
                 .run { [weak self] in self?.aura(at: position, step: index, perk: perk) }
+            ]))
+        }
+
+        // The Disco Ball gets a party of its own (Nov 2026): Heath wanted
+        // "slight more animation when using the disco ball".
+        if perk == .overdrive { discoBurst(at: origin, tile: tile) }
+
+        // And WHICH one, over their head (Nov 2026 polish): the power-up's own
+        // picture pops up as the column goes through it, holds a moment and
+        // floats off - so you can tell what somebody across the map just
+        // drank, and so can they.
+        let texture = ItemArt.texture(for: .perk(perk))
+        let icon = SKSpriteNode(texture: texture, size: ItemArt.size(of: texture, fittingInto: tile * 0.75))
+        icon.position = CGPoint(x: origin.x, y: origin.y + tile * 1.25)
+        icon.zPosition = 30
+        icon.alpha = 0
+        icon.setScale(0.3)
+        node.addChild(icon)
+
+        let halo = SKSpriteNode(texture: GlowArt.pool)
+        halo.size = CGSize(width: tile * 1.3, height: tile * 1.3)
+        halo.color = RenderPalette.colours(for: perk, at: 0).bright
+        halo.colorBlendFactor = 1
+        halo.alpha = 0
+        halo.zPosition = -0.1
+        icon.addChild(halo)
+        halo.run(.sequence([.wait(forDuration: 0.12), .fadeAlpha(to: 0.7, duration: 0.08),
+                            Motion.eased(.fadeOut(withDuration: 0.5), Motion.cubicIn)]))
+
+        icon.run(.sequence([
+            .wait(forDuration: 0.12),
+            .group([.fadeIn(withDuration: 0.08), Motion.pop(to: 1, duration: 0.34, overshoot: 2.4)]),
+            .wait(forDuration: 0.4),
+            .group([Motion.eased(.moveBy(x: 0, y: tile * 0.5, duration: 0.26), Motion.cubicIn),
+                    Motion.eased(.scale(to: 0.7, duration: 0.26), Motion.cubicIn),
+                    Motion.eased(.fadeOut(withDuration: 0.26), Motion.cubicIn)]),
+            .removeFromParent()
+        ]))
+    }
+
+    /// The Disco Ball going on: beams of coloured light swing round from over
+    /// the head like a mirror ball's, and a ring of rainbow glints bursts out.
+    private func discoBurst(at origin: CGPoint, tile: CGFloat) {
+        let ball = CGPoint(x: origin.x, y: origin.y + tile * 1.25)
+
+        let beams = SKNode()
+        beams.position = ball
+        beams.zPosition = 9
+        beams.alpha = 0
+        node.addChild(beams)
+        for index in 0..<8 {
+            let beam = SKSpriteNode(texture: GlowArt.pool)
+            beam.size = CGSize(width: tile * 2.6, height: tile * 0.28)
+            beam.anchorPoint = CGPoint(x: 0, y: 0.5)
+            beam.zRotation = CGFloat(index) / 8 * 2 * .pi
+            beam.color = RenderPalette.hue(at: index)
+            beam.colorBlendFactor = 1
+            beam.blendMode = .add
+            beam.alpha = 0.55
+            beams.addChild(beam)
+        }
+        beams.setScale(0.3)
+        beams.run(.sequence([
+            .wait(forDuration: 0.1),
+            .group([.fadeIn(withDuration: 0.1),
+                    Motion.eased(.scale(to: 1, duration: 0.3), Motion.cubicOut),
+                    Motion.eased(.rotate(byAngle: .pi * 0.9, duration: 1.0), Motion.inOut),
+                    .sequence([.wait(forDuration: 0.6), Motion.eased(.fadeOut(withDuration: 0.4), Motion.cubicIn)])]),
+            .removeFromParent()
+        ]))
+
+        for index in 0..<16 {
+            let glint = SKSpriteNode(texture: ImpactArt.star)
+            let side = tile * (0.18 + 0.06 * CGFloat(index % 3))
+            glint.size = CGSize(width: side, height: side)
+            glint.color = RenderPalette.hue(at: index)
+            glint.colorBlendFactor = 0.7
+            glint.position = ball
+            glint.zPosition = 12
+            glint.alpha = 0
+            glint.setScale(0.3)
+            node.addChild(glint)
+            let angle = CGFloat(index) / 16 * 2 * .pi
+            let reach = tile * (1.3 + 0.3 * CGFloat(index % 2))
+            glint.run(.sequence([
+                .wait(forDuration: 0.12 + Double(index % 4) * 0.03),
+                .group([.fadeIn(withDuration: 0.05),
+                        Motion.pop(to: 1, duration: 0.25, overshoot: 2),
+                        Motion.eased(.moveBy(x: cos(angle) * reach, y: sin(angle) * reach, duration: 0.5),
+                                     Motion.cubicOut),
+                        .rotate(byAngle: 1.5, duration: 0.6),
+                        .sequence([.wait(forDuration: 0.35), Motion.eased(.fadeOut(withDuration: 0.25), Motion.cubicIn)])]),
+                .removeFromParent()
             ]))
         }
     }

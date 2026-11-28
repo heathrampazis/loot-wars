@@ -70,11 +70,11 @@ final class ResultsNode: SKNode {
 
         scrim.fillColor = SKColor(white: 0, alpha: 0.6)
         scrim.strokeColor = .clear
+        scrim.zPosition = -0.5   // under the card's shadow - see PanelArt.dress
         addChild(scrim)
 
-        card.fillColor = SKColor(white: 0.99, alpha: 1)
-        card.strokeColor = SKColor(white: 0.78, alpha: 1)
-        card.lineWidth = 3
+        // Dressed in arrange, once its height is known - see PanelArt.
+        card.zPosition = 1
         addChild(card)
 
         trophy.zPosition = 3
@@ -145,7 +145,7 @@ final class ResultsNode: SKNode {
         let track = SKShapeNode(path: CGPath(
             roundedRect: CGRect(x: -width / 2, y: -6, width: width, height: 12),
             cornerWidth: 6, cornerHeight: 6, transform: nil))
-        track.fillColor = SKColor(white: 0.86, alpha: 1)
+        track.fillColor = PanelArt.plateEdge
         track.strokeColor = .clear
         levelRow.addChild(track)
 
@@ -196,6 +196,8 @@ final class ResultsNode: SKNode {
         let width = ResultsNode.cardWidth
         card.path = CGPath(roundedRect: CGRect(x: -width / 2, y: -top, width: width, height: cardHeight),
                            cornerWidth: 22, cornerHeight: 22, transform: nil)
+        // A game card (Nov 2026 polish pass): thick edge and a soft shadow.
+        PanelArt.dress(card, size: CGSize(width: width, height: cardHeight), corner: 22)
 
         trophy.position = CGPoint(x: 0, y: top - 18 - ResultsNode.trophySide / 2)
         headline.position = CGPoint(x: 0, y: top - headlineDown)
@@ -219,8 +221,9 @@ final class ResultsNode: SKNode {
             roundedRect: CGRect(x: -size.width / 2, y: -size.height / 2,
                                 width: size.width, height: size.height),
             cornerWidth: 12, cornerHeight: 12, transform: nil))
-        plate.fillColor = SKColor(white: 0.93, alpha: 1)
-        plate.strokeColor = .clear
+        plate.fillColor = PanelArt.plateFace
+        plate.strokeColor = PanelArt.plateEdge
+        plate.lineWidth = 2
         node.addChild(plate)
 
         let number = SKLabelNode()
@@ -353,9 +356,9 @@ final class ResultsNode: SKNode {
         let rest = card.position
         card.alpha = 0
         card.position = CGPoint(x: rest.x, y: rest.y - 40)
-        let rise = SKAction.move(to: rest, duration: 0.32)
-        rise.timingMode = .easeOut
-        card.run(.group([rise, .fadeIn(withDuration: 0.2)]))
+        // Rises into place, overshooting a hair (Nov 2026 polish pass).
+        let rise = Motion.eased(.move(to: rest, duration: 0.42)) { Motion.backOut($0, overshoot: 1.2) }
+        card.run(.group([rise, .fadeIn(withDuration: 0.18)]))
 
         if podium, let place {
             trophy.setScale(0)
@@ -364,20 +367,28 @@ final class ResultsNode: SKNode {
                 run(.sequence([.wait(forDuration: 0.28),
                                .run { SoundPlayer.shared.play(.victory) }]))
             }
+            // Slams in with a twist and a springy settle, and the confetti goes
+            // off as it lands (Nov 2026 polish pass). Then it stays still, with
+            // a gleam across it now and then, rather than wobbling forever.
+            trophy.zRotation = -0.35
             trophy.run(.sequence([
                 .wait(forDuration: 0.28),
-                .scale(to: 1.25, duration: 0.14),
-                .scale(to: 1, duration: 0.12),
+                .group([Motion.pop(to: 1, duration: 0.42, overshoot: 2.6),
+                        Motion.eased(.rotate(toAngle: 0, duration: 0.42)) { Motion.backOut($0, overshoot: 2) }]),
+            ]))
+            run(.sequence([
+                .wait(forDuration: 0.4),
                 .run { [weak self] in
                     guard let self else { return }
                     self.confetti(from: self.trophy, pieces: place == 0 ? 60 : 36)
                 }
             ]))
-            // A gentle wobble once it has landed, so it stays alive on the card.
-            let wobble = SKAction.sequence([.rotate(toAngle: 0.06, duration: 0.9),
-                                            .rotate(toAngle: -0.06, duration: 0.9)])
-            wobble.timingMode = .easeInEaseOut
-            trophy.run(.sequence([.wait(forDuration: 0.6), .repeatForever(wobble)]), withKey: "wobble")
+            if let texture = trophy.texture {
+                let side = ResultsNode.trophySide
+                let mask = SKSpriteNode(texture: texture, size: CGSize(width: side, height: side))
+                Motion.shine(on: trophy, mask: mask, size: CGSize(width: side, height: side),
+                             every: 2.8, after: 1.0, strength: 0.5)
+            }
         }
 
         // The score counts up.
@@ -397,19 +408,12 @@ final class ResultsNode: SKNode {
 
         // Your stats pop in one at a time.
         for (index, tile) in tiles.enumerated() {
-            tile.alpha = 0
-            tile.setScale(0.8)
-            tile.run(.sequence([
-                .wait(forDuration: 0.5 + Double(index) * 0.06),
-                .group([.fadeIn(withDuration: 0.15),
-                        .sequence([.scale(to: 1.08, duration: 0.1), .scale(to: 1, duration: 0.08)])])
-            ]))
+            Motion.popIn(tile, delay: 0.5 + Double(index) * Motion.Time.stagger, from: 0.7, to: 1)
         }
 
-        for button in [again, menu] {
-            button.alpha = 0
-            button.run(.sequence([.wait(forDuration: 0.9), .fadeIn(withDuration: 0.2)]))
-        }
+        // The buttons last, popping up one after the other.
+        Motion.popIn(again, delay: 0.9, from: 0.6, to: 1)
+        Motion.popIn(menu, delay: 0.96, from: 0.6, to: 1)
 
         playLevel(award)
     }
@@ -468,8 +472,7 @@ final class ResultsNode: SKNode {
                     self?.setLevel(next)
                     // The top level is a full bar, not a fresh one to fill.
                     self?.setXPBar(Roadmap.isMax(next) ? 1 : 0)
-                    self?.levelLabel.run(.sequence([.scale(to: 1.3, duration: 0.08),
-                                                    .scale(to: 1, duration: 0.14)]))
+                    if let label = self?.levelLabel { Motion.punch(label, by: 0.3) }
                 })
                 xp += room
                 left -= room
@@ -490,7 +493,7 @@ final class ResultsNode: SKNode {
 
     private func fill(from: CGFloat, to: CGFloat, duration: TimeInterval) -> SKAction {
         .customAction(withDuration: duration) { [weak self] _, elapsed in
-            let t = min(1, elapsed / CGFloat(duration))
+            let t = CGFloat(Motion.cubicOut(Float(min(1, elapsed / CGFloat(duration)))))
             self?.setXPBar(from + (to - from) * t)
         }
     }
@@ -559,8 +562,11 @@ final class ResultsNode: SKNode {
 
         let rest = unlockCard.xScale
         unlockCard.setScale(0)
-        unlockCard.run(.sequence([.scale(to: rest * 1.15, duration: 0.16),
-                                  .scale(to: rest, duration: 0.12)]))
+        unlockCard.zRotation = 0.18
+        unlockCard.run(.group([
+            Motion.pop(to: rest, duration: 0.46, overshoot: 2.2),
+            Motion.eased(.rotate(toAngle: 0, duration: 0.46)) { Motion.backOut($0, overshoot: 2) }
+        ]))
         SoundPlayer.shared.play(.upgrade)
         confetti(from: unlockCard, pieces: 24)
     }
@@ -576,7 +582,7 @@ final class ResultsNode: SKNode {
     private func revealBest() {
         best.isHidden = false
         best.setScale(0)
-        best.run(.sequence([.scale(to: 1.2, duration: 0.12), .scale(to: 1, duration: 0.1)]))
+        best.run(Motion.pop(to: 1, duration: 0.34, overshoot: 2.4))
     }
 
     /// A burst of confetti out of a node: little flat strips in the menu's

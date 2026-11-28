@@ -357,6 +357,29 @@ final class HotbarNode: SKNode {
 
     /// Acknowledges a tap that spent something, so the slot answers the finger
     /// even though what it held is on its way out.
+    /// Where a slot sits, in the bar's own space - for things flying into it.
+    func slotCentre(_ index: Int) -> CGPoint {
+        CGPoint(x: HotbarNode.centreX(of: index), y: 0)
+    }
+
+    /// Something is on its way into this slot - see ItemSlotNode.awaitArrival.
+    func awaitArrival(_ index: Int) {
+        guard slots.indices.contains(index) else { return }
+        slots[index].awaitArrival()
+    }
+
+    /// What was on its way in was used instead - see GameScene.absorbPickup.
+    func cancelArrival(_ index: Int) {
+        guard slots.indices.contains(index) else { return }
+        slots[index].cancelArrival()
+    }
+
+    /// Something just landed in this slot (Nov 2026) - see ItemSlotNode.receive.
+    func receive(_ index: Int) {
+        guard slots.indices.contains(index) else { return }
+        slots[index].receive()
+    }
+
     func acknowledge(_ index: Int) {
         guard slots.indices.contains(index) else { return }
         slots[index].flinch()

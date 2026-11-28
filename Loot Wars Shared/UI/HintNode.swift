@@ -142,13 +142,14 @@ final class HintNode: SKNode {
         removeAction(forKey: "hint")
         isHidden = false
         alpha = 0
-        setScale(0.92)
+        setScale(0.8)
 
-        // A nudge downwards on the way in, towards the thing it is talking about.
+        // Pops in with a springy settle and slips away (Nov 2026 polish pass).
         run(.sequence([
-            .group([.fadeIn(withDuration: 0.12), .scale(to: 1, duration: 0.12)]),
+            .group([.fadeIn(withDuration: 0.1), Motion.pop(to: 1, duration: 0.3, overshoot: 2)]),
             .wait(forDuration: seconds),
-            .fadeOut(withDuration: 0.22),
+            .group([Motion.eased(.fadeOut(withDuration: 0.18), Motion.cubicIn),
+                    Motion.eased(.scale(to: 0.94, duration: 0.18), Motion.cubicIn)]),
             .hide(),
             .run { [weak self] in self?.showing = nil }
         ]), withKey: "hint")

@@ -120,31 +120,32 @@ final class KillBannerNode: SKNode {
             // Already up: a bump rather than a second entrance.
             alpha = 1
             position.y = restingY
-            run(.sequence([.scale(to: 1.12, duration: 0.07),
-                           .scale(to: 1, duration: 0.12)]))
+            // Another one: a punch, and the count badge slams in (Nov 2026
+            // polish pass - eased, not linear).
+            Motion.punch(self, by: 0.14)
             badge.removeAllActions()
-            badge.setScale(1.4)
-            badge.run(.scale(to: 1, duration: 0.15))
+            badge.setScale(1.8)
+            badge.run(Motion.pop(to: 1, duration: 0.3, overshoot: 2.6))
         } else {
             alpha = 0
-            setScale(0.7)
+            setScale(0.6)
             position.y = restingY
-            run(.group([.fadeIn(withDuration: 0.12),
-                        .sequence([.scale(to: 1.08, duration: 0.12),
-                                   .scale(to: 1, duration: 0.1)])]))
+            run(.group([.fadeIn(withDuration: 0.1),
+                        Motion.pop(to: 1, duration: 0.32, overshoot: 2.2)]))
         }
 
         // The crosshair turns a quarter as it lands, which is the "got them".
         mark.removeAllActions()
         mark.zRotation = -.pi / 4
         mark.setScale(1.5)
-        mark.run(.group([.rotate(toAngle: 0, duration: 0.2),
-                         .scale(to: 1, duration: 0.2)]))
+        mark.run(.group([Motion.eased(.rotate(toAngle: 0, duration: 0.32)) { Motion.backOut($0, overshoot: 2) },
+                         Motion.pop(to: 1, duration: 0.32, overshoot: 2)]))
 
         run(.sequence([
             .wait(forDuration: KillBannerNode.holdTime),
-            .group([.fadeOut(withDuration: 0.25),
-                    .moveBy(x: 0, y: 6, duration: 0.25)]),
+            .group([Motion.eased(.fadeOut(withDuration: 0.2), Motion.cubicIn),
+                    Motion.eased(.moveBy(x: 0, y: 8, duration: 0.2), Motion.cubicIn),
+                    Motion.eased(.scale(to: 0.92, duration: 0.2), Motion.cubicIn)]),
             .run { [weak self] in
                 guard let self else { return }
                 self.isHidden = true

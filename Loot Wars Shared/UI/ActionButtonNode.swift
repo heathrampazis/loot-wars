@@ -13,6 +13,12 @@
 //  have picked out of the hotbar. See GameScene.updateRightControl for why the
 //  corner's swap waits for a lull.
 //
+//  RAISED (Nov 2026): Heath wanted the buttons to stop being "super static" and
+//  chose the chunky 3D look for all of them. Given a tone, a button is a solid
+//  coloured face standing on a darker lip (see ButtonArt): a finger pushes the
+//  face down onto the lip and letting go springs it back up. Without a tone it
+//  is the dark glass disc, exactly as it always was (the shop keeps it).
+//
 
 import Foundation
 import SpriteKit
@@ -34,11 +40,21 @@ final class ActionButtonNode: SKNode {
     private let glyphSize: CGFloat
     private let shape: Shape
 
+    /// The glass disc, or - on a raised button - the ring that lights up when
+    /// the button is recommending itself.
     private let base: SKShapeNode
     private let glyph = SKSpriteNode()
 
+    /// What moves when pressed: the face and everything on it. The lip and the
+    /// shadow stay put.
+    private let face = SKNode()
+    /// The glyph's darker copy just under it, on a raised button.
+    private let glyphShade = SKSpriteNode()
+    private let raised: Bool
+    /// How far the face goes down when pressed: the lip's height.
+    private let depth: CGFloat
+
     /// How strongly the glyph shows when the button is not recommending itself.
-    /// White symbols sit back a little at 85%; coloured art wants all of itself.
     private let restingGlyphAlpha: CGFloat
 
     private(set) var isPressed = false
@@ -50,61 +66,96 @@ final class ActionButtonNode: SKNode {
          grabRadius: CGFloat = 105,
          shape: Shape = .circle,
          fill: SKColor = RenderPalette.controlBackground,
+         tone: RenderPalette.MenuTone? = nil,
          glyphSize: CGFloat? = nil,
          glass: Bool = false,
          shadow: Bool = false,
          glyphAlpha: CGFloat = 0.85,
          caption: String? = nil) {
         self.grabRadius = grabRadius
-        self.restingGlyphAlpha = glyphAlpha
-        // Defaults to half the button, which is right for art that already has its
-        // own margin. The drawn glyphs do not, so they say how big they want to be.
+        self.raised = tone != nil
+        self.restingGlyphAlpha = tone != nil ? 1 : glyphAlpha
         self.glyphSize = glyphSize ?? radius
         self.shape = shape
+        let side = radius * 2
+        let corner = shape == .circle ? radius : side * 0.16
+        // A glass button is exactly as it always was (Nov 2026): a shallow lip
+        // under it was tried and read as "weird layering".
+        self.depth = tone != nil ? ButtonArt.depth(for: side) : 0
 
-        switch shape {
-        case .circle:
-            self.base = SKShapeNode(circleOfRadius: radius)
-        case .roundedSquare:
-            // Corner radius measured off the reference at 0.16 of the side.
-            self.base = SKShapeNode(
-                rect: CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2),
-                cornerRadius: radius * 2 * 0.16)
+        if tone != nil {
+            // The ring that lights up: a little outside the face.
+            let ring = radius + 5
+            switch shape {
+            case .circle:
+                self.base = SKShapeNode(circleOfRadius: ring)
+            case .roundedSquare:
+                self.base = SKShapeNode(rect: CGRect(x: -ring, y: -ring, width: ring * 2, height: ring * 2),
+                                        cornerRadius: corner + 5)
+            }
+        } else {
+            switch shape {
+            case .circle:
+                self.base = SKShapeNode(circleOfRadius: radius)
+            case .roundedSquare:
+                self.base = SKShapeNode(
+                    rect: CGRect(x: -radius, y: -radius, width: side, height: side),
+                    cornerRadius: corner)
+            }
         }
-
         super.init()
+        zPosition = 1000
 
-        base.fillColor = fill
-        base.strokeColor = RenderPalette.glassRim
-        base.lineWidth = RenderPalette.glassRimWidth
-        // Frosted map behind it - see GlassNode. Only where asked.
-        if glass, let path = base.path { base.addChild(GlassNode(path: path)) }
-
-        // A soft shadow under it, the menu buttons' own, lighter here so it lifts
-        // the button off the map without drawing a dark ring round it. A sibling
-        // of the base rather than a child, so it stays put while the base breathes.
-        if shadow {
-            let under = MenuButtonNode.dropShadow(
-                width: radius * 2, height: radius * 2,
-                corner: shape == .circle ? radius : radius * 2 * 0.16)
+        // No drop shadow under a raised button (Nov 2026): the lip is its
+        // depth, and a shadow under the lip too read as one layer too many -
+        // Heath, "the game buttons have a weird layering".
+        if shadow && tone == nil {
+            let under = MenuButtonNode.dropShadow(width: side, height: side, corner: corner)
             under.zPosition = -2
             under.alpha = 0.7
+            under.position = CGPoint(x: 0, y: -depth)
             addChild(under)
         }
 
-        glyph.alpha = glyphAlpha
+        if let tone {
+            base.fillColor = .clear
+            base.strokeColor = .clear
+            base.lineWidth = 4
+            base.position = CGPoint(x: 0, y: -depth / 2)
+            base.zPosition = -1
+            addChild(base)
 
-        zPosition = 1000
-        addChild(base)
-        addChild(glyph)
+            let parts = ButtonArt.parts(size: CGSize(width: side, height: side), corner: corner, tone: tone)
+            addChild(parts.lip)
+            addChild(face)
+            face.addChild(parts.face)
 
-        // A word under the glyph, in the title screen's lettering. The glyph moves
-        // up to make room; the word sits just inside the bottom edge.
+            // No darker copy under the glyph in game (Nov 2026) - another
+            // layer that made these look stacked. Kept as a node, hidden, so
+            // setGlyph stays simple.
+            glyphShade.isHidden = true
+            face.addChild(glyphShade)
+        } else {
+            base.fillColor = fill
+            base.strokeColor = RenderPalette.glassRim
+            base.lineWidth = RenderPalette.glassRimWidth
+            if glass, let path = base.path { base.addChild(GlassNode(path: path)) }
+            addChild(face)
+            face.addChild(base)
+        }
+
+        glyph.alpha = restingGlyphAlpha
+        glyph.zPosition = 0.2
+        face.addChild(glyph)
+
+        // A word under the glyph, set in the logo's lettering rather than plain
+        // type so it reads as part of the button - the shop's SHOP.
         if let caption {
             let art = LogoArt.make(caption, size: radius * 0.4, bounce: false)
             let word = SKSpriteNode(texture: art.texture, size: art.size)
             word.position = CGPoint(x: 0, y: -radius + radius * 0.1 + art.size.height / 2)
-            addChild(word)
+            word.zPosition = 0.3
+            face.addChild(word)
             glyph.position = CGPoint(x: 0, y: radius * 0.2)
         }
 
@@ -115,48 +166,55 @@ final class ActionButtonNode: SKNode {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// Swaps what the button does the job of. The caller decides when that is safe -
-    /// changing it under a thumb that is already pressing would be the worst
-    /// possible moment.
+    /// Swaps the picture, fitted to the same box whatever its proportions.
     func setGlyph(_ texture: SKTexture) {
         glyph.texture = texture
-
-        // Fit the art inside the glyph box rather than squashing it to a square.
         let art = texture.size()
         let scale = art.width > 0 && art.height > 0
             ? min(glyphSize / art.width, glyphSize / art.height)
             : 1
         glyph.size = CGSize(width: art.width * scale, height: art.height * scale)
+
+        guard raised else { return }
+        glyphShade.texture = texture
+        glyphShade.size = glyph.size
+        glyphShade.position = CGPoint(x: glyph.position.x,
+                                      y: glyph.position.y - max(1.5, (glyphSize * 0.05).rounded()))
     }
 
-    /// Drawn faint when the simulation would refuse the press, exactly as a hotbar
-    /// slot greys out - so a button you can see but not use looks the part rather
-    /// than looking broken.
-    /// Green: the button is recommending itself - a heal you should take, a bomb
-    /// lined up on a wall. A bright green rim round the usual see-through disc,
-    /// and the disc breathes gently while it stays green, so it reads as "press
-    /// me" rather than as a colour change.
+    /// Lit up when pressing this is the right call right now: a ring round it
+    /// and a slow swell. Eased in and out rather than straight lines.
     func setHighlighted(_ on: Bool) {
         guard on != isHighlighted else { return }
         isHighlighted = on
-        base.strokeColor = on ? RenderPalette.recommend : RenderPalette.glassRim
-        base.lineWidth = on ? 4 : RenderPalette.glassRimWidth
+
+        if raised {
+            base.strokeColor = on ? RenderPalette.recommend : .clear
+        } else {
+            base.strokeColor = on ? RenderPalette.recommend : RenderPalette.glassRim
+            base.lineWidth = on ? 4 : RenderPalette.glassRimWidth
+        }
         glyph.alpha = on ? 1 : restingGlyphAlpha
 
-        // The breathing is on the disc alone: the whole button's scale belongs to
-        // the press, and the art staying still keeps it easy to read.
+        let pulse: SKNode = raised ? face : base
+        pulse.removeAction(forKey: "invite")
+        pulse.setScale(1)
         base.removeAction(forKey: "invite")
         base.setScale(1)
         guard on else { return }
-
-        base.run(.sequence([
-            .scale(to: 1.14, duration: 0.1),
-            .scale(to: 1, duration: 0.12),
-            .repeatForever(.sequence([
-                .scale(to: 1.07, duration: 0.55),
-                .scale(to: 1, duration: 0.55)
-            ]))
+        let swell = Motion.eased(.scale(to: 1.06, duration: 0.6), Motion.inOut)
+        let back = Motion.eased(.scale(to: 1, duration: 0.6), Motion.inOut)
+        pulse.run(.sequence([
+            Motion.eased(.scale(to: 1.12, duration: 0.1), Motion.cubicOut),
+            Motion.pop(to: 1, duration: 0.26, overshoot: 2),
+            .repeatForever(.sequence([swell, back]))
         ]), withKey: "invite")
+        if raised {
+            base.run(.repeatForever(.sequence([
+                Motion.eased(.scale(to: 1.06, duration: 0.6), Motion.inOut),
+                Motion.eased(.scale(to: 1, duration: 0.6), Motion.inOut)
+            ])), withKey: "invite")
+        }
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -165,11 +223,8 @@ final class ActionButtonNode: SKNode {
         alpha = enabled ? 1.0 : 0.4
     }
 
-    /// - Parameter localPoint: the touch, in this node's own coordinate space.
-    /// - Returns: true if the button is taking ownership of this touch.
+    /// Returns true if the touch landed close enough to count as pressing this.
     func begin(atLocalPoint localPoint: CGPoint) -> Bool {
-        // The catch follows the shape, so a square button is not quietly pressable
-        // at its corners' diagonal and a round one is not pressable off its edge.
         let caught: Bool
         switch shape {
         case .circle:
@@ -177,53 +232,68 @@ final class ActionButtonNode: SKNode {
         case .roundedSquare:
             caught = abs(localPoint.x) <= grabRadius && abs(localPoint.y) <= grabRadius
         }
-
         guard caught else { return false }
-        isPressed = true
 
-        // Squashed in quickly, under the thumb. Takes over from a nudge that
-        // happened to be running, which also uses the button's scale.
+        isPressed = true
         removeAction(forKey: "nudge")
         removeAction(forKey: "press")
+        face.removeAction(forKey: "press")
         zRotation = 0
-        let squash = SKAction.scale(to: 0.86, duration: 0.05)
-        squash.timingMode = .easeOut
-        run(squash, withKey: "press")
+
+        if raised {
+            // Down onto the lip, and held there.
+            setScale(1)
+            face.run(.group([
+                Motion.eased(.moveTo(y: -depth, duration: Motion.Time.tap), Motion.cubicOut),
+                Motion.eased(.scaleX(to: 1.03, y: 0.95, duration: Motion.Time.tap), Motion.cubicOut)
+            ]), withKey: "press")
+        } else {
+            // The glass button's original squeeze.
+            let squash = SKAction.scale(to: 0.86, duration: 0.05)
+            squash.timingMode = .easeOut
+            run(squash, withKey: "press")
+        }
         return true
     }
 
-    /// A small wave, for a button nobody has pressed.
-    ///
-    /// Rotation and scale only, never position: the scene's layout owns where a
-    /// button sits, and an interrupted move would leave it parked somewhere the
-    /// layout would not put it back from until the next size change.
+    /// A small shake to draw the eye - a heal ready, say.
     func nudge() {
         removeAction(forKey: "nudge")
         zRotation = 0
         setScale(1)
-
         run(.sequence([
-            .group([.scale(to: 1.14, duration: 0.11), .rotate(toAngle: -0.10, duration: 0.11)]),
-            .rotate(toAngle: 0.10, duration: 0.14),
-            .group([.scale(to: 1.0, duration: 0.12), .rotate(toAngle: 0, duration: 0.12)])
+            .group([Motion.eased(.scale(to: 1.14, duration: 0.11), Motion.cubicOut),
+                    Motion.eased(.rotate(toAngle: -0.10, duration: 0.11), Motion.cubicOut)]),
+            Motion.eased(.rotate(toAngle: 0.10, duration: 0.14), Motion.inOut),
+            .group([Motion.pop(to: 1, duration: 0.24, overshoot: 2),
+                    Motion.eased(.rotate(toAngle: 0, duration: 0.2), Motion.cubicOut)])
         ]), withKey: "nudge")
     }
 
-    /// Let go: springs back past full size and settles, so a press pops. A
-    /// button that was not being pressed just stays as it is.
+    /// Let go: springs back up past where it rests and settles.
     func end() {
         let wasPressed = isPressed
         isPressed = false
         removeAction(forKey: "press")
+
         guard wasPressed else {
             if action(forKey: "nudge") == nil { setScale(1.0) }
             return
         }
 
-        let spring = SKAction.scale(to: 1.1, duration: 0.08)
-        spring.timingMode = .easeOut
-        let settle = SKAction.scale(to: 1.0, duration: 0.12)
-        settle.timingMode = .easeInEaseOut
-        run(.sequence([spring, settle]), withKey: "press")
+        if raised {
+            face.removeAction(forKey: "press")
+            face.run(.group([
+                Motion.eased(.moveTo(y: 0, duration: 0.3)) { Motion.backOut($0, overshoot: 3) },
+                Motion.eased(.scaleX(to: 1, y: 1, duration: 0.3)) { Motion.backOut($0, overshoot: 3) }
+            ]), withKey: "press")
+        } else {
+            // The glass button's original spring.
+            let spring = SKAction.scale(to: 1.1, duration: 0.08)
+            spring.timingMode = .easeOut
+            let settle = SKAction.scale(to: 1.0, duration: 0.12)
+            settle.timingMode = .easeInEaseOut
+            run(.sequence([spring, settle]), withKey: "press")
+        }
     }
 }
