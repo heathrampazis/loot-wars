@@ -389,29 +389,28 @@ final class MenuScene: SKScene {
         let sprite = SKSpriteNode(texture: logo.texture, size: logo.size)
         badge.addChild(sprite)
 
-        // In with a pop, the way the buttons press: up past full size and
-        // settling, rather than a fade.
+        // The entrance (Nov 2026 polish pass): the logo drops in from above
+        // and lands with a little squash, first of everything on the screen.
+        // Then it stays STILL - the endless float and sway it used to have
+        // were the kind of idle motion that makes a menu feel generated - with
+        // a gleam crossing it every few seconds instead.
         wordmark.alpha = 0
-        badge.setScale(0.6)
-        wordmark.run(.fadeIn(withDuration: 0.15))
+        wordmark.position = CGPoint(x: centre.x, y: centre.y + fontSize * 0.9)
+        badge.setScale(0.75)
+        wordmark.run(.sequence([
+            .wait(forDuration: 0.05),
+            .group([.fadeIn(withDuration: 0.14),
+                    Motion.eased(.move(to: centre, duration: 0.42)) { Motion.backOut($0, overshoot: 1.3) }])
+        ]))
         badge.run(.sequence([
-            .scale(to: 1.08, duration: 0.18),
-            .scale(to: 0.97, duration: 0.1),
-            .scale(to: 1, duration: 0.08)
+            .wait(forDuration: 0.05),
+            Motion.pop(to: 1, duration: 0.46, overshoot: 1.5),
+            Motion.eased(.scaleX(to: 1.04, y: 0.95, duration: 0.07), Motion.cubicOut),
+            Motion.pop(to: 1, duration: 0.24, overshoot: 2)
         ]))
 
-        // And a slow sway on top of the float - a degree either way, on its own
-        // clock, so the logo is alive without ever moving much.
-        // Centred on level, so it never looks like it is leaning.
-        let sway = SKAction.sequence([.rotate(toAngle: -0.018, duration: 3.1),
-                                      .rotate(toAngle: 0.018, duration: 3.1)])
-        sway.timingMode = .easeInEaseOut
-        badge.run(.repeatForever(sway))
-
-        let float = SKAction.sequence([.moveBy(x: 0, y: 5, duration: 2.3),
-                                       .moveBy(x: 0, y: -5, duration: 2.3)])
-        float.timingMode = .easeInEaseOut
-        wordmark.run(.repeatForever(float), withKey: "float")
+        let mask = SKSpriteNode(texture: logo.texture, size: logo.size)
+        Motion.shine(on: sprite, mask: mask, size: logo.size, every: 4.5, after: 1.2, strength: 0.38)
     }
 
     private func buildNameField(centredOn centre: CGPoint, width: CGFloat, height: CGFloat) {
@@ -462,11 +461,14 @@ final class MenuScene: SKScene {
 
         for button in [info, settings] {
             button.zPosition = 10
-            button.alpha = 0
-            button.run(.sequence([.wait(forDuration: 0.12),
-                                  .fadeAlpha(to: 1, duration: 0.3)]))
             addChild(button)
         }
+
+        // The entrance (Nov 2026 polish pass): one after another, after the
+        // logo - Play pops up, then the two squares, left then right.
+        Motion.popIn(play, delay: 0.2, from: 0.55)
+        Motion.popIn(info, delay: 0.3, from: 0.4)
+        Motion.popIn(settings, delay: 0.36, from: 0.4)
 
         infoButton = info
         settingsButton = settings
@@ -508,6 +510,7 @@ final class MenuScene: SKScene {
         badgeHolder.zPosition = 10
         badgeHolder.addChild(badge)
         addChild(badgeHolder)
+        Motion.slideIn(badgeHolder, delay: 0.42, from: CGVector(dx: -40 * uiScale, dy: 0), overshoot: true)
         levelBadge = badge
     }
 
@@ -555,6 +558,7 @@ final class MenuScene: SKScene {
         record.addChild(count)
 
         addChild(record)
+        Motion.slideIn(record, delay: 0.46, from: CGVector(dx: 40 * uiScale, dy: 0), overshoot: true)
     }
 
     // Type for this whole screen lives in MenuButtonNode.text - one helper, one
@@ -565,7 +569,7 @@ final class MenuScene: SKScene {
 
     #if os(iOS) || os(tvOS)
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let touch = touches.first, let view else { return }
+        guard let touch = touches.first, view != nil else { return }
         let point = touch.location(in: self)
 
         // The sheet gets first refusal on everything while it is up, which is what
@@ -604,29 +608,7 @@ final class MenuScene: SKScene {
             nameInput.resignFirstResponder()
         }
 
-        if let play = playButton,
-           play.contains(localPoint: CGPoint(x: point.x - play.position.x,
-                                             y: point.y - play.position.y)) {
-            starting = true
-
-            // On the press rather than when the match appears. The button's
-            // animation and the fade to the map take the better part of half a
-            // second between them, and a sound that arrives at the end of that
-            // belongs to the scene change; one that arrives on the press belongs
-            // to the finger.
-            SoundPlayer.shared.play(.play)
-
-            // And the rest of the screen stands down, so the button is the only
-            // thing moving at the moment it is pressed.
-            wordmark.removeAction(forKey: "float")
-
-            play.press { [weak view] in
-                view?.presentScene(GameScene.newGameScene(),
-                                   transition: .fade(withDuration: 0.35))
-            }
-            return
-        }
-
+        // The level badge keeps its own one-shot press.
         if let badge = levelBadge,
            badge.contains(localPoint: touch.location(in: badge)) {
             SoundPlayer.shared.play(.select)
@@ -637,45 +619,106 @@ final class MenuScene: SKScene {
             return
         }
 
-        if let info = infoButton,
-           info.contains(localPoint: CGPoint(x: point.x - info.position.x,
-                                             y: point.y - info.position.y)) {
-            SoundPlayer.shared.play(.select)
-            info.press { [weak self] in
-                guard let self else { return }
-                self.sheet.open(title: "HOW TO PLAY",
-                                content: self.howToPlay,
-                                on: self.uiSize)
-            }
+        // The three big buttons go down under the finger and act when it
+        // lifts (Nov 2026 polish pass) - see MenuButtonNode.pressDown. The
+        // click is on the way down, where the finger is.
+        for button in [playButton, infoButton, settingsButton].compactMap({ $0 }) {
+            let local = CGPoint(x: point.x - button.position.x, y: point.y - button.position.y)
+            guard button.contains(localPoint: local) else { continue }
+            SoundPlayer.shared.play(button === playButton ? .play : .select)
+            button.pressDown()
+            held = button
+            heldTouch = touch
             return
         }
+    }
 
-        if let settings = settingsButton,
-           settings.contains(localPoint: CGPoint(x: point.x - settings.position.x,
-                                                 y: point.y - settings.position.y)) {
-            SoundPlayer.shared.play(.select)
-            settings.press { [weak self] in
-                guard let self else { return }
-                self.sheet.open(title: "SETTINGS",
-                                content: self.settingsContent,
-                                on: self.uiSize)
+    /// The button a finger is holding down, and that finger.
+    private var held: MenuButtonNode?
+    private weak var heldTouch: UITouch?
+
+    /// What a button does once it is let go on.
+    private func act(on button: MenuButtonNode) {
+        if button === playButton {
+            starting = true
+            // Everything else stands down while Play springs back, then the
+            // map fades in.
+            let leaving: [SKNode?] = [wordmark, nameField, infoButton, settingsButton,
+                                      badgeHolder, childNode(withName: "record")]
+            for (index, node) in leaving.compactMap({ $0 }).enumerated() {
+                Motion.exit(node, delay: Double(index) * 0.02)
             }
+            nameInput.resignFirstResponder()
+            button.release { [weak self] in
+                guard let self else { return }
+                self.run(.sequence([
+                    .wait(forDuration: 0.12),
+                    .run { [weak self] in
+                        self?.view?.presentScene(GameScene.newGameScene(),
+                                                 transition: .fade(withDuration: 0.3))
+                    }
+                ]))
+            }
+        } else if button === infoButton {
+            button.release { [weak self] in
+                guard let self else { return }
+                self.sheet.open(title: "HOW TO PLAY", content: self.howToPlay, on: self.uiSize)
+            }
+        } else if button === settingsButton {
+            button.release { [weak self] in
+                guard let self else { return }
+                self.sheet.open(title: "SETTINGS", content: self.settingsContent, on: self.uiSize)
+            }
+        }
+    }
+
+    /// Lets go of a held button: acts if the finger is still on it, otherwise
+    /// it just springs back up.
+    private func letGo(_ touch: UITouch, cancelled: Bool) {
+        guard let button = held, touch === heldTouch else { return }
+        held = nil
+        heldTouch = nil
+        let point = touch.location(in: self)
+        let local = CGPoint(x: point.x - button.position.x, y: point.y - button.position.y)
+        if !cancelled, !starting, !sheet.isOpen, button.stillOver(localPoint: local) {
+            act(on: button)
+        } else {
+            button.cancelPress()
         }
     }
 
     // Swipes on the sheet - the How to Play pages. Nothing else on this screen
     // follows a finger.
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // A held button lets go if the finger slides well off it.
+        if let button = held, let touch = heldTouch, touches.contains(touch) {
+            let point = touch.location(in: self)
+            let local = CGPoint(x: point.x - button.position.x, y: point.y - button.position.y)
+            if !button.stillOver(localPoint: local) {
+                held = nil
+                heldTouch = nil
+                button.cancelPress()
+            }
+            return
+        }
         guard sheet.isOpen, let touch = touches.first else { return }
         sheet.dragMoved(localPoint: touch.location(in: sheet))
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if let touch = heldTouch, touches.contains(touch) {
+            letGo(touch, cancelled: false)
+            return
+        }
         guard sheet.isOpen, let touch = touches.first else { return }
         sheet.dragEnded(localPoint: touch.location(in: sheet))
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if let touch = heldTouch, touches.contains(touch) {
+            letGo(touch, cancelled: true)
+            return
+        }
         guard sheet.isOpen, let touch = touches.first else { return }
         sheet.dragEnded(localPoint: touch.location(in: sheet))
     }

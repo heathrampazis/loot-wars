@@ -67,6 +67,8 @@ final class LootboxRenderer {
         for (id, sprite) in Array(nodesByBox) where world.lootboxes[id] == nil {
             nodesByBox[id] = nil
             onOpened?(GridGeometry.position(for: sprite.position))
+            // Just gone, as it always was (Nov 2026): three opening animations
+            // were tried and Heath preferred the original.
             sprite.removeFromParent()
         }
 

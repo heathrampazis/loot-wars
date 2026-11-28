@@ -278,12 +278,42 @@ final class PlayerFigure {
 
     // MARK: - Moments
 
+    /// A better helmet going on (Nov 2026): it drops onto the head from above,
+    /// lands with a squash and springs back to shape. `weight` 0...1 makes the
+    /// rarer ones fall from higher and land harder.
+    func equipHelmet(weight: CGFloat) {
+        guard tier != .none else { return }
+        helmet.removeAction(forKey: "clank")
+        helmet.zRotation = 0
+        helmet.setScale(1.25)
+        helmet.alpha = 0
+        helmet.position = CGPoint(x: helmetRest.x, y: helmetRest.y + (50 + 40 * weight) * ky)
+        // No tint, flash or glow (Nov 2026): a rarity tint read darker, a
+        // white flash and halo did not feel right either. Heath chose "keep it
+        // minimal" - the drop and the squash are the moment.
+        helmet.colorBlendFactor = 0
+        let squash = 0.12 + 0.08 * weight
+        helmet.run(.sequence([
+            .group([.fadeIn(withDuration: 0.06),
+                    Motion.eased(.move(to: helmetRest, duration: 0.16), Motion.cubicIn),
+                    Motion.eased(.scale(to: 1, duration: 0.16), Motion.cubicIn)]),
+            Motion.eased(.scaleX(to: 1 + squash, y: 1 - squash, duration: 0.05), Motion.cubicOut),
+            Motion.eased(.scaleX(to: 1, y: 1, duration: 0.34)) { Motion.backOut($0, overshoot: 3) }
+        ]), withKey: "clank")
+        cheer()
+    }
+
     /// Hit: the helmet knocks up off the head and drops back, with a slight
     /// tilt about its brim. Up, never down, so it stays clear of the eyes.
     func flinch() {
         helmet.removeAction(forKey: "clank")
         helmet.position = helmetRest
         helmet.zRotation = 0
+        // Back to its own size and fully shown: a hit landing mid-way through
+        // the equip drop used to stop it squashed or still swollen - the
+        // "funky" Cosmic helmet (Nov 2026).
+        helmet.setScale(1)
+        helmet.alpha = 1
         let knock = CGFloat(18) * ky
         helmet.run(.sequence([
             .group([.moveTo(y: helmetRest.y + knock, duration: 0.05),

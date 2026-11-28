@@ -421,7 +421,12 @@ final class ActorRenderer {
             // Re-dress when the helmet changes. Picking one up has to be visible
             // instantly - it is the main way anybody can tell how dangerous the
             // actor coming at them is.
+            var upgraded: ItemType?
             if nodes.lastHelmet != actor.helmet {
+                // A better one going on, mid-life: worth a moment (Nov 2026).
+                if let old = nodes.lastHelmet, actor.helmet > old, actor.isAlive, nodes.wasAlive == true {
+                    upgraded = .helmet(actor.helmet)
+                }
                 nodes.lastHelmet = actor.helmet
                 if let parts = nodes.parts {
                     parts.setHelmet(actor.helmet)
@@ -431,9 +436,15 @@ final class ActorRenderer {
             }
 
             if nodes.lastBlaster != actor.blaster {
+                if let old = nodes.lastBlaster, actor.blaster > old, actor.isAlive, nodes.wasAlive == true {
+                    upgraded = .blaster(actor.blaster)
+                }
                 nodes.lastBlaster = actor.blaster
                 nodes.blaster.texture = blasterTexture(for: actor.blaster)
             }
+
+            // After the re-dress, so the moment animates the NEW piece.
+            if let upgraded { geared(nodes, item: upgraded) }
 
             // A cooldown that jumped up is a shot just fired.
             // The sound goes with it, off the trigger rather than the bullet: a
@@ -915,6 +926,151 @@ final class ActorRenderer {
     /// standing at home is a twelfth of one, and given the same treatment it turned
     /// a quiet minute in your own base into a strobe. Small heals get the wash and
     /// nothing else.
+    /// A better helmet or blaster going on (Nov 2026). Heath: "i wouldnt mind
+    /// some animation significance of upgrading the helmet and blasters" -
+    /// after an icon rising over the head was too much. So it happens ON the
+    /// figure: it stands up tall and settles, the new piece flashes white, a
+    /// ring in the gear's rarity colour spreads under the feet and a few glints
+    /// of that colour rise past. Everyone's, so you can see an enemy gear up.
+    private func geared(_ nodes: ActorNodes, item: ItemType) {
+        // Minimal for Common and Epic (Nov 2026): the helmet dropping on or
+        // the blaster pumping, and glints of the gear's rarity colour rising
+        // past. Legendary and up add glam around the figure - see glam. The
+        // gear is never tinted or flashed white: both were tried and disliked.
+        let tile = GridGeometry.length(ofTiles: 1)
+        let rarity = item.rarity
+        let colour = RenderPalette.colour(of: rarity)
+        // 0 for Common up to 1 for Cosmic.
+        let weight = CGFloat(rarity.rawValue) / 4
+
+        switch item {
+        case .helmet:
+            nodes.parts?.equipHelmet(weight: weight)
+        default:
+            // A pump of its height only - the renderer owns its width, which
+            // is the facing mirror.
+            let gun = nodes.blaster
+            gun.yScale = 1.5 + 0.3 * weight
+            gun.run(Motion.eased(.scaleY(to: 1, duration: 0.36)) { Motion.backOut($0, overshoot: 3) },
+                    withKey: "pump")
+        }
+
+        // The good stuff gets some glam (Nov 2026): Heath, "if its blue purple
+        // or cosmic to have a bit of glam and colouring to it to feel like you
+        // are getting a nice upgrade". Light added AROUND the figure - the gear
+        // itself is never tinted, which read darker.
+        if rarity >= .legendary { glam(nodes, rarity: rarity, colour: colour, tile: tile, item: item) }
+
+        let count = 4 + rarity.rawValue * 3
+        for index in 0..<count {
+            let glint = SKSpriteNode(texture: ImpactArt.star)
+            let side = tile * (0.15 + 0.05 * CGFloat(index % 3))
+            glint.size = CGSize(width: side, height: side)
+            glint.color = colour
+            glint.colorBlendFactor = 0.6
+            glint.alpha = 0
+            glint.zPosition = 7
+            let across = CGFloat((index * 37) % 100) / 100 - 0.5
+            glint.position = CGPoint(x: tile * across * 0.9, y: -tile * 0.25)
+            nodes.root.addChild(glint)
+            glint.run(.sequence([
+                .wait(forDuration: 0.12 + Double(index) * 0.035),
+                .group([.fadeIn(withDuration: 0.06),
+                        Motion.eased(.moveBy(x: 0, y: tile * (1 + 0.4 * weight), duration: 0.55), Motion.cubicOut),
+                        .rotate(byAngle: 1.2, duration: 0.55),
+                        .sequence([.wait(forDuration: 0.3),
+                                   Motion.eased(.fadeOut(withDuration: 0.25), Motion.cubicIn)])]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
+    /// Legendary, Mythical and Cosmic: a glow of the gear's colour blooms under
+    /// the feet and a burst of sparkles pops round the new piece. Mythical and
+    /// up add a column of light; Cosmic's sparkles are gold mixed with every
+    /// colour.
+    private func glam(_ nodes: ActorNodes, rarity: Rarity, colour: SKColor, tile: CGFloat, item: ItemType) {
+        let feet = CGPoint(x: 0, y: -tile * 0.4)
+        let cosmic = rarity == .cosmic
+
+        // A pool of its light under the feet.
+        let pool = SKSpriteNode(texture: GlowArt.pool)
+        pool.size = CGSize(width: tile * 2.2, height: tile * 1.0)
+        pool.color = colour
+        pool.colorBlendFactor = 1
+        pool.blendMode = .add
+        pool.alpha = 0
+        pool.position = feet
+        pool.zPosition = -0.6
+        nodes.root.addChild(pool)
+        pool.run(.sequence([
+            .wait(forDuration: 0.12),
+            .fadeAlpha(to: 0.75, duration: 0.08),
+            .group([Motion.eased(.scale(to: 1.25, duration: 0.7), Motion.cubicOut),
+                    .sequence([.wait(forDuration: 0.3), Motion.eased(.fadeOut(withDuration: 0.4), Motion.cubicIn)])]),
+            .removeFromParent()
+        ]))
+
+        // (A ring rising up the figure was here, and went: Heath, "remove the
+        // ring when getting that upgrades, i like the sparkles though".)
+
+        // A column of light for Mythical and Cosmic.
+        if rarity >= .mythical {
+            let column = SKSpriteNode(texture: GlowArt.pool)
+            column.size = CGSize(width: tile * 0.9, height: tile * 1.2)
+            column.color = colour
+            column.colorBlendFactor = 1
+            column.blendMode = .add
+            column.anchorPoint = CGPoint(x: 0.5, y: 0.1)
+            column.position = feet
+            column.alpha = 0
+            column.zPosition = 6
+            nodes.root.addChild(column)
+            column.run(.sequence([
+                .wait(forDuration: 0.1),
+                .group([Motion.eased(.scaleX(to: 0.7, y: cosmic ? 3.2 : 2.6, duration: 0.5), Motion.cubicOut),
+                        .sequence([.fadeAlpha(to: cosmic ? 0.8 : 0.65, duration: 0.1),
+                                   Motion.eased(.fadeOut(withDuration: 0.45), Motion.cubicIn)])]),
+                .removeFromParent()
+            ]))
+        }
+
+        // A burst of sparkles round the new piece: the head for a helmet, the
+        // hand for a blaster.
+        let centre: CGPoint
+        if case .helmet = item {
+            centre = CGPoint(x: 0, y: tile * 0.45)
+        } else {
+            centre = nodes.root.convert(.zero, from: nodes.blaster)
+        }
+        let sparks = rarity == .legendary ? 10 : (cosmic ? 18 : 14)
+        for index in 0..<sparks {
+            let star = SKSpriteNode(texture: ImpactArt.star)
+            let side = tile * (0.16 + 0.07 * CGFloat(index % 3))
+            star.size = CGSize(width: side, height: side)
+            star.color = cosmic && index % 2 == 1 ? RenderPalette.hue(at: index) : colour
+            star.colorBlendFactor = index % 4 == 0 ? 0.2 : 0.75
+            star.blendMode = .add
+            star.alpha = 0
+            star.position = centre
+            star.zPosition = 9
+            star.setScale(0.3)
+            nodes.root.addChild(star)
+            let angle = CGFloat(index) / CGFloat(sparks) * 2 * .pi
+            let reach = tile * (0.7 + 0.25 * CGFloat(index % 3))
+            star.run(.sequence([
+                .wait(forDuration: 0.2 + Double(index % 3) * 0.03),
+                .group([.fadeIn(withDuration: 0.05),
+                        Motion.pop(to: 1, duration: 0.24, overshoot: 2),
+                        Motion.eased(.moveBy(x: cos(angle) * reach, y: sin(angle) * reach, duration: 0.45),
+                                     Motion.cubicOut),
+                        .rotate(byAngle: 1.4, duration: 0.55),
+                        .sequence([.wait(forDuration: 0.3), Motion.eased(.fadeOut(withDuration: 0.25), Motion.cubicIn)])]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     private func healed(_ nodes: ActorNodes, share: Double) {
         let slight = share < 0.15
 
@@ -973,17 +1129,19 @@ final class ActorRenderer {
         ]), withKey: "hit")
 
         nodes.figure.removeAction(forKey: "react")
+        // Eased (Nov 2026 polish): a slow gather, a fast spring up, a falling
+        // landing and a springy settle, rather than four straight lines.
         nodes.figure.run(.sequence([
             // Gather.
-            .group([.scaleX(to: 1.16, y: 0.8, duration: 0.11),
-                    .moveTo(y: -3, duration: 0.11)]),
+            .group([Motion.eased(.scaleX(to: 1.16, y: 0.8, duration: 0.11), Motion.inOut),
+                    Motion.eased(.moveTo(y: -3, duration: 0.11), Motion.inOut)]),
             // Release.
-            .group([.scaleX(to: 0.84, y: 1.26, duration: 0.13),
-                    .moveTo(y: 13, duration: 0.13)]),
-            // And down, overshooting once so it lands rather than glides.
-            .group([.scaleX(to: 1.06, y: 0.94, duration: 0.16),
-                    .moveTo(y: 0, duration: 0.16)]),
-            .scaleX(to: 1, y: 1, duration: 0.12)
+            .group([Motion.eased(.scaleX(to: 0.84, y: 1.26, duration: 0.13), Motion.cubicOut),
+                    Motion.eased(.moveTo(y: 13, duration: 0.13), Motion.cubicOut)]),
+            // And down, landing with a squash.
+            .group([Motion.eased(.scaleX(to: 1.1, y: 0.9, duration: 0.14), Motion.cubicIn),
+                    Motion.eased(.moveTo(y: 0, duration: 0.14), Motion.cubicIn)]),
+            Motion.eased(.scaleX(to: 1, y: 1, duration: 0.22)) { Motion.backOut($0, overshoot: 2.4) }
         ]), withKey: "react")
     }
 

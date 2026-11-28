@@ -727,7 +727,9 @@ enum GameConfig {
         /// 20 -> 8 (Nov 2026, one life): Heath wants it action packed from the
         /// moment the match starts. Bombs, raids and hunts from eight seconds.
         /// 8 -> 5 (Nov 2026, 3x faster).
-        static let opening: Double = 5
+        /// 5 -> 0 (Nov 2026): Heath, raids and flags "should really be active
+        /// all the time from the start". Bombs still wait for bombGrace.
+        static let opening: Double = 0
 
         /// The final stretch: every point earned is multiplied, so the last half
         /// minute can still turn the board over and nobody coasts to the whistle.
@@ -839,7 +841,9 @@ enum GameConfig {
         /// when it ends.
         /// 45 -> 25 (Nov 2026): faster matches.
         /// 25 -> 15 (Nov 2026, "speed up the game by like 3x").
-        static let safeFor: Double = 15
+        /// 15 -> 0 (Nov 2026): flags can be taken from the start - see
+        /// Match.opening.
+        static let safeFor: Double = 0
     }
 
     enum Map {

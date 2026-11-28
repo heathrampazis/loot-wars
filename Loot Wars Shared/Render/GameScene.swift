@@ -46,6 +46,8 @@ final class GameScene: SKScene {
 
     /// Says so when you take somebody out - see KillBannerNode.
     private let killBanner = KillBannerNode()
+    /// The match's big moments, said big - see AnnouncementNode.
+    private let announcement = AnnouncementNode()
 
     /// Counts down the quiet after a raid - see RebuildTimerNode.
     private let rebuildTimer = RebuildTimerNode()
@@ -83,8 +85,6 @@ final class GameScene: SKScene {
     /// Whether the leaderboard is on screen at all. Off (Nov 2026).
     private static let showsLeaderboard = true
 
-    /// Whether "FLAGS CAN BE TAKEN" has been said this match - see Flag.safeFor.
-    private var announcedFlags = false
     private let groundItemRenderer = GroundItemRenderer()
     private let bombRenderer = BombRenderer()
     private let projectileRenderer = ProjectileRenderer()
@@ -127,7 +127,9 @@ final class GameScene: SKScene {
     private let openButton = ActionButtonNode(glyph: Glyphs.chest,
                                               radius: HealButtonNode.radius,
                                               grabRadius: HealButtonNode.grabRadius,
-                                              fill: RenderPalette.stickBackground,
+                                              // The HUD's black, like every in-game
+                                              // button (Nov 2026) - see throwButton.
+                                              fill: RenderPalette.hudPanel,
                                               glass: true, shadow: true)
 
     /// What that corner is currently for.
@@ -304,6 +306,10 @@ final class GameScene: SKScene {
     /// sized once would stop covering the corners the first time somebody opened
     /// the game on an iPad.
     private let perkFlash = SKSpriteNode(color: .white, size: .zero)
+    /// The Disco Ball's party on screen while yours runs - see DiscoLightsNode.
+    private let discoLights = DiscoLightsNode()
+    /// The other power-ups' quieter screen feel - see PerkAmbienceNode.
+    private let perkAmbience = PerkAmbienceNode()
 
 
     /// The hotbar slot picked out, waiting for a tile.
@@ -353,7 +359,14 @@ final class GameScene: SKScene {
 
     private let throwButton = ActionButtonNode(glyph: Glyphs.lootbox,
                                                radius: 40, grabRadius: 48,
-                                               fill: RenderPalette.stickBackground,
+                                               // The HUD's own black (Nov 2026): the
+                                               // 60% panel black every other piece of
+                                               // the HUD wears - the hotbar, the top
+                                               // bar, the shop - rather than the
+                                               // lighter stick grey. Heath: it "should
+                                               // match the UI on the game, the opaque
+                                               // black simple".
+                                               fill: RenderPalette.hudPanel,
                                                glass: true, shadow: true)
 
     /// What the throw button is currently showing, so its glyph is only rebuilt
@@ -690,6 +703,7 @@ final class GameScene: SKScene {
         hud.addChild(hint)
         hud.addChild(supplyCompass)
         hud.addChild(killBanner)
+        hud.addChild(announcement)
         hud.addChild(rebuildTimer)
         hud.addChild(baseCompass)
         hud.addChild(results)
@@ -706,6 +720,8 @@ final class GameScene: SKScene {
         perkFlash.alpha = 0
         perkFlash.isHidden = true
         cameraController.node.addChild(perkFlash)
+        cameraController.node.addChild(discoLights)
+        cameraController.node.addChild(perkAmbience)
         layOutUI()
 
         syncRenderers()
@@ -766,8 +782,7 @@ final class GameScene: SKScene {
             world.standings.firstIndex { $0.team == player.team }
         }
         _ = place
-        pauseMenu.show(playersLeft: world.stillIn,
-                       flagStanding: world.localPlayer.map { !world.flagLost($0.team) } ?? true)
+        pauseMenu.show(flagStanding: world.localPlayer.map { !world.flagLost($0.team) } ?? true)
     }
 
     private func resumeMatch() {
@@ -972,6 +987,8 @@ final class GameScene: SKScene {
         // mid-shake when this plays, and a rectangle cut to the glass would show a
         // hard edge sliding in from one side.
         perkFlash.size = CGSize(width: self.size.width * 1.3, height: self.size.height * 1.3)
+        discoLights.layOut(for: self.size)
+        perkAmbience.layOut(for: self.size)
 
         // The top-left corner itself, plus whatever the hardware is eating off the
         // left edge. Everything in that corner is measured from this one point, so
@@ -1010,6 +1027,9 @@ final class GameScene: SKScene {
         let noticeY = matchPanel.position.y - MatchPanelNode.size.height
             - 10 - KillBannerNode.height / 2
         killBanner.restingY = noticeY
+        // Upper middle, between the notices and your figure.
+        announcement.position = CGPoint(x: 0, y: size.height * 0.15)
+        announcement.setScale(min(1, size.width / 520))
         rebuildTimer.position = CGPoint(x: 0, y: noticeY)
         results.layOut(for: size)
         pauseMenu.layOut(for: size)
@@ -1211,12 +1231,9 @@ final class GameScene: SKScene {
         feelHits(in: world)
         matchPanel.update(with: world)
 
-        // The end of the flags' safe start, said once.
-        if !announcedFlags, world.flagsCapturable, !world.flags.isEmpty, !world.isOver {
-            announcedFlags = true
-            hint.show("FLAGS CAN BE TAKEN", seconds: 2.4)
-            Haptics.shared.play(.warning)
-        }
+        // Flags and raids are live from the first second now (Nov 2026):
+        // Heath, "they should really be active all the time from the start".
+        // So there is no "flags are open" moment to announce any more.
 
         // A bounty landing on you is worth one line: you are a target now.
         let bounty = world.localPlayer?.bounty ?? 0
@@ -1256,6 +1273,14 @@ final class GameScene: SKScene {
         updatePlacementGhost(with: world)
         updateQuickBuy(with: world)
         updateBaseUpgrade(with: world)
+        discoLights.setActive(!world.isOver && world.localPlayer.map {
+            $0.isAlive && $0.perk == .overdrive
+        } ?? false)
+        perkAmbience.set(world.isOver ? nil : world.localPlayer.flatMap { player -> Perk? in
+            guard player.isAlive, let perk = player.perk,
+                  perk != .overdrive, perk != .invisibility else { return nil }
+            return perk
+        })
         updateHint(with: world)
         gasRenderer.sync(with: world, dt: frameDelta)
         effectsRenderer.sync(with: world)
@@ -1339,6 +1364,85 @@ final class GameScene: SKScene {
             baseUpgrade.position = target
         }
         baseUpgrade.update(price: price)
+    }
+
+    /// What you just picked up, flying from you into your bar (Nov 2026):
+    /// Heath, "a bit more animation for picking up items". It arcs up off
+    /// your figure and drops into the slot it went to, which swells to catch
+    /// it. Gear you put straight on gets nothing extra.
+    private func flyPickup(_ type: ItemType, worn: Bool) {
+        // Where it was lying - GroundItemRenderer took it off the map at once
+        // for this, so there is only ever one of it on screen. Read every time
+        // so a stale spot is never left for the next pickup.
+        let lying = groundItemRenderer.takeCollectedByYou()
+
+        // Gear you put straight on is not animated (Nov 2026): Heath,
+        // "helmet and blaster upgrades dont need to be animating like that".
+        guard !worn, let player = world.localPlayer, player.isAlive, !world.isOver,
+              let index = player.inventory.firstSlot(holding: type), !hotbar.isHidden else { return }
+
+        let texture = ItemArt.texture(for: type)
+        let icon = SKSpriteNode(texture: texture, size: ItemArt.size(of: texture, fittingInto: 30))
+        icon.zPosition = 1040
+        let from = lying ?? GridGeometry.point(for: player.position + Vec2(x: 0, y: 0.3))
+        let start = hud.convert(from, from: worldLayer)
+        let end = hud.convert(hotbar.slotCentre(index), from: hotbar)
+        icon.position = start
+        hud.addChild(icon)
+
+        // A new item: the slot keeps its picture back until this lands, so it
+        // reads as the same thing moving into the bag rather than two of it.
+        if player.inventory.slots[index]?.count == 1 {
+            hotbar.awaitArrival(index)
+        }
+
+        // A quick, shallow arc into the slot (0.34s -> 0.18s, Nov 2026: Heath,
+        // "a bit more instantaneous"). Ease-out so it leaves at once and
+        // settles into the slot, rather than hanging before it goes.
+        let path = CGMutablePath()
+        path.move(to: start)
+        let peak = CGPoint(x: (start.x + end.x) / 2, y: max(start.y, end.y) + 16)
+        path.addQuadCurve(to: end, control: peak)
+        let flight = Motion.eased(.follow(path, asOffset: false, orientToPath: false, duration: 0.18),
+                                  Motion.cubicOut)
+
+        pickupFlights.append((type: type, icon: icon, slot: index))
+        icon.run(.sequence([
+            .group([flight, Motion.eased(.scale(to: 0.8, duration: 0.18), Motion.cubicOut)]),
+            .run { [weak self] in
+                self?.hotbar.receive(index)
+                self?.pickupFlights.removeAll { $0.icon === icon }
+            },
+            .removeFromParent()
+        ]))
+    }
+
+    /// Pickups on their way into the bar - see flyPickup and absorbPickup.
+    private var pickupFlights: [(type: ItemType, icon: SKSpriteNode, slot: Int)] = []
+
+    /// Something you just picked up was used straight away - a power-up in a
+    /// fight, a heal when you were low - so it never really went in the bag
+    /// (Nov 2026). Heath: that "needs to be improved so it doesnt look like its
+    /// going into the hotbar". Whatever icon was flying for it turns round and
+    /// is taken into you instead: it swells a little and shrinks into your
+    /// figure, and the slot it was heading for does not catch it.
+    private func absorbPickup(where matches: (ItemType) -> Bool) {
+        guard let player = world.localPlayer,
+              let found = pickupFlights.firstIndex(where: { matches($0.type) }) else { return }
+        let flight = pickupFlights.remove(at: found)
+        hotbar.cancelArrival(flight.slot)
+
+        let icon = flight.icon
+        icon.removeAllActions()
+        let body = hud.convert(GridGeometry.point(for: player.position + Vec2(x: 0, y: 0.25)),
+                               from: worldLayer)
+        icon.run(.sequence([
+            .group([Motion.eased(.move(to: body, duration: 0.14), Motion.cubicOut),
+                    Motion.eased(.scale(to: 1.3, duration: 0.14), Motion.cubicOut)]),
+            .group([Motion.eased(.scale(to: 0.2, duration: 0.12), Motion.cubicIn),
+                    Motion.eased(.fadeOut(withDuration: 0.12), Motion.cubicIn)]),
+            .removeFromParent()
+        ]))
     }
 
     /// How far above the top wall the tag stands, in tiles.
@@ -1622,6 +1726,8 @@ final class GameScene: SKScene {
                 SoundPlayer.shared.play(.complete, at: position, heardFrom: ears)
 
             case .perkStarted(let perk, let user):
+                // A power-up used as it was picked up goes into you, not the bar.
+                if user == world.localPlayerID { absorbPickup { $0 == .perk(perk) } }
                 // The steady trail comes off the world state a frame later; this is
                 // only the switch being thrown, which nothing about the state a
                 // second afterwards can show.
@@ -1801,8 +1907,10 @@ final class GameScene: SKScene {
             case .healed(let who):
                 guard who == world.localPlayerID else { break }
                 SoundPlayer.shared.play(.heal)
+                // A heal used as it was picked up goes into you, not the bar.
+                absorbPickup { $0 == .bandage || $0 == .medkit }
 
-            case .pickedUp(_, let who, let worn):
+            case .pickedUp(let type, let who, let worn):
                 // Yours only. Seven bots sweeping the map is a constant patter of
                 // somebody else's good fortune, and none of it is about you.
                 guard who == world.localPlayerID else { break }
@@ -1811,6 +1919,7 @@ final class GameScene: SKScene {
                 // a different noise - see WorldEvent.pickedUp for why the world has
                 // to say so rather than this working it out, which it cannot.
                 SoundPlayer.shared.play(worn ? .upgrade : .collect)
+                flyPickup(type, worn: worn)
 
             case .tokensPickedUp(_, let who):
                 // Yours only, like any other pickup.
@@ -1826,7 +1935,10 @@ final class GameScene: SKScene {
             case .flagCaptured(let team, let taker):
                 // The biggest moment in a match after the last elimination.
                 if team == world.localPlayer?.team {
-                    hint.show("YOUR FLAG WAS TAKEN: NO MORE RESPAWNS", seconds: 3.0)
+                    // The one moment that gets the banner (Nov 2026): Heath,
+                    // "only have that when you like lose your flag".
+                    announcement.show("FLAG LOST", subtitle: "NO MORE RESPAWNS",
+                                      accent: SKColor(red: 1, green: 0.45, blue: 0.42, alpha: 1))
                     Haptics.shared.play(.warning)
                 } else if taker == world.localPlayerID {
                     hint.hide()
@@ -1839,7 +1951,7 @@ final class GameScene: SKScene {
                               seconds: 2.2, tint: RenderPalette.vibrantColour(for: team))
                 }
 
-            case .knockedOut(let victim, let killer, let left):
+            case .knockedOut(let victim, let killer, _):
                 // Somebody used their last life. Yours is on the respawn banner;
                 // one you did keeps the usual ELIMINATION banner; anybody
                 // else's is news.
@@ -1849,10 +1961,10 @@ final class GameScene: SKScene {
                     break
                 } else if let team = world.actors[victim]?.team {
                     // By colour, in its colour (Nov 2026).
-                    hint.show("\(RenderPalette.colourName(for: team)) IS OUT, \(left) LEFT",
+                    // No head count (Nov 2026): Heath, "dont bother with the
+                    // player count since we have the leaderboard".
+                    hint.show("\(RenderPalette.colourName(for: team)) IS OUT",
                               seconds: 2.2, tint: RenderPalette.vibrantColour(for: team))
-                } else {
-                    hint.show("\(left) LEFT", seconds: 2.0)
                 }
 
             case .kill(let victim, let killer, let position, _, _):
@@ -1896,9 +2008,12 @@ final class GameScene: SKScene {
                 case .opening:
                     break
                 case .raiding:
-                    // The hint makes its own sound.
-                    hint.show("RAIDS ARE OPEN", seconds: 2.2)
+                    // Live from the start now - nothing to say.
+                    break
                 case .finale:
+                    // Back to the small hint (Nov 2026): the big banner is kept
+                    // for losing your flag. Heath: "the big banners in your face
+                    // are also very distracting".
                     hint.show("FINAL 30: DOUBLE POINTS", seconds: 2.6)
                     Haptics.shared.play(.warning)
                 }
@@ -2115,6 +2230,7 @@ final class GameScene: SKScene {
         hotbar.isHidden = true
         respawnBanner.isHidden = true
         killBanner.dismiss()
+        announcement.dismiss()
         rebuildTimer.dismiss()
         baseCompass.update(offset: nil, bounds: .zero)
 

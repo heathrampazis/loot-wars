@@ -31,12 +31,15 @@ final class LevelBadgeNode: SKNode {
         body.position = CGPoint(x: size.width / 2, y: -size.height / 2)
         addChild(body)
 
-        body.addChild(MenuButtonNode.dropShadow(width: size.width, height: size.height,
-                                                corner: LevelBadgeNode.corner))
-        body.addChild(MenuButtonNode.slab(width: size.width, height: size.height,
-                                          edge: LevelBadgeNode.edge,
-                                          corner: LevelBadgeNode.corner,
-                                          tone: tone))
+        // Raised like every other button (Nov 2026) - see ButtonArt.
+        let parts = ButtonArt.parts(size: size, corner: LevelBadgeNode.corner, tone: tone,
+                                    edge: LevelBadgeNode.edge)
+        let shadow = MenuButtonNode.dropShadow(width: size.width, height: size.height,
+                                               corner: LevelBadgeNode.corner)
+        shadow.position = CGPoint(x: 0, y: -parts.depth)
+        body.addChild(shadow)
+        body.addChild(parts.lip)
+        body.addChild(parts.face)
 
         // The profile tile: the edge colour, set into the face.
         let pad = LevelBadgeNode.padding
@@ -106,8 +109,8 @@ final class LevelBadgeNode: SKNode {
     }
 
     func press(then done: @escaping () -> Void) {
-        run(.sequence([.scale(to: 0.95, duration: 0.05),
-                       .scale(to: 1, duration: 0.1),
-                       .run(done)]))
+        run(.sequence([Motion.eased(.scaleX(to: 1.02, y: 0.94, duration: Motion.Time.tap), Motion.cubicOut),
+                       .run(done),
+                       Motion.pop(to: 1, duration: 0.26, overshoot: 2.4)]))
     }
 }

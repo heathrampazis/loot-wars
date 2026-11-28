@@ -30,6 +30,8 @@ final class MenuSheetNode: SKNode {
     private let scrim = SKSpriteNode(color: SKColor(white: 0, alpha: 0.35), size: .zero)
     private let card = SKShapeNode()
     private let heading = SKLabelNode()
+    /// The title's hard drop shadow, in the band's darker shade.
+    private let headingShade = SKLabelNode()
     private let body = SKLabelNode()
     private let close = SKNode()
 
@@ -47,6 +49,9 @@ final class MenuSheetNode: SKNode {
     /// Room at the top of the card for the heading and the X, and at the bottom
     /// below content.
     private static let headerHeight: CGFloat = 68
+    /// The coloured band across the top, inside the header.
+    private static let bandHeight: CGFloat = 54
+    private static let tone = PanelArt.band
     private static let footerHeight: CGFloat = 18
 
     override init() {
@@ -55,15 +60,13 @@ final class MenuSheetNode: SKNode {
         isHidden = true
         alpha = 0
 
-        scrim.zPosition = 0
+        scrim.zPosition = -0.5   // under the card's shadow - see PanelArt.dress
         addChild(scrim)
 
         // Near-white, because the screen it sits on is light. Edged in a darker
         // shade of its own fill, the way the buttons are - see MenuButtonNode.
         card.zPosition = 1
-        card.fillColor = SKColor(white: 0.99, alpha: 1)
-        card.strokeColor = SKColor(white: 0.78, alpha: 1)
-        card.lineWidth = 3
+        // Dressed in layOut, once its size is known - see PanelArt.
         addChild(card)
 
         // Everything on the card is a child of it, so it all rides the card's
@@ -71,6 +74,9 @@ final class MenuSheetNode: SKNode {
         heading.verticalAlignmentMode = .center
         heading.zPosition = 2
         card.addChild(heading)
+        headingShade.verticalAlignmentMode = .center
+        headingShade.zPosition = 1.9
+        card.addChild(headingShade)
 
         body.verticalAlignmentMode = .center
         body.numberOfLines = 0
@@ -83,14 +89,8 @@ final class MenuSheetNode: SKNode {
         // An X of two crossed bars, drawn rather than typed for the reason Glyphs
         // gives: a multiplication sign, a letter x and a dingbat are three different
         // widths in three different fallback fonts.
-        for angle in [CGFloat.pi / 4, -CGFloat.pi / 4] {
-            let bar = SKShapeNode(rect: CGRect(x: -8, y: -1.4, width: 16, height: 2.8),
-                                  cornerRadius: 1.4)
-            bar.fillColor = SKColor(white: 0.45, alpha: 1)
-            bar.strokeColor = .clear
-            bar.zRotation = angle
-            close.addChild(bar)
-        }
+        // A round red button rather than a grey cross (Nov 2026 polish pass).
+        close.addChild(PanelArt.closeButton(radius: 17))
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -124,12 +124,17 @@ final class MenuSheetNode: SKNode {
         card.path = CGPath(roundedRect: CGRect(x: -width / 2, y: -height / 2,
                                                width: width, height: height),
                            cornerWidth: 22, cornerHeight: 22, transform: nil)
+        // A game card rather than an app's (Nov 2026 polish pass): coloured
+        // header band with the title on it, thick edge, soft shadow.
+        PanelArt.dress(card, size: cardSize, corner: 22, band: MenuSheetNode.bandHeight,
+                       tone: MenuSheetNode.tone)
 
-        heading.position = CGPoint(x: 0, y: height / 2 - 38)
+        heading.position = CGPoint(x: 0, y: height / 2 - MenuSheetNode.bandHeight / 2)
+        headingShade.position = CGPoint(x: 0, y: heading.position.y - 1.5)
         body.position = CGPoint(x: 0, y: 4)
         body.preferredMaxLayoutWidth = inner
 
-        closeCentre = CGPoint(x: width / 2 - 26, y: height / 2 - 26)
+        closeCentre = CGPoint(x: width / 2 - 30, y: height / 2 - MenuSheetNode.bandHeight / 2)
         close.position = closeCentre
     }
 
@@ -155,14 +160,16 @@ final class MenuSheetNode: SKNode {
         guard isOpen else { return }
 
         let fade: TimeInterval = 0.1
+        card.removeAllActions()
         card.run(.sequence([
-            .group([.fadeAlpha(to: 0.0, duration: fade), .scale(to: 0.97, duration: fade)]),
+            .group([Motion.eased(.fadeAlpha(to: 0.0, duration: fade), Motion.cubicIn),
+                    Motion.eased(.scale(to: 0.96, duration: fade), Motion.cubicIn)]),
             .run { [weak self] in
                 guard let self else { return }
                 self.setContents(title: title, message: nil, content: content)
                 self.layOut(for: self.screen)
             },
-            .group([.fadeAlpha(to: 1, duration: fade), .scale(to: 1, duration: fade)])
+            .group([.fadeAlpha(to: 1, duration: fade), Motion.pop(to: 1, duration: 0.26, overshoot: 1.8)])
         ]))
     }
 
@@ -171,8 +178,10 @@ final class MenuSheetNode: SKNode {
         self.message = message
         self.content = content
 
-        heading.attributedText = MenuSheetNode.text(title, size: 22, weight: .bold,
-                                                    colour: RenderPalette.menuInk)
+        heading.attributedText = MenuSheetNode.text(title, size: 22, weight: .heavy,
+                                                    colour: PanelArt.title)
+        // Clean, with nothing under it (Nov 2026).
+        headingShade.attributedText = nil
         // No text at all rather than an empty one: an SKLabelNode given an
         // attributed string with no characters crashes on newer iOS
         // ("NSMutableRLEArray ... Out of bounds"). Pages with their own content
@@ -201,11 +210,17 @@ final class MenuSheetNode: SKNode {
         // The card comes up from slightly below and the scrim just fades. Moving
         // both would be the whole screen lurching; moving neither would be a card
         // that was simply already there.
+        // Eased now (Nov 2026 polish pass): it rises and swells into place,
+        // overshooting a hair, instead of sliding at one speed.
+        card.removeAllActions()
         card.alpha = 1
-        card.setScale(1)
-        card.position = CGPoint(x: 0, y: -18)
-        run(.fadeIn(withDuration: 0.16))
-        card.run(.moveTo(y: 0, duration: 0.22))
+        card.setScale(0.9)
+        card.position = CGPoint(x: 0, y: -16)
+        run(.fadeIn(withDuration: 0.14))
+        card.run(.group([
+            Motion.eased(.moveTo(y: 0, duration: 0.34)) { Motion.backOut($0, overshoot: 1.4) },
+            Motion.pop(to: 1, duration: 0.34, overshoot: 1.6)
+        ]))
     }
 
     func dismiss() {
@@ -220,8 +235,12 @@ final class MenuSheetNode: SKNode {
         // screen for a moment after the sheet had gone.
         content?.node.isHidden = true
 
-        run(.sequence([.fadeOut(withDuration: 0.14), .hide()]))
-        card.run(.moveTo(y: -14, duration: 0.14))
+        run(.sequence([Motion.eased(.fadeOut(withDuration: 0.14), Motion.cubicIn), .hide()]))
+        card.removeAllActions()
+        card.run(.group([
+            Motion.eased(.moveTo(y: -12, duration: 0.14), Motion.cubicIn),
+            Motion.eased(.scale(to: 0.94, duration: 0.14), Motion.cubicIn)
+        ]))
     }
 
     // MARK: - Touches

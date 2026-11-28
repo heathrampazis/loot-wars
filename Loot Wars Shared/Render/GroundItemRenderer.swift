@@ -39,6 +39,19 @@ final class GroundItemRenderer {
 
     // Each item's root node: ground glow, beam and the bobbing sprite.
     private var nodesByItem: [GroundItemID: SKNode] = [:]
+    /// What each one is, kept for the moment it goes - by then the world has
+    /// already forgotten.
+    private var pickupByItem: [GroundItemID: Pickup] = [:]
+
+    /// Where the last thing YOU put in your bag was lying, so the icon that
+    /// flies into the hotbar starts from there - see GameScene.flyPickup.
+    /// Read once and cleared.
+    private var collectedByYou: CGPoint?
+
+    func takeCollectedByYou() -> CGPoint? {
+        defer { collectedByYou = nil }
+        return collectedByYou
+    }
 
     // How tall the light beam above an item is, in tiles; the same for every rarity.
     private static let beamHeight: Double = 0.9
@@ -77,11 +90,70 @@ final class GroundItemRenderer {
         for (id, sprite) in Array(nodesByItem) where world.groundItems[id] == nil {
             nodesByItem[id] = nil
             sprite.removeAction(forKey: "expiring")
-            // Snap towards the player's hand rather than vanishing.
+            let pickup = pickupByItem.removeValue(forKey: id)
+            let here = GridGeometry.position(for: sprite.position)
+            let taker = world.actors.values
+                .filter { $0.isAlive && ($0.position - here).length < 1.6 }
+                .min { ($0.position - here).length < ($1.position - here).length }
+
+            guard let taker else {
+                // Nobody took it - it timed out - so it shrinks away.
+                sprite.run(.sequence([
+                    .group([Motion.eased(.scale(to: 0.2, duration: 0.16), Motion.cubicIn),
+                            .fadeOut(withDuration: 0.16)]),
+                    .removeFromParent()
+                ]))
+                continue
+            }
+            let hand = GridGeometry.point(for: taker.position + Vec2(x: 0, y: 0.35))
+
+            // Tokens are pulled in like a magnet (Nov 2026): Heath, collecting
+            // them "should like magnetise / point towards the player". A tiny
+            // pull back, then they shoot into whoever took them, speeding up.
+            if case .token = pickup {
+                let away = CGVector(dx: sprite.position.x - hand.x, dy: sprite.position.y - hand.y)
+                let length = max(1, hypot(away.dx, away.dy))
+                let back = CGVector(dx: away.dx / length * 4, dy: away.dy / length * 4)
+                sprite.zPosition += 2
+                sprite.run(.sequence([
+                    Motion.eased(.moveBy(x: back.dx, y: back.dy, duration: 0.05), Motion.cubicOut),
+                    .group([Motion.eased(.move(to: hand, duration: 0.16), Motion.cubicIn),
+                            Motion.eased(.scale(to: sprite.xScale * 0.45, duration: 0.16), Motion.cubicIn),
+                            .sequence([.wait(forDuration: 0.11), .fadeOut(withDuration: 0.05)])]),
+                    .removeFromParent()
+                ]))
+                continue
+            }
+
+            // Your own bag items go at once: the icon that flies into your
+            // hotbar IS the pickup (GameScene.flyPickup), and drawing this one
+            // being pulled in as well was the "double up" Heath saw. It starts
+            // from here.
+            if taker.id == world.localPlayerID, case .item(let type) = pickup,
+               !wornOnPickup(type, by: taker) {
+                collectedByYou = sprite.position
+                sprite.removeFromParent()
+                continue
+            }
+
+            // Anybody else's, and gear you put straight on: pulled in to them,
+            // shrinking, rather than vanishing where it lay.
+            let pull = Motion.eased(.move(to: hand, duration: 0.14), Motion.cubicIn)
+            sprite.zPosition += 2
             sprite.run(.sequence([
-                .group([.scale(to: 0.2, duration: 0.16), .fadeOut(withDuration: 0.16)]),
+                .group([pull, Motion.eased(.scale(to: sprite.xScale * 0.3, duration: 0.14), Motion.cubicIn),
+                        .sequence([.wait(forDuration: 0.08), .fadeOut(withDuration: 0.06)])]),
                 .removeFromParent()
             ]))
+        }
+    }
+
+    /// Whether this was gear the taker put straight on: they now wear exactly it.
+    private func wornOnPickup(_ type: ItemType, by actor: Actor) -> Bool {
+        switch type {
+        case .helmet(let tier):  return actor.helmet == tier
+        case .blaster(let tier): return actor.blaster == tier
+        default:                 return false
         }
     }
 
@@ -229,6 +301,7 @@ final class GroundItemRenderer {
 
         node.addChild(root)
         nodesByItem[item.id] = root
+        pickupByItem[item.id] = item.pickup
 
         // Flung rather than dropped: something that burst out of a machine flies
         // from the cabinet to where it lands - see GroundItem.launchedFrom.

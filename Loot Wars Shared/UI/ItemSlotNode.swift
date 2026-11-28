@@ -50,6 +50,11 @@ final class ItemSlotNode: SKNode {
 
     private let icon = SKSpriteNode()
 
+    /// An item is flying in from the map and has not landed yet, so the slot
+    /// keeps its picture back until it does (Nov 2026) - otherwise the item
+    /// sat in the slot already while its copy was still in the air.
+    private var awaitingArrival = false
+
     /// Sparkles, shown only on a power-up. Built once and hidden, rather than made
     /// and thrown away as the slot's contents change: a hotbar slot is rewritten
     /// every time anything at all happens to your inventory, and a node built that
@@ -320,6 +325,41 @@ final class ItemSlotNode: SKNode {
     /// held one is on its way to 0.8, and anything that ends at a flat 1 would
     /// quietly resize whichever slot you had picked out. It also takes the same
     /// key, so a squeeze and a settle cannot both be running.
+    /// Something just landed in it (Nov 2026): a swell and a springy settle,
+    /// from wherever it rests - see flinch for why it is not a plain scale.
+    func receive() {
+        awaitingArrival = false
+        removeAction(forKey: "arrival")
+        icon.alpha = 1
+        removeAction(forKey: "scale")
+        zRotation = 0
+        run(.sequence([
+            Motion.eased(.scale(to: restingScale * 1.22, duration: 0.08), Motion.cubicOut),
+            Motion.pop(to: restingScale, duration: 0.32, overshoot: 2.6)
+        ]), withKey: "scale")
+    }
+
+    /// Holds the picture back until receive - with a safety net, so it can
+    /// never stay hidden if the flight is cut short.
+    func awaitArrival() {
+        awaitingArrival = true
+        icon.alpha = 0
+        run(.sequence([.wait(forDuration: 0.8),
+                       .run { [weak self] in
+                           guard let self, self.awaitingArrival else { return }
+                           self.awaitingArrival = false
+                           self.icon.alpha = 1
+                       }]), withKey: "arrival")
+    }
+
+    /// Stops waiting without the swell: what was coming never arrived.
+    func cancelArrival() {
+        guard awaitingArrival else { return }
+        awaitingArrival = false
+        removeAction(forKey: "arrival")
+        icon.alpha = 1
+    }
+
     func flinch() {
         removeAction(forKey: "scale")
         zRotation = 0
@@ -454,7 +494,7 @@ final class ItemSlotNode: SKNode {
         icon.texture = texture
         icon.size = ItemArt.size(of: texture, fittingInto: side - side * 0.152)
         icon.isHidden = false
-        icon.alpha = 1.0
+        icon.alpha = awaitingArrival ? 0 : 1.0
 
         // A perk shows its sparkles whether or not one is already running. It used
         // to fade them, back when the slot faded with them; a power-up in the bar

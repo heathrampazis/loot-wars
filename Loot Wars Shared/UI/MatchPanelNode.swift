@@ -70,9 +70,15 @@ final class MatchPanelNode: SKNode {
     /// changes when a count gains or loses a digit - a pickup that leaves the
     /// digit count alone moves nothing. GameScene hangs the pause button off it.
     var width: CGFloat {
-        MatchPanelNode.padding * 2 + MatchPanelNode.spacing * 2
+        MatchPanelNode.padding * 2 + MatchPanelNode.spacing * (MatchPanelNode.showsClock ? 2 : 1)
             + clockWidth + purseRoom + killsRoom
     }
+
+    /// Whether the first section is there at all. It is the clock in a timed
+    /// match; in an untimed one it was the players left, which went (Nov 2026):
+    /// Heath, "remove the player count on the top banner" - the leaderboard
+    /// already shows who is in. So untimed, the panel is just tokens and kills.
+    private static let showsClock = GameConfig.Match.timed
 
     /// The room each count has right now, eased towards what it needs, so a new
     /// digit opens up smoothly and everything after it slides rather than jumps.
@@ -128,7 +134,8 @@ final class MatchPanelNode: SKNode {
     // MARK: - Size
 
     private var clockWidth: CGFloat {
-        MatchPanelNode.iconSize + MatchPanelNode.iconGap + MatchPanelNode.clockTextWidth
+        guard MatchPanelNode.showsClock else { return 0 }
+        return MatchPanelNode.iconSize + MatchPanelNode.iconGap + MatchPanelNode.clockTextWidth
     }
 
     /// Steps a room towards what its count needs. True while it is still moving.
@@ -147,7 +154,9 @@ final class MatchPanelNode: SKNode {
 
         clockIcon.position = CGPoint(x: x + MatchPanelNode.iconSize / 2, y: middle)
         label.position = CGPoint(x: x + MatchPanelNode.iconSize + MatchPanelNode.iconGap, y: middle)
-        x += clockWidth + MatchPanelNode.spacing
+        if MatchPanelNode.showsClock { x += clockWidth + MatchPanelNode.spacing }
+        clockIcon.isHidden = !MatchPanelNode.showsClock
+        label.isHidden = !MatchPanelNode.showsClock
 
         purse.position = CGPoint(x: x, y: middle)
         x += purseRoom + MatchPanelNode.spacing
@@ -183,19 +192,9 @@ final class MatchPanelNode: SKNode {
         let killing = MatchPanelNode.ease(&killsRoom, to: kills.reservedWidth)
         if pursing || killing { layOut() }
 
-        // No clock: players left, red once your flag is gone.
-        guard GameConfig.Match.timed else {
-            let exposed = world.localPlayer.map { world.flagLost($0.team) } ?? false
-            if exposed != lastUrgent {
-                lastUrgent = exposed
-                label.fontColor = exposed ? RenderPalette.healthBar : .white
-            }
-            let left = world.stillIn
-            guard left != lastShown else { return }
-            lastShown = left
-            label.text = "\(left)"
-            return
-        }
+        // No clock: nothing more to show. It used to be the players left,
+        // which went (Nov 2026) - see showsClock.
+        guard GameConfig.Match.timed else { return }
 
         // Rounded UP, so the clock reads 5:00 for the whole first second and only
         // shows 0:00 when the time is actually gone. Rounding down would start the
